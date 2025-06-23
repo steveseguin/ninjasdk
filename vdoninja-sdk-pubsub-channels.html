@@ -1,0 +1,872 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VDO.Ninja SDK - Advanced Pub/Sub with Channel Filtering</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #1a1a1a;
+            color: #e0e0e0;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        h1 {
+            color: #ffffff;
+            margin-bottom: 10px;
+        }
+        
+        .subtitle {
+            color: #999;
+            font-size: 16px;
+        }
+        
+        .main-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .section {
+            background: #2a2a2a;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+            border: 1px solid #3a3a3a;
+        }
+        
+        h2 {
+            color: #e0e0e0;
+            margin-top: 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .status-indicator {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background-color: #666;
+        }
+        
+        .status-indicator.connected {
+            background-color: #4CAF50;
+        }
+        
+        .control-group {
+            margin-bottom: 15px;
+        }
+        
+        label {
+            display: inline-block;
+            width: 120px;
+            font-weight: bold;
+            color: #b0b0b0;
+        }
+        
+        input[type="text"], select, textarea {
+            width: calc(100% - 130px);
+            padding: 8px;
+            border: 1px solid #444;
+            border-radius: 4px;
+            background-color: #1a1a1a;
+            color: #e0e0e0;
+            font-family: inherit;
+        }
+        
+        .channel-input-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        
+        .channel-input-group input {
+            flex: 1;
+            width: auto;
+        }
+        
+        .channel-input-group button {
+            padding: 8px 15px;
+            font-size: 14px;
+        }
+        
+        textarea {
+            width: 100%;
+            height: 60px;
+            margin-top: 5px;
+            resize: vertical;
+        }
+        
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+            font-size: 16px;
+            transition: background-color 0.3s;
+        }
+        
+        button:hover:not(:disabled) {
+            background-color: #5cbf60;
+        }
+        
+        button:disabled {
+            background-color: #444;
+            color: #666;
+            cursor: not-allowed;
+        }
+        
+        button.stop {
+            background-color: #f44336;
+        }
+        
+        button.stop:hover:not(:disabled) {
+            background-color: #ff6659;
+        }
+        
+        button.secondary {
+            background-color: #2196F3;
+        }
+        
+        button.secondary:hover:not(:disabled) {
+            background-color: #42a5f5;
+        }
+        
+        button.remove {
+            background-color: #ff9800;
+            padding: 5px 10px;
+            font-size: 12px;
+        }
+        
+        button.remove:hover:not(:disabled) {
+            background-color: #ffa726;
+        }
+        
+        .channel-controls {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #333;
+            border-radius: 5px;
+            border: 1px solid #444;
+        }
+        
+        .channel-list {
+            margin-top: 10px;
+        }
+        
+        .channel-item {
+            display: inline-block;
+            padding: 5px 10px;
+            margin: 5px;
+            background-color: #4CAF50;
+            color: white;
+            border-radius: 15px;
+            font-size: 14px;
+        }
+        
+        .channel-item.unsubscribed {
+            background-color: #666;
+        }
+        
+        .message-log {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #1a1a1a;
+            border: 1px solid #444;
+            border-radius: 5px;
+            height: 300px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        
+        .message-entry {
+            padding: 5px;
+            margin-bottom: 5px;
+            border-radius: 3px;
+            background-color: #2a2a2a;
+        }
+        
+        .message-entry.sent {
+            background-color: #1e3a1e;
+            border-left: 3px solid #4CAF50;
+        }
+        
+        .message-entry.received {
+            background-color: #1e2838;
+            border-left: 3px solid #2196F3;
+        }
+        
+        .message-entry.system {
+            background-color: #3a3a1e;
+            border-left: 3px solid #ff9800;
+            color: #ffc947;
+        }
+        
+        .message-channel {
+            display: inline-block;
+            padding: 2px 6px;
+            background-color: rgba(255,255,255,0.1);
+            border-radius: 10px;
+            font-size: 11px;
+            margin-right: 5px;
+        }
+        
+        .message-time {
+            color: #666;
+            font-size: 11px;
+            margin-right: 10px;
+        }
+        
+        .connection-list {
+            margin-top: 10px;
+            padding: 10px;
+            background-color: #333;
+            border-radius: 5px;
+            max-height: 150px;
+            overflow-y: auto;
+        }
+        
+        .connection-item {
+            padding: 5px;
+            margin-bottom: 5px;
+            background-color: #2a2a2a;
+            border-radius: 3px;
+            font-size: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .connection-channels {
+            font-size: 11px;
+            color: #999;
+        }
+        
+        .stats {
+            margin-top: 10px;
+            padding: 10px;
+            background-color: #333;
+            border-radius: 5px;
+            font-size: 12px;
+        }
+        
+        .warning {
+            background-color: #ff9800;
+            color: #000;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+        
+        @media (max-width: 768px) {
+            .main-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🔀 VDO.Ninja SDK - Advanced Pub/Sub with Channel Filtering</h1>
+        <div class="subtitle">Dynamic channel subscription system for targeted message distribution</div>
+    </div>
+    
+    <div class="warning">
+        ⚠️ This is an advanced example demonstrating channel-based message filtering. 
+        Viewers can subscribe/unsubscribe to specific channels, and publishers send messages to specific channels.
+    </div>
+    
+    <div class="main-grid">
+        <!-- Publisher Section -->
+        <div class="section">
+            <h2>
+                <span class="status-indicator" id="pubStatus"></span>
+                📡 Publisher
+            </h2>
+            
+            <div class="control-group">
+                <label for="pubRoom">Room:</label>
+                <input type="text" id="pubRoom" value="pubsub-channels-demo" placeholder="Room name">
+            </div>
+            
+            <div class="control-group">
+                <label for="pubStreamID">Stream ID:</label>
+                <input type="text" id="pubStreamID" value="channel-publisher" placeholder="Publisher ID">
+            </div>
+            
+            <button id="startPublish" onclick="startPublishing()">Start Publishing</button>
+            <button id="stopPublish" class="stop" onclick="stopPublishing()" disabled>Stop Publishing</button>
+            
+            <!-- Channel Publishing Controls -->
+            <div class="channel-controls" id="pubChannelControls" style="display: none;">
+                <h3 style="margin-top: 0;">📨 Send Message to Channel</h3>
+                
+                <div class="control-group">
+                    <label for="targetChannel">Channel:</label>
+                    <select id="targetChannel">
+                        <option value="general">general</option>
+                        <option value="alerts">alerts</option>
+                        <option value="updates">updates</option>
+                        <option value="chat">chat</option>
+                        <option value="system">system</option>
+                    </select>
+                </div>
+                
+                <div class="control-group">
+                    <label for="customChannel">Custom:</label>
+                    <input type="text" id="customChannel" placeholder="Or enter custom channel name">
+                </div>
+                
+                <div class="control-group">
+                    <label for="messageContent" style="vertical-align: top;">Message:</label>
+                    <textarea id="messageContent" placeholder="Enter your message here..."></textarea>
+                </div>
+                
+                <button onclick="sendChannelMessage()">Send to Channel</button>
+                <button class="secondary" onclick="broadcastToAll()">Broadcast to All</button>
+                
+                <!-- Connected Viewers -->
+                <h3>👥 Connected Viewers</h3>
+                <div class="connection-list" id="pubConnections">
+                    <div style="text-align: center; color: #666;">No viewers connected</div>
+                </div>
+                
+                <!-- Stats -->
+                <div class="stats">
+                    <div>Total Messages Sent: <span id="pubMessageCount">0</span></div>
+                    <div>Active Viewers: <span id="pubViewerCount">0</span></div>
+                </div>
+            </div>
+            
+            <!-- Message Log -->
+            <div class="message-log" id="pubLog"></div>
+        </div>
+        
+        <!-- Subscriber Section -->
+        <div class="section">
+            <h2>
+                <span class="status-indicator" id="subStatus"></span>
+                📥 Subscriber
+            </h2>
+            
+            <div class="control-group">
+                <label for="subRoom">Room:</label>
+                <input type="text" id="subRoom" value="pubsub-channels-demo" placeholder="Room name">
+            </div>
+            
+            <div class="control-group">
+                <label for="subStreamID">View Stream:</label>
+                <input type="text" id="subStreamID" value="channel-publisher" placeholder="Publisher Stream ID">
+            </div>
+            
+            <button id="startSubscribe" onclick="startSubscribing()">Start Subscribing</button>
+            <button id="stopSubscribe" class="stop" onclick="stopSubscribing()" disabled>Stop Subscribing</button>
+            
+            <!-- Channel Subscription Controls -->
+            <div class="channel-controls" id="subChannelControls" style="display: none;">
+                <h3 style="margin-top: 0;">📋 Channel Subscriptions</h3>
+                
+                <div class="channel-input-group">
+                    <input type="text" id="newChannel" placeholder="Enter channel name">
+                    <button onclick="subscribeToChannel()">Subscribe</button>
+                </div>
+                
+                <div class="channel-list">
+                    <strong>Subscribed Channels:</strong>
+                    <div id="subscribedChannels">
+                        <span class="channel-item">general</span>
+                    </div>
+                </div>
+                
+                <div style="margin-top: 10px;">
+                    <button class="secondary" onclick="subscribeToAll()">Subscribe to All</button>
+                    <button class="remove" onclick="unsubscribeFromAll()">Unsubscribe All</button>
+                </div>
+                
+                <!-- Stats -->
+                <div class="stats">
+                    <div>Messages Received: <span id="subMessageCount">0</span></div>
+                    <div>Subscribed Channels: <span id="subChannelCount">1</span></div>
+                    <div>Filtered Out: <span id="subFilteredCount">0</span></div>
+                </div>
+            </div>
+            
+            <!-- Message Log -->
+            <div class="message-log" id="subLog"></div>
+        </div>
+    </div>
+    
+    <!-- Load the SDK -->
+    <script src="vdoninja-sdk.js"></script>
+    
+    <script>
+        // Publisher state
+        let publisher = null;
+        let isPublishing = false;
+        let connectedViewers = new Map(); // uuid -> {channels: Set, joinedAt: Date}
+        let pubMessageCount = 0;
+        
+        // Subscriber state
+        let subscriber = null;
+        let isSubscribing = false;
+        let subscribedChannels = new Set(['general']); // Start with general channel
+        let subMessageCount = 0;
+        let subFilteredCount = 0;
+        
+        // Logging functions
+        function logPublisher(message, type = 'system') {
+            const log = document.getElementById('pubLog');
+            const entry = document.createElement('div');
+            entry.className = `message-entry ${type}`;
+            
+            const time = new Date().toLocaleTimeString();
+            entry.innerHTML = `<span class="message-time">${time}</span>${message}`;
+            
+            log.appendChild(entry);
+            log.scrollTop = log.scrollHeight;
+        }
+        
+        function logSubscriber(message, type = 'system') {
+            const log = document.getElementById('subLog');
+            const entry = document.createElement('div');
+            entry.className = `message-entry ${type}`;
+            
+            const time = new Date().toLocaleTimeString();
+            entry.innerHTML = `<span class="message-time">${time}</span>${message}`;
+            
+            log.appendChild(entry);
+            log.scrollTop = log.scrollHeight;
+        }
+        
+        // Publisher functions
+        async function startPublishing() {
+            try {
+                const room = document.getElementById('pubRoom').value;
+                const streamID = document.getElementById('pubStreamID').value;
+                
+                if (!room || !streamID) {
+                    alert('Please enter both room and stream ID');
+                    return;
+                }
+                
+                logPublisher('Initializing publisher...');
+                
+                publisher = new VDONinjaSDK({
+                    room: room,
+                    streamID: streamID,
+                    debug: true
+                });
+                
+                // Setup event listeners
+                publisher.addEventListener('connected', () => {
+                    logPublisher('Connected to signaling server');
+                    document.getElementById('pubStatus').classList.add('connected');
+                });
+                
+                publisher.addEventListener('dataChannelOpen', (event) => {
+                    const uuid = event.detail.uuid;
+                    logPublisher(`Data channel opened with viewer: ${uuid.substring(0, 8)}...`);
+                    
+                    // Initialize viewer with no channels subscribed
+                    connectedViewers.set(uuid, {
+                        channels: new Set(),
+                        joinedAt: new Date()
+                    });
+                    
+                    // Send welcome message
+                    publisher.sendData({
+                        type: 'welcome',
+                        availableChannels: ['general', 'alerts', 'updates', 'chat', 'system'],
+                        message: 'Welcome! Send subscription requests to join channels.'
+                    }, uuid);
+                    
+                    updatePublisherUI();
+                });
+                
+                publisher.addEventListener('dataReceived', (event) => {
+                    const data = event.detail.data;
+                    const uuid = event.detail.uuid;
+                    
+                    if (data.type === 'subscribe') {
+                        handleSubscription(uuid, data.channels, true);
+                    } else if (data.type === 'unsubscribe') {
+                        handleSubscription(uuid, data.channels, false);
+                    } else if (data.type === 'getChannels') {
+                        // Send current subscription state
+                        const viewer = connectedViewers.get(uuid);
+                        if (viewer) {
+                            publisher.sendData({
+                                type: 'channelList',
+                                subscribedChannels: Array.from(viewer.channels)
+                            }, uuid);
+                        }
+                    }
+                });
+                
+                publisher.addEventListener('bye', (event) => {
+                    const uuid = event.detail.UUID;
+                    if (connectedViewers.has(uuid)) {
+                        connectedViewers.delete(uuid);
+                        logPublisher(`Viewer disconnected: ${uuid.substring(0, 8)}...`);
+                        updatePublisherUI();
+                    }
+                });
+                
+                // Connect and start
+                await publisher.connect();
+                
+                isPublishing = true;
+                document.getElementById('startPublish').disabled = true;
+                document.getElementById('stopPublish').disabled = false;
+                document.getElementById('pubChannelControls').style.display = 'block';
+                
+                logPublisher('Publisher ready! Waiting for subscribers...');
+                
+            } catch (error) {
+                logPublisher(`Error: ${error.message}`, 'system');
+                console.error('Publishing error:', error);
+            }
+        }
+        
+        function stopPublishing() {
+            if (publisher) {
+                publisher.disconnect();
+                publisher = null;
+            }
+            
+            connectedViewers.clear();
+            pubMessageCount = 0;
+            
+            isPublishing = false;
+            document.getElementById('startPublish').disabled = false;
+            document.getElementById('stopPublish').disabled = true;
+            document.getElementById('pubChannelControls').style.display = 'none';
+            document.getElementById('pubStatus').classList.remove('connected');
+            
+            logPublisher('Publisher stopped');
+            updatePublisherUI();
+        }
+        
+        function handleSubscription(uuid, channels, subscribe) {
+            const viewer = connectedViewers.get(uuid);
+            if (!viewer) return;
+            
+            channels.forEach(channel => {
+                if (subscribe) {
+                    viewer.channels.add(channel);
+                    logPublisher(`Viewer ${uuid.substring(0, 8)}... subscribed to: ${channel}`);
+                } else {
+                    viewer.channels.delete(channel);
+                    logPublisher(`Viewer ${uuid.substring(0, 8)}... unsubscribed from: ${channel}`);
+                }
+            });
+            
+            // Send confirmation
+            publisher.sendData({
+                type: 'subscriptionUpdate',
+                subscribedChannels: Array.from(viewer.channels)
+            }, uuid);
+            
+            updatePublisherUI();
+        }
+        
+        function sendChannelMessage() {
+            if (!publisher) return;
+            
+            const selectedChannel = document.getElementById('targetChannel').value;
+            const customChannel = document.getElementById('customChannel').value;
+            const channel = customChannel || selectedChannel;
+            const message = document.getElementById('messageContent').value;
+            
+            if (!channel || !message) {
+                alert('Please select a channel and enter a message');
+                return;
+            }
+            
+            // Send to all viewers subscribed to this channel
+            let sentCount = 0;
+            connectedViewers.forEach((viewer, uuid) => {
+                if (viewer.channels.has(channel)) {
+                    publisher.sendData({
+                        type: 'channelMessage',
+                        channel: channel,
+                        message: message,
+                        timestamp: Date.now()
+                    }, uuid);
+                    sentCount++;
+                }
+            });
+            
+            pubMessageCount++;
+            logPublisher(
+                `<span class="message-channel">${channel}</span>Sent: "${message}" (${sentCount} recipients)`,
+                'sent'
+            );
+            
+            // Clear inputs
+            document.getElementById('messageContent').value = '';
+            document.getElementById('customChannel').value = '';
+            
+            updatePublisherUI();
+        }
+        
+        function broadcastToAll() {
+            if (!publisher) return;
+            
+            const message = document.getElementById('messageContent').value;
+            if (!message) {
+                alert('Please enter a message');
+                return;
+            }
+            
+            // Send to all connected viewers regardless of subscriptions
+            publisher.sendData({
+                type: 'broadcast',
+                message: message,
+                timestamp: Date.now()
+            });
+            
+            pubMessageCount++;
+            logPublisher(
+                `<span class="message-channel">BROADCAST</span>Sent: "${message}" (${connectedViewers.size} recipients)`,
+                'sent'
+            );
+            
+            document.getElementById('messageContent').value = '';
+            updatePublisherUI();
+        }
+        
+        function updatePublisherUI() {
+            // Update viewer count
+            document.getElementById('pubViewerCount').textContent = connectedViewers.size;
+            document.getElementById('pubMessageCount').textContent = pubMessageCount;
+            
+            // Update connection list
+            const connectionList = document.getElementById('pubConnections');
+            if (connectedViewers.size === 0) {
+                connectionList.innerHTML = '<div style="text-align: center; color: #666;">No viewers connected</div>';
+            } else {
+                connectionList.innerHTML = '';
+                connectedViewers.forEach((viewer, uuid) => {
+                    const item = document.createElement('div');
+                    item.className = 'connection-item';
+                    
+                    const channelList = viewer.channels.size > 0 
+                        ? Array.from(viewer.channels).join(', ')
+                        : 'No subscriptions';
+                    
+                    item.innerHTML = `
+                        <div>
+                            <strong>${uuid.substring(0, 8)}...</strong>
+                            <div class="connection-channels">Channels: ${channelList}</div>
+                        </div>
+                        <small>${viewer.joinedAt.toLocaleTimeString()}</small>
+                    `;
+                    connectionList.appendChild(item);
+                });
+            }
+        }
+        
+        // Subscriber functions
+        async function startSubscribing() {
+            try {
+                const room = document.getElementById('subRoom').value;
+                const streamID = document.getElementById('subStreamID').value;
+                
+                if (!room || !streamID) {
+                    alert('Please enter both room and stream ID to view');
+                    return;
+                }
+                
+                logSubscriber('Initializing subscriber...');
+                
+                subscriber = new VDONinjaSDK({
+                    room: room,
+                    debug: true
+                });
+                
+                // Setup event listeners
+                subscriber.addEventListener('connected', () => {
+                    logSubscriber('Connected to signaling server');
+                    document.getElementById('subStatus').classList.add('connected');
+                });
+                
+                subscriber.addEventListener('dataChannelOpen', (event) => {
+                    logSubscriber('Data channel opened with publisher');
+                    
+                    // Send initial subscription
+                    sendSubscriptionUpdate();
+                });
+                
+                subscriber.addEventListener('dataReceived', (event) => {
+                    const data = event.detail.data;
+                    
+                    if (data.type === 'welcome') {
+                        logSubscriber(`Welcome message: ${data.message}`, 'system');
+                        if (data.availableChannels) {
+                            logSubscriber(`Available channels: ${data.availableChannels.join(', ')}`, 'system');
+                        }
+                    } else if (data.type === 'channelMessage') {
+                        // Check if we're subscribed to this channel
+                        if (subscribedChannels.has(data.channel)) {
+                            subMessageCount++;
+                            logSubscriber(
+                                `<span class="message-channel">${data.channel}</span>Received: "${data.message}"`,
+                                'received'
+                            );
+                        } else {
+                            subFilteredCount++;
+                            // Optionally log filtered messages
+                            // logSubscriber(`[Filtered] Channel: ${data.channel}`, 'system');
+                        }
+                        updateSubscriberUI();
+                    } else if (data.type === 'broadcast') {
+                        subMessageCount++;
+                        logSubscriber(
+                            `<span class="message-channel">BROADCAST</span>Received: "${data.message}"`,
+                            'received'
+                        );
+                        updateSubscriberUI();
+                    } else if (data.type === 'subscriptionUpdate') {
+                        logSubscriber(`Subscription confirmed: ${data.subscribedChannels.join(', ')}`, 'system');
+                    }
+                });
+                
+                // Connect and view
+                await subscriber.connect();
+                await subscriber.quickView({
+                    streamID: streamID,
+                    room: room,
+                    dataOnly: true  // We only need data channels
+                });
+                
+                isSubscribing = true;
+                document.getElementById('startSubscribe').disabled = true;
+                document.getElementById('stopSubscribe').disabled = false;
+                document.getElementById('subChannelControls').style.display = 'block';
+                
+                logSubscriber('Subscriber ready! Subscribed to: general');
+                updateSubscriberUI();
+                
+            } catch (error) {
+                logSubscriber(`Error: ${error.message}`, 'system');
+                console.error('Subscribing error:', error);
+            }
+        }
+        
+        function stopSubscribing() {
+            if (subscriber) {
+                subscriber.disconnect();
+                subscriber = null;
+            }
+            
+            subMessageCount = 0;
+            subFilteredCount = 0;
+            subscribedChannels = new Set(['general']);
+            
+            isSubscribing = false;
+            document.getElementById('startSubscribe').disabled = false;
+            document.getElementById('stopSubscribe').disabled = true;
+            document.getElementById('subChannelControls').style.display = 'none';
+            document.getElementById('subStatus').classList.remove('connected');
+            
+            logSubscriber('Subscriber stopped');
+            updateSubscriberUI();
+        }
+        
+        function subscribeToChannel() {
+            const channel = document.getElementById('newChannel').value.trim();
+            if (!channel) {
+                alert('Please enter a channel name');
+                return;
+            }
+            
+            if (subscribedChannels.has(channel)) {
+                alert('Already subscribed to this channel');
+                return;
+            }
+            
+            subscribedChannels.add(channel);
+            document.getElementById('newChannel').value = '';
+            
+            logSubscriber(`Subscribed to channel: ${channel}`, 'system');
+            sendSubscriptionUpdate();
+            updateSubscriberUI();
+        }
+        
+        function unsubscribeFromChannel(channel) {
+            subscribedChannels.delete(channel);
+            logSubscriber(`Unsubscribed from channel: ${channel}`, 'system');
+            sendSubscriptionUpdate();
+            updateSubscriberUI();
+        }
+        
+        function subscribeToAll() {
+            // Subscribe to common channels
+            const allChannels = ['general', 'alerts', 'updates', 'chat', 'system'];
+            allChannels.forEach(channel => subscribedChannels.add(channel));
+            
+            logSubscriber('Subscribed to all standard channels', 'system');
+            sendSubscriptionUpdate();
+            updateSubscriberUI();
+        }
+        
+        function unsubscribeFromAll() {
+            subscribedChannels.clear();
+            logSubscriber('Unsubscribed from all channels', 'system');
+            sendSubscriptionUpdate();
+            updateSubscriberUI();
+        }
+        
+        function sendSubscriptionUpdate() {
+            if (!subscriber || !isSubscribing) return;
+            
+            // Send current subscriptions to publisher
+            subscriber.sendData({
+                type: 'subscribe',
+                channels: Array.from(subscribedChannels)
+            });
+        }
+        
+        function updateSubscriberUI() {
+            // Update stats
+            document.getElementById('subMessageCount').textContent = subMessageCount;
+            document.getElementById('subChannelCount').textContent = subscribedChannels.size;
+            document.getElementById('subFilteredCount').textContent = subFilteredCount;
+            
+            // Update channel list
+            const channelList = document.getElementById('subscribedChannels');
+            if (subscribedChannels.size === 0) {
+                channelList.innerHTML = '<span style="color: #666;">No channels subscribed</span>';
+            } else {
+                channelList.innerHTML = '';
+                subscribedChannels.forEach(channel => {
+                    const span = document.createElement('span');
+                    span.className = 'channel-item';
+                    span.innerHTML = `${channel} <button class="remove" onclick="unsubscribeFromChannel('${channel}')" style="margin-left: 5px;">×</button>`;
+                    channelList.appendChild(span);
+                });
+            }
+        }
+        
+        // Initialize UI
+        updatePublisherUI();
+        updateSubscriberUI();
+    </script>
+</body>
+</html>

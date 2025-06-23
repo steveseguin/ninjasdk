@@ -1,0 +1,37 @@
+VDO.Ninja SDK License
+=====================
+
+Copyright (C) 2024 Steve Seguin and VDO.Ninja Contributors
+
+The VDO.Ninja SDK core library (vdoninja-sdk.js and vdoninja-sdk.min.js) 
+is licensed under the GNU Affero General Public License v3.0 (AGPLv3).
+
+Demo files and examples are licensed separately under a permissive 
+"Do What You Want With It" license. See LICENSE-DEMOS for details.
+
+---
+
+GNU AFFERO GENERAL PUBLIC LICENSE
+Version 3, 19 November 2007
+
+Copyright (C) 2007 Free Software Foundation, Inc. <https://fsf.org/>
+Everyone is permitted to copy and distribute verbatim copies
+of this license document, but changing it is not allowed.
+
+[Full AGPLv3 license text would follow here - see https://www.gnu.org/licenses/agpl-3.0.txt]
+
+---
+
+ADDITIONAL TERMS
+
+1. Attribution: While not required by the AGPLv3, we appreciate attribution
+   to the VDO.Ninja project when using this SDK.
+
+2. Network Use: As per AGPLv3, if you modify this SDK and deploy it in a 
+   network service, you must provide the source code of your modifications
+   to users of that service.
+
+3. Commercial Use: This SDK is free for commercial use under the AGPLv3 terms.
+   No additional commercial license is required.
+
+For the full AGPLv3 license text, see: https://www.gnu.org/licenses/agpl-3.0.txt

@@ -1,0 +1,1200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VDO.Ninja SDK Demo - Canvas & Web Audio</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #1a1a1a;
+            color: #e0e0e0;
+        }
+        
+        .container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-top: 20px;
+        }
+        
+        .section {
+            background: #2a2a2a;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+            border: 1px solid #3a3a3a;
+        }
+        
+        h1 {
+            text-align: center;
+            color: #ffffff;
+        }
+        
+        h2 {
+            color: #e0e0e0;
+            margin-top: 0;
+        }
+        
+        .controls {
+            margin-bottom: 20px;
+        }
+        
+        .control-group {
+            margin-bottom: 10px;
+        }
+        
+        label {
+            display: inline-block;
+            width: 120px;
+            font-weight: bold;
+            color: #b0b0b0;
+        }
+        
+        input[type="text"], input[type="number"], input[type="range"], select {
+            width: 200px;
+            padding: 5px;
+            border: 1px solid #444;
+            border-radius: 4px;
+            background-color: #1a1a1a;
+            color: #e0e0e0;
+        }
+        
+        input[type="checkbox"] {
+            margin-right: 4px;
+            cursor: pointer;
+        }
+        
+        input[type="text"]:disabled {
+            background-color: #0a0a0a;
+            color: #666;
+            cursor: not-allowed;
+        }
+        
+        .inline-checkbox {
+            display: inline-flex;
+            align-items: center;
+            margin-left: 10px;
+            font-size: 12px;
+            color: #999;
+            cursor: pointer;
+            font-weight: normal;
+        }
+        
+        .inline-checkbox:hover {
+            color: #b0b0b0;
+        }
+        
+        .inline-checkbox input[type="checkbox"] {
+            margin: 0 4px 0 0;
+        }
+        
+        .inline-checkbox span {
+            user-select: none;
+        }
+        
+        input[type="text"]:focus, select:focus {
+            outline: none;
+            border-color: #4CAF50;
+        }
+        
+        input[type="range"] {
+            width: 150px;
+        }
+        
+        .range-value {
+            display: inline-block;
+            width: 60px;
+            text-align: right;
+            color: #4CAF50;
+        }
+		
+		.hidden {
+			display: none;
+			opacity: 0;
+			width: 0;
+			height: 0;
+		}
+        
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+            font-size: 16px;
+            transition: background-color 0.3s;
+        }
+        
+        button:hover {
+            background-color: #5cbf60;
+        }
+        
+        button:disabled {
+            background-color: #444;
+            color: #666;
+            cursor: not-allowed;
+        }
+        
+        button.stop {
+            background-color: #f44336;
+        }
+        
+        button.stop:hover {
+            background-color: #ff6659;
+        }
+        
+        canvas, video {
+            width: 100%;
+            max-width: 500px;
+            height: 300px;
+            background-color: #000;
+            border-radius: 8px;
+            display: block;
+            margin: 0 auto;
+        }
+        
+        .media-container {
+            text-align: center;
+            margin-top: 20px;
+        }
+        
+        .status {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        
+        .status.connected {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        
+        .status.disconnected {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        
+        .status.info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+        }
+        
+        .log {
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #1a1a1a;
+            border: 1px solid #444;
+            border-radius: 4px;
+            height: 150px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        
+        .log-entry {
+            margin-bottom: 5px;
+            color: #999;
+        }
+        
+        .log-entry.error {
+            color: #ff6b6b;
+        }
+        
+        .log-entry.success {
+            color: #6bcf7f;
+        }
+        
+        .stream-item {
+            padding: 8px;
+            margin-bottom: 5px;
+            background-color: #2a2a2a;
+            border-radius: 4px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            transition: background-color 0.2s;
+        }
+        
+        .stream-item:hover {
+            background-color: #3a3a3a;
+        }
+        
+        .stream-item.selected {
+            background-color: #4CAF50;
+            color: white;
+        }
+        
+        .stream-item-id {
+            font-weight: bold;
+            font-family: monospace;
+        }
+        
+        .stream-item-status {
+            font-size: 12px;
+            color: #999;
+        }
+        
+        .no-streams {
+            text-align: center;
+            color: #666;
+            padding: 20px;
+            font-style: italic;
+        }
+        
+        .audio-controls, .video-controls {
+            background-color: #333;
+            padding: 10px;
+            border-radius: 5px;
+            margin-top: 10px;
+            border: 1px solid #444;
+        }
+        
+        .audio-controls h3, .video-controls h3 {
+            margin-top: 0;
+            font-size: 16px;
+            color: #e0e0e0;
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1>VDO.Ninja SDK Demo - Canvas & Web Audio</h1>
+    
+    <div class="container">
+        <!-- Publisher Section -->
+        <div class="section">
+            <h2>🎨 Publisher</h2>
+            
+            <div class="controls">
+                <div class="control-group">
+                    <label for="pubRoom">Room:</label>
+                    <input type="text" id="pubRoom" value="demoroom" placeholder="Optional - leave empty for global room">
+                </div>
+                <div class="control-group">
+                    <label for="pubStreamID">Stream ID:</label>
+                    <input type="text" id="pubStreamID" value="canvas-stream" placeholder="Enter stream ID">
+                </div>
+                <div class="control-group">
+                    <label for="pubPassword">Password:</label>
+                    <input type="text" id="pubPassword" placeholder="Uses default if empty">
+                    <label for="pubDisableEncryption" class="inline-checkbox">
+                        <input type="checkbox" id="pubDisableEncryption" onchange="toggleEncryption('pub')">
+                        <span>Disable encryption</span>
+                    </label>
+                </div>
+                
+                <button id="startPublish" onclick="startPublishing()">Start Publishing</button>
+                <button id="stopPublish" class="stop" onclick="stopPublishing()" disabled>Stop Publishing</button>
+            </div>
+            
+            <div class="video-controls hidden">
+                <h3>Canvas Animation</h3>
+                <div class="control-group">
+                    <label for="animationType">Animation:</label>
+                    <select id="animationType" onchange="updateAnimation()">
+                        <option value="bouncing">Bouncing Ball</option>
+                        <option value="wave">Sine Wave</option>
+                        <option value="particles">Particles</option>
+                        <option value="text">Scrolling Text</option>
+                    </select>
+                </div>
+                <div class="control-group">
+                    <label for="animationSpeed">Speed:</label>
+                    <input type="range" id="animationSpeed" min="0.1" max="3" step="0.1" value="1" oninput="updateAnimationSpeed(this)">
+                    <span class="range-value" id="speedValue">1.0</span>
+                </div>
+            </div>
+            
+            <div class="audio-controls hidden">
+                <h3>Audio Tone Generator</h3>
+                <div class="control-group">
+                    <label for="frequency">Frequency:</label>
+                    <input type="range" id="frequency" min="100" max="2000" step="10" value="440" oninput="updateFrequency(this)">
+                    <span class="range-value" id="freqValue">440 Hz</span>
+                </div>
+                <div class="control-group">
+                    <label for="waveform">Waveform:</label>
+                    <select id="waveform" onchange="updateWaveform()">
+                        <option value="sine">Sine</option>
+                        <option value="square">Square</option>
+                        <option value="sawtooth">Sawtooth</option>
+                        <option value="triangle">Triangle</option>
+                    </select>
+                </div>
+                <div class="control-group">
+                    <label for="volume">Volume:</label>
+                    <input type="range" id="volume" min="0" max="100" step="1" value="30" oninput="updateVolume(this)">
+                    <span class="range-value" id="volValue">30%</span>
+                </div>
+            </div>
+            
+            <div class="media-container">
+                <canvas id="localCanvas"></canvas>
+            </div>
+            
+            <div id="pubStatus" class="status disconnected">Not connected</div>
+            
+            <div class="log" id="pubLog"></div>
+        </div>
+        
+        <!-- Viewer Section -->
+        <div class="section">
+            <h2>👁️ Viewer</h2>
+            
+            <div class="controls">
+                <div class="control-group">
+                    <label for="viewRoom">Room:</label>
+                    <input type="text" id="viewRoom" value="demoroom" placeholder="Optional - leave empty for global room">
+                </div>
+                <div class="control-group">
+                    <label for="viewStreamID">Stream ID:</label>
+                    <input type="text" id="viewStreamID" value="canvas-stream" placeholder="Leave empty to see available streams">
+                </div>
+                <div class="control-group">
+                    <label for="viewPassword">Password:</label>
+                    <input type="text" id="viewPassword" placeholder="Uses default if empty">
+                    <label for="viewDisableEncryption" class="inline-checkbox">
+                        <input type="checkbox" id="viewDisableEncryption" onchange="toggleEncryption('view')">
+                        <span>Disable encryption</span>
+                    </label>
+                </div>
+                
+                <button id="startView" onclick="startViewing()">Start Viewing</button>
+                <button id="stopView" class="stop" onclick="stopViewing()" disabled>Stop Viewing</button>
+            </div>
+            
+            <!-- Stream List Section -->
+            <div id="streamListSection" style="display: none; margin-top: 20px;">
+                <h3 style="color: #e0e0e0; font-size: 16px;">Available Streams:</h3>
+                <div id="streamList" style="background-color: #333; padding: 10px; border-radius: 5px; max-height: 200px; overflow-y: auto;">
+                    <!-- Stream items will be added here dynamically -->
+                </div>
+            </div>
+            
+            <div class="media-container">
+                <video id="remoteVideo" autoplay playsinline></video>
+            </div>
+            
+            <div id="viewStatus" class="status disconnected">Not connected</div>
+            
+            <div class="log" id="viewLog"></div>
+        </div>
+    </div>
+    
+    <!-- Load the SDK -->
+    <script src="vdoninja-sdk.js"></script>
+    
+    <script>
+        // Global variables
+        let publisher = null;
+        let viewer = null;
+        let localStream = null;
+        let isPublishing = false;
+        let isViewing = false;
+        let availableStreams = new Map(); // Map of streamID -> {uuid, addedAt}
+        let waitingForStreamID = null; // Track which stream we're waiting for
+        
+        // Canvas animation variables
+        let canvas = null;
+        let ctx = null;
+        let animationId = null;
+        let animationType = 'bouncing';
+        let animationSpeed = 1;
+        
+        // Animation state
+        let ballX = 50, ballY = 50, ballVX = 2, ballVY = 2;
+        let particles = [];
+        let waveOffset = 0;
+        let textOffset = 0;
+        
+        // Audio variables
+        let audioContext = null;
+        let oscillator = null;
+        let gainNode = null;
+        let audioDestination = null;
+        
+        // Initialize canvas
+        function initCanvas() {
+            canvas = document.getElementById('localCanvas');
+            ctx = canvas.getContext('2d');
+            canvas.width = 640;
+            canvas.height = 480;
+        }
+        
+        // Animation functions
+        function animate() {
+            ctx.fillStyle = '#1a1a1a';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            switch(animationType) {
+                case 'bouncing':
+                    animateBouncingBall();
+                    break;
+                case 'wave':
+                    animateSineWave();
+                    break;
+                case 'particles':
+                    animateParticles();
+                    break;
+                case 'text':
+                    animateScrollingText();
+                    break;
+            }
+            
+            animationId = requestAnimationFrame(animate);
+        }
+        
+        function animateBouncingBall() {
+            // Update position
+            ballX += ballVX * animationSpeed;
+            ballY += ballVY * animationSpeed;
+            
+            // Bounce off walls
+            if (ballX <= 25 || ballX >= canvas.width - 25) ballVX = -ballVX;
+            if (ballY <= 25 || ballY >= canvas.height - 25) ballVY = -ballVY;
+            
+            // Draw ball with gradient
+            const gradient = ctx.createRadialGradient(ballX, ballY, 0, ballX, ballY, 25);
+            gradient.addColorStop(0, '#ff6b6b');
+            gradient.addColorStop(1, '#c92a2a');
+            
+            ctx.beginPath();
+            ctx.arc(ballX, ballY, 25, 0, Math.PI * 2);
+            ctx.fillStyle = gradient;
+            ctx.fill();
+            
+            // Add trail effect
+            ctx.fillStyle = 'rgba(26, 26, 26, 0.1)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
+        
+        function animateSineWave() {
+            ctx.strokeStyle = '#4ecdc4';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            
+            for (let x = 0; x < canvas.width; x++) {
+                const y = canvas.height / 2 + Math.sin((x * 0.02) + waveOffset) * 100;
+                if (x === 0) {
+                    ctx.moveTo(x, y);
+                } else {
+                    ctx.lineTo(x, y);
+                }
+            }
+            
+            ctx.stroke();
+            waveOffset += 0.05 * animationSpeed;
+        }
+        
+        function animateParticles() {
+            // Add new particles
+            if (particles.length < 100) {
+                particles.push({
+                    x: Math.random() * canvas.width,
+                    y: canvas.height + 10,
+                    vx: (Math.random() - 0.5) * 2,
+                    vy: -Math.random() * 3 - 1,
+                    size: Math.random() * 3 + 1,
+                    color: `hsl(${Math.random() * 360}, 70%, 50%)`
+                });
+            }
+            
+            // Update and draw particles
+            particles = particles.filter(p => {
+                p.x += p.vx * animationSpeed;
+                p.y += p.vy * animationSpeed;
+                p.vy += 0.05; // Gravity
+                
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                ctx.fillStyle = p.color;
+                ctx.fill();
+                
+                return p.y < canvas.height + 10;
+            });
+        }
+        
+        function animateScrollingText() {
+            ctx.font = '48px Arial';
+            ctx.fillStyle = '#ffe66d';
+            ctx.textBaseline = 'middle';
+            
+            const text = 'VDO.Ninja SDK Demo - Canvas Stream';
+            const textWidth = ctx.measureText(text).width;
+            
+            ctx.fillText(text, -textOffset, canvas.height / 2);
+            ctx.fillText(text, -textOffset + textWidth + 100, canvas.height / 2);
+            
+            textOffset += 2 * animationSpeed;
+            if (textOffset > textWidth + 100) {
+                textOffset = 0;
+            }
+        }
+        
+        // Control functions
+        function updateAnimation() {
+            animationType = document.getElementById('animationType').value;
+            // Reset animation state
+            particles = [];
+            waveOffset = 0;
+            textOffset = 0;
+        }
+        
+        function updateAnimationSpeed(slider) {
+            animationSpeed = parseFloat(slider.value);
+            document.getElementById('speedValue').textContent = animationSpeed.toFixed(1);
+        }
+        
+        function updateFrequency(slider) {
+            const freq = parseInt(slider.value);
+            document.getElementById('freqValue').textContent = freq + ' Hz';
+            if (oscillator) {
+                oscillator.frequency.setValueAtTime(freq, audioContext.currentTime);
+            }
+        }
+        
+        function updateWaveform() {
+            const waveform = document.getElementById('waveform').value;
+            if (oscillator) {
+                oscillator.type = waveform;
+            }
+        }
+        
+        function updateVolume(slider) {
+            const volume = parseInt(slider.value) / 100;
+            document.getElementById('volValue').textContent = slider.value + '%';
+            if (gainNode) {
+                gainNode.gain.setValueAtTime(volume * 0.3, audioContext.currentTime);
+            }
+        }
+        
+        // Create synthetic media stream
+        async function createSyntheticStream() {
+            // Initialize canvas
+            initCanvas();
+            
+            // Start animation
+            animate();
+            
+            // Capture canvas as video stream
+            const videoStream = canvas.captureStream(30); // 30 FPS
+            
+            // Create audio context
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            
+            // Create audio nodes
+            oscillator = audioContext.createOscillator();
+            gainNode = audioContext.createGain();
+            audioDestination = audioContext.createMediaStreamDestination();
+            
+            // Configure audio
+            oscillator.type = 'sine';
+            oscillator.frequency.setValueAtTime(440, audioContext.currentTime);
+            gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+            
+            // Connect audio nodes
+            oscillator.connect(gainNode);
+            gainNode.connect(audioDestination);
+            
+            // Start oscillator
+            oscillator.start();
+            
+            // Combine video and audio tracks
+            const audioTrack = audioDestination.stream.getAudioTracks()[0];
+            const videoTrack = videoStream.getVideoTracks()[0];
+            
+            const combinedStream = new MediaStream([videoTrack, audioTrack]);
+            
+            return combinedStream;
+        }
+        
+        // Stop synthetic stream
+        function stopSyntheticStream() {
+            if (animationId) {
+                cancelAnimationFrame(animationId);
+                animationId = null;
+            }
+            
+            if (oscillator) {
+                oscillator.stop();
+                oscillator = null;
+            }
+            
+            if (audioContext) {
+                audioContext.close();
+                audioContext = null;
+            }
+        }
+        
+        // Logging functions
+        function logPublisher(message, type = 'info') {
+            const log = document.getElementById('pubLog');
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            log.appendChild(entry);
+            log.scrollTop = log.scrollHeight;
+        }
+        
+        function logViewer(message, type = 'info') {
+            const log = document.getElementById('viewLog');
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            log.appendChild(entry);
+            log.scrollTop = log.scrollHeight;
+        }
+        
+        // Status update functions
+        function updatePublisherStatus(message, type = 'info') {
+            const status = document.getElementById('pubStatus');
+            status.textContent = message;
+            status.className = `status ${type}`;
+        }
+        
+        function updateViewerStatus(message, type = 'info') {
+            const status = document.getElementById('viewStatus');
+            status.textContent = message;
+            status.className = `status ${type}`;
+        }
+        
+        // Toggle encryption
+        function toggleEncryption(type) {
+            const checkbox = document.getElementById(`${type}DisableEncryption`);
+            const passwordField = document.getElementById(`${type}Password`);
+            
+            if (checkbox.checked) {
+                passwordField.disabled = true;
+                passwordField.value = '';
+                if (type === 'pub') {
+                    logPublisher('Encryption disabled', 'info');
+                } else {
+                    logViewer('Encryption disabled', 'info');
+                }
+            } else {
+                passwordField.disabled = false;
+                if (type === 'pub') {
+                    logPublisher('Encryption enabled', 'info');
+                } else {
+                    logViewer('Encryption enabled', 'info');
+                }
+            }
+        }
+        
+        // Publisher functions
+        async function startPublishing() {
+            try {
+                const room = document.getElementById('pubRoom').value;
+                const streamID = document.getElementById('pubStreamID').value;
+                const disableEncryption = document.getElementById('pubDisableEncryption').checked;
+                
+                let password;
+                if (disableEncryption) {
+                    password = false;  // Explicitly disable encryption
+                    logPublisher('Encryption disabled');
+                } else {
+                    const passwordValue = document.getElementById('pubPassword').value;
+                    if (passwordValue) {
+                        password = passwordValue;  // Use custom password
+                        logPublisher('Using custom password');
+                    } else {
+                        password = "";  // Will use default password
+                        logPublisher('Using default password');
+                    }
+                }
+                
+                if (!streamID) {
+                    alert('Please enter a stream ID');
+                    return;
+                }
+                
+                logPublisher('Initializing publisher...');
+                if (!room) {
+                    logPublisher('Using global room (no specific room)');
+                } else {
+                    logPublisher(`Using room: ${room}`);
+                }
+                updatePublisherStatus('Creating synthetic stream...', 'info');
+                
+                // Create synthetic media stream
+                logPublisher('Creating canvas animation and audio tone...');
+                localStream = await createSyntheticStream();
+                logPublisher('Synthetic stream created', 'success');
+                
+                // Create publisher instance
+                publisher = new VDONinjaSDK({
+                    room: room || null,  // Use null if room is empty
+                    password: password,
+                    debug: true
+                });
+                
+                // Setup event listeners
+                publisher.addEventListener('connected', () => {
+                    logPublisher('Connected to signaling server', 'success');
+                    updatePublisherStatus('Connected', 'connected');
+                });
+                
+                publisher.addEventListener('roomJoined', (event) => {
+                    logPublisher(`Joined room: ${event.detail.room}`, 'success');
+                });
+                
+                publisher.addEventListener('publishing', (event) => {
+                    logPublisher(`Publishing with stream ID: ${event.detail.streamID}`, 'success');
+                    updatePublisherStatus(`Publishing as: ${event.detail.streamID}`, 'connected');
+                });
+                
+                publisher.addEventListener('peerConnected', (event) => {
+                    logPublisher(`Viewer connected: ${event.detail.uuid}`, 'success');
+                });
+                
+                publisher.addEventListener('error', (event) => {
+                    logPublisher(`Error: ${event.detail.error}`, 'error');
+                });
+                
+                publisher.addEventListener('alert', (event) => {
+                    logPublisher(`⚠️ Alert: ${event.detail.message}`, 'error');
+                    updatePublisherStatus(`Alert: ${event.detail.message}`, 'disconnected');
+                    
+                    // Show user-friendly error for common issues
+                    if (event.detail.message.includes('already in use')) {
+                        alert(`The stream ID "${streamID}" is already in use. Please choose a different stream ID.`);
+                        // Reset UI since publishing failed
+                        stopPublishing();
+                    }
+                });
+                
+                // Connect and publish
+                await publisher.connect();
+                // Prepare publish options
+                const publishOptions = {
+                    stream: localStream,
+                    streamID: streamID,
+                    password: password
+                };
+                
+                // Only add room if it has a value
+                if (room) {
+                    publishOptions.room = room;
+                }
+                
+                await publisher.quickPublish(publishOptions);
+                
+                isPublishing = true;
+                document.getElementById('startPublish').disabled = true;
+                document.getElementById('stopPublish').disabled = false;
+                
+            } catch (error) {
+                logPublisher(`Failed to start publishing: ${error.message}`, 'error');
+                updatePublisherStatus('Failed to connect', 'disconnected');
+                console.error('Publishing error:', error);
+            }
+        }
+        
+        function stopPublishing() {
+            if (publisher) {
+                publisher.stopPublishing();
+                publisher.disconnect();
+                publisher = null;
+            }
+            
+            if (localStream) {
+                localStream.getTracks().forEach(track => track.stop());
+                localStream = null;
+            }
+            
+            stopSyntheticStream();
+            
+            isPublishing = false;
+            document.getElementById('startPublish').disabled = false;
+            document.getElementById('stopPublish').disabled = true;
+            
+            updatePublisherStatus('Disconnected', 'disconnected');
+            logPublisher('Stopped publishing');
+        }
+        
+        // Viewer functions
+        async function startViewing() {
+            try {
+                const room = document.getElementById('viewRoom').value;
+                const streamID = document.getElementById('viewStreamID').value;
+                const disableEncryption = document.getElementById('viewDisableEncryption').checked;
+                
+                let password;
+                if (disableEncryption) {
+                    password = false;  // Explicitly disable encryption
+                    logViewer('Encryption disabled');
+                } else {
+                    const passwordValue = document.getElementById('viewPassword').value;
+                    if (passwordValue) {
+                        password = passwordValue;  // Use custom password
+                        logViewer('Using custom password');
+                    } else {
+                        password = "";  // Will use default password
+                        logViewer('Using default password');
+                    }
+                }
+                
+                // If no streamID specified and not in a room, we need at least one
+                if (!streamID && !room) {
+                    alert('Please enter either a room or a stream ID');
+                    return;
+                }
+                
+                logViewer('Initializing viewer...');
+                if (!room) {
+                    logViewer('Using global room (no specific room)');
+                } else {
+                    logViewer(`Using room: ${room}`);
+                }
+                updateViewerStatus('Connecting...', 'info');
+                
+                // Create viewer instance
+                viewer = new VDONinjaSDK({
+                    room: room || null,  // Use null if room is empty
+                    password: password,
+                    debug: true
+                });
+                
+                // Setup event listeners
+                logViewer('Setting up event listeners...');
+                console.log('[DEMO] Setting up viewer event listeners');
+                
+                viewer.addEventListener('connected', () => {
+                    logViewer('Connected to signaling server', 'success');
+                    updateViewerStatus('Connected', 'connected');
+                });
+                
+                viewer.addEventListener('roomJoined', (event) => {
+                    logViewer(`Joined room: ${event.detail.room}`, 'success');
+                });
+                
+                viewer.addEventListener('track', (event) => {
+                    logViewer(`Received ${event.detail.track.kind} track`, 'success');
+                    
+                    // Add track to video element
+                    const remoteVideo = document.getElementById('remoteVideo');
+                    
+                    // If srcObject exists but has no active tracks, it might be from a previous connection
+                    // Create a fresh MediaStream in this case
+                    if (remoteVideo.srcObject) {
+                        const activeTracks = remoteVideo.srcObject.getTracks().filter(t => t.readyState === 'live');
+                        if (activeTracks.length === 0) {
+                            console.log('[DEMO] Creating fresh MediaStream for reconnection');
+                            remoteVideo.srcObject = new MediaStream();
+                        }
+                    } else {
+                        remoteVideo.srcObject = new MediaStream();
+                    }
+                    
+                    remoteVideo.srcObject.addTrack(event.detail.track);
+                    
+                    updateViewerStatus(`Viewing: ${streamID}`, 'connected');
+                });
+                
+                viewer.addEventListener('peerConnected', (event) => {
+                    logViewer('Connected to publisher', 'success');
+                    isViewing = true;
+                    waitingForStreamID = null;
+                    
+                    // Set a timeout to check if we receive tracks
+                    setTimeout(() => {
+                        const remoteVideo = document.getElementById('remoteVideo');
+                        if (!remoteVideo.srcObject || remoteVideo.srcObject.getTracks().length === 0) {
+                            logViewer('Warning: Connected but no tracks received yet', 'error');
+                            updateViewerStatus('Connected but no media tracks', 'info');
+                        }
+                    }, 5000);
+                });
+                
+                viewer.addEventListener('error', (event) => {
+                    logViewer(`Error: ${event.detail.error}`, 'error');
+                });
+                
+                viewer.addEventListener('alert', (event) => {
+                    logViewer(`⚠️ Alert: ${event.detail.message}`, 'error');
+                    updateViewerStatus(`Alert: ${event.detail.message}`, 'disconnected');
+                });
+                
+                viewer.addEventListener('listing', (event) => {
+                    if (event.detail.list) {
+                        logViewer(`Found ${event.detail.list.length} peers in room`);
+                        // Update available streams from listing
+                        availableStreams.clear();
+                        event.detail.list.forEach(peer => {
+                            if (peer.streamID) {
+                                availableStreams.set(peer.streamID, {
+                                    uuid: peer.UUID,
+                                    addedAt: new Date()
+                                });
+                            }
+                        });
+                        updateStreamList();
+                    }
+                });
+                
+                viewer.addEventListener('videoaddedtoroom', (event) => {
+                    console.log('[DEMO] videoaddedtoroom event received:', event.detail);
+                    logViewer(`New stream available: ${event.detail.streamID}`);
+                    // Add new stream to available streams
+                    if (event.detail.streamID) {
+                        availableStreams.set(event.detail.streamID, {
+                            uuid: event.detail.UUID || 'unknown',
+                            addedAt: new Date()
+                        });
+                        updateStreamList();
+                        
+                        // The SDK now handles automatic reconnection for pending views
+                        // We just need to update the UI to show the stream is available
+                        const requestedStreamID = document.getElementById('viewStreamID').value;
+                        if (requestedStreamID && event.detail.streamID) {
+                            const normalizedRequested = requestedStreamID.replace(/-/g, '_');
+                            const normalizedEvent = event.detail.streamID.replace(/-/g, '_');
+                            
+                            if (normalizedRequested === normalizedEvent) {
+                                logViewer(`The stream "${requestedStreamID}" is now available. SDK will connect automatically.`, 'success');
+                                updateViewerStatus(`Connecting to ${event.detail.streamID}...`, 'info');
+                            }
+                        }
+                    }
+                });
+                
+                // Handle bye messages - clean up video when peer disconnects
+                viewer.addEventListener('bye', (event) => {
+                    console.log('[DEMO] Received bye from:', event.detail.UUID);
+                    logViewer(`Publisher disconnected. Awaiting reconnection...`, 'info');
+                    
+                    // Clear the video element to prepare for reconnection
+                    const remoteVideo = document.getElementById('remoteVideo');
+                    if (remoteVideo.srcObject) {
+                        // Stop all tracks and remove them
+                        remoteVideo.srcObject.getTracks().forEach(track => {
+                            track.stop();
+                            remoteVideo.srcObject.removeTrack(track);
+                        });
+                        // Clear the srcObject
+                        remoteVideo.srcObject = null;
+                    }
+                    
+                    updateViewerStatus('Publisher disconnected - reconnecting...', 'warning');
+                });
+                
+                // Handle connection failures - clean up video
+                viewer.addEventListener('connectionFailed', (event) => {
+                    console.log('[DEMO] Connection failed:', event.detail);
+                    logViewer(`Connection failed: ${event.detail.streamID || event.detail.uuid}`, 'error');
+                    
+                    // Clear the video element
+                    const remoteVideo = document.getElementById('remoteVideo');
+                    if (remoteVideo.srcObject) {
+                        // Stop all tracks and remove them
+                        remoteVideo.srcObject.getTracks().forEach(track => {
+                            track.stop();
+                            remoteVideo.srcObject.removeTrack(track);
+                        });
+                        // Clear the srcObject
+                        remoteVideo.srcObject = null;
+                    }
+                    
+                    updateViewerStatus('Connection failed - retrying...', 'warning');
+                });
+                
+                // Connect to server
+                await viewer.connect();
+                
+                // If streamID is provided, view it directly
+                if (streamID) {
+                    console.log('[DEMO] Attempting to view stream:', streamID);
+                    const viewOptions = {
+                        streamID: streamID,
+                        password: password,
+                        audio: true,
+                        video: true
+                    };
+                    
+                    // Only add room if it has a value
+                    if (room) {
+                        viewOptions.room = room;
+                    }
+                    
+                    try {
+                        console.log('[DEMO] Calling quickView...');
+                        await viewer.quickView(viewOptions);
+                        console.log('[DEMO] quickView succeeded!');
+                        isViewing = true;
+                    } catch (error) {
+                        console.log('[DEMO] quickView error caught:', error.message);
+                        // If we get a timeout, it might be because the publisher hasn't joined yet
+                        if (error.message.includes('timeout') || error.message.includes('Timeout')) {
+                            logViewer(`Stream "${streamID}" is not available yet. Will retry when publisher joins the room.`, 'system');
+                            updateViewerStatus(`Waiting for stream: ${streamID}`, 'info');
+                            waitingForStreamID = streamID; // Remember what we're waiting for
+                            console.log('[DEMO] Set waitingForStreamID to:', waitingForStreamID);
+                            logViewer(`Set waitingForStreamID to: "${waitingForStreamID}"`, 'system');
+                        } else {
+                            // Other errors, rethrow
+                            throw error;
+                        }
+                    }
+                } else if (room) {
+                    // If only room is provided, join it to get the stream list
+                    logViewer('Joining room to discover available streams...');
+                    // Show stream list section
+                    document.getElementById('streamListSection').style.display = 'block';
+                    updateStreamList();
+                    
+                    // Join the room - this will trigger the listing event
+                    await viewer.joinRoom({
+                        room: room,
+                        password: password
+                    });
+                }
+                
+                isViewing = true;
+                document.getElementById('startView').disabled = true;
+                document.getElementById('stopView').disabled = false;
+                
+            } catch (error) {
+                logViewer(`Failed to start viewing: ${error.message}`, 'error');
+                console.error('Viewing error:', error);
+                
+                // Don't disconnect if it's just a timeout - keep listening for the stream
+                if (error.message.includes('timeout') || error.message.includes('Timeout')) {
+                    logViewer('Keeping connection open to wait for stream...', 'system');
+                    // Keep the viewer connected and listening
+                } else {
+                    // Other errors - disconnect
+                    updateViewerStatus('Failed to connect', 'disconnected');
+                    
+                    // Reset UI state on error
+                    if (viewer) {
+                        viewer.disconnect();
+                        viewer = null;
+                    }
+                    isViewing = false;
+                    document.getElementById('startView').disabled = false;
+                    document.getElementById('stopView').disabled = true;
+                }
+            }
+        }
+        
+        function stopViewing() {
+            if (viewer) {
+                viewer.disconnect();
+                viewer = null;
+            }
+            
+            document.getElementById('remoteVideo').srcObject = null;
+            
+            isViewing = false;
+            waitingForStreamID = null;
+            document.getElementById('startView').disabled = false;
+            document.getElementById('stopView').disabled = true;
+            
+            // Clear stream list
+            availableStreams.clear();
+            document.getElementById('streamListSection').style.display = 'none';
+            
+            updateViewerStatus('Disconnected', 'disconnected');
+            logViewer('Stopped viewing');
+        }
+        
+        // Update the stream list UI
+        function updateStreamList() {
+            const streamListDiv = document.getElementById('streamList');
+            streamListDiv.innerHTML = '';
+            
+            if (availableStreams.size === 0) {
+                streamListDiv.innerHTML = '<div class="no-streams">No streams available in this room</div>';
+                return;
+            }
+            
+            availableStreams.forEach((info, streamID) => {
+                const streamItem = document.createElement('div');
+                streamItem.className = 'stream-item';
+                streamItem.innerHTML = `
+                    <div>
+                        <div class="stream-item-id">${streamID}</div>
+                        <div class="stream-item-status">Added ${info.addedAt.toLocaleTimeString()}</div>
+                    </div>
+                    <button onclick="viewStream('${streamID}')" style="padding: 5px 10px; font-size: 14px;">View</button>
+                `;
+                streamListDiv.appendChild(streamItem);
+            });
+        }
+        
+        // View a specific stream from the list
+        async function viewStream(streamID) {
+            // Update the stream ID input
+            document.getElementById('viewStreamID').value = streamID;
+            
+            // Get current settings
+            const room = document.getElementById('viewRoom').value;
+            const disableEncryption = document.getElementById('viewDisableEncryption').checked;
+            let password;
+            if (disableEncryption) {
+                password = false;
+            } else {
+                const passwordValue = document.getElementById('viewPassword').value;
+                password = passwordValue || "";
+            }
+            
+            logViewer(`Viewing stream: ${streamID}`);
+            
+            try {
+                const viewOptions = {
+                    streamID: streamID,
+                    password: password,
+                    audio: true,
+                    video: true
+                };
+                
+                // Only add room if it has a value
+                if (room) {
+                    viewOptions.room = room;
+                }
+                
+                await viewer.quickView(viewOptions);
+                
+                // Successfully connected
+                waitingForStreamID = null;
+                isViewing = true;
+                updateViewerStatus(`Viewing: ${streamID}`, 'connected');
+                
+                // Hide stream list when viewing starts
+                document.getElementById('streamListSection').style.display = 'none';
+            } catch (error) {
+                logViewer(`Failed to view stream ${streamID}: ${error.message}`, 'error');
+                // If it's a timeout, we might be waiting for the publisher
+                if (error.message.includes('timeout') || error.message.includes('Timeout')) {
+                    waitingForStreamID = streamID;
+                    updateViewerStatus(`Waiting for stream: ${streamID}`, 'info');
+                }
+            }
+        }
+        
+        // Initialize on load
+        window.addEventListener('load', () => {
+            initCanvas();
+        });
+        
+        // Clean up on page unload
+        window.addEventListener('beforeunload', () => {
+            if (isPublishing) stopPublishing();
+            if (isViewing) stopViewing();
+        });
+    </script>
+</body>
+</html>

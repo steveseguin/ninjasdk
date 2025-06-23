@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VDO.Ninja SDK - TURN Server Configuration Demo</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #1a1a1a;
+            color: #e0e0e0;
+        }
+        
+        h1 {
+            text-align: center;
+            color: #ffffff;
+            margin-bottom: 10px;
+        }
+        
+        .subtitle {
+            text-align: center;
+            color: #999;
+            font-size: 16px;
+            margin-bottom: 30px;
+        }
+        
+        .main-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        
+        .section {
+            background: #2a2a2a;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+            border: 1px solid #3a3a3a;
+        }
+        
+        h2 {
+            color: #e0e0e0;
+            margin-top: 0;
+        }
+        
+        .control-group {
+            margin-bottom: 15px;
+            padding: 10px;
+            background-color: #333;
+            border-radius: 5px;
+            border: 1px solid #444;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #b0b0b0;
+            font-weight: bold;
+        }
+        
+        select, input[type="text"] {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #444;
+            border-radius: 4px;
+            background-color: #1a1a1a;
+            color: #e0e0e0;
+            margin-bottom: 5px;
+        }
+        
+        input[type="checkbox"] {
+            margin-right: 8px;
+        }
+        
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+            margin-bottom: 10px;
+            font-size: 14px;
+            transition: background-color 0.3s;
+        }
+        
+        button:hover:not(:disabled) {
+            background-color: #5cbf60;
+        }
+        
+        button:disabled {
+            background-color: #444;
+            color: #666;
+            cursor: not-allowed;
+        }
+        
+        button.stop {
+            background-color: #f44336;
+        }
+        
+        button.stop:hover:not(:disabled) {
+            background-color: #ff6659;
+        }
+        
+        .ice-config {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #1a1a1a;
+            border-radius: 5px;
+            border: 1px solid #444;
+            font-family: monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+            word-break: break-all;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .status {
+            margin-top: 10px;
+            padding: 10px;
+            background-color: #1a1a1a;
+            border-radius: 5px;
+            border: 1px solid #444;
+            font-size: 14px;
+        }
+        
+        .status.connected {
+            border-color: #4CAF50;
+        }
+        
+        .status.error {
+            border-color: #f44336;
+        }
+        
+        video {
+            width: 100%;
+            max-width: 400px;
+            height: 300px;
+            background-color: #000;
+            border-radius: 8px;
+            border: 2px solid #444;
+            margin-top: 20px;
+        }
+        
+        .info {
+            background-color: #2196F3;
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+        
+        @media (max-width: 768px) {
+            .main-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1>🌐 VDO.Ninja SDK - TURN Server Configuration</h1>
+    <div class="subtitle">Demonstrate different TURN server configuration options</div>
+    
+    <div class="info">
+        💡 This demo shows how to configure TURN servers for the VDO.Ninja SDK:
+        <ul style="margin: 10px 0;">
+            <li><strong>Auto-fetch (default)</strong>: Automatically fetches optimal TURN servers from VDO.Ninja API</li>
+            <li><strong>Disabled</strong>: Use only STUN servers (may fail behind restrictive firewalls)</li>
+            <li><strong>Custom</strong>: Provide your own TURN server configuration</li>
+            <li><strong>Force TURN</strong>: Force all traffic through TURN servers for privacy</li>
+        </ul>
+    </div>
+    
+    <div class="main-grid">
+        <!-- Configuration Section -->
+        <div class="section">
+            <h2>🔧 TURN Configuration</h2>
+            
+            <div class="control-group">
+                <label for="turnMode">TURN Server Mode:</label>
+                <select id="turnMode" onchange="updateTurnConfig()">
+                    <option value="auto">Auto-fetch (Default)</option>
+                    <option value="disabled">Disabled (STUN only)</option>
+                    <option value="custom">Custom TURN servers</option>
+                </select>
+            </div>
+            
+            <div class="control-group" id="customTurnGroup" style="display: none;">
+                <label>Custom TURN Server:</label>
+                <input type="text" id="turnUrl" placeholder="turn:turn.example.com:3478" value="turn:turn.example.com:3478">
+                <input type="text" id="turnUsername" placeholder="Username" value="testuser" style="margin-top: 5px;">
+                <input type="text" id="turnCredential" placeholder="Credential" value="testpass" style="margin-top: 5px;">
+            </div>
+            
+            <div class="control-group">
+                <label>
+                    <input type="checkbox" id="forceTURN" onchange="updateTurnConfig()">
+                    Force TURN relay (privacy mode)
+                </label>
+                <small style="color: #888;">Routes all traffic through TURN servers, hiding peer IPs</small>
+            </div>
+            
+            <div class="control-group">
+                <label for="room">Room:</label>
+                <input type="text" id="room" value="turn-demo-room" placeholder="Enter room name">
+            </div>
+            
+            <div class="control-group">
+                <label for="password">Password:</label>
+                <input type="text" id="password" value="testPassword123" placeholder="Room password">
+            </div>
+            
+            <button id="connectBtn" onclick="connectSDK()">Connect</button>
+            <button id="disconnectBtn" onclick="disconnectSDK()" disabled>Disconnect</button>
+            <button id="clearCacheBtn" onclick="clearTURNCache()" style="background-color: #ff9800;">Clear TURN Cache</button>
+            
+            <div class="status" id="status">Not connected</div>
+            
+            <div class="ice-config" id="iceConfig">
+                ICE configuration will appear here after connection...
+            </div>
+        </div>
+        
+        <!-- Test Section -->
+        <div class="section">
+            <h2>📹 Connection Test</h2>
+            
+            <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+                <button id="publishBtn" onclick="startPublishing()" disabled>Publish</button>
+                <button id="viewBtn" onclick="startViewing()" disabled>View</button>
+                <button id="stopBtn" onclick="stopAll()" disabled>Stop</button>
+            </div>
+            
+            <video id="localVideo" autoplay muted playsinline style="display: none;"></video>
+            <video id="remoteVideo" autoplay playsinline style="display: none;"></video>
+            
+            <div class="ice-config" id="connectionStats" style="margin-top: 20px;">
+                Connection statistics will appear here...
+            </div>
+        </div>
+    </div>
+    
+    <!-- Load the SDK -->
+    <script src="vdoninja-sdk.js"></script>
+    
+    <script>
+        let sdk = null;
+        let isPublishing = false;
+        let isViewing = false;
+        
+        function updateTurnConfig() {
+            const mode = document.getElementById('turnMode').value;
+            const customGroup = document.getElementById('customTurnGroup');
+            
+            if (mode === 'custom') {
+                customGroup.style.display = 'block';
+            } else {
+                customGroup.style.display = 'none';
+            }
+        }
+        
+        function getTurnConfig() {
+            const mode = document.getElementById('turnMode').value;
+            const forceTURN = document.getElementById('forceTURN').checked;
+            
+            const config = {
+                forceTURN: forceTURN
+            };
+            
+            if (mode === 'disabled') {
+                config.turnServers = false;
+            } else if (mode === 'custom') {
+                config.turnServers = [{
+                    urls: [document.getElementById('turnUrl').value],
+                    username: document.getElementById('turnUsername').value,
+                    credential: document.getElementById('turnCredential').value
+                }];
+            }
+            // For 'auto' mode, we don't set turnServers (null by default)
+            
+            return config;
+        }
+        
+        async function connectSDK() {
+            try {
+                const room = document.getElementById('room').value;
+                const password = document.getElementById('password').value;
+                const turnConfig = getTurnConfig();
+                
+                // Create SDK instance with TURN configuration
+                sdk = new VDONinjaSDK({
+                    room: room,
+                    password: password,
+                    debug: true,
+                    ...turnConfig
+                });
+                
+                // Event listeners
+                sdk.addEventListener('connected', () => {
+                    document.getElementById('status').textContent = 'Connected to signaling server';
+                    document.getElementById('status').className = 'status connected';
+                    
+                    document.getElementById('connectBtn').disabled = true;
+                    document.getElementById('disconnectBtn').disabled = false;
+                    document.getElementById('publishBtn').disabled = false;
+                    document.getElementById('viewBtn').disabled = false;
+                    
+                    // Display ICE configuration
+                    displayICEConfig();
+                });
+                
+                sdk.addEventListener('disconnected', () => {
+                    document.getElementById('status').textContent = 'Disconnected';
+                    document.getElementById('status').className = 'status';
+                    resetUI();
+                });
+                
+                sdk.addEventListener('error', (event) => {
+                    document.getElementById('status').textContent = `Error: ${event.detail.error}`;
+                    document.getElementById('status').className = 'status error';
+                });
+                
+                sdk.addEventListener('peerConnected', (event) => {
+                    updateConnectionStats();
+                });
+                
+                sdk.addEventListener('track', (event) => {
+                    const remoteVideo = document.getElementById('remoteVideo');
+                    if (!remoteVideo.srcObject) {
+                        remoteVideo.srcObject = new MediaStream();
+                    }
+                    remoteVideo.srcObject.addTrack(event.detail.track);
+                    remoteVideo.style.display = 'block';
+                });
+                
+                // Connect
+                await sdk.connect();
+                
+            } catch (error) {
+                console.error('Connection error:', error);
+                document.getElementById('status').textContent = `Error: ${error.message}`;
+                document.getElementById('status').className = 'status error';
+            }
+        }
+        
+        async function displayICEConfig() {
+            if (!sdk) return;
+            
+            // Get the actual ICE configuration used
+            const config = await sdk._getICEConfiguration();
+            
+            // Check if servers came from cache
+            let cacheInfo = '';
+            try {
+                const cached = localStorage.getItem('turnlist');
+                if (cached) {
+                    const data = JSON.parse(cached);
+                    if (data.expiry && Date.now() < data.expiry) {
+                        const remainingMinutes = Math.round((data.expiry - Date.now()) / 60000);
+                        cacheInfo = `\n// TURN servers loaded from cache (expires in ${remainingMinutes} minutes)\n`;
+                    }
+                }
+            } catch (e) {}
+            
+            const display = {
+                iceTransportPolicy: config.iceTransportPolicy || 'all',
+                iceServers: config.iceServers.map(server => ({
+                    urls: server.urls,
+                    username: server.username ? '***' : undefined,
+                    credential: server.credential ? '***' : undefined,
+                    locale: server.locale
+                }))
+            };
+            
+            document.getElementById('iceConfig').textContent = cacheInfo + JSON.stringify(display, null, 2);
+        }
+        
+        async function startPublishing() {
+            if (!sdk || isPublishing) return;
+            
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: true, 
+                    audio: true 
+                });
+                
+                document.getElementById('localVideo').srcObject = stream;
+                document.getElementById('localVideo').style.display = 'block';
+                
+                await sdk.quickPublish({
+                    stream: stream
+                });
+                
+                isPublishing = true;
+                document.getElementById('publishBtn').disabled = true;
+                document.getElementById('stopBtn').disabled = false;
+                
+                updateConnectionStats();
+                
+            } catch (error) {
+                console.error('Publishing error:', error);
+                alert('Error publishing: ' + error.message);
+            }
+        }
+        
+        async function startViewing() {
+            if (!sdk || isViewing) return;
+            
+            try {
+                // Get list of available streams
+                const roomInfo = await sdk.getRoomInfo();
+                if (!roomInfo || roomInfo.length === 0) {
+                    alert('No streams available in the room');
+                    return;
+                }
+                
+                // View the first available stream
+                const streamID = roomInfo[0].streamID;
+                await sdk.quickView({
+                    streamID: streamID
+                });
+                
+                isViewing = true;
+                document.getElementById('viewBtn').disabled = true;
+                document.getElementById('stopBtn').disabled = false;
+                
+                updateConnectionStats();
+                
+            } catch (error) {
+                console.error('Viewing error:', error);
+                alert('Error viewing: ' + error.message);
+            }
+        }
+        
+        function stopAll() {
+            if (sdk) {
+                // Stop local stream
+                const localVideo = document.getElementById('localVideo');
+                if (localVideo.srcObject) {
+                    localVideo.srcObject.getTracks().forEach(track => track.stop());
+                    localVideo.srcObject = null;
+                    localVideo.style.display = 'none';
+                }
+                
+                // Clear remote video
+                const remoteVideo = document.getElementById('remoteVideo');
+                if (remoteVideo.srcObject) {
+                    remoteVideo.srcObject = null;
+                    remoteVideo.style.display = 'none';
+                }
+                
+                // Reset SDK connections
+                for (const [uuid, connections] of sdk.connections) {
+                    if (connections.viewer && connections.viewer.pc) {
+                        connections.viewer.pc.close();
+                    }
+                    if (connections.publisher && connections.publisher.pc) {
+                        connections.publisher.pc.close();
+                    }
+                }
+                sdk.connections.clear();
+            }
+            
+            isPublishing = false;
+            isViewing = false;
+            
+            document.getElementById('publishBtn').disabled = false;
+            document.getElementById('viewBtn').disabled = false;
+            document.getElementById('stopBtn').disabled = true;
+            
+            document.getElementById('connectionStats').textContent = 'Connection statistics will appear here...';
+        }
+        
+        async function updateConnectionStats() {
+            if (!sdk) return;
+            
+            const stats = [];
+            
+            for (const [uuid, connections] of sdk.connections) {
+                for (const [type, connection] of Object.entries(connections)) {
+                    if (connection && connection.pc) {
+                        const state = connection.pc.connectionState;
+                        const iceState = connection.pc.iceConnectionState;
+                        
+                        // Get selected candidate pair
+                        try {
+                            const statsReport = await connection.pc.getStats();
+                            let candidatePair = null;
+                            let localCandidate = null;
+                            let remoteCandidate = null;
+                            
+                            statsReport.forEach(report => {
+                                if (report.type === 'candidate-pair' && report.state === 'succeeded') {
+                                    candidatePair = report;
+                                }
+                            });
+                            
+                            if (candidatePair) {
+                                statsReport.forEach(report => {
+                                    if (report.type === 'local-candidate' && report.id === candidatePair.localCandidateId) {
+                                        localCandidate = report;
+                                    }
+                                    if (report.type === 'remote-candidate' && report.id === candidatePair.remoteCandidateId) {
+                                        remoteCandidate = report;
+                                    }
+                                });
+                            }
+                            
+                            stats.push({
+                                type: type,
+                                uuid: uuid.substring(0, 8) + '...',
+                                state: state,
+                                iceState: iceState,
+                                localCandidate: localCandidate ? {
+                                    type: localCandidate.candidateType,
+                                    protocol: localCandidate.protocol,
+                                    address: localCandidate.address ? '***' : 'N/A'
+                                } : null,
+                                remoteCandidate: remoteCandidate ? {
+                                    type: remoteCandidate.candidateType,
+                                    protocol: remoteCandidate.protocol,
+                                    address: remoteCandidate.address ? '***' : 'N/A'
+                                } : null
+                            });
+                        } catch (error) {
+                            stats.push({
+                                type: type,
+                                uuid: uuid.substring(0, 8) + '...',
+                                state: state,
+                                iceState: iceState,
+                                error: 'Could not get stats'
+                            });
+                        }
+                    }
+                }
+            }
+            
+            document.getElementById('connectionStats').textContent = JSON.stringify(stats, null, 2);
+        }
+        
+        function disconnectSDK() {
+            if (sdk) {
+                stopAll();
+                sdk.disconnect();
+                sdk = null;
+            }
+            resetUI();
+        }
+        
+        function resetUI() {
+            document.getElementById('connectBtn').disabled = false;
+            document.getElementById('disconnectBtn').disabled = true;
+            document.getElementById('publishBtn').disabled = true;
+            document.getElementById('viewBtn').disabled = true;
+            document.getElementById('stopBtn').disabled = true;
+            
+            document.getElementById('iceConfig').textContent = 'ICE configuration will appear here after connection...';
+            document.getElementById('connectionStats').textContent = 'Connection statistics will appear here...';
+        }
+        
+        function clearTURNCache() {
+            if (sdk) {
+                sdk.clearTURNCache();
+                alert('TURN cache cleared! Next connection will fetch fresh servers.');
+            } else {
+                // Clear even without SDK instance
+                try {
+                    localStorage.removeItem('turnlist');
+                    alert('TURN cache cleared!');
+                } catch (e) {
+                    alert('Failed to clear cache: ' + e.message);
+                }
+            }
+        }
+        
+        // Clean up on page unload
+        window.addEventListener('beforeunload', () => {
+            if (sdk) {
+                sdk.disconnect();
+            }
+        });
+    </script>
+</body>
+</html>

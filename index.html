@@ -1,0 +1,958 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VDO.Ninja SDK - AI-Friendly P2P Communication Framework</title>
+    <meta name="description" content="VDO.Ninja SDK - Build peer-to-peer audio, video, and data applications without servers. AI-friendly, no accounts required, free and open source.">
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://sdk.vdo.ninja/">
+    <meta property="og:title" content="VDO.Ninja SDK - AI-Friendly P2P Communication">
+    <meta property="og:description" content="Build serverless P2P apps with audio, video, and data channels. Perfect for AI bots - no accounts required.">
+    <meta property="og:image" content="https://sdk.vdo.ninja/og-image.png">
+    
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="https://sdk.vdo.ninja/">
+    <meta property="twitter:title" content="VDO.Ninja SDK - AI-Friendly P2P Communication">
+    <meta property="twitter:description" content="Build serverless P2P apps with audio, video, and data channels. Perfect for AI bots.">
+    <meta property="twitter:image" content="https://sdk.vdo.ninja/og-image.png">
+    
+    <!-- Additional SEO -->
+    <meta name="keywords" content="webrtc, p2p, peer-to-peer, sdk, video streaming, audio streaming, data channels, ai friendly, no server, free, open source, vdo.ninja">
+    <meta name="author" content="Steve Seguin">
+    <link rel="canonical" href="https://sdk.vdo.ninja/">
+    
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <div class="nav-brand">VDO.Ninja SDK</div>
+            <button class="nav-toggle" id="navToggle" onclick="toggleNav()">
+                <span></span>
+                <span></span>
+                <span></span>
+            </button>
+            <ul class="nav-links" id="navLinks">
+                <li><a href="#try-live">Try Live</a></li>
+                <li><a href="#features">Features</a></li>
+                <li><a href="#quickstart">Quick Start</a></li>
+                <li><a href="#ai-integration" class="nav-ai">🤖 AI Integration</a></li>
+                <li><a href="#examples">Examples</a></li>
+                <li><a href="#faq">FAQ</a></li>
+                <li><a href="#download">Download</a></li>
+                <li><a href="https://github.com/steveseguin/ninjasdk" target="_blank">GitHub</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <header class="hero">
+        <div class="container">
+            <h1 class="hero-title">The Web Without Servers</h1>
+            <p class="hero-subtitle">Direct Browser-to-Browser Communication. Zero Infrastructure. Unlimited Possibilities.</p>
+            <p class="hero-description">
+                VDO.Ninja SDK enables websites to talk directly to each other. Stream HD video to friends, 
+                remote control applications from anywhere, build AI bots with live feeds, or create 
+                high-bandwidth apps with <strong>zero server costs</strong>. No accounts. No hosting. No limits.
+            </p>
+            <div class="hero-features">
+                <div class="hero-feature">
+                    <span class="hero-icon">🌐</span>
+                    <span>Website-to-Website Direct</span>
+                </div>
+                <div class="hero-feature">
+                    <span class="hero-icon">🎮</span>
+                    <span>Remote Control Anything</span>
+                </div>
+                <div class="hero-feature">
+                    <span class="hero-icon">🎵</span>
+                    <span>Stream Media P2P</span>
+                </div>
+                <div class="hero-feature">
+                    <span class="hero-icon">🤖</span>
+                    <span>AI with Live Video/Audio</span>
+                </div>
+            </div>
+            <div class="hero-actions">
+                <a href="#try-live" class="btn btn-primary">Try It Live Now</a>
+                <a href="#vdo-ecosystem" class="btn btn-secondary">Works with VDO.Ninja</a>
+            </div>
+            <div class="hero-tagline">
+                A revolutionary approach to web development that breaks the server stranglehold
+            </div>
+        </div>
+    </header>
+
+    <section id="try-live" class="section section-demo">
+        <div class="container">
+            <h2 class="section-title">🚀 Try It Live - No Setup Required</h2>
+            <div class="live-demo-container">
+                <div class="demo-info">
+                    <p>Test P2P data channels right here in your browser. Open this page in two tabs or share the room ID with someone.</p>
+                </div>
+                <div class="demo-grid">
+                    <div class="demo-panel">
+                        <h3>Your Connection</h3>
+                        <div class="demo-status">
+                            <span class="status-indicator" id="connectionStatus"></span>
+                            <span id="connectionText">Not connected</span>
+                        </div>
+                        <div class="demo-controls">
+                            <input type="text" id="roomInput" placeholder="Enter room name" class="demo-input">
+                            <button id="connectBtn" class="btn btn-primary" onclick="toggleConnection()">Connect</button>
+                        </div>
+                        <div class="peer-list" id="peerList"></div>
+                    </div>
+                    <div class="demo-panel">
+                        <h3>Send & Receive Messages</h3>
+                        <div class="message-area" id="messageArea"></div>
+                        <div class="message-controls">
+                            <input type="text" id="messageInput" placeholder="Type a message..." class="demo-input" disabled>
+                            <button id="sendBtn" class="btn btn-secondary" onclick="sendMessage()" disabled>Send</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="demo-code">
+                    <h4>This demo uses just these few lines:</h4>
+                    <pre><code class="language-javascript">const vdo = new VDONinja();
+vdo.onDataMessage = (data, uid) => displayMessage(data, uid);
+await vdo.connect({ roomid: "demo-room", push: true, view: true, datamode: 1 });
+vdo.sendData({ message: "Hello P2P!" });</code></pre>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="revolution" class="section section-revolution">
+        <div class="container">
+            <h2 class="section-title">The Server-Free Revolution</h2>
+            <div class="revolution-content">
+                <div class="revolution-text">
+                    <h3>What if websites could talk directly to each other?</h3>
+                    <p>For decades, web applications have been trapped in a client-server model. Every message, every byte of data, every interaction must pass through a server you pay for, maintain, and scale.</p>
+                    <p><strong>VDO.Ninja SDK breaks this paradigm.</strong></p>
+                    <p>Now, browsers can establish direct, encrypted connections to each other. No middleman. No monthly bills. No data limits. Just pure peer-to-peer communication at the speed of your internet connection.</p>
+                </div>
+                <div class="revolution-examples">
+                    <h3>Real-World Magic</h3>
+                    <div class="magic-grid">
+                        <div class="magic-item">
+                            <h4>🎬 Remote Control OBS from Anywhere</h4>
+                            <p>Control your streaming setup from your phone, no port forwarding, no VPN, no TeamViewer. Just open a webpage.</p>
+                        </div>
+                        <div class="magic-item">
+                            <h4>💸 Free Services That Couldn't Exist</h4>
+                            <p>Like Social Stream Ninja - handles massive chat traffic for free because P2P makes server costs disappear.</p>
+                        </div>
+                        <div class="magic-item">
+                            <h4>🎵 Stream Music to Friends</h4>
+                            <p>Share your Spotify, game audio, or live DJ set directly. No upload bandwidth limits, no server costs.</p>
+                        </div>
+                        <div class="magic-item">
+                            <h4>🎮 Multiplayer Games Without Servers</h4>
+                            <p>Build real-time games where players connect directly. Lower latency than any server could provide.</p>
+                        </div>
+                        <div class="magic-item">
+                            <h4>🤖 AI Assistants with Live Vision</h4>
+                            <p>Give AI bots eyes and ears. Process video/audio in real-time without expensive cloud infrastructure.</p>
+                        </div>
+                        <div class="magic-item">
+                            <h4>📹 Security Cameras Without Cloud</h4>
+                            <p>Stream directly from camera to viewer. No monthly fees, no privacy concerns, no storage limits.</p>
+                        </div>
+                        <div class="magic-item">
+                            <h4>🏢 Corporate Apps Without IT</h4>
+                            <p>Deploy internal tools that work anywhere, no VPN required, no server maintenance, instant global access.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="revolution-cta">
+                <p class="cta-text">Already powering disruptive applications. This is the foundation for a new kind of web.</p>
+                <a href="#quickstart" class="btn btn-primary btn-large">Start Building the Future</a>
+            </div>
+        </div>
+    </section>
+
+    <section id="features" class="section">
+        <div class="container">
+            <h2 class="section-title">The Power of True P2P</h2>
+            <div class="features-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">💰</div>
+                    <h3>Zero Infrastructure Costs</h3>
+                    <p>No servers to rent, no bandwidth to pay for, no scaling concerns. Your users' browsers do all the work.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">⚡</div>
+                    <h3>Lowest Possible Latency</h3>
+                    <p>Direct connections mean data travels the shortest path. Better than any server could provide.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🔐</div>
+                    <h3>End-to-End Encrypted</h3>
+                    <p>Military-grade encryption on every connection. No middleman. No logs. What happens P2P, stays P2P.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🌍</div>
+                    <h3>Works Everywhere</h3>
+                    <p>Behind firewalls, across continents, on mobile. If it has a browser, it can connect.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🚫</div>
+                    <h3>No Accounts Required</h3>
+                    <p>No sign-ups, no API keys, no quotas. Just pick a room name and start communicating.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">∞</div>
+                    <h3>Unlimited Bandwidth</h3>
+                    <p>Stream 4K video, transfer gigabytes. You're only limited by your users' internet connections.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="quickstart" class="section section-alt">
+        <div class="container">
+            <h2 class="section-title">Quick Start</h2>
+            <div class="quickstart-options">
+                <div class="quickstart-option">
+                    <h3>Option 1: Simple IFRAME API (Easiest)</h3>
+                    <p>For basic P2P data transfer, you can use the IFRAME API without any SDK:</p>
+                    <pre><code class="language-html">&lt;iframe id="vdo" src="https://vdo.ninja/iframe"&gt;&lt;/iframe&gt;
+
+&lt;script&gt;
+const iframe = document.getElementById('vdo');
+iframe.onmessage = (e) => {
+    if (e.data.dataReceived) {
+        console.log('Received:', e.data.dataReceived);
+    }
+};
+
+// Send data
+iframe.contentWindow.postMessage({
+    sendData: { message: "Hello P2P!" }
+}, '*');
+&lt;/script&gt;</code></pre>
+                    <div class="iframe-links">
+                        <a href="https://vdo.ninja/iframe" target="_blank">Try IFRAME Demo</a>
+                        <a href="https://docs.vdo.ninja/guides/iframe-api-documentation/iframe-api-basics" target="_blank">IFRAME Docs</a>
+                        <a href="https://docs.vdo.ninja/guides/iframe-api-documentation/create-custom-drawing-app" target="_blank">Drawing App Example</a>
+                    </div>
+                </div>
+                <div class="quickstart-option">
+                    <h3>Option 2: Full SDK (More Control)</h3>
+                    <p>For advanced features, custom UI, and full control:</p>
+            <div class="quickstart-content">
+                <h3>1. Include the SDK</h3>
+                <pre><code class="language-html">&lt;script src="https://cdn.jsdelivr.net/gh/steveseguin/ninjasdk@latest/vdoninja-sdk.min.js"&gt;&lt;/script&gt;</code></pre>
+                
+                <h3>2. Basic Data Channel Example</h3>
+                <pre><code class="language-javascript">// Create a new VDO.Ninja instance
+const vdo = new VDONinja();
+
+// Set up data channel handling
+vdo.onDataMessage = (data, uid) => {
+    console.log(`Received from ${uid}:`, data);
+};
+
+// Connect to a room
+await vdo.connect({
+    roomid: "myroom",
+    push: true,  // Enable sending
+    view: true,  // Enable receiving
+    datamode: 1  // Data-only mode
+});
+
+// Send data to all peers
+vdo.sendData({
+    type: "chat",
+    message: "Hello from AI bot!"
+});</code></pre>
+
+                <h3>3. Audio/Video Example</h3>
+                <pre><code class="language-javascript">// Create instance with audio/video
+const vdo = new VDONinja();
+
+// Set up video element
+vdo.onVideoStream = (stream, uid) => {
+    const video = document.getElementById('remoteVideo');
+    video.srcObject = stream;
+};
+
+// Connect with media
+await vdo.connect({
+    roomid: "videoroom",
+    push: true,
+    view: true,
+    audio: true,
+    video: true
+});</code></pre>
+                </div>
+            </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="examples" class="section">
+        <div class="container">
+            <h2 class="section-title">Live Examples</h2>
+            <div class="examples-grid">
+                <a href="vdoninja-sdk-datachannel-demo.html" class="example-card">
+                    <h3>Data Channel Demo</h3>
+                    <p>Real-time bidirectional data communication between peers</p>
+                </a>
+                <a href="vdoninja-sdk-broadcast-demo.html" class="example-card">
+                    <h3>Broadcast Demo</h3>
+                    <p>One-to-many streaming with automatic peer management</p>
+                </a>
+                <a href="vdoninja-sdk-canvas-demo.html" class="example-card">
+                    <h3>Canvas Streaming</h3>
+                    <p>Stream canvas content as video in real-time</p>
+                </a>
+                <a href="vdoninja-sdk-dynamic-media-demo.html" class="example-card">
+                    <h3>Dynamic Media</h3>
+                    <p>Add/remove audio and video streams dynamically</p>
+                </a>
+                <a href="vdoninja-sdk-pubsub-channels.html" class="example-card">
+                    <h3>Pub/Sub Channels</h3>
+                    <p>Topic-based messaging with channel subscriptions</p>
+                </a>
+                <a href="vdoninja-sdk-tracks-demo.html" class="example-card">
+                    <h3>Track Management</h3>
+                    <p>Fine-grained control over individual media tracks</p>
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <section id="ai-integration" class="section section-ai">
+        <div class="container">
+            <h2 class="section-title">🤖 AI/LLM Integration</h2>
+            <div class="ai-integration-box">
+                <div class="ai-header">
+                    <h3>Complete SDK Knowledge for Vibe Coders</h3>
+                    <p>Everything your AI needs to know about VDO.Ninja SDK in one document</p>
+                </div>
+                <div class="ai-actions">
+                    <button class="btn btn-primary" onclick="copyAIIntegration()">
+                        <span class="copy-icon">📋</span>
+                        <span class="copy-text">Copy AI Integration Guide</span>
+                    </button>
+                    <a href="AI-INTEGRATION.md" class="btn btn-secondary" target="_blank">
+                        <span>📄</span> View Full Document
+                    </a>
+                </div>
+                <div class="ai-features">
+                    <div class="ai-feature">
+                        <span class="checkmark">✓</span>
+                        <span>Complete API reference with examples</span>
+                    </div>
+                    <div class="ai-feature">
+                        <span class="checkmark">✓</span>
+                        <span>Ready-to-use code patterns</span>
+                    </div>
+                    <div class="ai-feature">
+                        <span class="checkmark">✓</span>
+                        <span>AI-specific implementation guides</span>
+                    </div>
+                    <div class="ai-feature">
+                        <span class="checkmark">✓</span>
+                        <span>No authentication required</span>
+                    </div>
+                </div>
+                <div class="ai-preview">
+                    <h4>Quick Example for Your AI:</h4>
+                    <pre><code class="language-javascript">// Minimal AI Bot Setup
+const vdo = new VDONinja();
+vdo.onDataMessage = (data, uid) => {
+    // AI processes incoming data
+    const response = processWithAI(data);
+    vdo.sendDataTo(uid, response);
+};
+await vdo.connect({ 
+    roomid: "ai-bot", 
+    push: true, 
+    view: true, 
+    datamode: 1  // Data only, no media
+});</code></pre>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="docs" class="section section-alt">
+        <div class="container">
+            <h2 class="section-title">Documentation</h2>
+            <div class="docs-content">
+                <div class="docs-section">
+                    <h3>Core Concepts</h3>
+                    <ul>
+                        <li><strong>Rooms:</strong> Virtual spaces where peers connect</li>
+                        <li><strong>Push/View:</strong> Push to send, View to receive</li>
+                        <li><strong>Data Channels:</strong> Low-latency P2P data transfer</li>
+                        <li><strong>Mesh Networks:</strong> Every peer can connect directly to every other peer</li>
+                        <li><strong>End-to-End Encryption:</strong> All data is encrypted between peers using DTLS/SRTP</li>
+                        <li><strong>No Signaling Server:</strong> After initial handshake, all communication is P2P</li>
+                    </ul>
+                </div>
+
+                <div class="docs-section">
+                    <h3>Connection Options</h3>
+                    <pre><code class="language-javascript">{
+    roomid: "string",      // Room identifier
+    push: true,            // Enable sending
+    view: true,            // Enable receiving
+    audio: true,           // Enable audio
+    video: true,           // Enable video
+    datamode: 1,           // Data-only mode (no media)
+    bitrate: 1000,         // Target bitrate (kbps)
+    codec: "vp8",          // Video codec
+    turn: true,            // Use TURN servers
+    secure: true           // Require encryption
+}</code></pre>
+                </div>
+
+                <div class="docs-section">
+                    <h3>Event Handlers</h3>
+                    <pre><code class="language-javascript">vdo.onConnect = (uid) => { /* Peer connected */ };
+vdo.onDisconnect = (uid) => { /* Peer disconnected */ };
+vdo.onVideoStream = (stream, uid) => { /* Video received */ };
+vdo.onAudioStream = (stream, uid) => { /* Audio received */ };
+vdo.onDataMessage = (data, uid) => { /* Data received */ };
+vdo.onError = (error) => { /* Handle errors */ };</code></pre>
+                </div>
+
+                <div class="docs-section">
+                    <h3>Alternatives</h3>
+                    <p><strong>VDO.Ninja IFRAME API:</strong> For simpler web-only integration where cross-domain use is allowed.</p>
+                    <p><strong>Platform-Specific:</strong> Flutter app for mobile, Raspberry Ninja for Python, React Native version coming soon.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="section" id="vdo-ecosystem">
+        <div class="container">
+            <h2 class="section-title">🎯 Built-in Compatibility with VDO.Ninja</h2>
+            <div class="vdo-integration">
+                <div class="integration-hero">
+                    <h3>Your SDK Apps Work with VDO.Ninja Out of the Box!</h3>
+                    <p>Every app you build with the SDK is automatically compatible with the entire VDO.Ninja ecosystem. This means you get:</p>
+                </div>
+                <div class="integration-benefits">
+                    <div class="benefit-card">
+                        <div class="benefit-icon">🎨</div>
+                        <h4>Pre-Built Professional UI</h4>
+                        <p>Use VDO.Ninja's polished interface to invite guests, manage rooms, and control settings - no UI development needed.</p>
+                    </div>
+                    <div class="benefit-card">
+                        <div class="benefit-icon">🎬</div>
+                        <h4>Free Video Mixer & Layouts</h4>
+                        <p>Access VDO.Ninja's director view with multi-camera switching, scene layouts, and professional mixing tools.</p>
+                    </div>
+                    <div class="benefit-card">
+                        <div class="benefit-icon">📹</div>
+                        <h4>OBS Studio Integration</h4>
+                        <p>Stream your SDK app directly into OBS using VDO.Ninja's proven integration - perfect for Twitch, YouTube, etc.</p>
+                    </div>
+                    <div class="benefit-card">
+                        <div class="benefit-icon">⏺️</div>
+                        <h4>Cloud Recording Options</h4>
+                        <p>Record to your own server or use VDO.Ninja's recording features for next-gen multimedia experiences.</p>
+                    </div>
+                </div>
+                <div class="integration-example">
+                    <h4>Real Example: Social Stream Ninja</h4>
+                    <div class="example-content">
+                        <p><strong>The Challenge:</strong> Social Stream Ninja handles massive amounts of real-time chat data from multiple platforms. Using traditional WebSockets would cost thousands in server bandwidth.</p>
+                        <p><strong>The Solution:</strong> By using VDO.Ninja's P2P infrastructure, Social Stream routes chat data directly between streamers and their tools. The handshake cost is insignificant compared to relaying all that data through servers.</p>
+                        <p><strong>The Result:</strong> A completely free service that would be financially impossible with traditional architecture. This is the power of P2P - turning expensive impossibilities into free realities.</p>
+                    </div>
+                </div>
+                <div class="integration-cta">
+                    <p>Build your app with the SDK, and instantly tap into VDO.Ninja's proven ecosystem</p>
+                    <div class="ecosystem-links">
+                        <a href="https://vdo.ninja" target="_blank" class="btn btn-secondary">Explore VDO.Ninja</a>
+                        <a href="https://socialstream.ninja" target="_blank" class="btn btn-secondary">See Social Stream Ninja</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="faq" class="section">
+        <div class="container">
+            <h2 class="section-title">Frequently Asked Questions</h2>
+            <div class="faq-grid">
+                <div class="faq-item">
+                    <h3>Do I need to run my own server?</h3>
+                    <p>No! After the initial WebRTC handshake (using our free TURN servers), all communication is peer-to-peer. You don't need any server infrastructure.</p>
+                </div>
+                <div class="faq-item">
+                    <h3>Is it really free?</h3>
+                    <p>Yes, completely free. No hidden costs, no premium tiers, no usage limits. The P2P architecture means minimal server costs which we cover.</p>
+                </div>
+                <div class="faq-item">
+                    <h3>How is this different from Socket.io or WebSockets?</h3>
+                    <p>WebSockets require a server to relay all messages. VDO.Ninja SDK creates direct P2P connections between browsers, resulting in lower latency and no server costs.</p>
+                </div>
+                <div class="faq-item">
+                    <h3>What about firewalls and NAT?</h3>
+                    <p>We provide free TURN servers that help establish connections even through restrictive firewalls and NAT. It works in most network environments.</p>
+                </div>
+                <div class="faq-item">
+                    <h3>Can AI bots use this without human intervention?</h3>
+                    <p>Absolutely! No CAPTCHA, no email verification, no accounts. Just connect with a room ID and start communicating. Perfect for automated systems.</p>
+                </div>
+                <div class="faq-item">
+                    <h3>What's the latency like?</h3>
+                    <p>Since it's P2P, latency is typically just the network distance between peers - often under 50ms for users in the same region, compared to 100-200ms+ for server-relayed solutions.</p>
+                </div>
+                <div class="faq-item">
+                    <h3>How many peers can connect?</h3>
+                    <p>For full mesh networks (everyone connected to everyone): ~5-10 peers optimal. For broadcast mode (one-to-many): 50+ viewers. The SDK supports various network topologies including star, mesh, and hybrid configurations.</p>
+                </div>
+                <div class="faq-item">
+                    <h3>Is it secure?</h3>
+                    <p>Yes. All P2P connections use DTLS encryption by default. Data channels are end-to-end encrypted. No data passes through our servers after connection establishment.</p>
+                </div>
+                <div class="faq-item">
+                    <h3>Can I use this commercially?</h3>
+                    <p>Yes! The AGPLv3 license allows commercial use. You must share any modifications to the SDK itself, but your application code remains yours.</p>
+                </div>
+                <div class="faq-item">
+                    <h3>What browsers are supported?</h3>
+                    <p>All modern browsers: Chrome/Edge 80+, Firefox 75+, Safari 14+. Mobile browsers with WebRTC support work too.</p>
+                </div>
+                <div class="faq-item">
+                    <h3>How do I handle reconnections?</h3>
+                    <p>The SDK includes automatic reconnection logic. Just call <code>vdo.reconnect()</code> or handle the <code>onDisconnect</code> event.</p>
+                </div>
+                <div class="faq-item">
+                    <h3>Where can I get help?</h3>
+                    <p>Join our <a href="https://discord.vdo.ninja" target="_blank">Discord community</a>, check <a href="https://github.com/steveseguin/ninjasdk/issues" target="_blank">GitHub issues</a>, or refer to the documentation.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="comparison" class="section section-alt">
+        <div class="container">
+            <h2 class="section-title">How VDO.Ninja SDK Compares</h2>
+            <div class="comparison-table">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Feature</th>
+                            <th class="highlight">VDO.Ninja SDK</th>
+                            <th>Socket.io</th>
+                            <th>Firebase</th>
+                            <th>WebRTC (raw)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Server Required</td>
+                            <td class="highlight">❌ No (P2P)</td>
+                            <td>✅ Yes</td>
+                            <td>✅ Yes (Cloud)</td>
+                            <td>❌ No</td>
+                        </tr>
+                        <tr>
+                            <td>Setup Complexity</td>
+                            <td class="highlight">Simple (5 lines)</td>
+                            <td>Moderate</td>
+                            <td>Moderate</td>
+                            <td>Complex</td>
+                        </tr>
+                        <tr>
+                            <td>Latency</td>
+                            <td class="highlight">Lowest (P2P)</td>
+                            <td>Higher (Server relay)</td>
+                            <td>Higher (Cloud relay)</td>
+                            <td>Lowest (P2P)</td>
+                        </tr>
+                        <tr>
+                            <td>Cost</td>
+                            <td class="highlight">Free</td>
+                            <td>Server costs</td>
+                            <td>Usage-based pricing</td>
+                            <td>Free</td>
+                        </tr>
+                        <tr>
+                            <td>Audio/Video</td>
+                            <td class="highlight">✅ Built-in</td>
+                            <td>❌ No</td>
+                            <td>❌ No</td>
+                            <td>✅ Yes</td>
+                        </tr>
+                        <tr>
+                            <td>Data Channels</td>
+                            <td class="highlight">✅ Built-in</td>
+                            <td>✅ Yes</td>
+                            <td>✅ Yes</td>
+                            <td>✅ Yes</td>
+                        </tr>
+                        <tr>
+                            <td>NAT Traversal</td>
+                            <td class="highlight">✅ Automatic</td>
+                            <td>N/A</td>
+                            <td>N/A</td>
+                            <td>Manual setup</td>
+                        </tr>
+                        <tr>
+                            <td>AI Bot Friendly</td>
+                            <td class="highlight">✅ Designed for it</td>
+                            <td>⚠️ Needs auth setup</td>
+                            <td>⚠️ Needs auth setup</td>
+                            <td>⚠️ Complex</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+
+    <section class="section section-alt">
+        <div class="container">
+            <h2 class="section-title">Value Proposition Checklist</h2>
+            <div class="checklist">
+                <div class="checklist-item">✓ Zero server costs for end users</div>
+                <div class="checklist-item">✓ No user registration or authentication required</div>
+                <div class="checklist-item">✓ End-to-end encrypted by default</div>
+                <div class="checklist-item">✓ Works without SSL for local/development use</div>
+                <div class="checklist-item">✓ AI bot friendly - no CAPTCHA or human verification</div>
+                <div class="checklist-item">✓ Automatic NAT traversal and firewall bypassing</div>
+                <div class="checklist-item">✓ Scales horizontally with P2P architecture</div>
+                <div class="checklist-item">✓ Battle-tested in production with VDO.Ninja</div>
+                <div class="checklist-item">✓ Active development and community support</div>
+                <div class="checklist-item">✓ Multiple platform support (Web, Node.js, Mobile)</div>
+            </div>
+        </div>
+    </section>
+
+    <section id="download" class="section">
+        <div class="container">
+            <h2 class="section-title">Download & Install</h2>
+            <div class="download-grid">
+                <div class="download-option">
+                    <h3>📦 CDN (Recommended)</h3>
+                    <p>Always get the latest version automatically</p>
+                    <pre><code class="language-html">&lt;script src="https://cdn.jsdelivr.net/gh/steveseguin/ninjasdk@latest/vdoninja-sdk.min.js"&gt;&lt;/script&gt;</code></pre>
+                    <div class="download-meta">
+                        <span class="version-badge">Latest</span>
+                        <span class="size-badge">~45KB minified</span>
+                    </div>
+                </div>
+                <div class="download-option">
+                    <h3>💾 Direct Download</h3>
+                    <p>Download and host the files yourself</p>
+                    <div class="download-buttons">
+                        <a href="vdoninja-sdk.js" download class="btn btn-secondary">
+                            <span>⬇️</span> SDK (Full)
+                        </a>
+                        <a href="vdoninja-sdk.min.js" download class="btn btn-secondary">
+                            <span>⬇️</span> SDK (Minified)
+                        </a>
+                    </div>
+                    <div class="download-meta">
+                        <span class="version-badge">v1.0.0</span>
+                        <span class="license-badge">AGPLv3</span>
+                    </div>
+                </div>
+                <div class="download-option">
+                    <h3>📱 NPM (Coming Soon)</h3>
+                    <p>Install via Node Package Manager</p>
+                    <pre><code class="language-bash">npm install vdoninja-sdk</code></pre>
+                    <div class="download-meta">
+                        <span class="coming-soon">In Development</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <h4>VDO.Ninja SDK</h4>
+                    <p>Free, open-source P2P communication framework</p>
+                    <p class="footer-license">Licensed under AGPLv3</p>
+                </div>
+                <div class="footer-section">
+                    <h4>Links</h4>
+                    <ul>
+                        <li><a href="https://github.com/steveseguin/ninjasdk">GitHub Repository</a></li>
+                        <li><a href="https://vdo.ninja">VDO.Ninja</a></li>
+                        <li><a href="https://socialstream.ninja">Social Stream Ninja</a></li>
+                        <li><a href="#docs">Documentation</a></li>
+                    </ul>
+                </div>
+                <div class="footer-section">
+                    <h4>Community</h4>
+                    <ul>
+                        <li><a href="https://discord.vdo.ninja">Discord</a></li>
+                        <li><a href="https://github.com/steveseguin/ninjasdk/issues">Issues</a></li>
+                        <li><a href="https://github.com/steveseguin/ninjasdk/discussions">Discussions</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2024 VDO.Ninja SDK. Created with ❤️ by the VDO.Ninja community.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="vdoninja-sdk.js"></script>
+    <script>
+        // Smooth scrolling for navigation links
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            });
+        });
+
+        // Copy AI Integration Guide
+        async function copyAIIntegration() {
+            const button = event.currentTarget;
+            const copyIcon = button.querySelector('.copy-icon');
+            const copyText = button.querySelector('.copy-text');
+            
+            try {
+                // Fetch the AI integration document
+                const response = await fetch('AI-INTEGRATION.md');
+                const text = await response.text();
+                
+                // Copy to clipboard
+                await navigator.clipboard.writeText(text);
+                
+                // Update button state
+                copyIcon.textContent = '✅';
+                copyText.textContent = 'Copied to Clipboard!';
+                button.classList.add('copied');
+                
+                // Reset after 3 seconds
+                setTimeout(() => {
+                    copyIcon.textContent = '📋';
+                    copyText.textContent = 'Copy AI Integration Guide';
+                    button.classList.remove('copied');
+                }, 3000);
+            } catch (err) {
+                copyIcon.textContent = '❌';
+                copyText.textContent = 'Failed to copy';
+                console.error('Failed to copy:', err);
+                
+                setTimeout(() => {
+                    copyIcon.textContent = '📋';
+                    copyText.textContent = 'Copy AI Integration Guide';
+                }, 3000);
+            }
+        }
+
+        // Live Demo Functionality
+        let vdo = null;
+        let isConnected = false;
+        const peers = new Map();
+
+        function updateConnectionStatus(connected) {
+            const status = document.getElementById('connectionStatus');
+            const text = document.getElementById('connectionText');
+            const connectBtn = document.getElementById('connectBtn');
+            const messageInput = document.getElementById('messageInput');
+            const sendBtn = document.getElementById('sendBtn');
+
+            console.log('updateConnectionStatus called with:', connected);
+            console.log('messageInput element:', messageInput);
+
+            if (connected) {
+                status.classList.add('connected');
+                text.textContent = 'Connected';
+                connectBtn.textContent = 'Disconnect';
+                if (messageInput) {
+                    messageInput.disabled = false;
+                    messageInput.removeAttribute('disabled');
+                    console.log('messageInput disabled state:', messageInput.disabled);
+                }
+                if (sendBtn) {
+                    sendBtn.disabled = false;
+                }
+            } else {
+                status.classList.remove('connected');
+                text.textContent = 'Not connected';
+                connectBtn.textContent = 'Connect';
+                if (messageInput) {
+                    messageInput.disabled = true;
+                }
+                if (sendBtn) {
+                    sendBtn.disabled = true;
+                }
+            }
+        }
+
+        function displayMessage(data, uid, isSelf = false) {
+            const messageArea = document.getElementById('messageArea');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${isSelf ? 'message-self' : 'message-other'}`;
+            
+            const time = new Date().toLocaleTimeString();
+            const sender = isSelf ? 'You' : `Peer ${uid.substring(0, 6)}`;
+            
+            messageDiv.innerHTML = `
+                <div class="message-header">
+                    <span class="message-sender">${sender}</span>
+                    <span class="message-time">${time}</span>
+                </div>
+                <div class="message-content">${data.message || data}</div>
+            `;
+            
+            messageArea.appendChild(messageDiv);
+            messageArea.scrollTop = messageArea.scrollHeight;
+        }
+
+        function updatePeerList() {
+            const peerList = document.getElementById('peerList');
+            if (peers.size === 0) {
+                peerList.innerHTML = '<p class="no-peers">No other peers connected</p>';
+            } else {
+                peerList.innerHTML = '<h4>Connected Peers:</h4>' + 
+                    Array.from(peers.keys()).map(uid => 
+                        `<div class="peer-item">🟢 ${uid.substring(0, 8)}</div>`
+                    ).join('');
+            }
+        }
+
+        async function toggleConnection() {
+            if (!isConnected) {
+                const roomInput = document.getElementById('roomInput');
+                const roomId = roomInput.value.trim() || 'demo-room';
+                
+                try {
+                    vdo = new VDONinja();
+                    
+                    // Set up event handlers
+                    vdo.onConnect = (uid) => {
+                        peers.set(uid, { connected: Date.now() });
+                        updatePeerList();
+                        displayMessage({ message: 'A peer joined the room' }, uid);
+                    };
+                    
+                    vdo.onDisconnect = (uid) => {
+                        peers.delete(uid);
+                        updatePeerList();
+                        displayMessage({ message: 'A peer left the room' }, uid);
+                    };
+                    
+                    vdo.onDataMessage = (data, uid) => {
+                        displayMessage(data, uid);
+                    };
+                    
+                    vdo.onError = (error) => {
+                        console.error('VDO.Ninja Error:', error);
+                        displayMessage({ message: `Error: ${error}` }, 'System');
+                    };
+                    
+                    // Connect
+                    await vdo.connect({
+                        roomid: roomId,
+                        push: true,
+                        view: true,
+                        datamode: 1
+                    });
+                    
+                    isConnected = true;
+                    updateConnectionStatus(true);
+                    displayMessage({ message: `Connected to room: ${roomId}` }, 'System');
+                    
+                    // Force enable the input in case updateConnectionStatus didn't work
+                    document.getElementById('messageInput').disabled = false;
+                    document.getElementById('sendBtn').disabled = false;
+                    
+                } catch (error) {
+                    console.error('Connection failed:', error);
+                    displayMessage({ message: `Failed to connect: ${error.message}` }, 'System');
+                }
+            } else {
+                // Disconnect
+                if (vdo) {
+                    vdo.disconnect();
+                    vdo = null;
+                }
+                peers.clear();
+                isConnected = false;
+                updateConnectionStatus(false);
+                updatePeerList();
+                displayMessage({ message: 'Disconnected from room' }, 'System');
+            }
+        }
+
+        function sendMessage() {
+            const messageInput = document.getElementById('messageInput');
+            const message = messageInput.value.trim();
+            
+            if (message && vdo && isConnected) {
+                const data = {
+                    message: message,
+                    timestamp: Date.now()
+                };
+                
+                vdo.sendData(data);
+                displayMessage(data, 'self', true);
+                messageInput.value = '';
+            }
+        }
+
+        // Enter key to send
+        const messageInputElement = document.getElementById('messageInput');
+        if (messageInputElement) {
+            messageInputElement.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    sendMessage();
+                }
+            });
+        }
+
+        // Initialize peer list
+        updatePeerList();
+        
+        // Set default room name with random suffix
+        const roomInput = document.getElementById('roomInput');
+        const randomSuffix = Math.floor(Math.random() * 10000);
+        roomInput.value = `demo-room-${randomSuffix}`;
+
+        // Mobile navigation
+        function toggleNav() {
+            const navLinks = document.getElementById('navLinks');
+            const navToggle = document.getElementById('navToggle');
+            navLinks.classList.toggle('active');
+            navToggle.classList.toggle('active');
+        }
+
+        // Close mobile nav on link click
+        document.querySelectorAll('.nav-links a').forEach(link => {
+            link.addEventListener('click', () => {
+                const navLinks = document.getElementById('navLinks');
+                const navToggle = document.getElementById('navToggle');
+                navLinks.classList.remove('active');
+                navToggle.classList.remove('active');
+            });
+        });
+    </script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-javascript.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-bash.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-markup.min.js"></script>
+</body>
+</html>

@@ -1,0 +1,1454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VDO.Ninja SDK - Data Channel Messaging Demo</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #1a1a1a;
+            color: #e0e0e0;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        h1 {
+            color: #ffffff;
+            margin-bottom: 10px;
+        }
+        
+        .subtitle {
+            color: #999;
+            font-size: 16px;
+        }
+        
+        .main-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .section {
+            background: #2a2a2a;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+            border: 1px solid #3a3a3a;
+        }
+        
+        h2 {
+            color: #e0e0e0;
+            margin-top: 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .status-indicator {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background-color: #666;
+        }
+        
+        .status-indicator.connected {
+            background-color: #4CAF50;
+        }
+        
+        .control-group {
+            margin-bottom: 15px;
+        }
+        
+        label {
+            display: inline-block;
+            width: 120px;
+            font-weight: bold;
+            color: #b0b0b0;
+        }
+        
+        input[type="text"], select, textarea {
+            width: calc(100% - 130px);
+            padding: 8px;
+            border: 1px solid #444;
+            border-radius: 4px;
+            background-color: #1a1a1a;
+            color: #e0e0e0;
+            font-family: inherit;
+        }
+        
+        textarea {
+            width: 100%;
+            height: 60px;
+            margin-top: 5px;
+            resize: vertical;
+        }
+        
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+            font-size: 14px;
+            transition: background-color 0.3s;
+        }
+        
+        button:hover {
+            background-color: #5cbf60;
+        }
+        
+        button:disabled {
+            background-color: #444;
+            color: #666;
+            cursor: not-allowed;
+        }
+        
+        button.secondary {
+            background-color: #2196F3;
+        }
+        
+        button.secondary:hover {
+            background-color: #42a5f5;
+        }
+        
+        button.danger {
+            background-color: #f44336;
+        }
+        
+        button.danger:hover {
+            background-color: #ff6659;
+        }
+        
+        .message-controls {
+            background-color: #333;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 15px;
+            border: 1px solid #444;
+        }
+        
+        .filter-controls {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        
+        .chat-messages {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #1a1a1a;
+            border: 1px solid #444;
+            border-radius: 4px;
+            height: 250px;
+            overflow-y: auto;
+        }
+        
+        .chat-message {
+            margin-bottom: 10px;
+            padding: 10px;
+            border-radius: 8px;
+            animation: slideIn 0.3s ease-out;
+        }
+        
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+        
+        .chat-message.sent {
+            background-color: #2a4a2a;
+            border-left: 3px solid #4CAF50;
+            margin-left: 20px;
+        }
+        
+        .chat-message.received {
+            background-color: #2a3a4a;
+            border-left: 3px solid #2196F3;
+            margin-right: 20px;
+        }
+        
+        .chat-sender {
+            font-weight: bold;
+            color: #4CAF50;
+            margin-bottom: 5px;
+            font-size: 12px;
+        }
+        
+        .chat-message.received .chat-sender {
+            color: #2196F3;
+        }
+        
+        .chat-text {
+            color: #e0e0e0;
+            word-wrap: break-word;
+        }
+        
+        .chat-time {
+            font-size: 11px;
+            color: #999;
+            margin-top: 5px;
+        }
+        
+        .message-log {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #1a1a1a;
+            border: 1px solid #444;
+            border-radius: 4px;
+            height: 150px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        
+        .message-entry {
+            margin-bottom: 8px;
+            padding: 8px;
+            border-radius: 4px;
+            background-color: #2a2a2a;
+            border-left: 3px solid #444;
+        }
+        
+        .message-entry.sent {
+            border-left-color: #4CAF50;
+        }
+        
+        .message-entry.received {
+            border-left-color: #2196F3;
+        }
+        
+        .message-entry.system {
+            border-left-color: #ff9800;
+            color: #ffb74d;
+        }
+        
+        .message-meta {
+            color: #999;
+            font-size: 11px;
+            margin-bottom: 4px;
+        }
+        
+        .message-content {
+            color: #e0e0e0;
+            word-wrap: break-word;
+        }
+        
+        .peers-list {
+            margin-top: 15px;
+            padding: 10px;
+            background-color: #333;
+            border-radius: 5px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        
+        .peer-item {
+            padding: 8px;
+            margin-bottom: 5px;
+            background-color: #2a2a2a;
+            border-radius: 4px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .peer-info {
+            font-size: 12px;
+        }
+        
+        .peer-uuid {
+            font-family: monospace;
+            color: #66b3ff;
+        }
+        
+        .peer-role {
+            color: #999;
+            font-size: 11px;
+        }
+        
+        .stats {
+            margin-top: 10px;
+            padding: 10px;
+            background-color: #333;
+            border-radius: 5px;
+            font-size: 12px;
+        }
+        
+        .stat-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 5px;
+        }
+        
+        .examples {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #333;
+            border-radius: 5px;
+        }
+        
+        .example-button {
+            font-size: 12px;
+            padding: 5px 10px;
+            margin: 2px;
+        }
+        
+        .pubsub-section {
+            background-color: #2a2a2a;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 15px;
+            border: 1px solid #444;
+        }
+        
+        .pubsub-section h3 {
+            margin-top: 0;
+            font-size: 16px;
+            color: #e0e0e0;
+        }
+        
+        .topic-list {
+            margin: 10px 0;
+            padding: 10px;
+            background-color: #1a1a1a;
+            border-radius: 4px;
+            max-height: 150px;
+            overflow-y: auto;
+        }
+        
+        .topic-item {
+            padding: 5px 10px;
+            margin-bottom: 5px;
+            background-color: #333;
+            border-radius: 4px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .topic-item.subscribed {
+            background-color: #2a4a2a;
+            border: 1px solid #4CAF50;
+        }
+        
+        .topic-name {
+            font-family: monospace;
+            color: #66b3ff;
+        }
+        
+        .topic-actions {
+            display: flex;
+            gap: 5px;
+        }
+        
+        .topic-actions button {
+            font-size: 12px;
+            padding: 3px 8px;
+        }
+        
+        .ping-section {
+            background-color: #333;
+            padding: 10px;
+            border-radius: 5px;
+            margin-top: 10px;
+            border: 1px solid #444;
+        }
+        
+        .ping-results {
+            margin-top: 10px;
+            padding: 10px;
+            background-color: #1a1a1a;
+            border-radius: 4px;
+            max-height: 100px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        
+        .ping-result {
+            padding: 5px;
+            margin-bottom: 3px;
+            border-radius: 3px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            animation: fadeIn 0.3s ease-in;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        .ping-result.sent {
+            background-color: #2a3a2a;
+            color: #4CAF50;
+        }
+        
+        .ping-result.received {
+            background-color: #2a2a3a;
+            color: #2196F3;
+        }
+        
+        .ping-latency {
+            font-weight: bold;
+            color: #FFD700;
+        }
+        
+        .no-pings {
+            color: #666;
+            text-align: center;
+            font-style: italic;
+        }
+        
+        @media (max-width: 768px) {
+            .main-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .filter-controls {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>VDO.Ninja SDK - Data Channel Messaging Demo</h1>
+        <div class="subtitle">Real-time messaging, routing, and pub/sub over WebRTC data channels</div>
+        <div class="subtitle" style="margin-top: 10px; font-size: 14px; color: #666;">
+            Messages are automatically wrapped using VDO.Ninja's protocol
+        </div>
+    </div>
+    
+    <div class="main-grid">
+        <!-- Node 1 -->
+        <div class="section">
+            <h2>
+                <span class="status-indicator" id="node1Status"></span>
+                Node 1
+            </h2>
+            
+            <div class="control-group">
+                <label for="node1Room">Room:</label>
+                <input type="text" id="node1Room" value="datachannel-demo" placeholder="Room name">
+            </div>
+            
+            <div class="control-group">
+                <label for="node1StreamID">Stream ID:</label>
+                <input type="text" id="node1StreamID" value="node1" placeholder="Unique identifier">
+            </div>
+            
+            <div class="control-group">
+                <label for="node1Label">Label:</label>
+                <input type="text" id="node1Label" value="" placeholder="Optional label for filtering">
+            </div>
+            
+            <div class="control-group">
+                <label for="node1Role">Role:</label>
+                <select id="node1Role">
+                    <option value="publisher">Publisher</option>
+                    <option value="viewer">Viewer</option>
+                    <option value="both" selected>Both (Mesh)</option>
+                </select>
+            </div>
+            
+            <div class="control-group">
+                <button id="node1Connect" onclick="connectNode(1)">Connect</button>
+                <button id="node1Disconnect" onclick="disconnectNode(1)" disabled class="danger">Disconnect</button>
+            </div>
+            
+            <div class="message-controls">
+                <h3>💬 Chat</h3>
+                <div class="chat-messages" id="node1Chat" style="margin-bottom: 10px;"></div>
+                <div class="control-group">
+                    <input type="text" id="node1ChatInput" placeholder="Type a message and press Enter" style="width: 100%;" onkeypress="if(event.key==='Enter'){sendChatMessage(1);}">
+                    <button onclick="sendChatMessage(1)" class="secondary" style="margin-top: 5px;">Send Chat</button>
+                </div>
+            </div>
+            
+            <div class="message-controls" style="margin-top: 15px;">
+                <h3>📡 Send Custom Data</h3>
+                <textarea id="node1Message" placeholder='{"type": "custom", "data": "value"}' style="height: 80px;">{
+  "type": "command",
+  "action": "ping"
+}</textarea>
+                
+                <div class="filter-controls">
+                    <div>
+                        <label for="node1FilterType">Target:</label>
+                        <select id="node1FilterType" onchange="updateFilterOptions(1)">
+                            <option value="all">All Connected Peers</option>
+                            <option value="streamID">Specific Stream</option>
+                            <option value="uuid">Specific Peer (UUID)</option>
+                            <option value="viewer">All Viewers</option>
+                            <option value="publisher">All Publishers</option>
+                            <option value="room">Everyone in Room</option>
+                            <option value="label">By Label</option>
+                        </select>
+                    </div>
+                    <div>
+                        <input type="text" id="node1FilterValue" placeholder="Enter value for selected target" disabled style="width: 100%;">
+                    </div>
+                </div>
+                
+                <div style="margin-top: 10px;">
+                    <button onclick="sendMessage(1)" class="secondary">Send Custom Data</button>
+                </div>
+                
+                <div class="examples">
+                    <strong>Quick Examples:</strong><br>
+                    <button class="example-button" onclick="setExample(1, 'chat')">Chat</button>
+                    <button class="example-button" onclick="setExample(1, 'command')">Command</button>
+                    <button class="example-button" onclick="setExample(1, 'data')">Data</button>
+                    <button class="example-button" onclick="setExample(1, 'rpc')">RPC Call</button>
+                    <button class="example-button" onclick="setExample(1, 'broadcast')">Broadcast</button>
+                </div>
+            </div>
+            
+            <div class="ping-section">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <h3 style="margin: 0;">🏓 Network Latency</h3>
+                    <button onclick="sendPing(1)" class="secondary">Send Ping</button>
+                </div>
+                <div class="ping-results" id="node1PingResults">
+                    <div class="no-pings">No pings sent yet</div>
+                </div>
+                <div style="font-size: 11px; color: #999; margin-top: 5px;">
+                    Note: Ping/pong tests WebRTC data channel connectivity only
+                </div>
+            </div>
+            
+            <div class="pubsub-section">
+                <h3>📢 Pub/Sub Topics</h3>
+                <div class="control-group">
+                    <input type="text" id="node1TopicInput" placeholder="Enter topic name (e.g., sensor/temperature)" style="width: 70%;">
+                    <button onclick="subscribeTopic(1)" class="secondary" style="width: 25%;">Subscribe</button>
+                </div>
+                <div class="topic-list" id="node1Topics">
+                    <div style="color: #666; text-align: center;">No subscriptions yet</div>
+                </div>
+            </div>
+            
+            <div class="peers-list" id="node1Peers">
+                <strong>Connected Peers:</strong>
+                <div id="node1PeersList"></div>
+            </div>
+            
+            <div class="stats" id="node1Stats">
+                <div class="stat-item">
+                    <span>Messages Sent:</span>
+                    <span id="node1Sent">0</span>
+                </div>
+                <div class="stat-item">
+                    <span>Messages Received:</span>
+                    <span id="node1Received">0</span>
+                </div>
+                <div class="stat-item">
+                    <span>Average Latency:</span>
+                    <span id="node1Latency">-</span>
+                </div>
+            </div>
+            
+            <h3 style="margin-top: 20px;">📋 System Log</h3>
+            <div class="message-log" id="node1Log"></div>
+        </div>
+        
+        <!-- Node 2 -->
+        <div class="section">
+            <h2>
+                <span class="status-indicator" id="node2Status"></span>
+                Node 2
+            </h2>
+            
+            <div class="control-group">
+                <label for="node2Room">Room:</label>
+                <input type="text" id="node2Room" value="datachannel-demo" placeholder="Room name">
+            </div>
+            
+            <div class="control-group">
+                <label for="node2StreamID">Stream ID:</label>
+                <input type="text" id="node2StreamID" value="node2" placeholder="Unique identifier">
+            </div>
+            
+            <div class="control-group">
+                <label for="node2Label">Label:</label>
+                <input type="text" id="node2Label" value="" placeholder="Optional label for filtering">
+            </div>
+            
+            <div class="control-group">
+                <label for="node2Role">Role:</label>
+                <select id="node2Role">
+                    <option value="publisher">Publisher</option>
+                    <option value="viewer">Viewer</option>
+                    <option value="both" selected>Both (Mesh)</option>
+                </select>
+            </div>
+            
+            <div class="control-group">
+                <button id="node2Connect" onclick="connectNode(2)">Connect</button>
+                <button id="node2Disconnect" onclick="disconnectNode(2)" disabled class="danger">Disconnect</button>
+            </div>
+            
+            <div class="message-controls">
+                <h3>💬 Chat</h3>
+                <div class="chat-messages" id="node2Chat" style="margin-bottom: 10px;"></div>
+                <div class="control-group">
+                    <input type="text" id="node2ChatInput" placeholder="Type a message and press Enter" style="width: 100%;" onkeypress="if(event.key==='Enter'){sendChatMessage(2);}">
+                    <button onclick="sendChatMessage(2)" class="secondary" style="margin-top: 5px;">Send Chat</button>
+                </div>
+            </div>
+            
+            <div class="message-controls" style="margin-top: 15px;">
+                <h3>📡 Send Custom Data</h3>
+                <textarea id="node2Message" placeholder='{"type": "custom", "data": "value"}' style="height: 80px;">{
+  "type": "response",
+  "text": "ACK from Node 2"
+}</textarea>
+                
+                <div class="filter-controls">
+                    <div>
+                        <label for="node2FilterType">Target:</label>
+                        <select id="node2FilterType" onchange="updateFilterOptions(2)">
+                            <option value="all">All Connected Peers</option>
+                            <option value="streamID">Specific Stream</option>
+                            <option value="uuid">Specific Peer (UUID)</option>
+                            <option value="viewer">All Viewers</option>
+                            <option value="publisher">All Publishers</option>
+                            <option value="room">Everyone in Room</option>
+                            <option value="label">By Label</option>
+                        </select>
+                    </div>
+                    <div>
+                        <input type="text" id="node2FilterValue" placeholder="Enter value for selected target" disabled style="width: 100%;">
+                    </div>
+                </div>
+                
+                <div style="margin-top: 10px;">
+                    <button onclick="sendMessage(2)" class="secondary">Send Custom Data</button>
+                </div>
+                
+                <div class="examples">
+                    <strong>Quick Examples:</strong><br>
+                    <button class="example-button" onclick="setExample(2, 'chat')">Chat</button>
+                    <button class="example-button" onclick="setExample(2, 'command')">Command</button>
+                    <button class="example-button" onclick="setExample(2, 'data')">Data</button>
+                    <button class="example-button" onclick="setExample(2, 'rpc')">RPC Response</button>
+                    <button class="example-button" onclick="setExample(2, 'subscribe')">Subscribe</button>
+                </div>
+            </div>
+            
+            <div class="ping-section">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <h3 style="margin: 0;">🏓 Network Latency</h3>
+                    <button onclick="sendPing(2)" class="secondary">Send Ping</button>
+                </div>
+                <div class="ping-results" id="node2PingResults">
+                    <div class="no-pings">No pings sent yet</div>
+                </div>
+                <div style="font-size: 11px; color: #999; margin-top: 5px;">
+                    Note: Ping/pong tests WebRTC data channel connectivity only
+                </div>
+            </div>
+            
+            <div class="pubsub-section">
+                <h3>📢 Pub/Sub Topics</h3>
+                <div class="control-group">
+                    <input type="text" id="node2TopicInput" placeholder="Enter topic name (e.g., sensor/temperature)" style="width: 70%;">
+                    <button onclick="subscribeTopic(2)" class="secondary" style="width: 25%;">Subscribe</button>
+                </div>
+                <div class="topic-list" id="node2Topics">
+                    <div style="color: #666; text-align: center;">No subscriptions yet</div>
+                </div>
+            </div>
+            
+            <div class="peers-list" id="node2Peers">
+                <strong>Connected Peers:</strong>
+                <div id="node2PeersList"></div>
+            </div>
+            
+            <div class="stats" id="node2Stats">
+                <div class="stat-item">
+                    <span>Messages Sent:</span>
+                    <span id="node2Sent">0</span>
+                </div>
+                <div class="stat-item">
+                    <span>Messages Received:</span>
+                    <span id="node2Received">0</span>
+                </div>
+                <div class="stat-item">
+                    <span>Average Latency:</span>
+                    <span id="node2Latency">-</span>
+                </div>
+            </div>
+            
+            <h3 style="margin-top: 20px;">📋 System Log</h3>
+            <div class="message-log" id="node2Log"></div>
+        </div>
+    </div>
+    
+    <!-- Load the SDK -->
+    <script src="vdoninja-sdk.js"></script>
+    
+    <script>
+        // Node instances
+        const nodes = {
+            1: { sdk: null, stats: { sent: 0, received: 0, latencies: [] }, topics: new Set() },
+            2: { sdk: null, stats: { sent: 0, received: 0, latencies: [] }, topics: new Set() }
+        };
+        
+        // Example messages
+        const examples = {
+            chat: {
+                type: 'chat',
+                text: 'Hello from Node!',
+                timestamp: Date.now()
+            },
+            command: {
+                type: 'command',
+                action: 'startRecording',
+                params: { quality: 'high', format: 'mp4' }
+            },
+            data: {
+                type: 'data',
+                sensor: 'temperature',
+                value: 23.5,
+                unit: 'celsius',
+                timestamp: Date.now()
+            },
+            rpc: {
+                type: 'rpc',
+                method: 'getStatus',
+                id: Math.random().toString(36).substr(2, 9),
+                params: {}
+            },
+            broadcast: {
+                type: 'broadcast',
+                event: 'userJoined',
+                data: { username: 'User123', timestamp: Date.now() }
+            },
+            subscribe: {
+                type: 'subscribe',
+                topic: 'sensor/temperature',
+                callback: 'temp_updates'
+            },
+            response: {
+                type: 'response',
+                text: 'Hello from Node 2!',
+                timestamp: Date.now()
+            }
+        };
+        
+        // Connect a node
+        async function connectNode(nodeId) {
+            const room = document.getElementById(`node${nodeId}Room`).value;
+            const streamID = document.getElementById(`node${nodeId}StreamID`).value;
+            const label = document.getElementById(`node${nodeId}Label`).value;
+            const role = document.getElementById(`node${nodeId}Role`).value;
+            
+            if (!streamID) {
+                alert('Stream ID is required');
+                return;
+            }
+            
+            logMessage(nodeId, `Connecting to room: ${room || 'global'}, streamID: ${streamID}`, 'system');
+            
+            // Create SDK instance
+            const sdk = new VDONinjaSDK({
+                room: room || null,
+                password: false, // No encryption for this demo
+                debug: true
+            });
+            
+            nodes[nodeId].sdk = sdk;
+            nodes[nodeId].peers = new Map();
+            nodes[nodeId].room = room;
+            nodes[nodeId].streamID = streamID;
+            nodes[nodeId].label = label;
+            nodes[nodeId].role = role;
+            
+            // Setup event listeners
+            sdk.addEventListener('connected', () => {
+                logMessage(nodeId, 'Connected to signaling server', 'system');
+                updateStatus(nodeId, true);
+                document.getElementById(`node${nodeId}Connect`).disabled = true;
+                document.getElementById(`node${nodeId}Disconnect`).disabled = false;
+                
+                // Disable connection settings
+                document.getElementById(`node${nodeId}Room`).disabled = true;
+                document.getElementById(`node${nodeId}StreamID`).disabled = true;
+                document.getElementById(`node${nodeId}Label`).disabled = true;
+                document.getElementById(`node${nodeId}Role`).disabled = true;
+            });
+            
+            sdk.addEventListener('disconnected', () => {
+                logMessage(nodeId, 'Disconnected from signaling server', 'system');
+                updateStatus(nodeId, false);
+                document.getElementById(`node${nodeId}Connect`).disabled = false;
+                document.getElementById(`node${nodeId}Disconnect`).disabled = true;
+                
+                // Re-enable connection settings
+                document.getElementById(`node${nodeId}Room`).disabled = false;
+                document.getElementById(`node${nodeId}StreamID`).disabled = false;
+                document.getElementById(`node${nodeId}Label`).disabled = false;
+                document.getElementById(`node${nodeId}Role`).disabled = false;
+            });
+            
+            sdk.addEventListener('peerConnected', (event) => {
+                const peer = {
+                    uuid: event.detail.uuid,
+                    streamID: event.detail.streamID,
+                    role: event.detail.role || 'unknown',
+                    label: event.detail.label,
+                    room: room
+                };
+                nodes[nodeId].peers.set(event.detail.uuid, peer);
+                logMessage(nodeId, `Peer connected: ${event.detail.uuid} (${event.detail.streamID || 'unknown'})`, 'system');
+                updatePeersList(nodeId);
+            });
+            
+            sdk.addEventListener('peerDisconnected', (event) => {
+                nodes[nodeId].peers.delete(event.detail.uuid);
+                logMessage(nodeId, `Peer disconnected: ${event.detail.uuid}`, 'system');
+                updatePeersList(nodeId);
+            });
+            
+            sdk.addEventListener('dataChannelOpen', (event) => {
+                logMessage(nodeId, `Data channel opened with: ${event.detail.uuid}`, 'system');
+            });
+            
+            sdk.addEventListener('dataReceived', (event) => {
+                handleDataReceived(nodeId, event.detail);
+            });
+            
+            sdk.addEventListener('peerLatency', (event) => {
+                nodes[nodeId].stats.latencies.push(event.detail.latency);
+                if (nodes[nodeId].stats.latencies.length > 10) {
+                    nodes[nodeId].stats.latencies.shift();
+                }
+                updateStats(nodeId);
+            });
+            
+            // Handle room listings for mesh mode
+            sdk.addEventListener('listing', async (event) => {
+                if (event.detail.list) {
+                    logMessage(nodeId, `Found ${event.detail.list.length} peers in room`, 'system');
+                    
+                    // In mesh mode, automatically view other peers
+                    if (role === 'both' && room) {
+                        for (const peer of event.detail.list) {
+                            if (peer.streamID && peer.streamID !== streamID) {
+                                logMessage(nodeId, `Mesh mode: Auto-viewing peer ${peer.streamID}`, 'system');
+                                try {
+                                    await sdk.quickView({
+                                        streamID: peer.streamID,
+                                        password: false,
+                                        audio: true,
+                                        video: true
+                                    });
+                                } catch (error) {
+                                    logMessage(nodeId, `Failed to view ${peer.streamID}: ${error.message}`, 'system');
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+            
+            // Connect based on role
+            try {
+                await sdk.connect();
+                
+                if (role === 'publisher' || role === 'both') {
+                    // Use announce for data-only connections (no media stream)
+                    await sdk.announce({
+                        streamID: streamID,
+                        room: room || undefined,
+                        label: label || undefined
+                    });
+                    
+                    logMessage(nodeId, `Announced as: ${streamID} (data-only)`, 'system');
+                }
+                
+                if (role === 'viewer' || role === 'both') {
+                    // In mesh mode, we might need to view multiple streams
+                    if (role === 'both' && room) {
+                        // Join room to discover other peers
+                        await sdk.joinRoom({ room: room });
+                        
+                        // View other streams in the room after a brief delay
+                        setTimeout(async () => {
+                            logMessage(nodeId, 'Looking for other streams in mesh mode...', 'system');
+                            // The listing event will handle discovering peers
+                        }, 1000);
+                    }
+                }
+                
+            } catch (error) {
+                logMessage(nodeId, `Connection error: ${error.message}`, 'system');
+                console.error('Connection error:', error);
+            }
+        }
+        
+        // Disconnect a node
+        function disconnectNode(nodeId) {
+            if (nodes[nodeId].sdk) {
+                nodes[nodeId].sdk.disconnect();
+                nodes[nodeId].sdk = null;
+                nodes[nodeId].peers = new Map();
+                nodes[nodeId].topics.clear();
+                updatePeersList(nodeId);
+                updateTopicsList(nodeId);
+                
+                // Clear chat
+                document.getElementById(`node${nodeId}Chat`).innerHTML = '';
+                
+                // Re-enable connection settings (in case disconnect event doesn't fire)
+                document.getElementById(`node${nodeId}Room`).disabled = false;
+                document.getElementById(`node${nodeId}StreamID`).disabled = false;
+                document.getElementById(`node${nodeId}Label`).disabled = false;
+                document.getElementById(`node${nodeId}Role`).disabled = false;
+            }
+        }
+        
+        // Send a message
+        function sendMessage(nodeId) {
+            const sdk = nodes[nodeId].sdk;
+            if (!sdk) {
+                alert('Not connected');
+                return;
+            }
+            
+            const messageText = document.getElementById(`node${nodeId}Message`).value;
+            let message;
+            
+            try {
+                message = JSON.parse(messageText);
+            } catch (e) {
+                // If not JSON, send as plain text message
+                message = { type: 'text', content: messageText };
+            }
+            
+            // Add metadata
+            message._meta = {
+                from: nodes[nodeId].streamID,
+                timestamp: Date.now(),
+                nodeId: nodeId
+            };
+            
+            // Get filter settings
+            const filterType = document.getElementById(`node${nodeId}FilterType`).value;
+            const filterValue = document.getElementById(`node${nodeId}FilterValue`).value;
+            
+            // Find target peers based on filter
+            const targetPeers = getFilteredPeers(nodeId, filterType, filterValue);
+            
+            if (targetPeers.length === 0) {
+                logMessage(nodeId, 'No peers match the filter criteria', 'system');
+                return;
+            }
+            
+            // Send based on filter type
+            if (filterType === 'viewer' || filterType === 'publisher') {
+                // Use type targeting
+                const options = { type: filterType };
+                if (filterValue) {
+                    options.uuid = filterValue; // Optional UUID to target specific peer
+                }
+                const sent = sdk.sendData(message, options);
+                if (sent) {
+                    nodes[nodeId].stats.sent++;
+                    logMessage(nodeId, `Sent to ${filterType} connections: ${JSON.stringify(message)}`, 'sent');
+                } else {
+                    logMessage(nodeId, `No ${filterType} connections available`, 'system');
+                }
+            } else {
+                // Send to filtered peers
+                targetPeers.forEach(peer => {
+                    const sent = sdk.sendData(message, peer.uuid);
+                    if (sent) {
+                        nodes[nodeId].stats.sent++;
+                        logMessage(nodeId, `Sent to ${peer.uuid}: ${JSON.stringify(message)}`, 'sent');
+                    }
+                });
+            }
+            
+            updateStats(nodeId);
+        }
+        
+        // Send chat message
+        function sendChatMessage(nodeId) {
+            const input = document.getElementById(`node${nodeId}ChatInput`);
+            const message = input.value.trim();
+            
+            if (!message) return;
+            
+            const chatMsg = {
+                type: 'chat',
+                text: message,
+                from: nodes[nodeId].streamID || `Node ${nodeId}`,
+                timestamp: Date.now()
+            };
+            
+            // Send to all peers
+            const sdk = nodes[nodeId].sdk;
+            if (!sdk) {
+                alert('Not connected');
+                return;
+            }
+            
+            const sent = sdk.sendData(chatMsg);
+            if (sent) {
+                nodes[nodeId].stats.sent++;
+                displayChatMessage(nodeId, chatMsg, 'sent');
+                input.value = '';
+                updateStats(nodeId);
+            } else {
+                logMessage(nodeId, 'Failed to send chat message', 'error');
+            }
+        }
+        
+        // Display chat message
+        function displayChatMessage(nodeId, message, direction) {
+            const chatDiv = document.getElementById(`node${nodeId}Chat`);
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `chat-message ${direction}`;
+            
+            const time = new Date(message.timestamp || Date.now()).toLocaleTimeString();
+            
+            messageDiv.innerHTML = `
+                <div class="chat-sender">${message.from || 'Unknown'}</div>
+                <div class="chat-text">${message.text}</div>
+                <div class="chat-time">${time}</div>
+            `;
+            
+            chatDiv.appendChild(messageDiv);
+            chatDiv.scrollTop = chatDiv.scrollHeight;
+            
+            // Keep only last 50 messages
+            while (chatDiv.children.length > 50) {
+                chatDiv.removeChild(chatDiv.firstChild);
+            }
+        }
+        
+        // Subscribe to topic
+        function subscribeTopic(nodeId) {
+            const input = document.getElementById(`node${nodeId}TopicInput`);
+            const topic = input.value.trim();
+            
+            if (!topic) return;
+            
+            const sdk = nodes[nodeId].sdk;
+            if (!sdk) {
+                alert('Not connected');
+                return;
+            }
+            
+            // Add to local subscriptions
+            nodes[nodeId].topics.add(topic);
+            updateTopicsList(nodeId);
+            
+            // Send subscription message
+            const subMsg = {
+                type: 'subscribe',
+                topic: topic,
+                subscriber: nodes[nodeId].streamID || `Node ${nodeId}`
+            };
+            
+            sdk.sendData(subMsg);
+            logMessage(nodeId, `Subscribed to topic: ${topic}`, 'success');
+            input.value = '';
+        }
+        
+        // Unsubscribe from topic
+        function unsubscribeTopic(nodeId, topic) {
+            nodes[nodeId].topics.delete(topic);
+            updateTopicsList(nodeId);
+            
+            const sdk = nodes[nodeId].sdk;
+            if (sdk) {
+                const unsubMsg = {
+                    type: 'unsubscribe',
+                    topic: topic,
+                    subscriber: nodes[nodeId].streamID || `Node ${nodeId}`
+                };
+                sdk.sendData(unsubMsg);
+            }
+            
+            logMessage(nodeId, `Unsubscribed from topic: ${topic}`, 'info');
+        }
+        
+        // Publish to topic
+        function publishToTopic(nodeId, topic) {
+            const data = prompt(`Enter data to publish to ${topic}:`);
+            if (!data) return;
+            
+            const sdk = nodes[nodeId].sdk;
+            if (!sdk) return;
+            
+            const pubMsg = {
+                type: 'publish',
+                topic: topic,
+                data: data,
+                publisher: nodes[nodeId].streamID || `Node ${nodeId}`,
+                timestamp: Date.now()
+            };
+            
+            sdk.sendData(pubMsg);
+            logMessage(nodeId, `Published to ${topic}: ${data}`, 'sent');
+        }
+        
+        // Update topics list UI
+        function updateTopicsList(nodeId) {
+            const container = document.getElementById(`node${nodeId}Topics`);
+            
+            if (nodes[nodeId].topics.size === 0) {
+                container.innerHTML = '<div style="color: #666; text-align: center;">No subscriptions yet</div>';
+                return;
+            }
+            
+            container.innerHTML = '';
+            nodes[nodeId].topics.forEach(topic => {
+                const topicDiv = document.createElement('div');
+                topicDiv.className = 'topic-item subscribed';
+                topicDiv.innerHTML = `
+                    <span class="topic-name">${topic}</span>
+                    <div class="topic-actions">
+                        <button onclick="publishToTopic(${nodeId}, '${topic}')" class="example-button">Publish</button>
+                        <button onclick="unsubscribeTopic(${nodeId}, '${topic}')" class="example-button danger">Unsubscribe</button>
+                    </div>
+                `;
+                container.appendChild(topicDiv);
+            });
+        }
+        
+        // Display ping result
+        function displayPingResult(nodeId, message, latency = null) {
+            const resultsDiv = document.getElementById(`node${nodeId}PingResults`);
+            
+            // Remove "no pings" message if it exists
+            const noPings = resultsDiv.querySelector('.no-pings');
+            if (noPings) {
+                noPings.remove();
+            }
+            
+            const resultDiv = document.createElement('div');
+            resultDiv.className = `ping-result ${latency ? 'received' : 'sent'}`;
+            
+            const time = new Date().toLocaleTimeString();
+            
+            if (latency) {
+                resultDiv.innerHTML = `
+                    <span>🏓 Pong received</span>
+                    <span class="ping-latency">${latency}ms</span>
+                `;
+            } else {
+                resultDiv.innerHTML = `
+                    <span>📡 Ping sent</span>
+                    <span style="color: #999;">${time}</span>
+                `;
+            }
+            
+            resultsDiv.appendChild(resultDiv);
+            resultsDiv.scrollTop = resultsDiv.scrollHeight;
+            
+            // Keep only last 10 results
+            while (resultsDiv.children.length > 10) {
+                resultsDiv.removeChild(resultsDiv.firstChild);
+            }
+        }
+        
+        // Send ping
+        function sendPing(nodeId) {
+            const sdk = nodes[nodeId].sdk;
+            if (!sdk) {
+                alert('Not connected');
+                return;
+            }
+            
+            // Store ping timestamp for tracking
+            if (!nodes[nodeId].pendingPings) {
+                nodes[nodeId].pendingPings = new Map();
+            }
+            
+            const pingId = Math.random().toString(36).substr(2, 9);
+            const timestamp = Date.now();
+            
+            // For publishers, use built-in ping
+            if (nodes[nodeId].role === 'publisher' || nodes[nodeId].role === 'both') {
+                sdk.sendPing();
+                displayPingResult(nodeId, 'Sent ping to all viewers');
+                logMessage(nodeId, 'Sent ping to all viewers', 'sent');
+            } else {
+                // For viewers, send custom ping
+                const ping = {
+                    type: 'ping',
+                    timestamp: timestamp,
+                    pingId: pingId,
+                    _meta: {
+                        from: nodes[nodeId].streamID,
+                        nodeId: nodeId
+                    }
+                };
+                
+                nodes[nodeId].pendingPings.set(pingId, timestamp);
+                
+                const targetPeers = getFilteredPeers(nodeId, 'all', '');
+                targetPeers.forEach(peer => {
+                    sdk.sendData(ping, peer.uuid);
+                });
+                displayPingResult(nodeId, 'Sent custom ping');
+                logMessage(nodeId, 'Sent custom ping', 'sent');
+            }
+        }
+        
+        // Handle incoming data
+        function handleDataReceived(nodeId, detail) {
+            const { data, uuid, streamID, fallback } = detail;
+            
+            nodes[nodeId].stats.received++;
+            
+            // Add fallback indicator to logs if message came via WebSocket
+            const fallbackIndicator = fallback ? ' [via WebSocket fallback]' : '';
+            
+            // Handle special message types
+            if (data && typeof data === 'object') {
+                // Handle chat messages
+                if (data.type === 'chat') {
+                    displayChatMessage(nodeId, data, 'received', fallback);
+                    logMessage(nodeId, `Chat from ${data.from}: ${data.text}${fallbackIndicator}`, 'received');
+                }
+                // Handle pub/sub messages
+                else if (data.type === 'publish') {
+                    // Check if we're subscribed to this topic
+                    if (nodes[nodeId].topics.has(data.topic)) {
+                        logMessage(nodeId, `📢 [${data.topic}] ${data.data} (from ${data.publisher})${fallbackIndicator}`, 'received');
+                        // Could also display in a special pub/sub message area
+                    }
+                }
+                else if (data.type === 'subscribe') {
+                    logMessage(nodeId, `${data.subscriber} subscribed to ${data.topic}${fallbackIndicator}`, 'system');
+                }
+                else if (data.type === 'unsubscribe') {
+                    logMessage(nodeId, `${data.subscriber} unsubscribed from ${data.topic}${fallbackIndicator}`, 'system');
+                }
+                // Handle ping/pong
+                else if (data.type === 'ping' && data._meta) {
+                    // Respond with pong
+                    const sdk = nodes[nodeId].sdk;
+                    const pong = {
+                        type: 'pong',
+                        pingTimestamp: data.timestamp,
+                        pingId: data.pingId,
+                        timestamp: Date.now(),
+                        _meta: {
+                            from: nodes[nodeId].streamID,
+                            nodeId: nodeId
+                        }
+                    };
+                    sdk.sendData(pong, uuid);
+                    logMessage(nodeId, `Received ping from ${data._meta.from}, sent pong${fallbackIndicator}`, 'system');
+                } else if (data.type === 'pong' && data._meta) {
+                    // Calculate latency
+                    const latency = Date.now() - data.pingTimestamp;
+                    nodes[nodeId].stats.latencies.push(latency);
+                    if (nodes[nodeId].stats.latencies.length > 10) {
+                        nodes[nodeId].stats.latencies.shift();
+                    }
+                    
+                    // Display visual ping result
+                    displayPingResult(nodeId, 'Pong received', latency);
+                    logMessage(nodeId, `Pong received. Latency: ${latency}ms`, 'system');
+                    
+                    // Remove from pending pings if tracked
+                    if (data.pingId && nodes[nodeId].pendingPings) {
+                        nodes[nodeId].pendingPings.delete(data.pingId);
+                    }
+                }
+                // Log other message types
+                else {
+                    logMessage(nodeId, `Received ${data.type || 'unknown'} from ${uuid}: ${JSON.stringify(data)}${fallbackIndicator}`, 'received');
+                }
+            } else {
+                // Non-object data
+                logMessage(nodeId, `Received data from ${uuid}: ${data}${fallbackIndicator}`, 'received');
+            }
+            
+            updateStats(nodeId);
+        }
+        
+        // Get filtered peers
+        function getFilteredPeers(nodeId, filterType, filterValue) {
+            const peers = Array.from(nodes[nodeId].peers.values());
+            
+            switch (filterType) {
+                case 'all':
+                    return peers;
+                case 'room':
+                    return peers.filter(p => p.room === filterValue);
+                case 'streamID':
+                    return peers.filter(p => p.streamID === filterValue);
+                case 'label':
+                    return peers.filter(p => p.label === filterValue);
+                case 'role':
+                    return peers.filter(p => p.role === filterValue);
+                case 'uuid':
+                    return peers.filter(p => p.uuid === filterValue);
+                case 'viewer':
+                case 'publisher':
+                    // These are handled differently in sendMessage
+                    return peers;
+                default:
+                    return peers;
+            }
+        }
+        
+        // Update filter options
+        function updateFilterOptions(nodeId) {
+            const filterType = document.getElementById(`node${nodeId}FilterType`).value;
+            const filterValue = document.getElementById(`node${nodeId}FilterValue`);
+            
+            if (filterType === 'all' || filterType === 'viewer' || filterType === 'publisher') {
+                filterValue.disabled = filterType === 'all';
+                filterValue.value = '';
+                if (filterType === 'all') {
+                    filterValue.placeholder = 'No value needed - sends to all peers';
+                } else if (filterType === 'viewer' || filterType === 'publisher') {
+                    filterValue.placeholder = 'Optional: specific UUID to target';
+                }
+            } else {
+                filterValue.disabled = false;
+                
+                // Provide clear hints based on filter type
+                switch (filterType) {
+                    case 'room':
+                        filterValue.placeholder = 'Enter room name to target everyone in that room';
+                        break;
+                    case 'streamID':
+                        filterValue.placeholder = 'Enter stream ID (e.g., node1, publisher1)';
+                        break;
+                    case 'label':
+                        filterValue.placeholder = 'Enter label to target matching peers';
+                        break;
+                    case 'uuid':
+                        filterValue.placeholder = 'Enter exact UUID of target peer';
+                        break;
+                }
+            }
+        }
+        
+        // Set example message
+        function setExample(nodeId, type) {
+            const messageArea = document.getElementById(`node${nodeId}Message`);
+            const example = JSON.parse(JSON.stringify(examples[type])); // Deep clone
+            
+            // Update dynamic values
+            if (example.timestamp) {
+                example.timestamp = Date.now();
+            }
+            if (example.id) {
+                example.id = Math.random().toString(36).substr(2, 9);
+            }
+            
+            messageArea.value = JSON.stringify(example, null, 2);
+        }
+        
+        // Update status indicator
+        function updateStatus(nodeId, connected) {
+            const indicator = document.getElementById(`node${nodeId}Status`);
+            if (connected) {
+                indicator.classList.add('connected');
+            } else {
+                indicator.classList.remove('connected');
+            }
+        }
+        
+        // Update peers list
+        function updatePeersList(nodeId) {
+            const container = document.getElementById(`node${nodeId}PeersList`);
+            const peers = nodes[nodeId].peers;
+            
+            if (!peers || peers.size === 0) {
+                container.innerHTML = '<div style="color: #666; padding: 10px;">No peers connected</div>';
+                return;
+            }
+            
+            container.innerHTML = '';
+            peers.forEach((peer, uuid) => {
+                const peerDiv = document.createElement('div');
+                peerDiv.className = 'peer-item';
+                peerDiv.innerHTML = `
+                    <div class="peer-info">
+                        <div class="peer-uuid">${uuid.substring(0, 8)}...</div>
+                        <div class="peer-role">${peer.streamID || 'unknown'} (${peer.role})</div>
+                    </div>
+                `;
+                container.appendChild(peerDiv);
+            });
+        }
+        
+        // Update statistics
+        function updateStats(nodeId) {
+            const stats = nodes[nodeId].stats;
+            document.getElementById(`node${nodeId}Sent`).textContent = stats.sent;
+            document.getElementById(`node${nodeId}Received`).textContent = stats.received;
+            
+            if (stats.latencies.length > 0) {
+                const avgLatency = stats.latencies.reduce((a, b) => a + b, 0) / stats.latencies.length;
+                document.getElementById(`node${nodeId}Latency`).textContent = `${avgLatency.toFixed(1)}ms`;
+            }
+        }
+        
+        // Log message
+        function logMessage(nodeId, message, type = 'info') {
+            const log = document.getElementById(`node${nodeId}Log`);
+            const entry = document.createElement('div');
+            entry.className = `message-entry ${type}`;
+            
+            const time = new Date().toLocaleTimeString();
+            entry.innerHTML = `
+                <div class="message-meta">[${time}]</div>
+                <div class="message-content">${message}</div>
+            `;
+            
+            log.appendChild(entry);
+            log.scrollTop = log.scrollHeight;
+            
+            // Keep only last 100 messages
+            while (log.children.length > 100) {
+                log.removeChild(log.firstChild);
+            }
+        }
+        
+        // Initialize
+        window.addEventListener('load', () => {
+            // Set up some default examples
+            setExample(1, 'chat');
+            setExample(2, 'response');
+        });
+        
+        // Clean up on page unload
+        window.addEventListener('beforeunload', () => {
+            disconnectNode(1);
+            disconnectNode(2);
+        });
+    </script>
+</body>
+</html>

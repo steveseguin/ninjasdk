@@ -1,0 +1,42 @@
+{
+  "name": "vdoninja-sdk",
+  "version": "1.0.0",
+  "description": "AI-friendly P2P communication SDK for audio, video, and data",
+  "main": "vdoninja-sdk.js",
+  "scripts": {
+    "build": "npm run minify",
+    "minify": "terser vdoninja-sdk.js -o vdoninja-sdk.min.js --compress --mangle",
+    "watch": "npm-watch"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/steveseguin/ninjasdk.git"
+  },
+  "keywords": [
+    "webrtc",
+    "p2p",
+    "peer-to-peer",
+    "video",
+    "audio",
+    "streaming",
+    "vdo.ninja",
+    "ai-friendly",
+    "data-channel"
+  ],
+  "author": "Steve Seguin",
+  "license": "AGPL-3.0",
+  "bugs": {
+    "url": "https://github.com/steveseguin/ninjasdk/issues"
+  },
+  "homepage": "https://github.com/steveseguin/ninjasdk#readme",
+  "devDependencies": {
+    "terser": "^5.31.0",
+    "npm-watch": "^0.13.0"
+  },
+  "watch": {
+    "build": {
+      "patterns": ["vdoninja-sdk.js"],
+      "extensions": "js"
+    }
+  }
+}

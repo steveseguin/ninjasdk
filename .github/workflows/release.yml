@@ -1,0 +1,128 @@
+name: Release and Version
+
+on:
+  push:
+    branches: [ main, master ]
+    paths:
+      - 'vdoninja-sdk.js'
+      - 'package.json'
+  workflow_dispatch:
+    inputs:
+      version_type:
+        description: 'Version type'
+        required: true
+        default: 'patch'
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        
+    - name: Configure Git
+      run: |
+        git config user.name "GitHub Actions Bot"
+        git config user.email "actions@github.com"
+        
+    - name: Determine version bump
+      id: version
+      run: |
+        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          VERSION_TYPE="${{ inputs.version_type }}"
+        else
+          # Auto-detect version type based on commit message
+          COMMIT_MSG=$(git log -1 --pretty=%B)
+          if [[ "$COMMIT_MSG" == *"BREAKING CHANGE"* ]] || [[ "$COMMIT_MSG" == *"!"* ]]; then
+            VERSION_TYPE="major"
+          elif [[ "$COMMIT_MSG" == *"feat"* ]]; then
+            VERSION_TYPE="minor"
+          else
+            VERSION_TYPE="patch"
+          fi
+        fi
+        echo "version_type=$VERSION_TYPE" >> $GITHUB_OUTPUT
+        
+    - name: Bump version
+      run: |
+        npm version ${{ steps.version.outputs.version_type }} --no-git-tag-version
+        NEW_VERSION=$(node -p "require('./package.json').version")
+        echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
+        
+    - name: Update SDK version in file
+      run: |
+        sed -i "1s/.*/\/\/ VDO.Ninja SDK v${{ env.NEW_VERSION }}/" vdoninja-sdk.js
+        
+    - name: Install dependencies
+      run: npm install
+      
+    - name: Build minified version
+      run: npm run build
+      
+    - name: Create Pull Request
+      uses: peter-evans/create-pull-request@v6
+      with:
+        commit-message: "chore: bump version to v${{ env.NEW_VERSION }}"
+        title: "Release v${{ env.NEW_VERSION }}"
+        body: |
+          ## 🚀 Release v${{ env.NEW_VERSION }}
+          
+          This PR was automatically generated to bump the version.
+          
+          ### Changes
+          - Version bumped to v${{ env.NEW_VERSION }}
+          - Updated vdoninja-sdk.js with new version
+          - Regenerated minified build
+          
+          ### Checklist
+          - [ ] Review changes
+          - [ ] Merge to trigger release
+        branch: release/v${{ env.NEW_VERSION }}
+        delete-branch: true
+        
+    - name: Create Release
+      if: github.event_name == 'push'
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: v${{ env.NEW_VERSION }}
+        name: Release v${{ env.NEW_VERSION }}
+        body: |
+          ## VDO.Ninja SDK v${{ env.NEW_VERSION }}
+          
+          ### Installation
+          
+          CDN:
+          ```html
+          <script src="https://cdn.jsdelivr.net/gh/steveseguin/ninjasdk@v${{ env.NEW_VERSION }}/vdoninja-sdk.min.js"></script>
+          ```
+          
+          NPM (coming soon):
+          ```bash
+          npm install vdoninja-sdk@${{ env.NEW_VERSION }}
+          ```
+          
+          ### What's Changed
+          See [commit history](https://github.com/steveseguin/ninjasdk/commits/v${{ env.NEW_VERSION }}) for details.
+          
+        files: |
+          vdoninja-sdk.js
+          vdoninja-sdk.min.js
+          README.md
+        draft: false
+        prerelease: false

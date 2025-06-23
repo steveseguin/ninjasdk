@@ -1,0 +1,797 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VDO.Ninja SDK - Dynamic Media Demo</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #1a1a1a;
+            color: #e0e0e0;
+        }
+        
+        h1 {
+            text-align: center;
+            color: #ffffff;
+            margin-bottom: 10px;
+        }
+        
+        .subtitle {
+            text-align: center;
+            color: #999;
+            font-size: 16px;
+            margin-bottom: 30px;
+        }
+        
+        .warning {
+            background-color: #ff9800;
+            color: #000;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            text-align: center;
+            font-weight: bold;
+        }
+        
+        .main-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        
+        .section {
+            background: #2a2a2a;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+            border: 1px solid #3a3a3a;
+        }
+        
+        h2 {
+            color: #e0e0e0;
+            margin-top: 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .status-indicator {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background-color: #666;
+        }
+        
+        .status-indicator.connected {
+            background-color: #4CAF50;
+        }
+        
+        .control-group {
+            margin-bottom: 15px;
+            padding: 10px;
+            background-color: #333;
+            border-radius: 5px;
+        }
+        
+        .control-group h3 {
+            margin-top: 0;
+            font-size: 16px;
+            color: #4CAF50;
+        }
+        
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+            margin-bottom: 10px;
+            font-size: 14px;
+            transition: background-color 0.3s;
+        }
+        
+        button:hover:not(:disabled) {
+            background-color: #5cbf60;
+        }
+        
+        button:disabled {
+            background-color: #444;
+            color: #666;
+            cursor: not-allowed;
+        }
+        
+        button.stop {
+            background-color: #f44336;
+        }
+        
+        button.stop:hover:not(:disabled) {
+            background-color: #ff6659;
+        }
+        
+        button.secondary {
+            background-color: #2196F3;
+        }
+        
+        button.secondary:hover:not(:disabled) {
+            background-color: #42a5f5;
+        }
+        
+        button.warning {
+            background-color: #ff9800;
+        }
+        
+        button.warning:hover:not(:disabled) {
+            background-color: #ffb143;
+        }
+        
+        .video-container {
+            margin-top: 20px;
+            text-align: center;
+        }
+        
+        video {
+            width: 100%;
+            max-width: 400px;
+            height: 300px;
+            background-color: #000;
+            border-radius: 8px;
+            border: 2px solid #444;
+        }
+        
+        .message-log {
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #1a1a1a;
+            border: 1px solid #444;
+            border-radius: 5px;
+            height: 200px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        
+        .message-entry {
+            padding: 5px;
+            margin-bottom: 5px;
+            border-radius: 3px;
+        }
+        
+        .message-entry.system {
+            background-color: #3a3a1e;
+            border-left: 3px solid #ff9800;
+            color: #ffc947;
+        }
+        
+        .message-entry.success {
+            background-color: #1e3a1e;
+            border-left: 3px solid #4CAF50;
+        }
+        
+        .message-entry.error {
+            background-color: #3a1e1e;
+            border-left: 3px solid #f44336;
+        }
+        
+        .message-entry.data {
+            background-color: #1e2838;
+            border-left: 3px solid #2196F3;
+        }
+        
+        .message-time {
+            color: #666;
+            font-size: 11px;
+            margin-right: 10px;
+        }
+        
+        .connection-state {
+            margin-top: 15px;
+            padding: 10px;
+            background-color: #333;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        
+        .state-item {
+            margin: 5px 0;
+            display: flex;
+            justify-content: space-between;
+        }
+        
+        .state-label {
+            color: #999;
+        }
+        
+        .state-value {
+            color: #4CAF50;
+            font-weight: bold;
+        }
+        
+        .chat-section {
+            margin-top: 20px;
+        }
+        
+        textarea {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #444;
+            border-radius: 4px;
+            background-color: #1a1a1a;
+            color: #e0e0e0;
+            font-family: inherit;
+            margin-bottom: 10px;
+            resize: vertical;
+            height: 60px;
+        }
+        
+        .track-info {
+            margin: 10px 0;
+            padding: 10px;
+            background-color: #1a1a1a;
+            border-radius: 5px;
+            font-size: 12px;
+            border: 1px solid #444;
+        }
+        
+        .track-item {
+            margin: 5px 0;
+            color: #999;
+        }
+        
+        .track-item.active {
+            color: #4CAF50;
+        }
+        
+        @media (max-width: 768px) {
+            .main-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1>🎬 VDO.Ninja SDK - Dynamic Media Demo</h1>
+    <div class="subtitle">Start with data-only connection, dynamically add/remove media tracks</div>
+    
+    <div class="warning">
+        ⚠️ Note: The SDK doesn't fully support adding tracks after announce() yet. 
+        This demo shows the intended pattern for future implementation.
+    </div>
+    
+    <div class="main-grid">
+        <!-- Publisher Section -->
+        <div class="section">
+            <h2>
+                <span class="status-indicator" id="pubStatus"></span>
+                📡 Publisher
+            </h2>
+            
+            <!-- Connection Control -->
+            <div class="control-group">
+                <h3>1️⃣ Start Connection (Data-Only)</h3>
+                <button id="startAnnounce" onclick="startAnnounce()">Start with announce()</button>
+                <button id="stopPublish" class="stop" onclick="stopPublishing()" disabled>Disconnect</button>
+            </div>
+            
+            <!-- Media Controls -->
+            <div class="control-group">
+                <h3>2️⃣ Add Media Dynamically</h3>
+                <button id="addVideo" onclick="addVideo()" disabled>
+                    📹 Add Video Track
+                </button>
+                <button id="addAudio" onclick="addAudio()" disabled>
+                    🎤 Add Audio Track
+                </button>
+                <button id="addScreen" onclick="addScreen()" disabled>
+                    🖥️ Add Screen Share
+                </button>
+            </div>
+            
+            <!-- Track Management -->
+            <div class="control-group">
+                <h3>3️⃣ Manage Tracks</h3>
+                <button id="toggleVideo" onclick="toggleVideo()" disabled>
+                    Toggle Video
+                </button>
+                <button id="toggleAudio" onclick="toggleAudio()" disabled>
+                    Toggle Audio
+                </button>
+                <button id="removeAllTracks" onclick="removeAllTracks()" disabled class="warning">
+                    Remove All Tracks
+                </button>
+            </div>
+            
+            <!-- Active Tracks Display -->
+            <div class="track-info" id="pubTrackInfo">
+                <strong>Active Tracks:</strong>
+                <div id="pubTracks">No tracks active</div>
+            </div>
+            
+            <!-- Chat Section -->
+            <div class="chat-section">
+                <h3>💬 Data Channel Chat</h3>
+                <textarea id="pubMessage" placeholder="Send a message via data channel..."></textarea>
+                <button onclick="sendPublisherMessage()" id="pubSendBtn" disabled>Send Message</button>
+            </div>
+            
+            <!-- Local Video -->
+            <div class="video-container">
+                <video id="localVideo" autoplay muted playsinline></video>
+            </div>
+            
+            <!-- Connection State -->
+            <div class="connection-state">
+                <div class="state-item">
+                    <span class="state-label">Connection Type:</span>
+                    <span class="state-value" id="pubConnectionType">Not Connected</span>
+                </div>
+                <div class="state-item">
+                    <span class="state-label">Media Tracks:</span>
+                    <span class="state-value" id="pubMediaState">None</span>
+                </div>
+                <div class="state-item">
+                    <span class="state-label">Data Channel:</span>
+                    <span class="state-value" id="pubDataState">Closed</span>
+                </div>
+            </div>
+            
+            <!-- Log -->
+            <div class="message-log" id="pubLog"></div>
+        </div>
+        
+        <!-- Viewer Section -->
+        <div class="section">
+            <h2>
+                <span class="status-indicator" id="viewStatus"></span>
+                👁️ Viewer
+            </h2>
+            
+            <!-- Connection Control -->
+            <div class="control-group">
+                <h3>Connect to Publisher</h3>
+                <button id="startView" onclick="startViewing()">Connect as Viewer</button>
+                <button id="stopView" class="stop" onclick="stopViewing()" disabled>Disconnect</button>
+            </div>
+            
+            <!-- Active Tracks Display -->
+            <div class="track-info" id="viewTrackInfo">
+                <strong>Received Tracks:</strong>
+                <div id="viewTracks">No connection</div>
+            </div>
+            
+            <!-- Chat Section -->
+            <div class="chat-section">
+                <h3>💬 Data Channel Chat</h3>
+                <textarea id="viewMessage" placeholder="Send a message via data channel..."></textarea>
+                <button onclick="sendViewerMessage()" id="viewSendBtn" disabled>Send Message</button>
+            </div>
+            
+            <!-- Remote Video -->
+            <div class="video-container">
+                <video id="remoteVideo" autoplay playsinline></video>
+            </div>
+            
+            <!-- Connection State -->
+            <div class="connection-state">
+                <div class="state-item">
+                    <span class="state-label">Connection Status:</span>
+                    <span class="state-value" id="viewConnectionStatus">Not Connected</span>
+                </div>
+                <div class="state-item">
+                    <span class="state-label">Received Tracks:</span>
+                    <span class="state-value" id="viewMediaState">None</span>
+                </div>
+                <div class="state-item">
+                    <span class="state-label">Data Channel:</span>
+                    <span class="state-value" id="viewDataState">Closed</span>
+                </div>
+            </div>
+            
+            <!-- Log -->
+            <div class="message-log" id="viewLog"></div>
+        </div>
+    </div>
+    
+    <!-- Load the SDK -->
+    <script src="vdoninja-sdk.js"></script>
+    
+    <script>
+        // Configuration
+        const ROOM = 'dynamic-media-demo';
+        const STREAM_ID = 'dynamic-publisher';
+        
+        // State
+        let publisher = null;
+        let viewer = null;
+        let localStream = null;
+        let videoTrack = null;
+        let audioTrack = null;
+        let screenTrack = null;
+        
+        // Logging
+        function log(elementId, message, type = 'system') {
+            const logDiv = document.getElementById(elementId);
+            const entry = document.createElement('div');
+            entry.className = `message-entry ${type}`;
+            
+            const time = new Date().toLocaleTimeString();
+            entry.innerHTML = `<span class="message-time">${time}</span>${message}`;
+            
+            logDiv.appendChild(entry);
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+        
+        // Update track display
+        function updateTrackDisplay() {
+            const pubTracks = document.getElementById('pubTracks');
+            const tracks = [];
+            
+            if (videoTrack && videoTrack.enabled) tracks.push('<div class="track-item active">📹 Video: Active</div>');
+            else if (videoTrack) tracks.push('<div class="track-item">📹 Video: Muted</div>');
+            
+            if (audioTrack && audioTrack.enabled) tracks.push('<div class="track-item active">🎤 Audio: Active</div>');
+            else if (audioTrack) tracks.push('<div class="track-item">🎤 Audio: Muted</div>');
+            
+            if (screenTrack) tracks.push('<div class="track-item active">🖥️ Screen Share: Active</div>');
+            
+            pubTracks.innerHTML = tracks.length > 0 ? tracks.join('') : '<div class="track-item">No tracks active</div>';
+            
+            // Update state display
+            const mediaTypes = [];
+            if (videoTrack) mediaTypes.push('Video');
+            if (audioTrack) mediaTypes.push('Audio');
+            if (screenTrack) mediaTypes.push('Screen');
+            
+            document.getElementById('pubMediaState').textContent = mediaTypes.length > 0 ? mediaTypes.join(', ') : 'None';
+        }
+        
+        // Publisher functions
+        async function startAnnounce() {
+            try {
+                log('pubLog', 'Starting with announce() - data-only connection...', 'system');
+                
+                publisher = new VDONinjaSDK({
+                    room: ROOM,
+                    debug: true
+                });
+                
+                // Setup event listeners
+                publisher.addEventListener('connected', () => {
+                    log('pubLog', 'Connected to signaling server', 'success');
+                    document.getElementById('pubStatus').classList.add('connected');
+                    document.getElementById('pubConnectionType').textContent = 'Data-Only (announce)';
+                });
+                
+                publisher.addEventListener('dataChannelOpen', (event) => {
+                    log('pubLog', `Data channel opened with viewer: ${event.detail.uuid.substring(0, 8)}...`, 'success');
+                    document.getElementById('pubDataState').textContent = 'Open';
+                });
+                
+                publisher.addEventListener('dataReceived', (event) => {
+                    const { data } = event.detail;
+                    if (data.message) {
+                        log('pubLog', `Viewer: ${data.message}`, 'data');
+                    }
+                });
+                
+                // Connect and announce (data-only)
+                await publisher.connect();
+                await publisher.announce({
+                    streamID: STREAM_ID
+                });
+                
+                // Update UI
+                document.getElementById('startAnnounce').disabled = true;
+                document.getElementById('stopPublish').disabled = false;
+                document.getElementById('addVideo').disabled = false;
+                document.getElementById('addAudio').disabled = false;
+                document.getElementById('addScreen').disabled = false;
+                document.getElementById('pubSendBtn').disabled = false;
+                
+                log('pubLog', `✅ Announced as data-only stream: ${STREAM_ID}`, 'success');
+                log('pubLog', '💡 Now you can add media tracks dynamically!', 'system');
+                
+            } catch (error) {
+                log('pubLog', `Error: ${error.message}`, 'error');
+                console.error('Announce error:', error);
+            }
+        }
+        
+        async function addVideo() {
+            try {
+                log('pubLog', 'Adding video track...', 'system');
+                
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                videoTrack = stream.getVideoTracks()[0];
+                
+                // Add to local video element
+                if (!localStream) {
+                    localStream = new MediaStream();
+                    document.getElementById('localVideo').srcObject = localStream;
+                }
+                localStream.addTrack(videoTrack);
+                
+                // TODO: When SDK supports it, this would be:
+                // await publisher.addTrack(videoTrack);
+                
+                log('pubLog', '⚠️ SDK limitation: Cannot add track to existing connections yet', 'error');
+                log('pubLog', 'In a full implementation, this would update all peer connections', 'system');
+                
+                document.getElementById('toggleVideo').disabled = false;
+                document.getElementById('removeAllTracks').disabled = false;
+                updateTrackDisplay();
+                
+            } catch (error) {
+                log('pubLog', `Failed to add video: ${error.message}`, 'error');
+            }
+        }
+        
+        async function addAudio() {
+            try {
+                log('pubLog', 'Adding audio track...', 'system');
+                
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                audioTrack = stream.getAudioTracks()[0];
+                
+                // Add to local stream
+                if (!localStream) {
+                    localStream = new MediaStream();
+                    document.getElementById('localVideo').srcObject = localStream;
+                }
+                localStream.addTrack(audioTrack);
+                
+                // TODO: When SDK supports it, this would be:
+                // await publisher.addTrack(audioTrack);
+                
+                log('pubLog', '⚠️ SDK limitation: Cannot add track to existing connections yet', 'error');
+                log('pubLog', 'In a full implementation, this would update all peer connections', 'system');
+                
+                document.getElementById('toggleAudio').disabled = false;
+                document.getElementById('removeAllTracks').disabled = false;
+                updateTrackDisplay();
+                
+            } catch (error) {
+                log('pubLog', `Failed to add audio: ${error.message}`, 'error');
+            }
+        }
+        
+        async function addScreen() {
+            try {
+                log('pubLog', 'Adding screen share...', 'system');
+                
+                const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+                screenTrack = stream.getVideoTracks()[0];
+                
+                // Replace video track with screen share
+                if (videoTrack && localStream) {
+                    localStream.removeTrack(videoTrack);
+                    videoTrack.stop();
+                }
+                
+                if (!localStream) {
+                    localStream = new MediaStream();
+                    document.getElementById('localVideo').srcObject = localStream;
+                }
+                localStream.addTrack(screenTrack);
+                
+                // Handle screen share ending
+                screenTrack.onended = () => {
+                    log('pubLog', 'Screen share ended', 'system');
+                    screenTrack = null;
+                    updateTrackDisplay();
+                };
+                
+                // TODO: When SDK supports it, this would be:
+                // await publisher.replaceTrack(videoTrack, screenTrack);
+                
+                log('pubLog', '⚠️ SDK limitation: Cannot replace track in existing connections yet', 'error');
+                
+                document.getElementById('removeAllTracks').disabled = false;
+                updateTrackDisplay();
+                
+            } catch (error) {
+                log('pubLog', `Failed to add screen share: ${error.message}`, 'error');
+            }
+        }
+        
+        function toggleVideo() {
+            if (videoTrack) {
+                videoTrack.enabled = !videoTrack.enabled;
+                log('pubLog', `Video ${videoTrack.enabled ? 'enabled' : 'disabled'}`, 'system');
+                updateTrackDisplay();
+            }
+        }
+        
+        function toggleAudio() {
+            if (audioTrack) {
+                audioTrack.enabled = !audioTrack.enabled;
+                log('pubLog', `Audio ${audioTrack.enabled ? 'enabled' : 'disabled'}`, 'system');
+                updateTrackDisplay();
+            }
+        }
+        
+        function removeAllTracks() {
+            if (localStream) {
+                localStream.getTracks().forEach(track => {
+                    track.stop();
+                    localStream.removeTrack(track);
+                });
+            }
+            
+            videoTrack = null;
+            audioTrack = null;
+            screenTrack = null;
+            
+            document.getElementById('toggleVideo').disabled = true;
+            document.getElementById('toggleAudio').disabled = true;
+            document.getElementById('removeAllTracks').disabled = true;
+            
+            log('pubLog', 'All tracks removed', 'system');
+            updateTrackDisplay();
+            
+            // TODO: When SDK supports it, this would be:
+            // await publisher.removeAllTracks();
+        }
+        
+        function sendPublisherMessage() {
+            if (!publisher) return;
+            
+            const message = document.getElementById('pubMessage').value.trim();
+            if (!message) return;
+            
+            publisher.sendData({ message: message });
+            log('pubLog', `You: ${message}`, 'data');
+            document.getElementById('pubMessage').value = '';
+        }
+        
+        function stopPublishing() {
+            if (publisher) {
+                publisher.disconnect();
+                publisher = null;
+            }
+            
+            removeAllTracks();
+            
+            // Reset UI
+            document.getElementById('startAnnounce').disabled = false;
+            document.getElementById('stopPublish').disabled = true;
+            document.getElementById('addVideo').disabled = true;
+            document.getElementById('addAudio').disabled = true;
+            document.getElementById('addScreen').disabled = true;
+            document.getElementById('pubSendBtn').disabled = true;
+            document.getElementById('pubStatus').classList.remove('connected');
+            document.getElementById('pubConnectionType').textContent = 'Not Connected';
+            document.getElementById('pubDataState').textContent = 'Closed';
+            
+            log('pubLog', 'Disconnected', 'system');
+        }
+        
+        // Viewer functions
+        async function startViewing() {
+            try {
+                log('viewLog', 'Connecting to publisher...', 'system');
+                
+                viewer = new VDONinjaSDK({
+                    room: ROOM,
+                    debug: true
+                });
+                
+                // Setup event listeners
+                viewer.addEventListener('connected', () => {
+                    log('viewLog', 'Connected to signaling server', 'success');
+                    document.getElementById('viewStatus').classList.add('connected');
+                });
+                
+                viewer.addEventListener('dataChannelOpen', () => {
+                    log('viewLog', 'Data channel opened with publisher', 'success');
+                    document.getElementById('viewDataState').textContent = 'Open';
+                    document.getElementById('viewConnectionStatus').textContent = 'Connected';
+                });
+                
+                viewer.addEventListener('track', (event) => {
+                    const track = event.detail.track;
+                    log('viewLog', `Received ${track.kind} track`, 'success');
+                    
+                    const remoteVideo = document.getElementById('remoteVideo');
+                    if (!remoteVideo.srcObject) {
+                        remoteVideo.srcObject = new MediaStream();
+                    }
+                    remoteVideo.srcObject.addTrack(track);
+                    
+                    updateViewerTracks();
+                });
+                
+                viewer.addEventListener('dataReceived', (event) => {
+                    const { data } = event.detail;
+                    if (data.message) {
+                        log('viewLog', `Publisher: ${data.message}`, 'data');
+                    }
+                });
+                
+                // Connect and view
+                await viewer.connect();
+                await viewer.quickView({
+                    streamID: STREAM_ID,
+                    dataOnly: true  // Start with data-only expectation
+                });
+                
+                // Update UI
+                document.getElementById('startView').disabled = true;
+                document.getElementById('stopView').disabled = false;
+                document.getElementById('viewSendBtn').disabled = false;
+                
+                log('viewLog', 'Connected! Waiting for media tracks...', 'success');
+                
+            } catch (error) {
+                log('viewLog', `Error: ${error.message}`, 'error');
+                console.error('Viewing error:', error);
+            }
+        }
+        
+        function updateViewerTracks() {
+            const remoteVideo = document.getElementById('remoteVideo');
+            const viewTracks = document.getElementById('viewTracks');
+            
+            if (remoteVideo.srcObject) {
+                const tracks = remoteVideo.srcObject.getTracks();
+                const trackInfo = tracks.map(track => 
+                    `<div class="track-item active">${track.kind === 'video' ? '📹' : '🎤'} ${track.kind}: ${track.enabled ? 'Active' : 'Muted'}</div>`
+                ).join('');
+                
+                viewTracks.innerHTML = trackInfo || '<div class="track-item">No tracks received yet</div>';
+                
+                const mediaTypes = [];
+                if (tracks.some(t => t.kind === 'video')) mediaTypes.push('Video');
+                if (tracks.some(t => t.kind === 'audio')) mediaTypes.push('Audio');
+                document.getElementById('viewMediaState').textContent = mediaTypes.join(', ') || 'None';
+            }
+        }
+        
+        function sendViewerMessage() {
+            if (!viewer) return;
+            
+            const message = document.getElementById('viewMessage').value.trim();
+            if (!message) return;
+            
+            viewer.sendData({ message: message });
+            log('viewLog', `You: ${message}`, 'data');
+            document.getElementById('viewMessage').value = '';
+        }
+        
+        function stopViewing() {
+            if (viewer) {
+                viewer.disconnect();
+                viewer = null;
+            }
+            
+            document.getElementById('remoteVideo').srcObject = null;
+            
+            // Reset UI
+            document.getElementById('startView').disabled = false;
+            document.getElementById('stopView').disabled = true;
+            document.getElementById('viewSendBtn').disabled = true;
+            document.getElementById('viewStatus').classList.remove('connected');
+            document.getElementById('viewConnectionStatus').textContent = 'Not Connected';
+            document.getElementById('viewDataState').textContent = 'Closed';
+            document.getElementById('viewTracks').innerHTML = '<div class="track-item">No connection</div>';
+            document.getElementById('viewMediaState').textContent = 'None';
+            
+            log('viewLog', 'Disconnected', 'system');
+        }
+        
+        // Initialize
+        updateTrackDisplay();
+        
+        // Clean up on page unload
+        window.addEventListener('beforeunload', () => {
+            stopPublishing();
+            stopViewing();
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VDO.Ninja SDK - Broadcast Demo</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #1a1a1a;
+            color: #e0e0e0;
+        }
+        
+        h1 {
+            text-align: center;
+            color: #ffffff;
+            margin-bottom: 10px;
+        }
+        
+        .subtitle {
+            text-align: center;
+            color: #999;
+            font-size: 16px;
+            margin-bottom: 30px;
+        }
+        
+        .broadcaster-section {
+            background: #2a2a2a;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+            border: 2px solid #4CAF50;
+            margin-bottom: 30px;
+        }
+        
+        .viewers-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+        }
+        
+        .viewer-section {
+            background: #2a2a2a;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+            border: 1px solid #3a3a3a;
+        }
+        
+        h2 {
+            color: #e0e0e0;
+            margin-top: 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .status-indicator {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background-color: #666;
+        }
+        
+        .status-indicator.connected {
+            background-color: #4CAF50;
+        }
+        
+        .control-group {
+            margin-bottom: 15px;
+        }
+        
+        label {
+            display: inline-block;
+            width: 100px;
+            font-weight: bold;
+            color: #b0b0b0;
+        }
+        
+        input[type="text"] {
+            width: calc(100% - 110px);
+            padding: 8px;
+            border: 1px solid #444;
+            border-radius: 4px;
+            background-color: #1a1a1a;
+            color: #e0e0e0;
+            font-family: inherit;
+        }
+        
+        textarea {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #444;
+            border-radius: 4px;
+            background-color: #1a1a1a;
+            color: #e0e0e0;
+            font-family: inherit;
+            margin-bottom: 10px;
+            resize: vertical;
+            height: 60px;
+        }
+        
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+            font-size: 14px;
+            transition: background-color 0.3s;
+        }
+        
+        button:hover:not(:disabled) {
+            background-color: #5cbf60;
+        }
+        
+        button:disabled {
+            background-color: #444;
+            color: #666;
+            cursor: not-allowed;
+        }
+        
+        button.stop {
+            background-color: #f44336;
+        }
+        
+        button.stop:hover:not(:disabled) {
+            background-color: #ff6659;
+        }
+        
+        button.secondary {
+            background-color: #2196F3;
+        }
+        
+        button.secondary:hover:not(:disabled) {
+            background-color: #42a5f5;
+        }
+        
+        .connected-viewers {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #333;
+            border-radius: 5px;
+            border: 1px solid #444;
+        }
+        
+        .viewer-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        
+        .viewer-tag {
+            background-color: #4CAF50;
+            color: white;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .viewer-tag .label {
+            font-weight: bold;
+        }
+        
+        .viewer-tag .uuid {
+            font-size: 11px;
+            opacity: 0.8;
+        }
+        
+        .message-log {
+            margin-top: 15px;
+            padding: 10px;
+            background-color: #1a1a1a;
+            border: 1px solid #444;
+            border-radius: 5px;
+            height: 200px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        
+        .message-entry {
+            padding: 5px;
+            margin-bottom: 5px;
+            border-radius: 3px;
+        }
+        
+        .message-entry.sent {
+            background-color: #1e3a1e;
+            border-left: 3px solid #4CAF50;
+        }
+        
+        .message-entry.received {
+            background-color: #1e2838;
+            border-left: 3px solid #2196F3;
+        }
+        
+        .message-entry.system {
+            background-color: #3a3a1e;
+            border-left: 3px solid #ff9800;
+            color: #ffc947;
+        }
+        
+        .message-entry.broadcast {
+            background-color: #3a1e3a;
+            border-left: 3px solid #e91e63;
+        }
+        
+        .sender-label {
+            font-weight: bold;
+            color: #4CAF50;
+            margin-right: 5px;
+        }
+        
+        .message-time {
+            color: #666;
+            font-size: 11px;
+            margin-right: 10px;
+        }
+        
+        .room-info {
+            text-align: center;
+            padding: 10px;
+            background-color: #333;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+        
+        .room-info strong {
+            color: #4CAF50;
+        }
+        
+        @media (max-width: 768px) {
+            .viewers-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1>📡 VDO.Ninja SDK - Broadcast Demo</h1>
+    <div class="subtitle">One broadcaster sends to all viewers, viewers can respond back</div>
+    
+    <div class="room-info">
+        Room: <strong id="roomName">broadcast-demo</strong> | 
+        Stream ID: <strong id="streamId">broadcaster</strong>
+    </div>
+    
+    <!-- Broadcaster Section -->
+    <div class="broadcaster-section">
+        <h2>
+            <span class="status-indicator" id="broadcasterStatus"></span>
+            🎙️ Broadcaster
+        </h2>
+        
+        <div class="control-group">
+            <label for="broadcasterLabel">Label:</label>
+            <input type="text" id="broadcasterLabel" value="Main Broadcaster" placeholder="Your label">
+        </div>
+        
+        <button id="startBroadcast" onclick="startBroadcasting()">Start Broadcasting</button>
+        <button id="stopBroadcast" class="stop" onclick="stopBroadcasting()" disabled>Stop Broadcasting</button>
+        
+        <div class="connected-viewers" id="viewersList" style="display: none;">
+            <h3 style="margin-top: 0;">👥 Connected Viewers</h3>
+            <div class="viewer-list" id="connectedViewersList">
+                <!-- Viewer tags will be added here dynamically -->
+            </div>
+        </div>
+        
+        <div style="margin-top: 20px;">
+            <h3>📤 Broadcast Message</h3>
+            <textarea id="broadcastMessage" placeholder="Type your broadcast message here..."></textarea>
+            <button onclick="sendBroadcast()" id="sendBroadcastBtn" disabled>Send to All Viewers</button>
+        </div>
+        
+        <div class="message-log" id="broadcasterLog"></div>
+    </div>
+    
+    <!-- Viewers Section -->
+    <div class="viewers-grid">
+        <!-- Viewer 1 -->
+        <div class="viewer-section">
+            <h2>
+                <span class="status-indicator" id="viewer1Status"></span>
+                👁️ Viewer 1
+            </h2>
+            
+            <div class="control-group">
+                <label for="viewer1Label">Label:</label>
+                <input type="text" id="viewer1Label" value="Viewer One" placeholder="Your label">
+            </div>
+            
+            <button id="viewer1Start" onclick="startViewing(1)">Connect</button>
+            <button id="viewer1Stop" class="stop" onclick="stopViewing(1)" disabled>Disconnect</button>
+            
+            <div style="margin-top: 15px;">
+                <textarea id="viewer1Message" placeholder="Send message to broadcaster..."></textarea>
+                <button onclick="sendViewerMessage(1)" id="viewer1SendBtn" disabled>Send to Broadcaster</button>
+            </div>
+            
+            <div class="message-log" id="viewer1Log"></div>
+        </div>
+        
+        <!-- Viewer 2 -->
+        <div class="viewer-section">
+            <h2>
+                <span class="status-indicator" id="viewer2Status"></span>
+                👁️ Viewer 2
+            </h2>
+            
+            <div class="control-group">
+                <label for="viewer2Label">Label:</label>
+                <input type="text" id="viewer2Label" value="Viewer Two" placeholder="Your label">
+            </div>
+            
+            <button id="viewer2Start" onclick="startViewing(2)">Connect</button>
+            <button id="viewer2Stop" class="stop" onclick="stopViewing(2)" disabled>Disconnect</button>
+            
+            <div style="margin-top: 15px;">
+                <textarea id="viewer2Message" placeholder="Send message to broadcaster..."></textarea>
+                <button onclick="sendViewerMessage(2)" id="viewer2SendBtn" disabled>Send to Broadcaster</button>
+            </div>
+            
+            <div class="message-log" id="viewer2Log"></div>
+        </div>
+        
+        <!-- Viewer 3 -->
+        <div class="viewer-section">
+            <h2>
+                <span class="status-indicator" id="viewer3Status"></span>
+                👁️ Viewer 3
+            </h2>
+            
+            <div class="control-group">
+                <label for="viewer3Label">Label:</label>
+                <input type="text" id="viewer3Label" value="Viewer Three" placeholder="Your label">
+            </div>
+            
+            <button id="viewer3Start" onclick="startViewing(3)">Connect</button>
+            <button id="viewer3Stop" class="stop" onclick="stopViewing(3)" disabled>Disconnect</button>
+            
+            <div style="margin-top: 15px;">
+                <textarea id="viewer3Message" placeholder="Send message to broadcaster..."></textarea>
+                <button onclick="sendViewerMessage(3)" id="viewer3SendBtn" disabled>Send to Broadcaster</button>
+            </div>
+            
+            <div class="message-log" id="viewer3Log"></div>
+        </div>
+    </div>
+    
+    <!-- Load the SDK -->
+    <script src="vdoninja-sdk.js"></script>
+    
+    <script>
+        // Configuration
+        const ROOM = 'broadcast-demo';
+        const STREAM_ID = 'broadcaster';
+        
+        // State
+        let broadcaster = null;
+        let viewers = {
+            1: null,
+            2: null,
+            3: null
+        };
+        let connectedViewers = new Map(); // uuid -> {label, connectedAt}
+        
+        // Update room info display
+        document.getElementById('roomName').textContent = ROOM;
+        document.getElementById('streamId').textContent = STREAM_ID;
+        
+        // Logging functions
+        function log(elementId, message, type = 'system') {
+            const logDiv = document.getElementById(elementId);
+            const entry = document.createElement('div');
+            entry.className = `message-entry ${type}`;
+            
+            const time = new Date().toLocaleTimeString();
+            entry.innerHTML = `<span class="message-time">${time}</span>${message}`;
+            
+            logDiv.appendChild(entry);
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+        
+        // Broadcaster functions
+        async function startBroadcasting() {
+            try {
+                const label = document.getElementById('broadcasterLabel').value || 'Broadcaster';
+                
+                log('broadcasterLog', 'Starting broadcast...', 'system');
+                
+                broadcaster = new VDONinjaSDK({
+                    room: ROOM,
+                    streamID: STREAM_ID,
+                    label: label,
+                    debug: true
+                });
+                
+                // Setup event listeners
+                broadcaster.addEventListener('connected', () => {
+                    log('broadcasterLog', 'Connected to server', 'system');
+                    document.getElementById('broadcasterStatus').classList.add('connected');
+                });
+                
+                broadcaster.addEventListener('dataChannelOpen', (event) => {
+                    const uuid = event.detail.uuid;
+                    log('broadcasterLog', `Viewer connected: ${uuid.substring(0, 8)}...`, 'system');
+                    
+                    // Request viewer's label
+                    broadcaster.sendData({ type: 'requestLabel' }, uuid);
+                });
+                
+                broadcaster.addEventListener('dataReceived', (event) => {
+                    const { data, uuid } = event.detail;
+                    
+                    if (data.type === 'label') {
+                        // Store viewer label
+                        connectedViewers.set(uuid, {
+                            label: data.label,
+                            connectedAt: new Date()
+                        });
+                        updateViewersList();
+                        log('broadcasterLog', `Viewer identified as: ${data.label}`, 'system');
+                    } else if (data.type === 'message') {
+                        // Display message from viewer
+                        const viewer = connectedViewers.get(uuid) || { label: 'Unknown' };
+                        log('broadcasterLog', 
+                            `<span class="sender-label">[${viewer.label}]</span> ${data.message}`, 
+                            'received'
+                        );
+                    }
+                });
+                
+                broadcaster.addEventListener('bye', (event) => {
+                    const uuid = event.detail.UUID;
+                    const viewer = connectedViewers.get(uuid);
+                    if (viewer) {
+                        log('broadcasterLog', `Viewer disconnected: ${viewer.label}`, 'system');
+                        connectedViewers.delete(uuid);
+                        updateViewersList();
+                    }
+                });
+                
+                // Connect and publish
+                await broadcaster.connect();
+                
+                // Use announce for data-only connection
+                await broadcaster.announce({
+                    streamID: STREAM_ID
+                });
+                
+                // Update UI
+                document.getElementById('startBroadcast').disabled = true;
+                document.getElementById('stopBroadcast').disabled = false;
+                document.getElementById('sendBroadcastBtn').disabled = false;
+                document.getElementById('viewersList').style.display = 'block';
+                
+                log('broadcasterLog', `Broadcasting as "${label}" in room: ${ROOM}`, 'system');
+                
+            } catch (error) {
+                log('broadcasterLog', `Error: ${error.message}`, 'system');
+                console.error('Broadcasting error:', error);
+            }
+        }
+        
+        function stopBroadcasting() {
+            if (broadcaster) {
+                broadcaster.disconnect();
+                broadcaster = null;
+            }
+            
+            connectedViewers.clear();
+            updateViewersList();
+            
+            document.getElementById('startBroadcast').disabled = false;
+            document.getElementById('stopBroadcast').disabled = true;
+            document.getElementById('sendBroadcastBtn').disabled = true;
+            document.getElementById('viewersList').style.display = 'none';
+            document.getElementById('broadcasterStatus').classList.remove('connected');
+            
+            log('broadcasterLog', 'Broadcast stopped', 'system');
+        }
+        
+        function sendBroadcast() {
+            if (!broadcaster) return;
+            
+            const message = document.getElementById('broadcastMessage').value.trim();
+            if (!message) return;
+            
+            // Send to all connected viewers
+            broadcaster.sendData({
+                type: 'broadcast',
+                message: message,
+                timestamp: Date.now()
+            });
+            
+            log('broadcasterLog', `📢 Broadcast sent: "${message}"`, 'broadcast');
+            document.getElementById('broadcastMessage').value = '';
+        }
+        
+        function updateViewersList() {
+            const container = document.getElementById('connectedViewersList');
+            
+            if (connectedViewers.size === 0) {
+                container.innerHTML = '<div style="color: #666; text-align: center;">No viewers connected</div>';
+                return;
+            }
+            
+            container.innerHTML = '';
+            connectedViewers.forEach((viewer, uuid) => {
+                const tag = document.createElement('div');
+                tag.className = 'viewer-tag';
+                tag.innerHTML = `
+                    <span class="label">${viewer.label}</span>
+                    <span class="uuid">(${uuid.substring(0, 8)}...)</span>
+                `;
+                container.appendChild(tag);
+            });
+        }
+        
+        // Viewer functions
+        async function startViewing(viewerId) {
+            try {
+                const label = document.getElementById(`viewer${viewerId}Label`).value || `Viewer ${viewerId}`;
+                
+                log(`viewer${viewerId}Log`, 'Connecting to broadcaster...', 'system');
+                
+                viewers[viewerId] = new VDONinjaSDK({
+                    room: ROOM,
+                    label: label,
+                    debug: true
+                });
+                
+                const viewer = viewers[viewerId];
+                
+                // Setup event listeners
+                viewer.addEventListener('connected', () => {
+                    log(`viewer${viewerId}Log`, 'Connected to server', 'system');
+                    document.getElementById(`viewer${viewerId}Status`).classList.add('connected');
+                });
+                
+                viewer.addEventListener('dataChannelOpen', (event) => {
+                    log(`viewer${viewerId}Log`, 'Connected to broadcaster', 'system');
+                    
+                    // Send our label when requested
+                    viewer.addEventListener('dataReceived', (event) => {
+                        const { data } = event.detail;
+                        
+                        if (data.type === 'requestLabel') {
+                            viewer.sendData({
+                                type: 'label',
+                                label: label
+                            });
+                        } else if (data.type === 'broadcast') {
+                            log(`viewer${viewerId}Log`, 
+                                `<span class="sender-label">[Broadcast]</span> ${data.message}`, 
+                                'broadcast'
+                            );
+                        }
+                    });
+                });
+                
+                // Connect and view
+                await viewer.connect();
+                await viewer.quickView({
+                    streamID: STREAM_ID,
+                    dataOnly: true
+                });
+                
+                // Update UI
+                document.getElementById(`viewer${viewerId}Start`).disabled = true;
+                document.getElementById(`viewer${viewerId}Stop`).disabled = false;
+                document.getElementById(`viewer${viewerId}SendBtn`).disabled = false;
+                
+                log(`viewer${viewerId}Log`, `Connected as "${label}"`, 'system');
+                
+            } catch (error) {
+                log(`viewer${viewerId}Log`, `Error: ${error.message}`, 'system');
+                console.error(`Viewer ${viewerId} error:`, error);
+            }
+        }
+        
+        function stopViewing(viewerId) {
+            if (viewers[viewerId]) {
+                viewers[viewerId].disconnect();
+                viewers[viewerId] = null;
+            }
+            
+            document.getElementById(`viewer${viewerId}Start`).disabled = false;
+            document.getElementById(`viewer${viewerId}Stop`).disabled = true;
+            document.getElementById(`viewer${viewerId}SendBtn`).disabled = true;
+            document.getElementById(`viewer${viewerId}Status`).classList.remove('connected');
+            
+            log(`viewer${viewerId}Log`, 'Disconnected', 'system');
+        }
+        
+        function sendViewerMessage(viewerId) {
+            const viewer = viewers[viewerId];
+            if (!viewer) return;
+            
+            const message = document.getElementById(`viewer${viewerId}Message`).value.trim();
+            if (!message) return;
+            
+            viewer.sendData({
+                type: 'message',
+                message: message,
+                timestamp: Date.now()
+            });
+            
+            log(`viewer${viewerId}Log`, `Sent: "${message}"`, 'sent');
+            document.getElementById(`viewer${viewerId}Message`).value = '';
+        }
+        
+        // Initialize
+        updateViewersList();
+        
+        // Clean up on page unload
+        window.addEventListener('beforeunload', () => {
+            stopBroadcasting();
+            [1, 2, 3].forEach(id => stopViewing(id));
+        });
+    </script>
+</body>
+</html>
