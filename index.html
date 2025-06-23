@@ -840,7 +840,7 @@ vdo.onError = (error) => { /* Handle errors */ };</code></pre>
                 const roomId = roomInput.value.trim() || 'demo-room';
                 
                 try {
-                    vdo = new VDONinja();
+                    vdo = new VDONinjaSDK();
                     
                     // Set up event handlers
                     vdo.onConnect = (uid) => {
