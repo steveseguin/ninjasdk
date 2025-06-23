@@ -519,7 +519,8 @@
             this._intentionalDisconnect = false;
             
             // Initialize salt before setting up crypto
-            this.salt = "vdo.ninja";
+            this.salt = options.salt || "vdo.ninja";
+            this._saltProvidedViaOptions = !!options.salt;
             
             // Setup crypto utilities
             this._setupCryptoUtils();
@@ -2940,8 +2941,8 @@
             this._encoder = new TextEncoder();
             this._decoder = new TextDecoder();
             
-            // Set salt based on environment
-            if (typeof window !== 'undefined' && window.location) {
+            // Only set salt based on environment if not explicitly provided via options
+            if (!this._saltProvidedViaOptions && typeof window !== 'undefined' && window.location) {
                 const hostname = window.location.hostname;
                 this._log('Setting salt based on hostname:', hostname);
                 
@@ -2960,7 +2961,7 @@
                         this.salt = hostname;
                     }
                 }
-            } else {
+            } else if (!this._saltProvidedViaOptions) {
                 // Node.js environment or no location available
                 this.salt = "vdo.ninja";
             }
