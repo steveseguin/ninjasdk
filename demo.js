@@ -1,3 +1,13 @@
+/**
+ * VDO.Ninja SDK Demo - Two-Peer P2P Messaging
+ * 
+ * This demo code is released into the public domain (CC0 1.0 Universal).
+ * You may use, modify, and distribute this demo code without any restrictions.
+ * 
+ * Note: The VDO.Ninja SDK itself (vdoninja-sdk.js) remains licensed under AGPL-3.0.
+ * See: https://github.com/steveseguin/ninjasdk/blob/main/LICENSE
+ */
+
 // Live demo functionality with two peers
 let peers = {
     1: { vdo: null, isConnected: false, streamID: null, viewingStreamID: null },

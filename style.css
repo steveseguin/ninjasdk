@@ -1,3 +1,13 @@
+/**
+ * VDO.Ninja SDK Demo - Stylesheet
+ * 
+ * This demo code is released into the public domain (CC0 1.0 Universal).
+ * You may use, modify, and distribute this demo code without any restrictions.
+ * 
+ * Note: The VDO.Ninja SDK itself (vdoninja-sdk.js) remains licensed under AGPL-3.0.
+ * See: https://github.com/steveseguin/ninjasdk/blob/main/LICENSE
+ */
+
 :root {
     --primary-color: #6366f1;
     --primary-dark: #4f46e5;
@@ -1324,4 +1334,69 @@ code[class*="language-"] {
     .integration-benefits {
         grid-template-columns: repeat(2, 1fr);
     }
+}
+
+/* Usage Guidelines Section */
+.handshake-intro {
+    background: var(--bg-dark);
+    border: 1px solid var(--border-color);
+    border-radius: 0.5rem;
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+    font-size: 1.1rem;
+    line-height: 1.8;
+    color: var(--text-secondary);
+}
+
+.guidelines-content {
+    display: grid;
+    gap: 2rem;
+    margin-top: 2rem;
+}
+
+.guideline-box {
+    background: var(--bg-dark);
+    border: 1px solid var(--border-color);
+    border-radius: 0.75rem;
+    padding: 1.5rem;
+}
+
+.guideline-box.important {
+    border-color: #ef4444;
+    background: rgba(239, 68, 68, 0.05);
+}
+
+.guideline-box h3 {
+    margin: 0 0 1rem 0;
+    color: var(--text-primary);
+    font-size: 1.25rem;
+}
+
+.guideline-box ul {
+    margin: 0;
+    padding-left: 1.5rem;
+}
+
+.guideline-box li {
+    margin-bottom: 0.5rem;
+    color: var(--text-secondary);
+}
+
+.guideline-box li strong {
+    color: #ef4444;
+    font-weight: 600;
+}
+
+.guideline-warning {
+    background: rgba(245, 158, 11, 0.1);
+    border: 1px solid rgba(245, 158, 11, 0.3);
+    border-radius: 0.5rem;
+    padding: 1rem;
+    margin-top: 2rem;
+    color: #f59e0b;
+    text-align: center;
+}
+
+.guideline-warning strong {
+    font-weight: 600;
 }

@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CaptureVideo.js Example - Using External SDK</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        
+        .info {
+            background: #e3f2fd;
+            border: 1px solid #1976d2;
+            border-radius: 4px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .warning {
+            background: #fff3e0;
+            border: 1px solid #f57c00;
+            border-radius: 4px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        
+        code {
+            background: #f5f5f5;
+            padding: 2px 4px;
+            border-radius: 3px;
+            font-family: monospace;
+        }
+        
+        pre {
+            background: #263238;
+            color: #aed581;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>CaptureVideo.js with External VDO.Ninja SDK</h1>
+    
+    <div class="info">
+        <h2>How to Use</h2>
+        <p>The updated <code>capturevideo.js</code> now uses the external VDO.Ninja SDK instead of having it embedded.</p>
+        <p>To use it in your Chrome extension:</p>
+        <ol>
+            <li>Include <code>vdoninja-sdk.js</code> in your extension's manifest</li>
+            <li>Load it before <code>capturevideo.js</code></li>
+            <li>The script will automatically use the external SDK</li>
+        </ol>
+    </div>
+    
+    <div class="warning">
+        <h2>Chrome Extension Manifest</h2>
+        <p>Update your <code>manifest.json</code> to include both scripts in the correct order:</p>
+        <pre>{
+  "content_scripts": [{
+    "matches": ["https://discord.com/*"],
+    "js": [
+      "vdoninja-sdk.js",
+      "capturevideo.js"
+    ],
+    "run_at": "document_start"
+  }]
+}</pre>
+    </div>
+    
+    <h2>SDK Configuration</h2>
+    <p>The script creates SDK instances with this configuration:</p>
+    <pre>const vdo = new VDONinjaSDK({
+    room: ROOM_ID,
+    password: false,  // No encryption for this demo
+    debug: true
+});</pre>
+    
+    <h2>Testing</h2>
+    <p>To test the integration:</p>
+    <ol>
+        <li>Load your Chrome extension with the updated files</li>
+        <li>Enable VDO.Ninja integration in the extension settings</li>
+        <li>Visit a Discord channel with video</li>
+        <li>Check the console for connection logs</li>
+        <li>View streams at: <code>https://vdo.ninja/?room=autopublish_XXXXX&scene</code></li>
+    </ol>
+    
+    <!-- Load the SDK first -->
+    <script src="../vdoninja-sdk.js"></script>
+    <!-- Then load the updated capturevideo script -->
+    <script src="../capturevideo.js"></script>
+</body>
+</html>

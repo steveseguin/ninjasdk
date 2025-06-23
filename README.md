@@ -2,6 +2,19 @@
 
 AI-friendly P2P communication SDK for audio, video, and data streaming. Build peer-to-peer applications without servers, user accounts, or complex infrastructure.
 
+## ⚠️ IMPORTANT: Usage Guidelines
+
+**Direct WebSocket API access is NOT APPROVED.** You must use this SDK to interact with VDO.Ninja services.
+
+- **SDK Required**: Direct WebSocket connections will be blocked
+- **API Stability**: The WebSocket API may change without notice - the SDK handles these updates
+- **Rate Limits**: Excessive requests are throttled/blocked. Higher limits available on request
+- **Serverless Philosophy**: No state management or data relay through the signaling server
+- **Connection Limits**: ~80 connections per room, viewer limits may apply
+- **Data Policy**: Only WebRTC handshake data allowed through WebSocket - all other data must use P2P channels
+
+By using this SDK, you agree to respect these guidelines to keep the service free for everyone.
+
 ## Quick Start
 
 ### Include via CDN

@@ -1,4 +1,13 @@
 <!DOCTYPE html>
+<!--
+    VDO.Ninja SDK Demo - Main Landing Page
+    
+    This demo code is released into the public domain (CC0 1.0 Universal).
+    You may use, modify, and distribute this demo code without any restrictions.
+    
+    Note: The VDO.Ninja SDK itself (vdoninja-sdk.js) remains licensed under AGPL-3.0.
+    See: https://github.com/steveseguin/ninjasdk/blob/main/LICENSE
+-->
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -48,6 +57,7 @@
                 <li><a href="#examples">Examples</a></li>
                 <li><a href="#faq">FAQ</a></li>
                 <li><a href="#download">Download</a></li>
+                <li><a href="#usage-guidelines">Usage Guidelines</a></li>
                 <li><a href="https://github.com/steveseguin/ninjasdk" target="_blank">GitHub</a></li>
             </ul>
         </div>
@@ -60,7 +70,7 @@
             <p class="hero-description">
                 VDO.Ninja SDK enables websites to talk directly to each other. Stream HD video to friends, 
                 remote control applications from anywhere, build AI bots with live feeds, or create 
-                high-bandwidth apps with <strong>zero server costs</strong>. No accounts. No hosting. No limits.
+                high-bandwidth apps with <strong>zero server costs</strong>. No accounts. No hosting.
             </p>
             <div class="hero-features">
                 <div class="hero-feature">
@@ -211,6 +221,10 @@ vdo.sendData({ message: "Hello P2P!" });</code></pre>
                             <h4>🏢 Corporate Apps Without IT</h4>
                             <p>Deploy internal tools that work anywhere, no VPN required, no server maintenance, instant global access.</p>
                         </div>
+                        <div class="magic-item">
+                            <h4>🏠 LAN File Sharing & Streaming</h4>
+                            <p>Share files or stream media to devices on your local network at gigabit speeds. WebRTC detects LAN peers and keeps traffic local - no internet bandwidth used!</p>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -233,7 +247,7 @@ vdo.sendData({ message: "Hello P2P!" });</code></pre>
                 <div class="feature-card">
                     <div class="feature-icon">⚡</div>
                     <h3>Lowest Possible Latency</h3>
-                    <p>Direct connections mean data travels the shortest path. Better than any server could provide.</p>
+                    <p>Direct connections mean data travels the shortest path. When peers are on the same LAN, data stays local - no internet required!</p>
                 </div>
                 <div class="feature-card">
                     <div class="feature-icon">🔐</div>
@@ -254,6 +268,11 @@ vdo.sendData({ message: "Hello P2P!" });</code></pre>
                     <div class="feature-icon">∞</div>
                     <h3>Unlimited Bandwidth</h3>
                     <p>Stream 4K video, transfer gigabytes. You're only limited by your users' internet connections.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🏠</div>
+                    <h3>LAN-Aware Connections</h3>
+                    <p>When peers are on the same local network, WebRTC automatically keeps traffic local. Ultra-low latency, no internet bandwidth used!</p>
                 </div>
             </div>
         </div>
@@ -423,27 +442,27 @@ await vdo.publish(stream, { room: "videoroom" });</code></pre>
         <div class="container">
             <h2 class="section-title">Live Examples</h2>
             <div class="examples-grid">
-                <a href="vdoninja-sdk-datachannel-demo.html" class="example-card">
+                <a href="demos/vdoninja-sdk-datachannel-demo.html" class="example-card">
                     <h3>Data Channel Demo</h3>
                     <p>Real-time bidirectional data communication between peers</p>
                 </a>
-                <a href="vdoninja-sdk-broadcast-demo.html" class="example-card">
+                <a href="demos/vdoninja-sdk-broadcast-demo.html" class="example-card">
                     <h3>Broadcast Demo</h3>
                     <p>One-to-many streaming with automatic peer management</p>
                 </a>
-                <a href="vdoninja-sdk-canvas-demo.html" class="example-card">
+                <a href="demos/vdoninja-sdk-canvas-demo.html" class="example-card">
                     <h3>Canvas Streaming</h3>
                     <p>Stream canvas content as video in real-time</p>
                 </a>
-                <a href="vdoninja-sdk-dynamic-media-demo.html" class="example-card">
+                <a href="demos/vdoninja-sdk-dynamic-media-demo.html" class="example-card">
                     <h3>Dynamic Media</h3>
                     <p>Add/remove audio and video streams dynamically</p>
                 </a>
-                <a href="vdoninja-sdk-pubsub-channels.html" class="example-card">
+                <a href="demos/vdoninja-sdk-pubsub-channels.html" class="example-card">
                     <h3>Pub/Sub Channels</h3>
                     <p>Topic-based messaging with channel subscriptions</p>
                 </a>
-                <a href="vdoninja-sdk-tracks-demo.html" class="example-card">
+                <a href="demos/vdoninja-sdk-tracks-demo.html" class="example-card">
                     <h3>Track Management</h3>
                     <p>Fine-grained control over individual media tracks</p>
                 </a>
@@ -518,7 +537,10 @@ await vdo.connect({
                         <li><strong>Data Channels:</strong> Low-latency P2P data transfer</li>
                         <li><strong>Mesh Networks:</strong> Every peer can connect directly to every other peer</li>
                         <li><strong>End-to-End Encryption:</strong> All data is encrypted between peers using DTLS/SRTP</li>
-                        <li><strong>No Signaling Server:</strong> After initial handshake, all communication is P2P</li>
+                        <li><strong>LAN-Aware:</strong> WebRTC automatically detects and uses local network paths when peers are on the same LAN</li>
+                        <li><strong>Handshake Server:</strong> Minimal WebSocket server that only facilitates initial WebRTC connection setup</li>
+                        <li><strong>Serverless Philosophy:</strong> After handshake, all communication is P2P - no state management, no data relay</li>
+                        <li><strong>SDK Only:</strong> Direct handshake server access is prohibited - always use the SDK</li>
                     </ul>
                 </div>
 
@@ -630,11 +652,11 @@ vdo.addEventListener('error', (event) => {
             <div class="faq-grid">
                 <div class="faq-item">
                     <h3>Do I need to run my own server?</h3>
-                    <p>No! After the initial WebRTC handshake (using our free TURN servers), all communication is peer-to-peer. You don't need any server infrastructure.</p>
+                    <p>No! The SDK uses our free handshake server to establish WebRTC connections. After the initial handshake, all communication is peer-to-peer. You don't need any server infrastructure.</p>
                 </div>
                 <div class="faq-item">
                     <h3>Is it really free?</h3>
-                    <p>Yes, completely free. No hidden costs, no premium tiers, no usage limits. The P2P architecture means minimal server costs which we cover.</p>
+                    <p>Yes, completely free. No hidden costs, no premium tiers. The P2P architecture means minimal server costs which we cover. Please respect the usage guidelines to keep it free for everyone.</p>
                 </div>
                 <div class="faq-item">
                     <h3>How is this different from Socket.io or WebSockets?</h3>
@@ -650,11 +672,11 @@ vdo.addEventListener('error', (event) => {
                 </div>
                 <div class="faq-item">
                     <h3>What's the latency like?</h3>
-                    <p>Since it's P2P, latency is typically just the network distance between peers - often under 50ms for users in the same region, compared to 100-200ms+ for server-relayed solutions.</p>
+                    <p>Since it's P2P, latency is typically just the network distance between peers - often under 50ms for users in the same region, compared to 100-200ms+ for server-relayed solutions. When peers are on the same LAN, latency can be under 1ms!</p>
                 </div>
                 <div class="faq-item">
                     <h3>How many peers can connect?</h3>
-                    <p>For full mesh networks (everyone connected to everyone): ~5-10 peers optimal. For broadcast mode (one-to-many): 50+ viewers. The SDK supports various network topologies including star, mesh, and hybrid configurations.</p>
+                    <p>Rooms are limited to ~80 total connections. For full mesh networks: ~5-10 peers optimal. For broadcast mode: 50+ viewers. Viewer connections to a stream may also be limited. Higher limits available on request.</p>
                 </div>
                 <div class="faq-item">
                     <h3>Is it secure?</h3>
@@ -669,12 +691,16 @@ vdo.addEventListener('error', (event) => {
                     <p>All modern browsers: Chrome/Edge 80+, Firefox 75+, Safari 14+. Mobile browsers with WebRTC support work too.</p>
                 </div>
                 <div class="faq-item">
-                    <h3>How do I handle reconnections?</h3>
-                    <p>The SDK includes automatic reconnection logic. Just call <code>vdo.reconnect()</code> or handle the <code>onDisconnect</code> event.</p>
+                    <h3>Are there rate limits?</h3>
+                    <p>Yes, the handshake server has rate limiting to prevent abuse. Normal SDK usage stays well within limits. Higher rate limits can be accommodated on request. Abusers may be throttled or blocked.</p>
                 </div>
                 <div class="faq-item">
-                    <h3>Where can I get help?</h3>
-                    <p>Join our <a href="https://discord.vdo.ninja" target="_blank">Discord community</a>, check <a href="https://github.com/steveseguin/ninjasdk/issues" target="_blank">GitHub issues</a>, or refer to the documentation.</p>
+                    <h3>Can I connect directly to the handshake server?</h3>
+                    <p><strong>No.</strong> Direct WebSocket connections to the handshake server are not permitted. The handshake protocol may change without notice. Always use the SDK which handles updates and stays within usage guidelines. Direct access will result in blocking.</p>
+                </div>
+                <div class="faq-item">
+                    <h3>Does it work on local networks without internet?</h3>
+                    <p>Once peers discover each other via the handshake server, WebRTC intelligently routes traffic. If two peers are on the same LAN, data flows directly between them locally - no internet bandwidth used! This makes it perfect for local file sharing, LAN parties, or office applications.</p>
                 </div>
             </div>
         </div>
@@ -811,6 +837,87 @@ vdo.addEventListener('error', (event) => {
                     <div class="download-meta">
                         <span class="coming-soon">In Development</span>
                     </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="usage-guidelines" class="section section-alt">
+        <div class="container">
+            <h2 class="section-title">🤝 Handshake Server Usage Guidelines</h2>
+            
+            <div class="handshake-intro">
+                <p>The VDO.Ninja SDK uses a WebSocket handshake server to initiate WebRTC connections between peers. Once the handshake is complete, all communication flows directly peer-to-peer. Understanding and respecting the handshake server's limitations ensures this free service remains available for everyone.</p>
+            </div>
+            
+            <div class="guidelines-content">
+                <div class="guideline-box important">
+                    <h3>🔌 What is the Handshake Server?</h3>
+                    <ul>
+                        <li>A minimal WebSocket server that facilitates the initial WebRTC connection setup</li>
+                        <li>Exchanges offer/answer SDP messages and ICE candidates between peers</li>
+                        <li>Once peers are connected, the handshake server is no longer involved</li>
+                        <li>Does NOT relay application data - only connection establishment</li>
+                        <li>Maintains no state about connections after handshake completion</li>
+                    </ul>
+                </div>
+                
+                <div class="guideline-box important">
+                    <h3>🚫 Direct API Access Prohibited</h3>
+                    <ul>
+                        <li><strong>You MUST use the SDK - direct WebSocket connections are not permitted</strong></li>
+                        <li>The handshake protocol may change without notice</li>
+                        <li>Direct API access bypassing the SDK will result in immediate blocking</li>
+                        <li>The SDK handles protocol changes and ensures proper usage patterns</li>
+                        <li>This policy protects the service from abuse and keeps it free</li>
+                    </ul>
+                </div>
+                
+                <div class="guideline-box">
+                    <h3>📊 Rate Limits & Fair Use</h3>
+                    <ul>
+                        <li>The handshake server implements rate limiting to prevent abuse</li>
+                        <li>Normal SDK usage (connecting, disconnecting, room changes) stays within limits</li>
+                        <li>Rapid connection attempts or excessive handshakes will be throttled</li>
+                        <li>Higher rate limits available on request for legitimate high-volume use cases</li>
+                        <li>Contact us before launching applications expecting high connection rates</li>
+                    </ul>
+                </div>
+                
+                <div class="guideline-box">
+                    <h3>🌐 Connection Capacity</h3>
+                    <ul>
+                        <li>Rooms support approximately 80 concurrent connections</li>
+                        <li>Individual streams may have viewer limits to ensure quality</li>
+                        <li>These limits prevent server overload and ensure reliable handshakes</li>
+                        <li>For events requiring more connections, please contact us in advance</li>
+                    </ul>
+                </div>
+                
+                <div class="guideline-box">
+                    <h3>💭 Serverless Philosophy</h3>
+                    <ul>
+                        <li>The handshake server does the absolute minimum - just WebRTC setup</li>
+                        <li>No message relay, no data storage, no connection state management</li>
+                        <li>All application data MUST flow through P2P connections</li>
+                        <li>Attempting to use the handshake server for data relay is prohibited</li>
+                        <li>This minimal approach keeps the service free and scalable</li>
+                    </ul>
+                </div>
+                
+                <div class="guideline-box">
+                    <h3>✅ Best Practices</h3>
+                    <ul>
+                        <li>Always use the official SDK from the CDN or GitHub</li>
+                        <li>Keep your SDK version updated for compatibility</li>
+                        <li>Implement exponential backoff for reconnection attempts</li>
+                        <li>Use P2P data channels for all application messaging</li>
+                        <li>Test your application's connection patterns before launch</li>
+                    </ul>
+                </div>
+                
+                <div class="guideline-warning">
+                    <strong>Community Service:</strong> This handshake server is provided free of charge to enable serverless P2P applications. Respecting these guidelines ensures it remains available for innovative developers worldwide. Abuse affects everyone - please be a good citizen of the ecosystem.
                 </div>
             </div>
         </div>

@@ -6,6 +6,19 @@ This document contains all the information needed for AI systems to understand a
 
 ---
 
+## ⚠️ CRITICAL: Usage Requirements
+
+**IMPORTANT**: Direct WebSocket API access is NOT permitted. Your AI system MUST use this SDK.
+
+- **SDK ONLY**: Direct WebSocket connections to VDO.Ninja servers will be blocked
+- **API Changes**: The WebSocket API may change without notice - only the SDK is guaranteed to work
+- **Rate Limits**: Excessive requests will result in throttling or blocking
+- **Data Policy**: Only WebRTC handshake data through WebSocket - all application data must use P2P
+- **Connection Limits**: ~80 connections per room maximum
+- **Serverless Design**: No state management or data relay through signaling server
+
+Failure to follow these guidelines may result in your application being blocked.
+
 ## What is VDO.Ninja SDK?
 
 VDO.Ninja SDK is a peer-to-peer (P2P) communication framework that enables direct audio, video, and data streaming between browsers without requiring servers, user accounts, or complex infrastructure. It's specifically designed to be AI-friendly, allowing bots and automated systems to create real-time communication applications.

@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<!--
+    VDO.Ninja SDK Demo - Demo Index
+    
+    This demo code is released into the public domain (CC0 1.0 Universal).
+    You may use, modify, and distribute this demo code without any restrictions.
+    
+    Note: The VDO.Ninja SDK itself (vdoninja-sdk.js) remains licensed under AGPL-3.0.
+    See: https://github.com/steveseguin/ninjasdk/blob/main/LICENSE
+-->
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VDO.Ninja SDK - Demo Gallery</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #0f172a;
+            color: #e2e8f0;
+            line-height: 1.6;
+        }
+        
+        h1 {
+            text-align: center;
+            color: #6366f1;
+            margin-bottom: 10px;
+            font-size: 2.5rem;
+        }
+        
+        .subtitle {
+            text-align: center;
+            color: #94a3b8;
+            margin-bottom: 40px;
+            font-size: 1.125rem;
+        }
+        
+        .back-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: #6366f1;
+            text-decoration: none;
+            margin-bottom: 2rem;
+            padding: 0.5rem 1rem;
+            background: rgba(99, 102, 241, 0.1);
+            border-radius: 0.5rem;
+            transition: all 0.3s;
+        }
+        
+        .back-link:hover {
+            background: rgba(99, 102, 241, 0.2);
+            transform: translateX(-5px);
+        }
+        
+        .demos-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 2rem;
+            margin-bottom: 3rem;
+        }
+        
+        .demo-card {
+            background: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            text-decoration: none;
+            color: inherit;
+            transition: all 0.3s;
+            display: block;
+        }
+        
+        .demo-card:hover {
+            border-color: #6366f1;
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(99, 102, 241, 0.2);
+        }
+        
+        .demo-card h3 {
+            color: #f1f5f9;
+            margin-bottom: 0.5rem;
+            font-size: 1.25rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .demo-card p {
+            color: #94a3b8;
+            margin-bottom: 1rem;
+            font-size: 0.95rem;
+        }
+        
+        .demo-features {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-top: 1rem;
+        }
+        
+        .feature-tag {
+            background: rgba(99, 102, 241, 0.1);
+            color: #818cf8;
+            padding: 0.25rem 0.75rem;
+            border-radius: 2rem;
+            font-size: 0.75rem;
+            border: 1px solid rgba(99, 102, 241, 0.3);
+        }
+        
+        .category {
+            margin-bottom: 3rem;
+        }
+        
+        .category h2 {
+            color: #6366f1;
+            margin-bottom: 1.5rem;
+            font-size: 1.75rem;
+            border-bottom: 2px solid #334155;
+            padding-bottom: 0.5rem;
+        }
+        
+        .info-box {
+            background: rgba(99, 102, 241, 0.1);
+            border: 1px solid rgba(99, 102, 241, 0.3);
+            border-radius: 0.5rem;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        
+        .info-box h3 {
+            color: #6366f1;
+            margin-top: 0;
+        }
+        
+        .info-box p {
+            margin-bottom: 0.5rem;
+        }
+        
+        .info-box code {
+            background: #0f172a;
+            padding: 0.125rem 0.375rem;
+            border-radius: 0.25rem;
+            font-family: monospace;
+            font-size: 0.875rem;
+        }
+    </style>
+</head>
+<body>
+    <a href="../index.html" class="back-link">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/>
+        </svg>
+        Back to Main Page
+    </a>
+    
+    <h1>VDO.Ninja SDK Demo Gallery</h1>
+    <p class="subtitle">Explore working examples of P2P communication patterns and features</p>
+    
+    <div class="info-box">
+        <h3>🚀 Running the Demos</h3>
+        <p>All demos work directly in your browser - no server setup required!</p>
+        <p>For best results, open demos in multiple browser tabs or share the URL with others to test P2P connections.</p>
+        <p>Each demo includes the SDK via: <code>&lt;script src="../vdoninja-sdk.js"&gt;&lt;/script&gt;</code></p>
+    </div>
+    
+    <div class="category">
+        <h2>📡 Core Communication</h2>
+        <div class="demos-grid">
+            <a href="vdoninja-sdk-datachannel-demo.html" class="demo-card">
+                <h3>📨 Data Channel Messaging</h3>
+                <p>Comprehensive demonstration of P2P data messaging with multiple nodes, pub/sub patterns, and advanced filtering.</p>
+                <div class="demo-features">
+                    <span class="feature-tag">Multi-node</span>
+                    <span class="feature-tag">Pub/Sub</span>
+                    <span class="feature-tag">Filtering</span>
+                    <span class="feature-tag">JSON Messages</span>
+                </div>
+            </a>
+            
+            <a href="vdoninja-sdk-pubsub-channels.html" class="demo-card">
+                <h3>📻 Channel-Based Pub/Sub</h3>
+                <p>Topic-based messaging system with channel subscriptions, perfect for chat rooms or event systems.</p>
+                <div class="demo-features">
+                    <span class="feature-tag">Channels</span>
+                    <span class="feature-tag">Topics</span>
+                    <span class="feature-tag">Routing</span>
+                </div>
+            </a>
+            
+            <a href="vdoninja-sdk-pubsub-p2p-only.html" class="demo-card">
+                <h3>🔗 Pure P2P Pub/Sub</h3>
+                <p>Direct peer-to-peer publish/subscribe without any server relay after initial handshake.</p>
+                <div class="demo-features">
+                    <span class="feature-tag">Direct P2P</span>
+                    <span class="feature-tag">No Relay</span>
+                    <span class="feature-tag">Efficient</span>
+                </div>
+            </a>
+        </div>
+    </div>
+    
+    <div class="category">
+        <h2>🎥 Media Streaming</h2>
+        <div class="demos-grid">
+            <a href="vdoninja-sdk-broadcast-demo.html" class="demo-card">
+                <h3>📺 Broadcast Mode</h3>
+                <p>One-to-many streaming setup with automatic viewer management and real-time statistics.</p>
+                <div class="demo-features">
+                    <span class="feature-tag">One-to-Many</span>
+                    <span class="feature-tag">Live Stats</span>
+                    <span class="feature-tag">Viewer Control</span>
+                </div>
+            </a>
+            
+            <a href="vdoninja-sdk-canvas-demo.html" class="demo-card">
+                <h3>🎨 Canvas & Web Audio</h3>
+                <p>Stream programmatically generated content using Canvas API and Web Audio for creative applications.</p>
+                <div class="demo-features">
+                    <span class="feature-tag">Canvas API</span>
+                    <span class="feature-tag">Web Audio</span>
+                    <span class="feature-tag">Synthetic Media</span>
+                </div>
+            </a>
+            
+            <a href="vdoninja-sdk-two-way-chat.html" class="demo-card">
+                <h3>💬 Two-Way Video Chat</h3>
+                <p>Bidirectional video/audio chat using canvas animations and tone generators.</p>
+                <div class="demo-features">
+                    <span class="feature-tag">Bidirectional</span>
+                    <span class="feature-tag">Canvas Video</span>
+                    <span class="feature-tag">Audio Tones</span>
+                </div>
+            </a>
+        </div>
+    </div>
+    
+    <div class="category">
+        <h2>🎛️ Advanced Features</h2>
+        <div class="demos-grid">
+            <a href="vdoninja-sdk-dynamic-media-demo.html" class="demo-card">
+                <h3>🔄 Dynamic Media Control</h3>
+                <p>Add and remove audio/video tracks on the fly, demonstrating runtime media manipulation.</p>
+                <div class="demo-features">
+                    <span class="feature-tag">Dynamic Tracks</span>
+                    <span class="feature-tag">Runtime Control</span>
+                    <span class="feature-tag">Track Toggle</span>
+                </div>
+            </a>
+            
+            <a href="vdoninja-sdk-tracks-demo.html" class="demo-card">
+                <h3>🎚️ Track Management</h3>
+                <p>Fine-grained control over individual media tracks with quality switching and constraints.</p>
+                <div class="demo-features">
+                    <span class="feature-tag">Track Control</span>
+                    <span class="feature-tag">Quality Settings</span>
+                    <span class="feature-tag">Constraints</span>
+                </div>
+            </a>
+            
+            <a href="vdoninja-sdk-turn-demo.html" class="demo-card">
+                <h3>🔧 TURN Server Config</h3>
+                <p>Configure and test custom TURN servers for improved connectivity through firewalls.</p>
+                <div class="demo-features">
+                    <span class="feature-tag">TURN Config</span>
+                    <span class="feature-tag">ICE Testing</span>
+                    <span class="feature-tag">Connectivity</span>
+                </div>
+            </a>
+        </div>
+    </div>
+    
+    <div class="category">
+        <h2>🔌 Integrations</h2>
+        <div class="demos-grid">
+            <a href="capturevideo-example.html" class="demo-card">
+                <h3>🎮 Discord Auto-Publisher</h3>
+                <p>Chrome extension example that automatically publishes Discord video streams to VDO.Ninja.</p>
+                <div class="demo-features">
+                    <span class="feature-tag">Chrome Extension</span>
+                    <span class="feature-tag">Auto-capture</span>
+                    <span class="feature-tag">Discord</span>
+                </div>
+            </a>
+        </div>
+    </div>
+    
+    <div class="info-box">
+        <h3>💡 Tips for Testing</h3>
+        <p><strong>Local Testing:</strong> Open demos in multiple browser tabs or windows</p>
+        <p><strong>Remote Testing:</strong> Share the demo URL with others - no server needed!</p>
+        <p><strong>Debug Mode:</strong> Open browser console to see detailed connection logs</p>
+        <p><strong>Room Names:</strong> Most demos generate random room names to avoid conflicts</p>
+    </div>
+</body>
+</html>

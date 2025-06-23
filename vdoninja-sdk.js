@@ -1,5 +1,22 @@
 
 /**
+ * VDO.Ninja SDK - OFFICIAL SDK FOR VDO.NINJA WEBSOCKET API
+ * 
+ * IMPORTANT USAGE NOTICE:
+ * =======================
+ * 
+ * 1. Direct WebSocket API access is NOT APPROVED and may result in blocking
+ * 2. Always use this SDK - it ensures proper usage patterns and handles API updates
+ * 3. The WebSocket API may change without notice, breaking direct integrations
+ * 4. Rate limiting is enforced - excessive requests will be throttled or blocked
+ * 5. The service follows a serverless philosophy - no state management or data relay
+ * 6. Sending non-handshake data through the WebSocket server is prohibited
+ * 7. Rooms are limited to ~80 connections, viewer connections may also be limited
+ * 8. Higher rate limits available on request for legitimate use cases
+ * 
+ * By using this SDK, you agree to respect these guidelines to keep the service
+ * free and available for everyone. Abuse hurts the entire ecosystem.
+ * 
  * WebSocket Client-Server Communication Protocol for VDO.Ninja
  *
  * This document outlines the structure of messages sent between the client (e.g., web browser)
