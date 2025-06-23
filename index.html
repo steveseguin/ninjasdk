@@ -269,11 +269,6 @@ vdo.sendData({ message: "Hello P2P!" });</code></pre>
                     <h3>Unlimited Bandwidth</h3>
                     <p>Stream 4K video, transfer gigabytes. You're only limited by your users' internet connections.</p>
                 </div>
-                <div class="feature-card">
-                    <div class="feature-icon">🏠</div>
-                    <h3>LAN-Aware Connections</h3>
-                    <p>When peers are on the same local network, WebRTC automatically keeps traffic local. Ultra-low latency, no internet bandwidth used!</p>
-                </div>
             </div>
         </div>
     </section>
@@ -691,16 +686,12 @@ vdo.addEventListener('error', (event) => {
                     <p>All modern browsers: Chrome/Edge 80+, Firefox 75+, Safari 14+. Mobile browsers with WebRTC support work too.</p>
                 </div>
                 <div class="faq-item">
-                    <h3>Are there rate limits?</h3>
-                    <p>Yes, the handshake server has rate limiting to prevent abuse. Normal SDK usage stays well within limits. Higher rate limits can be accommodated on request. Abusers may be throttled or blocked.</p>
-                </div>
-                <div class="faq-item">
-                    <h3>Can I connect directly to the handshake server?</h3>
-                    <p><strong>No.</strong> Direct WebSocket connections to the handshake server are not permitted. The handshake protocol may change without notice. Always use the SDK which handles updates and stays within usage guidelines. Direct access will result in blocking.</p>
+                    <h3>Can I self-host the handshake-server?</h3>
+                    <p>In upcoming versions of the SDK, there will be support for self-hosting.</p>
                 </div>
                 <div class="faq-item">
                     <h3>Does it work on local networks without internet?</h3>
-                    <p>Once peers discover each other via the handshake server, WebRTC intelligently routes traffic. If two peers are on the same LAN, data flows directly between them locally - no internet bandwidth used! This makes it perfect for local file sharing, LAN parties, or office applications.</p>
+                    <p>Yes! If two peers are on the same LAN, data flows directly between them locally - no internet bandwidth used!</p>
                 </div>
             </div>
         </div>
