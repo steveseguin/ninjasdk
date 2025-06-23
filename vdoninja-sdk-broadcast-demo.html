@@ -363,9 +363,11 @@
     <script src="vdoninja-sdk.js"></script>
     
     <script>
-        // Configuration
-        const ROOM = 'broadcast-demo';
-        const STREAM_ID = 'broadcaster';
+        // Configuration with random IDs
+        const randomRoom = Math.floor(Math.random() * 10000);
+        const randomStream = Math.floor(Math.random() * 1000);
+        const ROOM = `broadcast-demo-${randomRoom}`;
+        const STREAM_ID = `broadcaster-${randomStream}`;
         
         // State
         let broadcaster = null;

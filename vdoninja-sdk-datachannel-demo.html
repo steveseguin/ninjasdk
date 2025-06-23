@@ -1439,6 +1439,17 @@
         
         // Initialize
         window.addEventListener('load', () => {
+            // Set random room name and stream IDs
+            const randomRoom = Math.floor(Math.random() * 10000);
+            const roomName = `datachannel-demo-${randomRoom}`;
+            document.getElementById('node1Room').value = roomName;
+            document.getElementById('node2Room').value = roomName;
+            
+            const randomId1 = Math.floor(Math.random() * 1000);
+            const randomId2 = Math.floor(Math.random() * 1000);
+            document.getElementById('node1StreamID').value = `node1-${randomId1}`;
+            document.getElementById('node2StreamID').value = `node2-${randomId2}`;
+            
             // Set up some default examples
             setExample(1, 'chat');
             setExample(2, 'response');

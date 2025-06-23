@@ -467,8 +467,6 @@
                 logPublisher('Initializing publisher...');
                 
                 publisher = new VDONinjaSDK({
-                    room: room,
-                    streamID: streamID,
                     debug: true
                 });
                 
@@ -498,9 +496,8 @@
                     updatePublisherUI();
                 });
                 
-                publisher.addEventListener('dataReceived', (event) => {
-                    const data = event.detail.data;
-                    const uuid = event.detail.uuid;
+                publisher.addEventListener('data', (event) => {
+                    const { data, uuid } = event.detail;
                     
                     if (data.type === 'subscribe') {
                         handleSubscription(uuid, data.channels, true);
@@ -518,17 +515,16 @@
                     }
                 });
                 
-                publisher.addEventListener('bye', (event) => {
-                    const uuid = event.detail.UUID;
-                    if (connectedViewers.has(uuid)) {
-                        connectedViewers.delete(uuid);
-                        logPublisher(`Viewer disconnected: ${uuid.substring(0, 8)}...`);
-                        updatePublisherUI();
-                    }
+                publisher.addEventListener('disconnected', () => {
+                    logPublisher('Disconnected from server');
+                    connectedViewers.clear();
+                    updatePublisherUI();
                 });
                 
-                // Connect and start
+                // Connect to server, join room, and announce as data-only publisher
                 await publisher.connect();
+                await publisher.joinRoom({ room: room });
+                await publisher.announce({ room: room, streamID: streamID });
                 
                 isPublishing = true;
                 document.getElementById('startPublish').disabled = true;
@@ -696,7 +692,6 @@
                 logSubscriber('Initializing subscriber...');
                 
                 subscriber = new VDONinjaSDK({
-                    room: room,
                     debug: true
                 });
                 
@@ -713,8 +708,8 @@
                     sendSubscriptionUpdate();
                 });
                 
-                subscriber.addEventListener('dataReceived', (event) => {
-                    const data = event.detail.data;
+                subscriber.addEventListener('data', (event) => {
+                    const { data } = event.detail;
                     
                     if (data.type === 'welcome') {
                         logSubscriber(`Welcome message: ${data.message}`, 'system');
@@ -747,12 +742,12 @@
                     }
                 });
                 
-                // Connect and view
+                // Connect to server, join room, and view the publisher's stream
                 await subscriber.connect();
-                await subscriber.quickView({
-                    streamID: streamID,
-                    room: room,
-                    dataOnly: true  // We only need data channels
+                await subscriber.joinRoom({ room: room });
+                await subscriber.view(streamID, {
+                    audio: false,
+                    video: false
                 });
                 
                 isSubscribing = true;
@@ -867,6 +862,12 @@
         // Initialize UI
         updatePublisherUI();
         updateSubscriberUI();
+        
+        // Set default room names with random number
+        const randomSuffix = Math.floor(Math.random() * 10000);
+        const defaultRoom = `pubsub-channels-demo-${randomSuffix}`;
+        document.getElementById('pubRoom').value = defaultRoom;
+        document.getElementById('subRoom').value = defaultRoom;
     </script>
 </body>
 </html>

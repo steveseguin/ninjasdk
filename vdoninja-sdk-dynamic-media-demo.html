@@ -401,9 +401,11 @@
     <script src="vdoninja-sdk.js"></script>
     
     <script>
-        // Configuration
-        const ROOM = 'dynamic-media-demo';
-        const STREAM_ID = 'dynamic-publisher';
+        // Configuration with random IDs
+        const randomRoom = Math.floor(Math.random() * 10000);
+        const randomStream = Math.floor(Math.random() * 1000);
+        const ROOM = `dynamic-media-demo-${randomRoom}`;
+        const STREAM_ID = `dynamic-publisher-${randomStream}`;
         
         // State
         let publisher = null;

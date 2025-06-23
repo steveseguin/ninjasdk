@@ -1003,6 +1003,17 @@
         // Initialize UI
         updatePublisherUI();
         updateSubscriberUI();
+        
+        // Set random room name and stream ID
+        const randomRoom = Math.floor(Math.random() * 10000);
+        const randomStream = Math.floor(Math.random() * 1000);
+        const roomName = `p2p-pubsub-demo-${randomRoom}`;
+        const streamId = `p2p-publisher-${randomStream}`;
+        
+        document.getElementById('pubRoom').value = roomName;
+        document.getElementById('subRoom').value = roomName;
+        document.getElementById('pubStreamID').value = streamId;
+        document.getElementById('subStreamID').value = streamId;
     </script>
 </body>
 </html>

@@ -1188,6 +1188,15 @@
         // Initialize on load
         window.addEventListener('load', () => {
             initCanvas();
+            
+            // Set random room name and stream ID
+            const randomRoom = Math.floor(Math.random() * 10000);
+            const randomStream = Math.floor(Math.random() * 1000);
+            
+            document.getElementById('pubRoom').value = `canvas-demo-${randomRoom}`;
+            document.getElementById('viewRoom').value = `canvas-demo-${randomRoom}`;
+            document.getElementById('pubStreamID').value = `canvas-stream-${randomStream}`;
+            document.getElementById('viewStreamID').value = `canvas-stream-${randomStream}`;
         });
         
         // Clean up on page unload
