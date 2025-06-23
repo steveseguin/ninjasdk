@@ -4331,12 +4331,15 @@
     // Export for different environments
     if (typeof module !== 'undefined' && module.exports) {
         module.exports = VDONinjaSDK;
+        module.exports.VDONinja = VDONinjaSDK; // Also expose as VDONinja
     } else if (typeof define === 'function' && define.amd) {
         define([], function() {
             return VDONinjaSDK;
         });
     } else {
+        // Browser global - expose as both VDONinjaSDK and VDONinja
         global.VDONinjaSDK = VDONinjaSDK;
+        global.VDONinja = VDONinjaSDK;
     }
 
 })(typeof window !== 'undefined' ? window : global);

@@ -255,8 +255,8 @@ iframe.contentWindow.postMessage({
                 <pre><code class="language-html">&lt;script src="https://cdn.jsdelivr.net/gh/steveseguin/ninjasdk@latest/vdoninja-sdk.min.js"&gt;&lt;/script&gt;</code></pre>
                 
                 <h3>2. Basic Data Channel Example</h3>
-                <pre><code class="language-javascript">// Create a new VDO.Ninja instance
-const vdo = new VDONinja();
+                <pre><code class="language-javascript">// Create a new VDO.Ninja instance (both names work)
+const vdo = new VDONinja();  // or new VDONinjaSDK()
 
 // Set up data channel handling
 vdo.onDataMessage = (data, uid) => {
