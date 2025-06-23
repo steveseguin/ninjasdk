@@ -95,35 +95,75 @@
             <h2 class="section-title">🚀 Try It Live - No Setup Required</h2>
             <div class="live-demo-container">
                 <div class="demo-info">
-                    <p>Test P2P data channels right here in your browser. Open this page in two tabs or share the room ID with someone.</p>
+                    <p>Experience true P2P messaging right here. Two independent peers that can connect and chat directly through your browser.</p>
                 </div>
-                <div class="demo-grid">
-                    <div class="demo-panel">
-                        <h3>Your Connection</h3>
+                <div class="demo-grid demo-grid-peers">
+                    <!-- Peer 1 -->
+                    <div class="demo-panel peer-panel">
+                        <h3>👤 Peer 1</h3>
                         <div class="demo-status">
-                            <span class="status-indicator" id="connectionStatus"></span>
-                            <span id="connectionText">Not connected</span>
+                            <span class="status-indicator" id="peer1Status"></span>
+                            <span id="peer1StatusText">Not connected</span>
                         </div>
                         <div class="demo-controls">
-                            <input type="text" id="roomInput" placeholder="Enter room name" class="demo-input">
-                            <button id="connectBtn" class="btn btn-primary" onclick="toggleConnection()">Connect</button>
+                            <button id="peer1ConnectBtn" class="btn btn-primary" onclick="togglePeer(1)">Connect</button>
                         </div>
-                        <div class="peer-list" id="peerList"></div>
-                    </div>
-                    <div class="demo-panel">
-                        <h3>Send & Receive Messages</h3>
-                        <div class="message-area" id="messageArea"></div>
-                        <div class="message-controls">
-                            <input type="text" id="messageInput" placeholder="Type a message..." class="demo-input" disabled>
-                            <button id="sendBtn" class="btn btn-secondary" onclick="sendMessage()" disabled>Send</button>
+                        <div class="peer-info">
+                            <small>Stream ID: <span id="peer1StreamID">-</span></small><br>
+                            <small>Viewing: <span id="peer1Viewing">-</span></small>
+                        </div>
+                        <div class="message-container" id="peer1MessageContainer" style="display: none;">
+                            <div class="message-area" id="peer1Messages"></div>
+                            <div class="message-controls">
+                                <input type="text" id="peer1Input" placeholder="Type a message..." class="demo-input" disabled>
+                                <button id="peer1SendBtn" class="btn btn-secondary" onclick="sendPeerMessage(1)" disabled>Send</button>
+                            </div>
                         </div>
                     </div>
+                    
+                    <!-- Peer 2 -->
+                    <div class="demo-panel peer-panel">
+                        <h3>👤 Peer 2</h3>
+                        <div class="demo-status">
+                            <span class="status-indicator" id="peer2Status"></span>
+                            <span id="peer2StatusText">Not connected</span>
+                        </div>
+                        <div class="demo-controls">
+                            <button id="peer2ConnectBtn" class="btn btn-primary" onclick="togglePeer(2)">Connect</button>
+                        </div>
+                        <div class="peer-info">
+                            <small>Stream ID: <span id="peer2StreamID">-</span></small><br>
+                            <small>Viewing: <span id="peer2Viewing">-</span></small>
+                        </div>
+                        <div class="message-container" id="peer2MessageContainer" style="display: none;">
+                            <div class="message-area" id="peer2Messages"></div>
+                            <div class="message-controls">
+                                <input type="text" id="peer2Input" placeholder="Type a message..." class="demo-input" disabled>
+                                <button id="peer2SendBtn" class="btn btn-secondary" onclick="sendPeerMessage(2)" disabled>Send</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="demo-room-info">
+                    <span>Room: <strong id="demoRoomName">-</strong></span>
+                    <span class="separator">|</span>
+                    <span id="connectionInfo">Connect both peers to start chatting</span>
                 </div>
                 <div class="demo-code">
                     <h4>This demo uses just these few lines:</h4>
-                    <pre><code class="language-javascript">const vdo = new VDONinja();
-vdo.onDataMessage = (data, uid) => displayMessage(data, uid);
-await vdo.connect({ roomid: "demo-room", push: true, view: true, datamode: 1 });
+                    <pre><code class="language-javascript">// Setup
+const vdo = new VDONinjaSDK();
+vdo.addEventListener('dataReceived', (e) => displayMessage(e.detail.data));
+
+// Connect and announce yourself
+await vdo.connect();
+await vdo.joinRoom({ room: "demo-room" });
+await vdo.announce({ streamID: "myPeerID" });
+
+// View another peer to establish P2P connection
+await vdo.quickView({ streamID: "otherPeerID", dataOnly: true });
+
+// Send messages
 vdo.sendData({ message: "Hello P2P!" });</code></pre>
                 </div>
             </div>
@@ -224,23 +264,97 @@ vdo.sendData({ message: "Hello P2P!" });</code></pre>
             <h2 class="section-title">Quick Start</h2>
             <div class="quickstart-options">
                 <div class="quickstart-option">
-                    <h3>Option 1: Simple IFRAME API (Easiest)</h3>
+                    <h3>Option 1: Simple IFRAME API</h3>
                     <p>For basic P2P data transfer, you can use the IFRAME API without any SDK:</p>
-                    <pre><code class="language-html">&lt;iframe id="vdo" src="https://vdo.ninja/iframe"&gt;&lt;/iframe&gt;
+                    <div class="code-preview">
+                        <pre><code class="language-html">&lt;iframe id="vdo" src="https://vdo.ninja/?room=my-room&amp;dataonly"&gt;&lt;/iframe&gt;
+&lt;script&gt;
+// Listen for data
+window.addEventListener('message', (e) =&gt; {
+    if (e.data.dataReceived) console.log('Received:', e.data.dataReceived);
+});
+// Send data
+iframe.contentWindow.postMessage({ sendData: { msg: "Hello!" }}, '*');
+&lt;/script&gt;</code></pre>
+                    </div>
+                    <button class="expand-btn" onclick="toggleIframeExample(this)">
+                        <span class="expand-text">Show Full Example</span>
+                        <span class="expand-icon">▼</span>
+                    </button>
+                    <div class="expandable-content" style="display: none;">
+                        <pre><code class="language-html">&lt;!-- Create the iframe --&gt;
+&lt;iframe id="vdo" 
+        src="https://vdo.ninja/?room=my-data-room&amp;cleanish&amp;dataonly"
+        allow="camera;microphone;fullscreen;display-capture;autoplay;"
+        style="width: 100%; height: 400px;"&gt;
+&lt;/iframe&gt;
 
 &lt;script&gt;
+// Get iframe reference
 const iframe = document.getElementById('vdo');
-iframe.onmessage = (e) => {
-    if (e.data.dataReceived) {
-        console.log('Received:', e.data.dataReceived);
+
+// Track connected peers
+const connectedPeers = {};
+
+// Set up event listener for messages from iframe
+window.addEventListener('message', function(e) {
+    // Verify message is from our iframe
+    if (e.source !== iframe.contentWindow) return;
+    
+    // Handle connection events
+    if (e.data.action === 'guest-connected' && e.data.streamID) {
+        connectedPeers[e.data.streamID] = e.data.value?.label || 'Guest';
+        console.log('Peer connected:', e.data.streamID);
     }
+    
+    // Handle received data
+    if (e.data.dataReceived) {
+        console.log('Data from', e.data.UUID + ':', e.data.dataReceived);
+        
+        // Check for your custom namespace
+        if (e.data.dataReceived.myApp) {
+            handleCustomData(e.data.dataReceived.myApp);
+        }
+    }
+});
+
+// Send data to all peers
+function sendToAll(data) {
+    iframe.contentWindow.postMessage({
+        sendData: {
+            myApp: data  // Use namespace to avoid conflicts
+        },
+        type: 'pcs'  // Use peer connections (most reliable)
+    }, '*');
+}
+
+// Send data to specific peer
+function sendToPeer(data, targetUUID) {
+    iframe.contentWindow.postMessage({
+        sendData: {
+            myApp: data
+        },
+        type: 'pcs',
+        UUID: targetUUID
+    }, '*');
+}
+
+// Example: Send a message after iframe loads
+iframe.onload = function() {
+    setTimeout(() => {
+        sendToAll({ 
+            message: 'Hello from P2P!',
+            timestamp: Date.now()
+        });
+    }, 2000);
 };
 
-// Send data
-iframe.contentWindow.postMessage({
-    sendData: { message: "Hello P2P!" }
-}, '*');
+function handleCustomData(data) {
+    console.log('Custom data received:', data);
+    // Your app logic here
+}
 &lt;/script&gt;</code></pre>
+                    </div>
                     <div class="iframe-links">
                         <a href="https://vdo.ninja/iframe" target="_blank">Try IFRAME Demo</a>
                         <a href="https://docs.vdo.ninja/guides/iframe-api-documentation/iframe-api-basics" target="_blank">IFRAME Docs</a>
@@ -784,175 +898,6 @@ vdo.addEventListener('error', (event) => {
             }
         }
 
-        // Live Demo Functionality
-        let vdo = null;
-        let isConnected = false;
-        const peers = new Map();
-
-        function updateConnectionStatus(connected) {
-            const status = document.getElementById('connectionStatus');
-            const text = document.getElementById('connectionText');
-            const connectBtn = document.getElementById('connectBtn');
-            const messageInput = document.getElementById('messageInput');
-            const sendBtn = document.getElementById('sendBtn');
-
-            console.log('updateConnectionStatus called with:', connected);
-            console.log('messageInput element:', messageInput);
-
-            if (connected) {
-                status.classList.add('connected');
-                text.textContent = 'Connected';
-                connectBtn.textContent = 'Disconnect';
-                if (messageInput) {
-                    messageInput.disabled = false;
-                    messageInput.removeAttribute('disabled');
-                    console.log('messageInput disabled state:', messageInput.disabled);
-                }
-                if (sendBtn) {
-                    sendBtn.disabled = false;
-                }
-            } else {
-                status.classList.remove('connected');
-                text.textContent = 'Not connected';
-                connectBtn.textContent = 'Connect';
-                if (messageInput) {
-                    messageInput.disabled = true;
-                }
-                if (sendBtn) {
-                    sendBtn.disabled = true;
-                }
-            }
-        }
-
-        function displayMessage(data, uid, isSelf = false) {
-            const messageArea = document.getElementById('messageArea');
-            const messageDiv = document.createElement('div');
-            messageDiv.className = `message ${isSelf ? 'message-self' : 'message-other'}`;
-            
-            const time = new Date().toLocaleTimeString();
-            const sender = isSelf ? 'You' : `Peer ${uid.substring(0, 6)}`;
-            
-            messageDiv.innerHTML = `
-                <div class="message-header">
-                    <span class="message-sender">${sender}</span>
-                    <span class="message-time">${time}</span>
-                </div>
-                <div class="message-content">${data.message || data}</div>
-            `;
-            
-            messageArea.appendChild(messageDiv);
-            messageArea.scrollTop = messageArea.scrollHeight;
-        }
-
-        function updatePeerList() {
-            const peerList = document.getElementById('peerList');
-            if (peers.size === 0) {
-                peerList.innerHTML = '<p class="no-peers">No other peers connected</p>';
-            } else {
-                peerList.innerHTML = '<h4>Connected Peers:</h4>' + 
-                    Array.from(peers.keys()).map(uid => 
-                        `<div class="peer-item">🟢 ${uid.substring(0, 8)}</div>`
-                    ).join('');
-            }
-        }
-
-        async function toggleConnection() {
-            if (!isConnected) {
-                const roomInput = document.getElementById('roomInput');
-                const roomId = roomInput.value.trim() || 'demo-room';
-                
-                try {
-                    vdo = new VDONinjaSDK();
-                    
-                    // Set up event handlers
-                    vdo.addEventListener('peerConnected', (event) => {
-                        const { uuid } = event.detail;
-                        peers.set(uuid, { connected: Date.now() });
-                        updatePeerList();
-                        displayMessage({ message: 'A peer joined the room' }, uuid);
-                    });
-                    
-                    vdo.addEventListener('disconnected', (event) => {
-                        // Note: This fires when we disconnect from server
-                        // Individual peer disconnects may need different handling
-                        peers.clear();
-                        updatePeerList();
-                    });
-                    
-                    vdo.addEventListener('data', (event) => {
-                        const { data, uuid } = event.detail;
-                        displayMessage(data, uuid);
-                    });
-                    
-                    vdo.addEventListener('error', (event) => {
-                        console.error('VDO.Ninja Error:', event.detail.error);
-                        displayMessage({ message: `Error: ${event.detail.error}` }, 'System');
-                    });
-                    
-                    // Connect to server, join room, and announce
-                    await vdo.connect();
-                    await vdo.joinRoom({ room: roomId });
-                    await vdo.announce({ room: roomId });
-                    
-                    isConnected = true;
-                    updateConnectionStatus(true);
-                    displayMessage({ message: `Connected to room: ${roomId}` }, 'System');
-                    
-                    // Force enable the input in case updateConnectionStatus didn't work
-                    document.getElementById('messageInput').disabled = false;
-                    document.getElementById('sendBtn').disabled = false;
-                    
-                } catch (error) {
-                    console.error('Connection failed:', error);
-                    displayMessage({ message: `Failed to connect: ${error.message}` }, 'System');
-                }
-            } else {
-                // Disconnect
-                if (vdo) {
-                    vdo.disconnect();
-                    vdo = null;
-                }
-                peers.clear();
-                isConnected = false;
-                updateConnectionStatus(false);
-                updatePeerList();
-                displayMessage({ message: 'Disconnected from room' }, 'System');
-            }
-        }
-
-        function sendMessage() {
-            const messageInput = document.getElementById('messageInput');
-            const message = messageInput.value.trim();
-            
-            if (message && vdo && isConnected) {
-                const data = {
-                    message: message,
-                    timestamp: Date.now()
-                };
-                
-                vdo.sendData(data);
-                displayMessage(data, 'self', true);
-                messageInput.value = '';
-            }
-        }
-
-        // Enter key to send
-        const messageInputElement = document.getElementById('messageInput');
-        if (messageInputElement) {
-            messageInputElement.addEventListener('keypress', (e) => {
-                if (e.key === 'Enter') {
-                    sendMessage();
-                }
-            });
-        }
-
-        // Initialize peer list
-        updatePeerList();
-        
-        // Set default room name with random suffix
-        const roomInput = document.getElementById('roomInput');
-        const randomSuffix = Math.floor(Math.random() * 10000);
-        roomInput.value = `demo-room-${randomSuffix}`;
 
         // Mobile navigation
         function toggleNav() {
@@ -960,6 +905,23 @@ vdo.addEventListener('error', (event) => {
             const navToggle = document.getElementById('navToggle');
             navLinks.classList.toggle('active');
             navToggle.classList.toggle('active');
+        }
+
+        // Toggle iframe example
+        function toggleIframeExample(button) {
+            const content = button.nextElementSibling;
+            const text = button.querySelector('.expand-text');
+            const icon = button.querySelector('.expand-icon');
+            
+            if (content.style.display === 'none') {
+                content.style.display = 'block';
+                text.textContent = 'Hide Full Example';
+                icon.style.transform = 'rotate(180deg)';
+            } else {
+                content.style.display = 'none';
+                text.textContent = 'Show Full Example';
+                icon.style.transform = 'rotate(0deg)';
+            }
         }
 
         // Close mobile nav on link click
@@ -972,6 +934,7 @@ vdo.addEventListener('error', (event) => {
             });
         });
     </script>
+    <script src="demo.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-javascript.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-bash.min.js"></script>

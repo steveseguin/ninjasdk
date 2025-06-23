@@ -1,0 +1,851 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VDO.Ninja SDK - Two-Way Canvas/WebAudio Chat</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #1a1a1a;
+            color: #e0e0e0;
+        }
+        
+        h1 {
+            text-align: center;
+            color: #ffffff;
+            margin-bottom: 10px;
+        }
+        
+        .subtitle {
+            text-align: center;
+            color: #999;
+            font-size: 16px;
+            margin-bottom: 30px;
+        }
+        
+        .info {
+            background-color: #2196F3;
+            color: white;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .main-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        
+        .peer-section {
+            background: #2a2a2a;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+            border: 1px solid #3a3a3a;
+        }
+        
+        .peer-section.peer1 {
+            border-color: #4CAF50;
+        }
+        
+        .peer-section.peer2 {
+            border-color: #2196F3;
+        }
+        
+        h2 {
+            color: #e0e0e0;
+            margin-top: 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .status-indicator {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background-color: #666;
+        }
+        
+        .status-indicator.connected {
+            background-color: #4CAF50;
+        }
+        
+        .control-group {
+            margin-bottom: 15px;
+            padding: 10px;
+            background-color: #333;
+            border-radius: 5px;
+        }
+        
+        .control-group h3 {
+            margin-top: 0;
+            font-size: 16px;
+            color: #b0b0b0;
+        }
+        
+        label {
+            display: inline-block;
+            width: 120px;
+            font-weight: bold;
+            color: #b0b0b0;
+        }
+        
+        input[type="text"], select {
+            width: calc(100% - 130px);
+            padding: 8px;
+            border: 1px solid #444;
+            border-radius: 4px;
+            background-color: #1a1a1a;
+            color: #e0e0e0;
+        }
+        
+        input[type="range"] {
+            width: 150px;
+            vertical-align: middle;
+        }
+        
+        .range-value {
+            display: inline-block;
+            width: 60px;
+            text-align: right;
+            color: #4CAF50;
+        }
+        
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+            margin-bottom: 10px;
+            font-size: 14px;
+            transition: background-color 0.3s;
+        }
+        
+        button:hover:not(:disabled) {
+            background-color: #5cbf60;
+        }
+        
+        button:disabled {
+            background-color: #444;
+            color: #666;
+            cursor: not-allowed;
+        }
+        
+        button.stop {
+            background-color: #f44336;
+        }
+        
+        button.stop:hover:not(:disabled) {
+            background-color: #ff6659;
+        }
+        
+        .media-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        
+        .media-container {
+            text-align: center;
+        }
+        
+        .media-container h4 {
+            margin: 0 0 10px 0;
+            color: #999;
+            font-size: 14px;
+        }
+        
+        canvas, video {
+            width: 100%;
+            max-width: 300px;
+            height: 225px;
+            background-color: #000;
+            border-radius: 8px;
+            border: 2px solid #444;
+        }
+        
+        .connection-info {
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #1a1a1a;
+            border-radius: 5px;
+            font-size: 12px;
+            font-family: monospace;
+        }
+        
+        .log {
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #1a1a1a;
+            border: 1px solid #444;
+            border-radius: 5px;
+            height: 150px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        
+        .log-entry {
+            padding: 3px 0;
+            border-bottom: 1px solid #333;
+        }
+        
+        .log-entry.error {
+            color: #ff6b6b;
+        }
+        
+        .log-entry.success {
+            color: #6bcf7f;
+        }
+        
+        .log-entry.info {
+            color: #4ecdc4;
+        }
+        
+        @media (max-width: 768px) {
+            .main-grid {
+                grid-template-columns: 1fr;
+            }
+            .media-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1>🎥 VDO.Ninja SDK - Two-Way Canvas/WebAudio Chat</h1>
+    <div class="subtitle">Bidirectional video/audio chat using canvas animations and tone generators</div>
+    
+    <div class="info">
+        💡 This demo shows two peers exchanging canvas-based video and WebAudio streams simultaneously.
+        Each peer publishes their own stream and views the other peer's stream.
+    </div>
+    
+    <div class="main-grid">
+        <!-- Peer 1 Section -->
+        <div class="peer-section peer1">
+            <h2>
+                <span class="status-indicator" id="peer1Status"></span>
+                👤 Peer 1 (Green)
+            </h2>
+            
+            <!-- Canvas Controls -->
+            <div class="control-group">
+                <h3>🎨 Canvas Animation</h3>
+                <label for="peer1Animation">Animation:</label>
+                <select id="peer1Animation" onchange="updateAnimation(1)">
+                    <option value="bouncing">Bouncing Ball</option>
+                    <option value="wave">Sine Wave</option>
+                    <option value="particles">Particles</option>
+                    <option value="spiral">Spiral</option>
+                </select>
+                <br>
+                <label for="peer1Speed">Speed:</label>
+                <input type="range" id="peer1Speed" min="0.1" max="3" step="0.1" value="1" oninput="updateSpeed(1, this)">
+                <span class="range-value" id="peer1SpeedValue">1.0</span>
+            </div>
+            
+            <!-- Audio Controls -->
+            <div class="control-group">
+                <h3>🔊 Audio Tone</h3>
+                <label for="peer1Freq">Frequency:</label>
+                <input type="range" id="peer1Freq" min="200" max="1000" step="10" value="440" oninput="updateFrequency(1, this)">
+                <span class="range-value" id="peer1FreqValue">440 Hz</span>
+                <br>
+                <label for="peer1Volume">Volume:</label>
+                <input type="range" id="peer1Volume" min="0" max="100" step="1" value="30" oninput="updateVolume(1, this)">
+                <span class="range-value" id="peer1VolumeValue">30%</span>
+            </div>
+            
+            <!-- Connection Controls -->
+            <button id="peer1Connect" onclick="connectPeer(1)">Connect & Start</button>
+            <button id="peer1Disconnect" class="stop" onclick="disconnectPeer(1)" disabled>Disconnect</button>
+            
+            <!-- Media Display -->
+            <div class="media-grid">
+                <div class="media-container">
+                    <h4>📤 My Stream (Canvas)</h4>
+                    <canvas id="peer1Canvas"></canvas>
+                </div>
+                <div class="media-container">
+                    <h4>📥 Remote Stream</h4>
+                    <video id="peer1RemoteVideo" autoplay playsinline></video>
+                </div>
+            </div>
+            
+            <!-- Connection Info -->
+            <div class="connection-info" id="peer1Info">
+                Room: <span id="peer1Room">-</span><br>
+                Stream ID: <span id="peer1StreamID">-</span><br>
+                Viewing: <span id="peer1Viewing">-</span>
+            </div>
+            
+            <!-- Log -->
+            <div class="log" id="peer1Log"></div>
+        </div>
+        
+        <!-- Peer 2 Section -->
+        <div class="peer-section peer2">
+            <h2>
+                <span class="status-indicator" id="peer2Status"></span>
+                👤 Peer 2 (Blue)
+            </h2>
+            
+            <!-- Canvas Controls -->
+            <div class="control-group">
+                <h3>🎨 Canvas Animation</h3>
+                <label for="peer2Animation">Animation:</label>
+                <select id="peer2Animation" onchange="updateAnimation(2)">
+                    <option value="bouncing">Bouncing Ball</option>
+                    <option value="wave" selected>Sine Wave</option>
+                    <option value="particles">Particles</option>
+                    <option value="spiral">Spiral</option>
+                </select>
+                <br>
+                <label for="peer2Speed">Speed:</label>
+                <input type="range" id="peer2Speed" min="0.1" max="3" step="0.1" value="1" oninput="updateSpeed(2, this)">
+                <span class="range-value" id="peer2SpeedValue">1.0</span>
+            </div>
+            
+            <!-- Audio Controls -->
+            <div class="control-group">
+                <h3>🔊 Audio Tone</h3>
+                <label for="peer2Freq">Frequency:</label>
+                <input type="range" id="peer2Freq" min="200" max="1000" step="10" value="660" oninput="updateFrequency(2, this)">
+                <span class="range-value" id="peer2FreqValue">660 Hz</span>
+                <br>
+                <label for="peer2Volume">Volume:</label>
+                <input type="range" id="peer2Volume" min="0" max="100" step="1" value="30" oninput="updateVolume(2, this)">
+                <span class="range-value" id="peer2VolumeValue">30%</span>
+            </div>
+            
+            <!-- Connection Controls -->
+            <button id="peer2Connect" onclick="connectPeer(2)">Connect & Start</button>
+            <button id="peer2Disconnect" class="stop" onclick="disconnectPeer(2)" disabled>Disconnect</button>
+            
+            <!-- Media Display -->
+            <div class="media-grid">
+                <div class="media-container">
+                    <h4>📤 My Stream (Canvas)</h4>
+                    <canvas id="peer2Canvas"></canvas>
+                </div>
+                <div class="media-container">
+                    <h4>📥 Remote Stream</h4>
+                    <video id="peer2RemoteVideo" autoplay playsinline></video>
+                </div>
+            </div>
+            
+            <!-- Connection Info -->
+            <div class="connection-info" id="peer2Info">
+                Room: <span id="peer2Room">-</span><br>
+                Stream ID: <span id="peer2StreamID">-</span><br>
+                Viewing: <span id="peer2Viewing">-</span>
+            </div>
+            
+            <!-- Log -->
+            <div class="log" id="peer2Log"></div>
+        </div>
+    </div>
+    
+    <!-- Load the SDK -->
+    <script src="vdoninja-sdk.js"></script>
+    
+    <script>
+        // Configuration
+        const randomRoom = Math.floor(Math.random() * 10000);
+        const ROOM = `two-way-chat-${randomRoom}`;
+        const PASSWORD = 'demoPassword123';
+        
+        // Peer states
+        const peers = {
+            1: {
+                sdk: null,
+                streamID: `peer1-${Math.floor(Math.random() * 1000)}`,
+                canvas: null,
+                ctx: null,
+                animationId: null,
+                animationType: 'bouncing',
+                animationSpeed: 1,
+                audioContext: null,
+                oscillator: null,
+                gainNode: null,
+                audioDestination: null,
+                frequency: 440,
+                volume: 0.3,
+                // Animation state
+                ballX: 50, ballY: 50, ballVX: 2, ballVY: 2,
+                particles: [],
+                waveOffset: 0,
+                spiralAngle: 0
+            },
+            2: {
+                sdk: null,
+                streamID: `peer2-${Math.floor(Math.random() * 1000)}`,
+                canvas: null,
+                ctx: null,
+                animationId: null,
+                animationType: 'wave',
+                animationSpeed: 1,
+                audioContext: null,
+                oscillator: null,
+                gainNode: null,
+                audioDestination: null,
+                frequency: 660,
+                volume: 0.3,
+                // Animation state
+                ballX: 50, ballY: 50, ballVX: 2, ballVY: 2,
+                particles: [],
+                waveOffset: 0,
+                spiralAngle: 0
+            }
+        };
+        
+        // Initialize canvases
+        function initCanvas(peerId) {
+            const peer = peers[peerId];
+            peer.canvas = document.getElementById(`peer${peerId}Canvas`);
+            peer.ctx = peer.canvas.getContext('2d');
+            peer.canvas.width = 640;
+            peer.canvas.height = 480;
+        }
+        
+        // Logging function
+        function log(peerId, message, type = 'info') {
+            const logDiv = document.getElementById(`peer${peerId}Log`);
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            const time = new Date().toLocaleTimeString();
+            entry.textContent = `[${time}] ${message}`;
+            logDiv.appendChild(entry);
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+        
+        // Animation functions
+        function animate(peerId) {
+            const peer = peers[peerId];
+            const ctx = peer.ctx;
+            const canvas = peer.canvas;
+            
+            // Clear canvas with slight trail effect
+            ctx.fillStyle = 'rgba(26, 26, 26, 0.1)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            switch(peer.animationType) {
+                case 'bouncing':
+                    animateBouncingBall(peerId);
+                    break;
+                case 'wave':
+                    animateSineWave(peerId);
+                    break;
+                case 'particles':
+                    animateParticles(peerId);
+                    break;
+                case 'spiral':
+                    animateSpiral(peerId);
+                    break;
+            }
+            
+            peer.animationId = requestAnimationFrame(() => animate(peerId));
+        }
+        
+        function animateBouncingBall(peerId) {
+            const peer = peers[peerId];
+            const ctx = peer.ctx;
+            const canvas = peer.canvas;
+            
+            // Update position
+            peer.ballX += peer.ballVX * peer.animationSpeed;
+            peer.ballY += peer.ballVY * peer.animationSpeed;
+            
+            // Bounce off walls
+            if (peer.ballX <= 25 || peer.ballX >= canvas.width - 25) peer.ballVX = -peer.ballVX;
+            if (peer.ballY <= 25 || peer.ballY >= canvas.height - 25) peer.ballVY = -peer.ballVY;
+            
+            // Draw ball with gradient
+            const gradient = ctx.createRadialGradient(peer.ballX, peer.ballY, 0, peer.ballX, peer.ballY, 25);
+            if (peerId === 1) {
+                gradient.addColorStop(0, '#4CAF50');
+                gradient.addColorStop(1, '#2e7d32');
+            } else {
+                gradient.addColorStop(0, '#2196F3');
+                gradient.addColorStop(1, '#1565C0');
+            }
+            
+            ctx.beginPath();
+            ctx.arc(peer.ballX, peer.ballY, 25, 0, Math.PI * 2);
+            ctx.fillStyle = gradient;
+            ctx.fill();
+        }
+        
+        function animateSineWave(peerId) {
+            const peer = peers[peerId];
+            const ctx = peer.ctx;
+            const canvas = peer.canvas;
+            
+            ctx.strokeStyle = peerId === 1 ? '#4CAF50' : '#2196F3';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            
+            for (let x = 0; x < canvas.width; x++) {
+                const y = canvas.height / 2 + Math.sin((x * 0.02) + peer.waveOffset) * 100;
+                if (x === 0) {
+                    ctx.moveTo(x, y);
+                } else {
+                    ctx.lineTo(x, y);
+                }
+            }
+            
+            ctx.stroke();
+            peer.waveOffset += 0.05 * peer.animationSpeed;
+        }
+        
+        function animateParticles(peerId) {
+            const peer = peers[peerId];
+            const ctx = peer.ctx;
+            const canvas = peer.canvas;
+            
+            // Add new particles
+            if (peer.particles.length < 50) {
+                peer.particles.push({
+                    x: canvas.width / 2,
+                    y: canvas.height / 2,
+                    vx: (Math.random() - 0.5) * 4,
+                    vy: (Math.random() - 0.5) * 4,
+                    life: 1.0
+                });
+            }
+            
+            // Update and draw particles
+            peer.particles = peer.particles.filter(particle => {
+                particle.x += particle.vx * peer.animationSpeed;
+                particle.y += particle.vy * peer.animationSpeed;
+                particle.life -= 0.01 * peer.animationSpeed;
+                
+                if (particle.life > 0) {
+                    ctx.beginPath();
+                    ctx.arc(particle.x, particle.y, 5, 0, Math.PI * 2);
+                    ctx.fillStyle = peerId === 1 
+                        ? `rgba(76, 175, 80, ${particle.life})`
+                        : `rgba(33, 150, 243, ${particle.life})`;
+                    ctx.fill();
+                    return true;
+                }
+                return false;
+            });
+        }
+        
+        function animateSpiral(peerId) {
+            const peer = peers[peerId];
+            const ctx = peer.ctx;
+            const canvas = peer.canvas;
+            
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+            
+            ctx.strokeStyle = peerId === 1 ? '#4CAF50' : '#2196F3';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            
+            for (let i = 0; i < 200; i++) {
+                const angle = 0.1 * i;
+                const radius = 2 * i;
+                const x = centerX + radius * Math.cos(angle + peer.spiralAngle);
+                const y = centerY + radius * Math.sin(angle + peer.spiralAngle);
+                
+                if (i === 0) {
+                    ctx.moveTo(x, y);
+                } else {
+                    ctx.lineTo(x, y);
+                }
+            }
+            
+            ctx.stroke();
+            peer.spiralAngle += 0.02 * peer.animationSpeed;
+        }
+        
+        // Create media stream from canvas and audio
+        async function createMediaStream(peerId) {
+            const peer = peers[peerId];
+            
+            try {
+                // Start animation first to ensure canvas has content
+                if (!peer.animationId) {
+                    animate(peerId);
+                }
+                
+                // Wait a moment for canvas to render
+                await new Promise(resolve => setTimeout(resolve, 100));
+                
+                // Get canvas stream
+                const canvasStream = peer.canvas.captureStream(30);
+                const videoTrack = canvasStream.getVideoTracks()[0];
+                
+                if (!videoTrack) {
+                    throw new Error('Failed to get video track from canvas');
+                }
+                
+                // Create audio context and nodes
+                peer.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                peer.oscillator = peer.audioContext.createOscillator();
+                peer.gainNode = peer.audioContext.createGain();
+                
+                // Create destination for capture
+                peer.audioDestination = peer.audioContext.createMediaStreamDestination();
+                
+                // Connect audio nodes
+                peer.oscillator.connect(peer.gainNode);
+                peer.gainNode.connect(peer.audioDestination);
+                
+                // Configure oscillator
+                peer.oscillator.type = 'sine';
+                peer.oscillator.frequency.value = peer.frequency;
+                peer.gainNode.gain.value = peer.volume;
+                
+                // Start oscillator
+                peer.oscillator.start();
+                
+                // Get audio track
+                const audioTrack = peer.audioDestination.stream.getAudioTracks()[0];
+                
+                if (!audioTrack) {
+                    throw new Error('Failed to get audio track from WebAudio');
+                }
+                
+                // Combine tracks
+                const mediaStream = new MediaStream([videoTrack, audioTrack]);
+                
+                log(peerId, `Created media stream with ${mediaStream.getTracks().length} tracks`, 'success');
+                
+                return mediaStream;
+            } catch (error) {
+                log(peerId, `Failed to create media stream: ${error.message}`, 'error');
+                throw error;
+            }
+        }
+        
+        // Connect peer
+        async function connectPeer(peerId) {
+            try {
+                const peer = peers[peerId];
+                const otherPeerId = peerId === 1 ? 2 : 1;
+                const otherPeer = peers[otherPeerId];
+                
+                log(peerId, 'Initializing connection...', 'info');
+                
+                // Initialize SDK
+                peer.sdk = new VDONinjaSDK({
+                    room: ROOM,
+                    password: PASSWORD,
+                    streamID: peer.streamID,
+                    debug: true
+                });
+                
+                // Setup event listeners
+                peer.sdk.addEventListener('connected', () => {
+                    log(peerId, 'Connected to signaling server', 'success');
+                    document.getElementById(`peer${peerId}Status`).classList.add('connected');
+                });
+                
+                peer.sdk.addEventListener('track', (event) => {
+                    const track = event.detail.track;
+                    log(peerId, `Received ${track.kind} track from remote peer`, 'success');
+                    
+                    const remoteVideo = document.getElementById(`peer${peerId}RemoteVideo`);
+                    if (!remoteVideo.srcObject) {
+                        remoteVideo.srcObject = new MediaStream();
+                    }
+                    remoteVideo.srcObject.addTrack(track);
+                });
+                
+                peer.sdk.addEventListener('peerDisconnected', () => {
+                    log(peerId, 'Remote peer disconnected', 'error');
+                    document.getElementById(`peer${peerId}RemoteVideo`).srcObject = null;
+                });
+                
+                // Listen for new streams to automatically connect
+                peer.sdk.addEventListener('listing', (event) => {
+                    const streamID = event.detail.streamID;
+                    if (streamID === otherPeer.streamID && !document.getElementById(`peer${peerId}RemoteVideo`).srcObject) {
+                        log(peerId, `Other peer came online: ${streamID}`, 'info');
+                        // Try to view the stream
+                        peer.sdk.quickView({
+                            streamID: streamID,
+                            room: ROOM,
+                            password: PASSWORD
+                        }).then(() => {
+                            log(peerId, `Now viewing: ${streamID}`, 'success');
+                            document.getElementById(`peer${peerId}Viewing`).textContent = streamID;
+                        }).catch(err => {
+                            log(peerId, `Failed to view: ${err.message}`, 'error');
+                        });
+                    }
+                });
+                
+                // Connect to server
+                await peer.sdk.connect();
+                
+                // Join room first
+                await peer.sdk.joinRoom({
+                    room: ROOM,
+                    password: PASSWORD
+                });
+                
+                log(peerId, `Joined room: ${ROOM}`, 'success');
+                
+                // Create media stream
+                const stream = await createMediaStream(peerId);
+                
+                // Verify stream is valid
+                if (!stream || stream.getTracks().length === 0) {
+                    throw new Error('Invalid media stream created');
+                }
+                
+                // Publish stream - SDK expects stream as first parameter
+                await peer.sdk.publish(stream, {
+                    streamID: peer.streamID
+                });
+                
+                log(peerId, `Publishing as ${peer.streamID}`, 'success');
+                
+                // Try to view the other peer's stream (might fail if they haven't connected yet)
+                const viewStreamID = otherPeer.streamID;
+                try {
+                    await peer.sdk.quickView({
+                        streamID: viewStreamID,
+                        room: ROOM,
+                        password: PASSWORD
+                    });
+                    log(peerId, `Viewing stream: ${viewStreamID}`, 'success');
+                } catch (viewError) {
+                    log(peerId, `Other peer not ready yet: ${viewError.message}`, 'info');
+                    // This is expected if the other peer hasn't connected yet
+                }
+                
+                // Update UI
+                document.getElementById(`peer${peerId}Connect`).disabled = true;
+                document.getElementById(`peer${peerId}Disconnect`).disabled = false;
+                
+                // Update info
+                document.getElementById(`peer${peerId}Room`).textContent = ROOM;
+                document.getElementById(`peer${peerId}StreamID`).textContent = peer.streamID;
+                document.getElementById(`peer${peerId}Viewing`).textContent = viewStreamID;
+                
+            } catch (error) {
+                log(peerId, `Connection error: ${error.message}`, 'error');
+                console.error(`Peer ${peerId} connection error:`, error);
+            }
+        }
+        
+        // Disconnect peer
+        function disconnectPeer(peerId) {
+            const peer = peers[peerId];
+            
+            // Stop animation
+            if (peer.animationId) {
+                cancelAnimationFrame(peer.animationId);
+                peer.animationId = null;
+            }
+            
+            // Stop audio
+            if (peer.oscillator) {
+                peer.oscillator.stop();
+                peer.oscillator = null;
+            }
+            if (peer.audioContext) {
+                peer.audioContext.close();
+                peer.audioContext = null;
+            }
+            
+            // Disconnect SDK
+            if (peer.sdk) {
+                peer.sdk.disconnect();
+                peer.sdk = null;
+            }
+            
+            // Clear canvas
+            if (peer.ctx) {
+                peer.ctx.clearRect(0, 0, peer.canvas.width, peer.canvas.height);
+            }
+            
+            // Clear remote video
+            document.getElementById(`peer${peerId}RemoteVideo`).srcObject = null;
+            
+            // Update UI
+            document.getElementById(`peer${peerId}Connect`).disabled = false;
+            document.getElementById(`peer${peerId}Disconnect`).disabled = true;
+            document.getElementById(`peer${peerId}Status`).classList.remove('connected');
+            
+            // Update info
+            document.getElementById(`peer${peerId}Room`).textContent = '-';
+            document.getElementById(`peer${peerId}StreamID`).textContent = '-';
+            document.getElementById(`peer${peerId}Viewing`).textContent = '-';
+            
+            log(peerId, 'Disconnected', 'info');
+        }
+        
+        // Update controls
+        function updateAnimation(peerId) {
+            const peer = peers[peerId];
+            peer.animationType = document.getElementById(`peer${peerId}Animation`).value;
+            
+            // Reset animation state for clean transition
+            peer.particles = [];
+            peer.waveOffset = 0;
+            peer.spiralAngle = 0;
+        }
+        
+        function updateSpeed(peerId, input) {
+            const peer = peers[peerId];
+            peer.animationSpeed = parseFloat(input.value);
+            document.getElementById(`peer${peerId}SpeedValue`).textContent = input.value;
+        }
+        
+        function updateFrequency(peerId, input) {
+            const peer = peers[peerId];
+            peer.frequency = parseFloat(input.value);
+            document.getElementById(`peer${peerId}FreqValue`).textContent = input.value + ' Hz';
+            
+            if (peer.oscillator) {
+                peer.oscillator.frequency.value = peer.frequency;
+            }
+        }
+        
+        function updateVolume(peerId, input) {
+            const peer = peers[peerId];
+            peer.volume = parseFloat(input.value) / 100;
+            document.getElementById(`peer${peerId}VolumeValue`).textContent = input.value + '%';
+            
+            if (peer.gainNode) {
+                peer.gainNode.gain.value = peer.volume;
+            }
+        }
+        
+        // Initialize on load
+        window.addEventListener('load', () => {
+            initCanvas(1);
+            initCanvas(2);
+            
+            // Log initial room info
+            log(1, `Room: ${ROOM}`, 'info');
+            log(2, `Room: ${ROOM}`, 'info');
+        });
+        
+        // Clean up on page unload
+        window.addEventListener('beforeunload', () => {
+            disconnectPeer(1);
+            disconnectPeer(2);
+        });
+    </script>
+</body>
+</html>
