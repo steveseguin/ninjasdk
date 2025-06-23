@@ -47,17 +47,19 @@ npm install vdoninja-sdk
 const vdo = new VDONinja();
 
 // Handle incoming data
-vdo.onDataMessage = (data, senderUID) => {
-    console.log('Received:', data, 'from:', senderUID);
-};
-
-// Connect to a room
-await vdo.connect({
-    roomid: "my-ai-room",     // Any string identifier
-    push: true,                // Can send data
-    view: true,                // Can receive data
-    datamode: 1                // Data-only mode (no audio/video)
+vdo.addEventListener('data', (event) => {
+    const { data, uuid } = event.detail;
+    console.log('Received:', data, 'from:', uuid);
 });
+
+// Connect to signaling server
+await vdo.connect();
+
+// Join a room
+await vdo.joinRoom({ room: "my-ai-room" });
+
+// Announce as data-only publisher
+await vdo.announce({ room: "my-ai-room" });
 
 // Send data to all peers
 vdo.sendData({ type: 'greeting', message: 'Hello from AI!' });
@@ -74,32 +76,31 @@ class AIBot {
 
     async start() {
         // Handle peer connections
-        this.vdo.onConnect = (uid) => {
-            console.log('Peer connected:', uid);
-            this.peers.set(uid, { connected: Date.now() });
-        };
+        this.vdo.addEventListener('peerConnected', (event) => {
+            const { uuid } = event.detail;
+            console.log('Peer connected:', uuid);
+            this.peers.set(uuid, { connected: Date.now() });
+        });
 
         // Handle peer disconnections
-        this.vdo.onDisconnect = (uid) => {
-            console.log('Peer disconnected:', uid);
-            this.peers.delete(uid);
-        };
+        this.vdo.addEventListener('disconnected', (event) => {
+            // Note: Individual peer disconnect events may vary
+            console.log('Disconnected from server');
+        });
 
         // Handle incoming messages
-        this.vdo.onDataMessage = async (data, uid) => {
-            const response = await this.processMessage(data, uid);
+        this.vdo.addEventListener('data', async (event) => {
+            const { data, uuid } = event.detail;
+            const response = await this.processMessage(data, uuid);
             if (response) {
-                this.vdo.sendDataTo(uid, response);
+                this.vdo.sendData(response, uuid);
             }
-        };
-
-        // Connect to room
-        await this.vdo.connect({
-            roomid: this.roomId,
-            push: true,
-            view: true,
-            datamode: 1
         });
+
+        // Connect to server and join room
+        await this.vdo.connect();
+        await this.vdo.joinRoom({ room: this.roomId });
+        await this.vdo.announce({ room: this.roomId });
     }
 
     async processMessage(data, uid) {
@@ -124,101 +125,149 @@ const bot = new AIBot('ai-assistant-room');
 await bot.start();
 ```
 
-## Connection Options Reference
+## Connection Methods Reference
 
 ```javascript
-{
-    // Required
-    roomid: "string",          // Unique room identifier
-    
-    // Basic options
-    push: true,                // Enable sending
-    view: true,                // Enable receiving
-    
-    // Media options
-    audio: true,               // Enable audio
-    video: true,               // Enable video
-    screen: true,              // Screen sharing
-    
-    // Data options
-    datamode: 1,               // Data-only mode (no media)
-    
-    // Quality options
-    bitrate: 1000,             // Target bitrate in kbps
-    width: 1920,               // Video width
-    height: 1080,              // Video height
-    framerate: 30,             // Video framerate
-    codec: "vp8",              // Video codec (vp8, vp9, h264)
-    
-    // Audio options
-    stereo: true,              // Stereo audio
-    echoCancellation: true,    // Echo cancellation
-    noiseSuppression: true,    // Noise suppression
-    
-    // Network options
-    turn: true,                // Use TURN servers for firewall traversal
-    secure: true,              // Require encryption
-    
-    // Advanced options
-    broadcast: false,          // One-to-many broadcast mode
-    director: false,           // Director mode for remote control
-    salt: "string",            // Additional room salt for security
-    password: "string"         // Room password
-}
+// Constructor options
+const vdo = new VDONinja({
+    host: 'wss://wss.vdo.ninja',  // WebSocket server URL
+    room: 'myroom',                // Initial room name (optional)
+    password: 'password123',       // Room password (optional)
+    debug: true,                   // Enable debug logging
+    turnServers: null,             // null=auto-fetch, false=disable, array=custom
+    forceTURN: false,              // Force relay mode
+    maxReconnectAttempts: 5        // Max reconnection attempts
+});
+
+// Connect to signaling server
+await vdo.connect();
+
+// Join a room
+await vdo.joinRoom({
+    room: 'myroom',                // Room name (required)
+    password: 'password123',       // Room password (optional)
+    claim: false                   // Claim director status (optional)
+});
+
+// Publish a media stream
+await vdo.publish(mediaStream, {
+    streamID: 'custom-id',         // Custom stream ID (optional)
+    room: 'myroom',                // Room name (optional if already joined)
+    label: 'Main Camera'           // Stream label (optional)
+});
+
+// Announce as data-only publisher
+await vdo.announce({
+    room: 'myroom',                // Room name (optional if already joined)
+    streamID: 'bot-1'              // Stream ID (optional)
+});
+
+// View a stream
+await vdo.view('streamID', {
+    audio: true,                   // Request audio (default: true)
+    video: true,                   // Request video (default: true)
+    label: 'Viewer 1'              // Viewer label (optional)
+});
 ```
 
-## Event Handlers
+## Event Listeners
 
 ```javascript
 // Connection events
-vdo.onConnect = (uid) => { };           // Peer connected
-vdo.onDisconnect = (uid) => { };        // Peer disconnected
-vdo.onStateChange = (state) => { };     // Connection state changed
+vdo.addEventListener('connected', (event) => {
+    console.log('Connected to signaling server');
+});
 
-// Media events
-vdo.onVideoStream = (stream, uid) => { };  // Video stream received
-vdo.onAudioStream = (stream, uid) => { };  // Audio stream received
-vdo.onStreamEnded = (uid) => { };          // Stream ended
+vdo.addEventListener('disconnected', (event) => {
+    console.log('Disconnected from server');
+});
+
+vdo.addEventListener('peerConnected', (event) => {
+    const { uuid, connection } = event.detail;
+    console.log('Peer connected:', uuid);
+});
+
+// Media events  
+vdo.addEventListener('track', (event) => {
+    const { track, streams, uuid, streamID } = event.detail;
+    console.log('Track received:', track.kind, 'from:', uuid);
+});
 
 // Data events
-vdo.onDataMessage = (data, uid) => { };    // Data message received
+vdo.addEventListener('data', (event) => {
+    const { data, uuid, streamID } = event.detail;
+    console.log('Data received:', data, 'from:', uuid);
+});
+
+// Room events
+vdo.addEventListener('roomJoined', (event) => {
+    const { room } = event.detail;
+    console.log('Joined room:', room);
+});
+
+vdo.addEventListener('listing', (event) => {
+    const { list } = event.detail;
+    console.log('Room members:', list);
+});
 
 // Error handling
-vdo.onError = (error) => { };              // Error occurred
+vdo.addEventListener('error', (event) => {
+    console.error('Error:', event.detail.error);
+});
 ```
 
-## Methods
+## Core Methods
 
 ### Connection Management
 ```javascript
-await vdo.connect(options);              // Connect to room
-vdo.disconnect();                        // Disconnect from room
-vdo.reconnect();                         // Reconnect to room
+await vdo.connect();                     // Connect to signaling server
+vdo.disconnect();                        // Disconnect from server
+await vdo.joinRoom(options);             // Join a room
+vdo.leaveRoom();                         // Leave current room
+```
+
+### Publishing
+```javascript
+await vdo.publish(stream, options);      // Publish media stream
+await vdo.announce(options);             // Announce as data-only publisher
+vdo.stopPublishing();                    // Stop publishing
+```
+
+### Viewing
+```javascript
+await vdo.view(streamID, options);       // View a stream
+vdo.stopViewing(streamID);               // Stop viewing a stream
 ```
 
 ### Data Communication
 ```javascript
-vdo.sendData(data);                      // Send to all peers
-vdo.sendDataTo(uid, data);              // Send to specific peer
-vdo.broadcast(data);                     // Broadcast to all (one-way)
+vdo.sendData(data, target);              // Send data with flexible targeting
+vdo.sendPing(uuid);                      // Send ping (publishers only)
+
+// Target options:
+// - null or undefined: Send to all peers
+// - "uuid123": Send to specific peer
+// - { uuid: "uuid123" }: Send to specific peer
+// - { type: "viewer" }: Send to all viewers
+// - { type: "publisher" }: Send to all publishers
+// - { streamID: "stream1" }: Send to connections for stream
+// - { uuid: "uuid123", allowFallback: true }: Use WebSocket if no P2P
 ```
 
-### Media Control
+### Track Management
 ```javascript
-vdo.setAudioEnabled(enabled);            // Toggle audio
-vdo.setVideoEnabled(enabled);            // Toggle video
-vdo.setVolume(volume, uid);              // Set volume (0-100)
-vdo.switchCamera();                      // Switch camera (mobile)
-vdo.setVideoQuality(quality);            // Set video quality
+await vdo.addTrack(track, stream);       // Add track to publishers
+await vdo.removeTrack(track);            // Remove track from publishers
+await vdo.replaceTrack(oldTrack, newTrack); // Replace track
 ```
 
-### Advanced
+### Statistics & Utilities
 ```javascript
-vdo.addTrack(track);                     // Add media track
-vdo.removeTrack(track);                  // Remove media track
-vdo.replaceTrack(oldTrack, newTrack);    // Replace track
-vdo.getStats();                          // Get connection statistics
-vdo.getPeers();                          // Get connected peers list
+await vdo.getStats(uuid);                // Get connection statistics
+
+// Quick methods (convenience wrappers)
+await vdo.quickPublish(options);         // Connect, join, and publish
+await vdo.quickView(options);            // Connect, join, and view
 ```
 
 ## Common AI Use Cases
@@ -227,49 +276,50 @@ vdo.getPeers();                          // Get connected peers list
 ```javascript
 const supportBot = new VDONinja();
 
-supportBot.onDataMessage = async (data, uid) => {
+supportBot.addEventListener('data', async (event) => {
+    const { data, uuid } = event.detail;
     if (data.type === 'support_request') {
         // Process with AI
         const solution = await analyzeIssue(data.issue);
         
-        supportBot.sendDataTo(uid, {
+        supportBot.sendData({
             type: 'support_response',
             solution: solution,
             confidence: 0.95
-        });
+        }, uuid);
     }
-};
-
-await supportBot.connect({
-    roomid: 'support-channel',
-    push: true,
-    view: true,
-    datamode: 1
 });
+
+// Connect and join support channel
+await supportBot.connect();
+await supportBot.joinRoom({ room: 'support-channel' });
+await supportBot.announce({ room: 'support-channel' });
 ```
 
 ### 2. Real-time Translation Bot
 ```javascript
 const translatorBot = new VDONinja();
 
-translatorBot.onDataMessage = async (data, uid) => {
+translatorBot.addEventListener('data', async (event) => {
+    const { data, uuid } = event.detail;
     if (data.type === 'translate') {
         const translated = await translateText(data.text, data.targetLang);
         
-        // Send to all peers except sender
-        vdo.getPeers().forEach(peer => {
-            if (peer.uid !== uid) {
-                translatorBot.sendDataTo(peer.uid, {
-                    type: 'translation',
-                    original: data.text,
-                    translated: translated,
-                    fromLang: data.fromLang,
-                    toLang: data.targetLang
-                });
-            }
+        // Send translation to all peers except sender
+        translatorBot.sendData({
+            type: 'translation',
+            original: data.text,
+            translated: translated,
+            fromLang: data.fromLang,
+            toLang: data.targetLang,
+            excludeSender: uuid  // Tag to exclude original sender
         });
     }
-};
+});
+
+await translatorBot.connect();
+await translatorBot.joinRoom({ room: 'global-chat' });
+await translatorBot.announce({ room: 'global-chat' });
 ```
 
 ### 3. IoT Data Aggregator
@@ -277,10 +327,11 @@ translatorBot.onDataMessage = async (data, uid) => {
 const iotHub = new VDONinja();
 const sensorData = new Map();
 
-iotHub.onDataMessage = (data, uid) => {
+iotHub.addEventListener('data', (event) => {
+    const { data, uuid } = event.detail;
     if (data.type === 'sensor_data') {
         // Store sensor data
-        sensorData.set(uid, {
+        sensorData.set(uuid, {
             ...data,
             lastUpdate: Date.now()
         });
@@ -294,7 +345,10 @@ iotHub.onDataMessage = (data, uid) => {
             });
         }
     }
-};
+});
+
+await iotHub.connect();
+await iotHub.joinRoom({ room: 'sensor-network' });
 ```
 
 ### 4. Collaborative AI Assistant
@@ -309,17 +363,22 @@ const handlers = {
     'chat': async (message) => await chatResponse(message)
 };
 
-aiAssistant.onDataMessage = async (data, uid) => {
+aiAssistant.addEventListener('data', async (event) => {
+    const { data, uuid } = event.detail;
     const handler = handlers[data.type];
     if (handler) {
         const result = await handler(data.payload);
-        aiAssistant.sendDataTo(uid, {
+        aiAssistant.sendData({
             type: 'response',
             requestId: data.requestId,
             result: result
-        });
+        }, uuid);
     }
-};
+});
+
+await aiAssistant.connect();
+await aiAssistant.joinRoom({ room: 'ai-workspace' });
+await aiAssistant.announce({ room: 'ai-workspace' });
 ```
 
 ## Binary Data Handling
@@ -330,48 +389,54 @@ const fileBuffer = await file.arrayBuffer();
 vdo.sendData(fileBuffer);
 
 // Receive binary data
-vdo.onDataMessage = (data, uid) => {
+vdo.addEventListener('data', (event) => {
+    const { data, uuid } = event.detail;
     if (data instanceof ArrayBuffer) {
         // Process binary data
         const blob = new Blob([data]);
         const url = URL.createObjectURL(blob);
         // Use the data...
     }
-};
+});
 ```
 
 ## Error Handling
 
 ```javascript
-vdo.onError = (error) => {
-    console.error('VDO.Ninja Error:', error);
+vdo.addEventListener('error', (event) => {
+    console.error('VDO.Ninja Error:', event.detail.error);
     
-    if (error.includes('Permission')) {
+    if (event.detail.error.includes('Permission')) {
         // Handle permission errors
-    } else if (error.includes('Network')) {
+    } else if (event.detail.error.includes('Network')) {
         // Handle network errors
-    } else if (error.includes('TURN')) {
+    } else if (event.detail.error.includes('TURN')) {
         // Firewall/NAT issues
     }
-};
+});
 
-// Connection state monitoring
-vdo.onStateChange = (state) => {
-    switch(state) {
-        case 'connecting':
-            console.log('Establishing connection...');
-            break;
-        case 'connected':
-            console.log('Connected successfully');
-            break;
-        case 'disconnected':
-            console.log('Disconnected');
-            break;
-        case 'failed':
-            console.log('Connection failed');
-            break;
-    }
-};
+// Connection monitoring
+vdo.addEventListener('connected', () => {
+    console.log('Connected to signaling server');
+});
+
+vdo.addEventListener('disconnected', () => {
+    console.log('Disconnected from server');
+});
+
+vdo.addEventListener('reconnecting', (event) => {
+    const { attempt, maxAttempts } = event.detail;
+    console.log(`Reconnecting... Attempt ${attempt}/${maxAttempts}`);
+});
+
+vdo.addEventListener('reconnected', () => {
+    console.log('Reconnected successfully');
+});
+
+vdo.addEventListener('connectionFailed', (event) => {
+    const { uuid, reason } = event.detail;
+    console.error('Connection failed to peer:', uuid, 'Reason:', reason);
+});
 ```
 
 ## Security Considerations
@@ -393,18 +458,28 @@ vdo.onStateChange = (state) => {
 ## Debugging
 
 ```javascript
-// Enable verbose logging
+// Enable verbose logging in constructor
+const vdo = new VDONinja({ debug: true });
+
+// Or enable after creation
 vdo.debug = true;
 
 // Get connection statistics
-const stats = await vdo.getStats();
+const stats = await vdo.getStats(); // Get all connections
+const peerStats = await vdo.getStats('specific-uuid'); // Get specific peer
 console.log('Connection stats:', stats);
 
-// Monitor peer count
-setInterval(() => {
-    const peers = vdo.getPeers();
-    console.log('Connected peers:', peers.length);
-}, 5000);
+// Monitor room members
+vdo.addEventListener('listing', (event) => {
+    const { list } = event.detail;
+    console.log('Room members:', list);
+});
+
+// Track peer connections
+vdo.addEventListener('peerConnected', (event) => {
+    const { uuid } = event.detail;
+    console.log('New peer connected:', uuid);
+});
 ```
 
 ## Integration with AI Frameworks
@@ -414,19 +489,24 @@ setInterval(() => {
 const vdo = new VDONinja();
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-vdo.onDataMessage = async (data, uid) => {
+vdo.addEventListener('data', async (event) => {
+    const { data, uuid } = event.detail;
     if (data.type === 'chat') {
         const completion = await openai.chat.completions.create({
             model: "gpt-4",
             messages: [{ role: "user", content: data.message }]
         });
         
-        vdo.sendDataTo(uid, {
+        vdo.sendData({
             type: 'response',
             message: completion.choices[0].message.content
-        });
+        }, uuid);
     }
-};
+});
+
+await vdo.connect();
+await vdo.joinRoom({ room: 'ai-chat' });
+await vdo.announce({ room: 'ai-chat' });
 ```
 
 ### LangChain Integration Example
@@ -434,10 +514,18 @@ vdo.onDataMessage = async (data, uid) => {
 const vdo = new VDONinja();
 const chain = new ConversationalChain({ /* config */ });
 
-vdo.onDataMessage = async (data, uid) => {
+vdo.addEventListener('data', async (event) => {
+    const { data, uuid } = event.detail;
     const response = await chain.call({ input: data.message });
-    vdo.sendDataTo(uid, { type: 'response', message: response });
-};
+    vdo.sendData({ 
+        type: 'response', 
+        message: response 
+    }, uuid);
+});
+
+await vdo.connect();
+await vdo.joinRoom({ room: 'langchain-demo' });
+await vdo.announce({ room: 'langchain-demo' });
 ```
 
 ## Platform Support
@@ -472,33 +560,43 @@ AGPLv3 - Free for all uses including commercial. Must share modifications.
 ### Minimal Bot Setup (Copy This)
 ```javascript
 const vdo = new VDONinja();
-vdo.onDataMessage = (data, uid) => console.log('Received:', data);
-await vdo.connect({ roomid: "test", push: true, view: true, datamode: 1 });
+vdo.addEventListener('data', (event) => {
+    console.log('Received:', event.detail.data, 'from:', event.detail.uuid);
+});
+await vdo.connect();
+await vdo.joinRoom({ room: "test" });
+await vdo.announce({ room: "test" });
 vdo.sendData({ message: "Bot is ready!" });
 ```
 
 ### Request-Response Pattern (Copy This)
 ```javascript
 const vdo = new VDONinja();
-vdo.onDataMessage = async (data, uid) => {
+vdo.addEventListener('data', async (event) => {
+    const { data, uuid } = event.detail;
     if (data.request) {
         const response = await processRequest(data.request);
-        vdo.sendDataTo(uid, { response });
+        vdo.sendData({ response }, uuid);
     }
-};
-await vdo.connect({ roomid: "api-room", push: true, view: true, datamode: 1 });
+});
+await vdo.connect();
+await vdo.joinRoom({ room: "api-room" });
+await vdo.announce({ room: "api-room" });
 ```
 
 ### Broadcast Pattern (Copy This)
 ```javascript
 const vdo = new VDONinja();
+await vdo.connect();
+await vdo.joinRoom({ room: "broadcast" });
+await vdo.announce({ room: "broadcast" });
+
 setInterval(() => {
     vdo.sendData({ 
         timestamp: Date.now(), 
         data: getLatestData() 
     });
 }, 1000);
-await vdo.connect({ roomid: "broadcast", push: true, broadcast: true, datamode: 1 });
 ```
 
 ---

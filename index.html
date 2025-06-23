@@ -259,17 +259,15 @@ iframe.contentWindow.postMessage({
 const vdo = new VDONinja();  // or new VDONinjaSDK()
 
 // Set up data channel handling
-vdo.onDataMessage = (data, uid) => {
-    console.log(`Received from ${uid}:`, data);
-};
-
-// Connect to a room
-await vdo.connect({
-    roomid: "myroom",
-    push: true,  // Enable sending
-    view: true,  // Enable receiving
-    datamode: 1  // Data-only mode
+vdo.addEventListener('data', (event) => {
+    const { data, uuid } = event.detail;
+    console.log(`Received from ${uuid}:`, data);
 });
+
+// Connect, join room, and announce
+await vdo.connect();
+await vdo.joinRoom({ room: "myroom" });
+await vdo.announce({ room: "myroom" });
 
 // Send data to all peers
 vdo.sendData({
@@ -278,23 +276,29 @@ vdo.sendData({
 });</code></pre>
 
                 <h3>3. Audio/Video Example</h3>
-                <pre><code class="language-javascript">// Create instance with audio/video
+                <pre><code class="language-javascript">// Create instance for audio/video
 const vdo = new VDONinja();
 
-// Set up video element
-vdo.onVideoStream = (stream, uid) => {
+// Set up track handling
+vdo.addEventListener('track', (event) => {
+    const { track, streams, uuid } = event.detail;
     const video = document.getElementById('remoteVideo');
-    video.srcObject = stream;
-};
+    if (!video.srcObject) {
+        video.srcObject = new MediaStream();
+    }
+    video.srcObject.addTrack(track);
+});
 
-// Connect with media
-await vdo.connect({
-    roomid: "videoroom",
-    push: true,
-    view: true,
+// Get user media
+const stream = await navigator.mediaDevices.getUserMedia({
     audio: true,
     video: true
-});</code></pre>
+});
+
+// Connect, join room, and publish
+await vdo.connect();
+await vdo.joinRoom({ room: "videoroom" });
+await vdo.publish(stream, { room: "videoroom" });</code></pre>
                 </div>
             </div>
             </div>
@@ -405,29 +409,47 @@ await vdo.connect({
                 </div>
 
                 <div class="docs-section">
-                    <h3>Connection Options</h3>
-                    <pre><code class="language-javascript">{
-    roomid: "string",      // Room identifier
-    push: true,            // Enable sending
-    view: true,            // Enable receiving
-    audio: true,           // Enable audio
-    video: true,           // Enable video
-    datamode: 1,           // Data-only mode (no media)
-    bitrate: 1000,         // Target bitrate (kbps)
-    codec: "vp8",          // Video codec
-    turn: true,            // Use TURN servers
-    secure: true           // Require encryption
-}</code></pre>
+                    <h3>Connection Flow</h3>
+                    <pre><code class="language-javascript">// 1. Connect to signaling server
+await vdo.connect();
+
+// 2. Join a room
+await vdo.joinRoom({ 
+    room: "myroom",
+    password: "optional" 
+});
+
+// 3a. Publish media stream
+const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+await vdo.publish(stream, { streamID: "custom-id" });
+
+// 3b. OR announce as data-only
+await vdo.announce({ streamID: "bot-1" });
+
+// 4. View other streams
+await vdo.view("streamID", { audio: true, video: true });</code></pre>
                 </div>
 
                 <div class="docs-section">
-                    <h3>Event Handlers</h3>
-                    <pre><code class="language-javascript">vdo.onConnect = (uid) => { /* Peer connected */ };
-vdo.onDisconnect = (uid) => { /* Peer disconnected */ };
-vdo.onVideoStream = (stream, uid) => { /* Video received */ };
-vdo.onAudioStream = (stream, uid) => { /* Audio received */ };
-vdo.onDataMessage = (data, uid) => { /* Data received */ };
-vdo.onError = (error) => { /* Handle errors */ };</code></pre>
+                    <h3>Event Listeners</h3>
+                    <pre><code class="language-javascript">// SDK extends EventTarget - use addEventListener
+vdo.addEventListener('connected', (event) => {
+    console.log('Connected to server');
+});
+
+vdo.addEventListener('track', (event) => {
+    const { track, uuid, streamID } = event.detail;
+    console.log('Track received:', track.kind);
+});
+
+vdo.addEventListener('data', (event) => {
+    const { data, uuid } = event.detail;
+    console.log('Data received:', data);
+});
+
+vdo.addEventListener('error', (event) => {
+    console.error('Error:', event.detail.error);
+});</code></pre>
                 </div>
 
                 <div class="docs-section">
@@ -843,34 +865,34 @@ vdo.onError = (error) => { /* Handle errors */ };</code></pre>
                     vdo = new VDONinjaSDK();
                     
                     // Set up event handlers
-                    vdo.onConnect = (uid) => {
-                        peers.set(uid, { connected: Date.now() });
+                    vdo.addEventListener('peerConnected', (event) => {
+                        const { uuid } = event.detail;
+                        peers.set(uuid, { connected: Date.now() });
                         updatePeerList();
-                        displayMessage({ message: 'A peer joined the room' }, uid);
-                    };
-                    
-                    vdo.onDisconnect = (uid) => {
-                        peers.delete(uid);
-                        updatePeerList();
-                        displayMessage({ message: 'A peer left the room' }, uid);
-                    };
-                    
-                    vdo.onDataMessage = (data, uid) => {
-                        displayMessage(data, uid);
-                    };
-                    
-                    vdo.onError = (error) => {
-                        console.error('VDO.Ninja Error:', error);
-                        displayMessage({ message: `Error: ${error}` }, 'System');
-                    };
-                    
-                    // Connect
-                    await vdo.connect({
-                        roomid: roomId,
-                        push: true,
-                        view: true,
-                        datamode: 1
+                        displayMessage({ message: 'A peer joined the room' }, uuid);
                     });
+                    
+                    vdo.addEventListener('disconnected', (event) => {
+                        // Note: This fires when we disconnect from server
+                        // Individual peer disconnects may need different handling
+                        peers.clear();
+                        updatePeerList();
+                    });
+                    
+                    vdo.addEventListener('data', (event) => {
+                        const { data, uuid } = event.detail;
+                        displayMessage(data, uuid);
+                    });
+                    
+                    vdo.addEventListener('error', (event) => {
+                        console.error('VDO.Ninja Error:', event.detail.error);
+                        displayMessage({ message: `Error: ${event.detail.error}` }, 'System');
+                    });
+                    
+                    // Connect to server, join room, and announce
+                    await vdo.connect();
+                    await vdo.joinRoom({ room: roomId });
+                    await vdo.announce({ room: roomId });
                     
                     isConnected = true;
                     updateConnectionStatus(true);
