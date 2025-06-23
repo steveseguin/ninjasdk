@@ -78,6 +78,7 @@ jobs:
     - name: Create Pull Request
       uses: peter-evans/create-pull-request@v6
       with:
+        token: ${{ secrets.PAT_TOKEN || secrets.GITHUB_TOKEN }}
         commit-message: "chore: bump version to v${{ env.NEW_VERSION }}"
         title: "Release v${{ env.NEW_VERSION }}"
         body: |

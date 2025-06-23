@@ -1214,4 +1214,8 @@ code[class*="language-"] {
     .iframe-links a {
         text-align: center;
     }
+    
+    .integration-benefits {
+        grid-template-columns: repeat(2, 1fr);
+    }
 }
