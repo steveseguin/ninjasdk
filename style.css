@@ -30,12 +30,17 @@
     box-sizing: border-box;
 }
 
+html {
+    overflow-x: hidden;
+}
+
 body {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
     background-color: var(--bg-dark);
     color: var(--text-primary);
     line-height: 1.6;
     overflow-x: hidden;
+    max-width: 100vw;
 }
 
 .container {
@@ -337,18 +342,27 @@ pre {
     padding: 1.5rem;
     overflow-x: auto;
     margin: 1rem 0;
+    max-width: 100%;
+    -webkit-overflow-scrolling: touch;
 }
 
 code {
     font-family: 'JetBrains Mono', 'Courier New', monospace;
     font-size: 0.875rem;
     color: var(--text-primary);
+    word-break: break-word;
+}
+
+pre code {
+    word-break: normal;
+    white-space: pre;
 }
 
 /* Quick Start */
 .quickstart-options {
     display: grid;
     gap: 3rem;
+    max-width: 100%;
 }
 
 .quickstart-option {
@@ -356,6 +370,8 @@ code {
     padding: 2rem;
     border-radius: 1rem;
     border: 1px solid var(--border-color);
+    overflow: hidden;
+    max-width: 100%;
 }
 
 .quickstart-option h3 {
@@ -369,8 +385,15 @@ code {
 }
 
 /* Expandable code sections */
+.code-preview {
+    max-width: 100%;
+    overflow: hidden;
+}
+
 .code-preview pre {
     margin: 1rem 0;
+    max-width: 100%;
+    overflow-x: auto;
 }
 
 .expand-btn {
@@ -403,6 +426,13 @@ code {
 .expandable-content {
     margin-top: 1rem;
     animation: slideDown 0.3s ease-out;
+    max-width: 100%;
+    overflow: hidden;
+}
+
+.expandable-content pre {
+    max-width: 100%;
+    overflow-x: auto;
 }
 
 @keyframes slideDown {
@@ -436,9 +466,19 @@ code {
     background: rgba(99, 102, 241, 0.2);
 }
 
+.quickstart-content {
+    max-width: 100%;
+    overflow: hidden;
+}
+
 .quickstart-content h3 {
     margin: 2rem 0 1rem;
     color: var(--primary-color);
+}
+
+.quickstart-content pre {
+    max-width: 100%;
+    box-sizing: border-box;
 }
 
 /* Examples Grid */
@@ -899,6 +939,19 @@ code {
     margin-bottom: 1rem;
 }
 
+.demo-room-info {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 1rem;
+    margin: 1rem 0;
+    padding: 1rem;
+    background: var(--bg-dark);
+    border-radius: 0.5rem;
+    font-size: 0.95rem;
+    color: var(--text-secondary);
+}
+
 /* FAQ Section */
 .faq-grid {
     display: grid;
@@ -1222,27 +1275,49 @@ code[class*="language-"] {
     font-size: 0.875rem;
 }
 
-/* Responsive */
-@media (max-width: 768px) {
-    .hero-title {
-        font-size: 2.5rem;
+/* Responsive - Tablet and Mobile */
+@media (max-width: 1024px) {
+    .container {
+        padding: 0 15px;
     }
     
-    .hero-subtitle {
-        font-size: 1.125rem;
+    .integration-benefits {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    
+    .hero-title {
+        font-size: 3rem;
+    }
+    
+    .revolution-content {
+        gap: 2rem;
+    }
+}
+
+@media (max-width: 768px) {
+    /* Navigation fixes */
+    .navbar .container {
+        position: relative;
     }
     
     .nav-toggle {
         display: flex;
+        z-index: 1002;
     }
-    
     
     .nav-links {
         display: none;
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        background: rgba(15, 23, 42, 0.98);
         flex-direction: column;
-        width: 100%;
-        padding: 1rem 0;
+        padding: 1rem;
         gap: 0.5rem;
+        border: 1px solid var(--border-color);
+        border-top: none;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
     }
     
     .nav-links.active {
@@ -1264,9 +1339,37 @@ code[class*="language-"] {
         background: rgba(99, 102, 241, 0.1);
     }
     
+    /* Hero section mobile */
+    .hero {
+        padding: 6rem 0 3rem;
+    }
+    
+    .hero-title {
+        font-size: 2rem;
+        line-height: 1.2;
+    }
+    
+    .hero-subtitle {
+        font-size: 1rem;
+        line-height: 1.4;
+    }
+    
+    .hero-description {
+        font-size: 1rem;
+        line-height: 1.6;
+        padding: 0 1rem;
+    }
+    
     .hero-actions {
         flex-direction: column;
-        align-items: center;
+        align-items: stretch;
+        padding: 0 1rem;
+        gap: 0.75rem;
+    }
+    
+    .hero-actions .btn {
+        width: 100%;
+        text-align: center;
     }
     
     .hero-features {
@@ -1284,38 +1387,109 @@ code[class*="language-"] {
         font-size: 1.1rem;
     }
     
+    .hero-tagline {
+        font-size: 0.95rem;
+        padding: 0 1rem;
+    }
+    
+    /* Section titles and spacing */
+    .section {
+        padding: 3rem 0;
+    }
+    
+    .section-title {
+        font-size: 1.75rem;
+        margin-bottom: 2rem;
+        padding: 0 1rem;
+    }
+    
+    /* Grid layouts - single column on mobile */
     .features-grid,
     .examples-grid,
     .ecosystem-grid,
     .faq-grid,
     .download-grid,
-    .magic-grid {
+    .magic-grid,
+    .ai-features,
+    .checklist {
         grid-template-columns: 1fr;
+        gap: 1rem;
     }
     
     .revolution-content {
         grid-template-columns: 1fr;
+        gap: 2rem;
+    }
+    
+    .revolution-text h3 {
+        font-size: 1.5rem;
+    }
+    
+    .revolution-text p {
+        font-size: 1rem;
     }
     
     .demo-grid {
         grid-template-columns: 1fr;
+        gap: 1rem;
     }
     
+    /* Buttons and interactive elements */
+    .btn {
+        padding: 0.875rem 1.5rem;
+        font-size: 1rem;
+    }
+    
+    .btn-large {
+        font-size: 1rem;
+        padding: 0.875rem 2rem;
+    }
+    
+    /* Tables responsive */
     .comparison-table {
-        font-size: 0.875rem;
+        font-size: 0.75rem;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    
+    .comparison-table table {
+        min-width: 600px;
     }
     
     .comparison-table th,
     .comparison-table td {
         padding: 0.5rem;
+        font-size: 0.75rem;
     }
     
+    /* Code blocks responsive */
+    pre {
+        padding: 1rem;
+        font-size: 0.75rem;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    
+    code {
+        font-size: 0.75rem;
+    }
+    
+    /* AI Integration section */
     .ai-integration-box {
         padding: 1.5rem;
     }
     
+    .ai-header h3 {
+        font-size: 1.25rem;
+    }
+    
+    .ai-header p {
+        font-size: 0.95rem;
+    }
+    
     .ai-actions {
         flex-direction: column;
+        gap: 0.75rem;
     }
     
     .ai-actions .btn {
@@ -1323,16 +1497,159 @@ code[class*="language-"] {
         justify-content: center;
     }
     
+    /* Live demo section */
+    .demo-panel {
+        padding: 1rem;
+    }
+    
+    .demo-panel h3 {
+        font-size: 1.125rem;
+    }
+    
+    .message-area {
+        height: 150px;
+    }
+    
+    .demo-code {
+        padding: 1rem;
+    }
+    
+    .demo-code h4 {
+        font-size: 1rem;
+    }
+    
+    /* Quick start section */
+    .quickstart-option {
+        padding: 1.5rem;
+    }
+    
+    .quickstart-option h3 {
+        font-size: 1.25rem;
+    }
+    
     .iframe-links {
         flex-direction: column;
+        gap: 0.75rem;
     }
     
     .iframe-links a {
         text-align: center;
+        width: 100%;
+    }
+    
+    /* VDO Integration */
+    .integration-hero h3 {
+        font-size: 1.5rem;
+    }
+    
+    .integration-hero p {
+        font-size: 1rem;
     }
     
     .integration-benefits {
-        grid-template-columns: repeat(2, 1fr);
+        grid-template-columns: 1fr;
+    }
+    
+    .benefit-card {
+        padding: 1.25rem;
+    }
+    
+    .benefit-icon {
+        font-size: 2rem;
+    }
+    
+    .benefit-card h4 {
+        font-size: 1rem;
+    }
+    
+    /* FAQ items */
+    .faq-item {
+        padding: 1.25rem;
+    }
+    
+    .faq-item h3 {
+        font-size: 1rem;
+    }
+    
+    /* Footer */
+    .footer {
+        padding: 2rem 0 1.5rem;
+    }
+    
+    .footer-content {
+        gap: 1.5rem;
+    }
+    
+    /* Cards and panels */
+    .feature-card,
+    .example-card,
+    .download-option {
+        padding: 1.5rem;
+    }
+    
+    .feature-icon {
+        font-size: 2rem;
+    }
+    
+    /* Usage guidelines */
+    .guideline-box {
+        padding: 1.25rem;
+    }
+    
+    .guideline-box h3 {
+        font-size: 1.125rem;
+    }
+    
+    /* Demo room info */
+    .demo-room-info {
+        flex-direction: column;
+        text-align: center;
+        gap: 0.5rem;
+        font-size: 0.875rem;
+    }
+    
+    .demo-room-info .separator {
+        display: none;
+    }
+}
+
+/* Small mobile devices */
+@media (max-width: 480px) {
+    .hero-title {
+        font-size: 1.75rem;
+    }
+    
+    .hero-subtitle {
+        font-size: 0.95rem;
+    }
+    
+    .section-title {
+        font-size: 1.5rem;
+    }
+    
+    .btn {
+        padding: 0.75rem 1.25rem;
+        font-size: 0.95rem;
+    }
+    
+    .feature-card h3,
+    .example-card h3,
+    .download-option h3 {
+        font-size: 1.125rem;
+    }
+    
+    .magic-item h4 {
+        font-size: 1rem;
+    }
+    
+    /* Even smaller code on very small screens */
+    pre {
+        font-size: 0.7rem;
+        padding: 0.75rem;
+    }
+    
+    code {
+        font-size: 0.7rem;
     }
 }
 

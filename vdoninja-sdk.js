@@ -487,6 +487,9 @@
             this._streamToUUID = {};
             this.messageHandlers = new Map();
             
+            // Stream tracking
+            this.streams = new Map(); // streamID -> { firstSeen, lastSeen, uuid, state }
+            
             // Media management
             this.localStream = null;
             this.videoElement = options.videoElement || null;
@@ -518,6 +521,10 @@
             this._isReconnecting = false;
             this._intentionalDisconnect = false;
             
+            // View retry mechanism
+            this._viewRetryTimers = new Map();
+            this._viewRetryInterval = 15 * 60 * 1000; // 15 minutes
+            
             // Initialize salt before setting up crypto
             this.salt = options.salt || "vdo.ninja";
             this._saltProvidedViaOptions = !!options.salt;
@@ -547,6 +554,8 @@
             if (!this._streamToUUID) this._streamToUUID = {};
             if (!this._pendingViews) this._pendingViews = new Map();
             if (!this.messageHandlers) this.messageHandlers = new Map();
+            if (!this.streams) this.streams = new Map();
+            if (!this._viewRetryTimers) this._viewRetryTimers = new Map();
             
             if (this.state.connected) {
                 this._log('Already connected');
@@ -684,6 +693,12 @@
                 }
                 this.connections.clear();
                 
+                // Clear all retry timers
+                for (const [streamID, timer] of this._viewRetryTimers) {
+                    clearTimeout(timer);
+                }
+                this._viewRetryTimers.clear();
+                
                 // Close WebSocket
                 if (this.signaling) {
                     this.signaling.close();
@@ -757,6 +772,58 @@
             }, delay);
         }
 
+
+        // ============================================================================
+        // STREAM TRACKING
+        // ============================================================================
+        
+        /**
+         * Get all tracked streams
+         * @returns {Array} Array of stream objects with metadata
+         */
+        getStreams() {
+            const streams = [];
+            const now = Date.now();
+            
+            for (const [streamID, data] of this.streams) {
+                streams.push({
+                    streamID,
+                    firstSeen: data.firstSeen,
+                    lastSeen: data.lastSeen,
+                    timeSinceLastSeen: now - data.lastSeen,
+                    uuid: data.uuid,
+                    state: data.state,
+                    viewRequestTime: data.viewRequestTime,
+                    waitingTime: data.state === 'pending' && data.viewRequestTime ? 
+                        now - data.viewRequestTime : null
+                });
+            }
+            
+            return streams.sort((a, b) => b.lastSeen - a.lastSeen);
+        }
+        
+        /**
+         * Get info about a specific stream
+         * @param {string} streamID - Stream ID to look up
+         * @returns {Object|null} Stream info or null if not found
+         */
+        getStreamInfo(streamID) {
+            const data = this.streams.get(streamID);
+            if (!data) return null;
+            
+            const now = Date.now();
+            return {
+                streamID,
+                firstSeen: data.firstSeen,
+                lastSeen: data.lastSeen,
+                timeSinceLastSeen: now - data.lastSeen,
+                uuid: data.uuid,
+                state: data.state,
+                viewRequestTime: data.viewRequestTime,
+                waitingTime: data.state === 'pending' && data.viewRequestTime ? 
+                    now - data.viewRequestTime : null
+            };
+        }
 
         // ============================================================================
         // ROOM MANAGEMENT
@@ -914,6 +981,17 @@
             this._sendMessageWS(seedMessage);
 
             this._emit('publishing', { streamID, hashedStreamID });
+            
+            // Add our own stream to tracking
+            if (this.streams) {
+                const now = Date.now();
+                this.streams.set(streamID, {
+                    firstSeen: now,
+                    lastSeen: now,
+                    uuid: this.state.uuid,
+                    state: 'connected' // Our own stream is connected
+                });
+            }
 
             return streamID;
         }
@@ -1077,6 +1155,17 @@
             }
 
             this._log('View request for:', streamID, 'with options:', options);
+            
+            // Track stream as pending
+            const now = Date.now();
+            const existing = this.streams.get(streamID);
+            this.streams.set(streamID, {
+                firstSeen: existing?.firstSeen || now,
+                lastSeen: now,
+                uuid: existing?.uuid || null,
+                state: 'pending',
+                viewRequestTime: now
+            });
 
             try {
                 // Hash the streamID if password is set
@@ -1132,8 +1221,10 @@
 
                     const timeout = setTimeout(() => {
                         clearInterval(checkConnection);
-                        this._pendingViews.delete(streamID);
-                        reject(new Error(`Timeout waiting for stream: ${streamID}`));
+                        // Don't reject - instead set up retry mechanism
+                        this._log(`Stream ${streamID} not available yet, will retry in 15 minutes`);
+                        this._setupViewRetry(streamID, options);
+                        resolve(null); // Resolve without error - we're still waiting
                     }, 15000);
                 });
 
@@ -1143,6 +1234,34 @@
                 throw error;
             }
         }
+        
+        /**
+         * Set up automatic retry for viewing a stream
+         * @private
+         * @param {string} streamID - The stream ID to retry
+         * @param {Object} options - View options
+         */
+        _setupViewRetry(streamID, options) {
+            // Clear any existing retry timer for this stream
+            if (this._viewRetryTimers.has(streamID)) {
+                clearTimeout(this._viewRetryTimers.get(streamID));
+            }
+            
+            // Set up new retry timer
+            const retryTimer = setTimeout(() => {
+                this._log(`Retrying view for stream: ${streamID}`);
+                this._viewRetryTimers.delete(streamID);
+                
+                // Only retry if we're still connected and haven't manually stopped viewing
+                if (this.state.connected && !this._intentionalDisconnect) {
+                    this.view(streamID, options).catch(err => {
+                        this._log('Retry view error:', err.message);
+                    });
+                }
+            }, this._viewRetryInterval);
+            
+            this._viewRetryTimers.set(streamID, retryTimer);
+        }
 
         /**
          * Stop viewing a stream
@@ -1151,6 +1270,15 @@
         stopViewing(streamID) {
             // Mark as intentional disconnect
             this._intentionalDisconnect = true;
+            
+            // Cancel any retry timer for this stream
+            if (this._viewRetryTimers.has(streamID)) {
+                clearTimeout(this._viewRetryTimers.get(streamID));
+                this._viewRetryTimers.delete(streamID);
+            }
+            
+            // Remove from pending views
+            this._pendingViews.delete(streamID);
             
             // Remove from failed connections if present
             if (this._failedViewerConnections) {
@@ -1292,9 +1420,22 @@
                 this._log(`ICE state for ${uuid}:`, connection.pc.iceConnectionState);
                 
                 if (connection.pc.iceConnectionState === 'connected') {
+                    // Update stream state to connected
+                    if (connection.streamID && this.streams.has(connection.streamID)) {
+                        const stream = this.streams.get(connection.streamID);
+                        stream.state = 'connected';
+                        stream.lastSeen = Date.now();
+                        if (connection.uuid) stream.uuid = connection.uuid;
+                    }
                     this._emit('peerConnected', { uuid, connection });
                 } else if (connection.pc.iceConnectionState === 'failed' || 
                            connection.pc.iceConnectionState === 'disconnected') {
+                    // Update stream state to disconnected/failed
+                    if (connection.streamID && this.streams.has(connection.streamID)) {
+                        const stream = this.streams.get(connection.streamID);
+                        stream.state = connection.pc.iceConnectionState === 'failed' ? 'failed' : 'disconnected';
+                        stream.lastSeen = Date.now();
+                    }
                     this._handleConnectionFailed(connection);
                 }
             };
@@ -2459,6 +2600,21 @@
                     return item;
                 });
                 
+                // Update stream tracking
+                const now = Date.now();
+                cleanList.forEach(item => {
+                    const streamID = typeof item === 'string' ? item : item.streamID;
+                    if (streamID) {
+                        const existing = this.streams.get(streamID);
+                        this.streams.set(streamID, {
+                            firstSeen: existing?.firstSeen || now,
+                            lastSeen: now,
+                            uuid: item.UUID || item.uuid || existing?.uuid || null,
+                            state: 'available'
+                        });
+                    }
+                });
+                
                 // Emit for the whole list
                 this._emit('listing', { list: cleanList, raw: msg });
 
@@ -2532,6 +2688,18 @@
                 streamID: cleanStreamID,
                 uuid: msg.UUID || msg.uuid
             });
+            
+            // Update stream tracking
+            if (cleanStreamID && this.streams) {
+                const now = Date.now();
+                const existing = this.streams.get(cleanStreamID);
+                this.streams.set(cleanStreamID, {
+                    firstSeen: existing?.firstSeen || now,
+                    lastSeen: now,
+                    uuid: msg.UUID || msg.uuid || existing?.uuid || null,
+                    state: existing?.state || 'available'
+                });
+            }
         }
 
         /**

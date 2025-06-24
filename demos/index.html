@@ -147,6 +147,103 @@
             font-family: monospace;
             font-size: 0.875rem;
         }
+        
+        /* Responsive styles */
+        @media (max-width: 768px) {
+            body {
+                padding: 15px;
+            }
+            
+            h1 {
+                font-size: 2rem;
+            }
+            
+            .subtitle {
+                font-size: 1rem;
+            }
+            
+            .back-link {
+                margin-bottom: 1.5rem;
+                padding: 0.5rem 0.75rem;
+                font-size: 0.875rem;
+            }
+            
+            .info-box {
+                padding: 1rem;
+                margin-bottom: 1.5rem;
+            }
+            
+            .info-box h3 {
+                font-size: 1.125rem;
+            }
+            
+            .info-box p,
+            .info-box code {
+                font-size: 0.875rem;
+            }
+            
+            .category h2 {
+                font-size: 1.5rem;
+                margin-bottom: 1rem;
+            }
+            
+            .demos-grid {
+                grid-template-columns: 1fr;
+                gap: 1rem;
+            }
+            
+            .demo-card {
+                padding: 1.25rem;
+            }
+            
+            .demo-card h3 {
+                font-size: 1.125rem;
+            }
+            
+            .demo-card p {
+                font-size: 0.875rem;
+            }
+            
+            .feature-tag {
+                font-size: 0.7rem;
+                padding: 0.2rem 0.5rem;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            body {
+                padding: 10px;
+            }
+            
+            h1 {
+                font-size: 1.75rem;
+            }
+            
+            .subtitle {
+                font-size: 0.95rem;
+                margin-bottom: 30px;
+            }
+            
+            .info-box {
+                padding: 0.875rem;
+            }
+            
+            .info-box h3 {
+                font-size: 1rem;
+            }
+            
+            .category h2 {
+                font-size: 1.25rem;
+            }
+            
+            .demo-card {
+                padding: 1rem;
+            }
+            
+            .demo-card h3 {
+                font-size: 1rem;
+            }
+        }
     </style>
 </head>
 <body>
@@ -243,6 +340,16 @@
                     <span class="feature-tag">Scene Links</span>
                     <span class="feature-tag">Room Hashing</span>
                     <span class="feature-tag">Password Support</span>
+                </div>
+            </a>
+            
+            <a href="stream-tracking-demo.html" class="demo-card">
+                <h3>📊 Stream Tracking</h3>
+                <p>Monitor all streams in a room with connection states, timestamps, and waiting times.</p>
+                <div class="demo-features">
+                    <span class="feature-tag">Stream States</span>
+                    <span class="feature-tag">Time Tracking</span>
+                    <span class="feature-tag">Live Updates</span>
                 </div>
             </a>
         </div>

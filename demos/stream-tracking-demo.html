@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VDO.Ninja SDK - Stream Tracking Demo</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+        
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        
+        input {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+        
+        button {
+            background: #2196F3;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        
+        button:hover {
+            background: #1976D2;
+        }
+        
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        
+        .stream-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        
+        .stream-table th {
+            background: #f0f0f0;
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+            border-bottom: 2px solid #ddd;
+        }
+        
+        .stream-table td {
+            padding: 12px;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .stream-table tr:hover {
+            background: #f9f9f9;
+        }
+        
+        .state-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        
+        .state-available {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+        
+        .state-pending {
+            background: #fff3e0;
+            color: #f57c00;
+        }
+        
+        .state-connected {
+            background: #e3f2fd;
+            color: #1976d2;
+        }
+        
+        .state-disconnected {
+            background: #ffebee;
+            color: #c62828;
+        }
+        
+        .state-failed {
+            background: #fce4ec;
+            color: #880e4f;
+        }
+        
+        .time-ago {
+            color: #666;
+            font-size: 12px;
+        }
+        
+        .uuid {
+            font-family: monospace;
+            font-size: 12px;
+            color: #666;
+        }
+        
+        .status {
+            background: #f0f0f0;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        
+        .status-item {
+            margin: 5px 0;
+        }
+        
+        .actions {
+            display: flex;
+            gap: 5px;
+        }
+        
+        .action-btn {
+            padding: 4px 8px;
+            font-size: 12px;
+            background: #666;
+        }
+        
+        .action-btn.view {
+            background: #4CAF50;
+        }
+        
+        .action-btn.stop {
+            background: #f44336;
+        }
+        
+        .action-btn.publish {
+            background: #FF9800;
+        }
+        
+        .refresh-info {
+            color: #666;
+            font-size: 12px;
+            margin-top: 10px;
+        }
+        
+        .no-streams {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+        }
+        
+        video {
+            width: 100%;
+            max-width: 300px;
+            background: #000;
+            border-radius: 8px;
+        }
+        
+        .preview-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+        
+        .preview-item {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 8px;
+        }
+        
+        .preview-item h4 {
+            margin: 0 0 10px 0;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>VDO.Ninja SDK - Stream Tracking Demo</h1>
+        <p>This demo shows the new stream tracking capabilities of the SDK.</p>
+        
+        <div class="controls">
+            <input type="text" id="roomInput" placeholder="Room name" value="">
+            <button id="connectBtn" onclick="connect()">Connect</button>
+            <button id="disconnectBtn" onclick="disconnect()" disabled>Disconnect</button>
+            <button onclick="publishNewStream()">Publish Canvas Stream</button>
+            <button onclick="refreshStreams()">Refresh</button>
+            <label style="margin-left: 20px;">
+                <input type="checkbox" id="autoRefresh" checked> Auto-refresh (2s)
+            </label>
+        </div>
+        
+        <div class="status" id="status">
+            <div class="status-item">Status: <strong id="connectionStatus">Disconnected</strong></div>
+            <div class="status-item">Room: <strong id="roomStatus">None</strong></div>
+            <div class="status-item">My UUID: <strong id="uuidStatus">None</strong></div>
+            <div class="status-item">Total Streams: <strong id="streamCount">0</strong></div>
+        </div>
+        
+        <h3>Streams in Room</h3>
+        <div id="streamTableContainer">
+            <div class="no-streams">No streams detected. Connect to a room to see streams.</div>
+        </div>
+        
+        <h3>Stream Previews</h3>
+        <div id="previewContainer" class="preview-container"></div>
+        
+        <div class="refresh-info">
+            Last updated: <span id="lastUpdate">Never</span>
+        </div>
+    </div>
+    
+    <script src="../vdoninja-sdk.js"></script>
+    <script>
+        let vdo = null;
+        let refreshInterval = null;
+        let viewedStreams = new Map(); // Track which streams we're viewing
+        let publishedStreams = new Map(); // Track our published streams
+        
+        function formatTime(ms) {
+            if (ms < 1000) return `${ms}ms`;
+            if (ms < 60000) return `${Math.floor(ms/1000)}s`;
+            if (ms < 3600000) return `${Math.floor(ms/60000)}m`;
+            return `${Math.floor(ms/3600000)}h`;
+        }
+        
+        function formatTimestamp(ts) {
+            return new Date(ts).toLocaleTimeString();
+        }
+        
+        async function connect() {
+            const room = document.getElementById('roomInput').value;
+            if (!room) {
+                alert('Please enter a room name');
+                return;
+            }
+            
+            if (vdo) {
+                await disconnect();
+            }
+            
+            vdo = new VDONinjaSDK({
+                room: room,
+                salt: "vdo.ninja",
+                debug: true
+            });
+            
+            // Set up event listeners
+            vdo.addEventListener('connected', () => {
+                console.log('Connected to server');
+                updateStatus();
+            });
+            
+            vdo.addEventListener('disconnected', () => {
+                console.log('Disconnected from server');
+                updateStatus();
+                viewedStreams.clear();
+            });
+            
+            vdo.addEventListener('roomJoined', (event) => {
+                console.log('Joined room:', event.detail);
+                updateStatus();
+            });
+            
+            vdo.addEventListener('listing', (event) => {
+                console.log('Room listing update:', event.detail);
+                refreshStreams();
+            });
+            
+            vdo.addEventListener('videoaddedtoroom', (event) => {
+                console.log('Video added to room:', event.detail);
+                refreshStreams();
+            });
+            
+            vdo.addEventListener('peerConnected', (event) => {
+                console.log('Peer connected:', event.detail);
+                refreshStreams();
+            });
+            
+            vdo.addEventListener('bye', (event) => {
+                console.log('Peer disconnected:', event.detail);
+                refreshStreams();
+            });
+            
+            try {
+                await vdo.connect();
+                await vdo.joinRoom(room);
+                
+                document.getElementById('connectBtn').disabled = true;
+                document.getElementById('disconnectBtn').disabled = false;
+                
+                // Start auto-refresh if enabled
+                startAutoRefresh();
+                
+                // Initial refresh
+                refreshStreams();
+            } catch (error) {
+                console.error('Connection error:', error);
+                alert(`Failed to connect: ${error.message}`);
+            }
+        }
+        
+        async function disconnect() {
+            if (vdo) {
+                // Stop viewing all streams
+                for (const [streamID, preview] of viewedStreams) {
+                    if (preview.stream) {
+                        preview.stream.getTracks().forEach(track => track.stop());
+                    }
+                }
+                viewedStreams.clear();
+                
+                // Stop all published streams
+                for (const [streamID, published] of publishedStreams) {
+                    stopPublishing(streamID);
+                }
+                publishedStreams.clear();
+                
+                vdo.disconnect();
+                vdo = null;
+                
+                document.getElementById('connectBtn').disabled = false;
+                document.getElementById('disconnectBtn').disabled = true;
+                
+                updateStatus();
+                refreshStreams();
+            }
+        }
+        
+        function createCanvasStream(streamID) {
+            // Create canvas
+            const canvas = document.createElement('canvas');
+            canvas.width = 640;
+            canvas.height = 480;
+            const ctx = canvas.getContext('2d');
+            
+            // Animation variables
+            let x = 0;
+            let hue = Math.random() * 360;
+            
+            // Draw animation
+            function draw() {
+                // Background
+                ctx.fillStyle = `hsl(${hue}, 50%, 20%)`;
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                // Moving circle
+                ctx.fillStyle = `hsl(${hue}, 70%, 60%)`;
+                ctx.beginPath();
+                ctx.arc(x, canvas.height / 2, 50, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Stream ID text
+                ctx.fillStyle = 'white';
+                ctx.font = 'bold 24px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText(streamID, canvas.width / 2, 50);
+                
+                // Time
+                ctx.font = '16px Arial';
+                ctx.fillText(new Date().toLocaleTimeString(), canvas.width / 2, 80);
+                
+                // Move circle
+                x = (x + 5) % (canvas.width + 100);
+            }
+            
+            // Start animation
+            const interval = setInterval(draw, 1000 / 30); // 30 fps
+            
+            // Get stream from canvas
+            const stream = canvas.captureStream(30);
+            
+            // Store canvas data for cleanup
+            stream.canvasData = { canvas, interval };
+            
+            return stream;
+        }
+        
+        async function publishNewStream() {
+            if (!vdo || !vdo.state.connected) {
+                alert('Please connect first');
+                return;
+            }
+            
+            try {
+                const streamID = 'canvas_' + Math.random().toString(36).substring(7);
+                const stream = createCanvasStream(streamID);
+                
+                // Create new SDK instance for this stream
+                const publisherVdo = new VDONinjaSDK({
+                    room: vdo.state.room,
+                    salt: "vdo.ninja",
+                    debug: true
+                });
+                
+                await publisherVdo.connect();
+                await publisherVdo.joinRoom(vdo.state.room);
+                await publisherVdo.publish(stream, { streamID });
+                
+                // Store publisher instance
+                publishedStreams.set(streamID, {
+                    vdo: publisherVdo,
+                    stream: stream,
+                    streamID: streamID
+                });
+                
+                console.log(`Publishing new stream: ${streamID}`);
+                
+                // Add preview
+                addPreview(streamID, stream, true);
+                
+                refreshStreams();
+            } catch (error) {
+                console.error('Publish error:', error);
+                alert(`Failed to publish: ${error.message}`);
+            }
+        }
+        
+        function stopPublishing(streamID) {
+            const published = publishedStreams.get(streamID);
+            if (published) {
+                // Stop the stream
+                if (published.stream) {
+                    published.stream.getTracks().forEach(track => track.stop());
+                    
+                    // Clean up canvas
+                    if (published.stream.canvasData) {
+                        clearInterval(published.stream.canvasData.interval);
+                    }
+                }
+                
+                // Disconnect the publisher
+                if (published.vdo) {
+                    published.vdo.disconnect();
+                }
+                
+                // Remove preview
+                const preview = document.getElementById(`preview-${streamID}`);
+                if (preview) {
+                    preview.remove();
+                }
+                
+                publishedStreams.delete(streamID);
+                console.log(`Stopped publishing: ${streamID}`);
+                
+                refreshStreams();
+            }
+        }
+        
+        function updateStatus() {
+            document.getElementById('connectionStatus').textContent = 
+                vdo?.state?.connected ? 'Connected' : 'Disconnected';
+            document.getElementById('roomStatus').textContent = 
+                vdo?.state?.room || 'None';
+            document.getElementById('uuidStatus').textContent = 
+                vdo?.state?.uuid || 'None';
+        }
+        
+        function refreshStreams() {
+            if (!vdo) {
+                document.getElementById('streamTableContainer').innerHTML = 
+                    '<div class="no-streams">No streams detected. Connect to a room to see streams.</div>';
+                document.getElementById('streamCount').textContent = '0';
+                document.getElementById('lastUpdate').textContent = 'Never';
+                return;
+            }
+            
+            const streams = vdo.getStreams();
+            document.getElementById('streamCount').textContent = streams.length;
+            document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString();
+            
+            if (streams.length === 0) {
+                document.getElementById('streamTableContainer').innerHTML = 
+                    '<div class="no-streams">No streams in room yet.</div>';
+                return;
+            }
+            
+            // Build table
+            let html = `
+                <table class="stream-table">
+                    <thead>
+                        <tr>
+                            <th>Stream ID</th>
+                            <th>State</th>
+                            <th>First Seen</th>
+                            <th>Last Seen</th>
+                            <th>UUID</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+            
+            streams.forEach(stream => {
+                const isViewing = viewedStreams.has(stream.streamID);
+                const isPublished = publishedStreams.has(stream.streamID);
+                const isMyStream = stream.streamID === vdo.state.streamID || isPublished;
+                
+                html += `
+                    <tr>
+                        <td><strong>${stream.streamID}</strong></td>
+                        <td>
+                            <span class="state-badge state-${stream.state}">
+                                ${stream.state}
+                                ${stream.waitingTime ? ` (${formatTime(stream.waitingTime)})` : ''}
+                            </span>
+                        </td>
+                        <td>${formatTimestamp(stream.firstSeen)}</td>
+                        <td>
+                            ${formatTimestamp(stream.lastSeen)}
+                            <span class="time-ago">(${formatTime(stream.timeSinceLastSeen)} ago)</span>
+                        </td>
+                        <td class="uuid">${stream.uuid || 'Unknown'}</td>
+                        <td class="actions">
+                            ${!isMyStream && !isViewing ? 
+                                `<button class="action-btn view" onclick="viewStream('${stream.streamID}')">View</button>` : ''}
+                            ${isViewing ? 
+                                `<button class="action-btn stop" onclick="stopViewing('${stream.streamID}')">Stop Viewing</button>` : ''}
+                            ${isPublished ? 
+                                `<button class="action-btn stop" onclick="stopPublishing('${stream.streamID}')">Stop Publishing</button>` : ''}
+                            ${isMyStream && !isPublished ? '<span style="color: #4CAF50;">My Stream</span>' : ''}
+                        </td>
+                    </tr>
+                `;
+            });
+            
+            html += '</tbody></table>';
+            document.getElementById('streamTableContainer').innerHTML = html;
+        }
+        
+        async function viewStream(streamID) {
+            if (!vdo) return;
+            
+            try {
+                const result = await vdo.view(streamID);
+                
+                // Track that we're viewing this stream (even if still pending)
+                viewedStreams.set(streamID, { video: null, stream: null });
+                
+                if (result === null) {
+                    console.log(`Stream ${streamID} not available yet, will retry automatically`);
+                }
+                
+                refreshStreams();
+            } catch (error) {
+                console.error('View error:', error);
+                // Only show alert for actual errors, not for waiting
+                if (error.message && !error.message.includes('Timeout waiting')) {
+                    alert(`Failed to view stream: ${error.message}`);
+                }
+            }
+        }
+        
+        function stopViewing(streamID) {
+            const preview = viewedStreams.get(streamID);
+            if (preview) {
+                if (preview.stream) {
+                    preview.stream.getTracks().forEach(track => track.stop());
+                }
+                if (preview.video && preview.video.parentNode) {
+                    preview.video.parentNode.remove();
+                }
+                viewedStreams.delete(streamID);
+            }
+            
+            // Close the connection for this stream
+            if (vdo && vdo.connections) {
+                for (const [uuid, connections] of vdo.connections) {
+                    if (connections.viewer && connections.viewer.streamID === streamID) {
+                        if (connections.viewer.pc) {
+                            connections.viewer.pc.close();
+                        }
+                        // Send hangup message
+                        vdo._sendMessageWS({
+                            hangup: true,
+                            UUID: uuid
+                        });
+                        vdo.connections.delete(uuid);
+                        break;
+                    }
+                }
+            }
+            
+            refreshStreams();
+        }
+        
+        function addPreview(streamID, stream, isLocal = false) {
+            const container = document.getElementById('previewContainer');
+            
+            // Remove existing preview if any
+            const existing = document.getElementById(`preview-${streamID}`);
+            if (existing) {
+                existing.remove();
+            }
+            
+            const previewDiv = document.createElement('div');
+            previewDiv.className = 'preview-item';
+            previewDiv.id = `preview-${streamID}`;
+            previewDiv.innerHTML = `
+                <h4>${streamID} ${isLocal ? '(My Stream)' : ''}</h4>
+                <video id="video-${streamID}" autoplay ${isLocal ? 'muted' : ''} playsinline></video>
+            `;
+            
+            container.appendChild(previewDiv);
+            
+            const video = document.getElementById(`video-${streamID}`);
+            video.srcObject = stream;
+            
+            if (!isLocal && viewedStreams.has(streamID)) {
+                const preview = viewedStreams.get(streamID);
+                preview.video = video;
+                preview.stream = stream;
+            }
+        }
+        
+        function startAutoRefresh() {
+            if (document.getElementById('autoRefresh').checked) {
+                refreshInterval = setInterval(refreshStreams, 2000);
+            }
+        }
+        
+        function stopAutoRefresh() {
+            if (refreshInterval) {
+                clearInterval(refreshInterval);
+                refreshInterval = null;
+            }
+        }
+        
+        // Handle auto-refresh toggle
+        document.getElementById('autoRefresh').addEventListener('change', (e) => {
+            if (e.target.checked) {
+                startAutoRefresh();
+            } else {
+                stopAutoRefresh();
+            }
+        });
+        
+        // Set up track event handler globally
+        window.addEventListener('load', () => {
+            // This will handle incoming streams
+            document.addEventListener('track', (event) => {
+                if (event.detail && event.detail.stream && event.detail.streamID) {
+                    console.log('Received track for stream:', event.detail.streamID);
+                    addPreview(event.detail.streamID, event.detail.stream);
+                }
+            });
+        });
+        
+        // Clean up on page unload
+        window.addEventListener('beforeunload', () => {
+            stopAutoRefresh();
+            if (vdo) {
+                vdo.disconnect();
+            }
+        });
+        
+        // Generate random room name on load
+        window.addEventListener('DOMContentLoaded', () => {
+            const randomRoom = 'stream-tracking-' + Math.random().toString(36).substring(2, 8);
+            document.getElementById('roomInput').value = randomRoom;
+        });
+    </script>
+</body>
+</html>
