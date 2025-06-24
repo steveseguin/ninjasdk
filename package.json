@@ -1,6 +1,6 @@
 {
   "name": "vdoninja-sdk",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "AI-friendly P2P communication SDK for audio, video, and data",
   "main": "vdoninja-sdk.js",
   "scripts": {
@@ -35,7 +35,9 @@
   },
   "watch": {
     "build": {
-      "patterns": ["vdoninja-sdk.js"],
+      "patterns": [
+        "vdoninja-sdk.js"
+      ],
       "extensions": "js"
     }
   }
