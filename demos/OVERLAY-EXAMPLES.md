@@ -36,7 +36,7 @@ npm install node-datachannel
 
 Start the SSN listener:
 ```bash
-node socialstreamninja-listener.js roomname
+node socialstreamninja-listener.js you-ssn-session-ID-here
 ```
 
 The listener will connect to your Social Stream Ninja room and receive all chat messages sent to "dock" clients.
@@ -46,10 +46,10 @@ Note: The example uses `password: false` to disable password protection. Modify 
 ### Command Line Arguments
 
 ```
-node socialstreamninja-listener.js [roomname]
+node socialstreamninja-listener.js [you-ssn-session-ID-here]
 
 Arguments:
-  roomname  - The SSN room to join (default: 'testroom')
+  you-ssn-session-ID-here  - The SSN session to join (default: 'testroom')
 ```
 
 ## Message Format
@@ -87,34 +87,6 @@ SSN supports messages from:
 - `facebook` - Facebook comments
 - `youtubeshorts` - YouTube Shorts
 - And more...
-
-## Integration Tips
-
-1. **Browser Integration**: Set up Social Stream Ninja:
-   - Go to `https://socialstream.ninja`
-   - Configure your chat sources
-   - Use the same room name in both SSN and this listener
-
-2. **Custom Processing**: Modify the listener's message handler to:
-   - Save messages to a database
-   - Trigger OBS scene changes
-   - Update a web overlay
-   - Send to other systems
-
-3. **Message Validation**: Add validation in the listener:
-   ```javascript
-   if (data.overlayNinja && data.overlayNinja.type === 'alert') {
-     // Process alert-specific logic
-   }
-   ```
-
-4. **Filtering**: Extend the listener to filter by message type:
-   ```javascript
-   const allowedTypes = ['text', 'alert'];
-   if (allowedTypes.includes(data.overlayNinja.type)) {
-     // Process message
-   }
-   ```
 
 ## Troubleshooting
 
