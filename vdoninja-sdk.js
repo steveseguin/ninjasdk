@@ -1,4 +1,4 @@
-
+// VDO.Ninja SDK v1.1.1
 /**
  * VDO.Ninja SDK - OFFICIAL SDK FOR VDO.NINJA WEBSOCKET API
  * 
