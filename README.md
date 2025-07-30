@@ -17,10 +17,19 @@ By using this SDK, you agree to respect these guidelines to keep the service fre
 
 ## Quick Start
 
-### Include via CDN
+### Browser - Include via CDN
 ```html
 <script src="https://cdn.jsdelivr.net/gh/steveseguin/ninjasdk@latest/vdoninja-sdk.min.js"></script>
 ```
+
+### Node.js - Install and Use
+```bash
+npm install ws @roamhq/wrtc  # or node-datachannel instead of @roamhq/wrtc
+```
+```javascript
+const VDONinjaSDK = require('./vdoninja-sdk-node.js');
+```
+See [README-NODE.md](README-NODE.md) for detailed Node.js setup instructions.
 
 ### Basic Data Channel Example
 ```javascript
@@ -357,13 +366,21 @@ await monitor.connect();
 await monitor.joinRoom({ room: 'sensor-network' });
 ```
 
-## Browser Compatibility
+## Platform Support
 
+### Browser Compatibility
 - Chrome/Edge 80+
 - Firefox 75+
 - Safari 14+
 - Opera 67+
 - Mobile browsers with WebRTC support
+
+### Node.js Support
+Full Node.js support is available with WebRTC implementations. See [README-NODE.md](README-NODE.md) for setup.
+
+### Other Platforms
+- **Python**: Use [Raspberry.Ninja](https://raspberry.ninja) for VDO.Ninja Python SDK support
+- **Mobile (Flutter)**: See [vdon_flutter](https://github.com/steveseguin/vdon_flutter) for a sample mobile app with VDO.Ninja support
 
 ## Security
 

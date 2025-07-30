@@ -380,7 +380,14 @@ function handleCustomData(data) {
                     <p>For advanced features, custom UI, and full control:</p>
             <div class="quickstart-content">
                 <h3>1. Include the SDK</h3>
+                <p><strong>For Browsers:</strong></p>
                 <pre><code class="language-html">&lt;script src="https://cdn.jsdelivr.net/gh/steveseguin/ninjasdk@latest/vdoninja-sdk.min.js"&gt;&lt;/script&gt;</code></pre>
+                
+                <p><strong>For Node.js:</strong></p>
+                <pre><code class="language-bash">npm install ws @roamhq/wrtc  # or node-datachannel
+# Then in your code:
+const VDONinja = require('./vdoninja-sdk-node.js');</code></pre>
+                <p>See <a href="README-NODE.md">README-NODE.md</a> for detailed Node.js setup instructions.</p>
                 
                 <h3>2. Basic Data Channel Example</h3>
                 <pre><code class="language-javascript">// Create a new VDO.Ninja instance (both names work)
@@ -586,7 +593,7 @@ vdo.addEventListener('error', (event) => {
                 <div class="docs-section">
                     <h3>Alternatives</h3>
                     <p><strong>VDO.Ninja IFRAME API:</strong> For simpler web-only integration where cross-domain use is allowed.</p>
-                    <p><strong>Platform-Specific:</strong> Flutter app for mobile, Raspberry Ninja for Python, React Native version coming soon.</p>
+                    <p><strong>Platform-Specific:</strong> <a href="https://github.com/steveseguin/vdon_flutter" target="_blank">Flutter app</a> for mobile, <a href="https://raspberry.ninja" target="_blank">Raspberry Ninja</a> for Python SDK support, Node.js support available (see <a href="README-NODE.md">README-NODE.md</a>).</p>
                 </div>
             </div>
         </div>
@@ -682,8 +689,11 @@ vdo.addEventListener('error', (event) => {
                     <p>Yes! The AGPLv3 license allows commercial use. You must share any modifications to the SDK itself, but your application code remains yours.</p>
                 </div>
                 <div class="faq-item">
-                    <h3>What browsers are supported?</h3>
-                    <p>All modern browsers: Chrome/Edge 80+, Firefox 75+, Safari 14+. Mobile browsers with WebRTC support work too.</p>
+                    <h3>What platforms are supported?</h3>
+                    <p><strong>Browsers:</strong> Chrome/Edge 80+, Firefox 75+, Safari 14+. Mobile browsers with WebRTC support.</p>
+                    <p><strong>Node.js:</strong> Full support with WebRTC implementations. See <a href="README-NODE.md">README-NODE.md</a>.</p>
+                    <p><strong>Python:</strong> SDK available via <a href="https://raspberry.ninja" target="_blank">Raspberry.Ninja</a>.</p>
+                    <p><strong>Mobile:</strong> Flutter sample app at <a href="https://github.com/steveseguin/vdon_flutter" target="_blank">vdon_flutter</a>.</p>
                 </div>
                 <div class="faq-item">
                     <h3>Can I self-host the handshake-server?</h3>
@@ -787,7 +797,7 @@ vdo.addEventListener('error', (event) => {
                 <div class="checklist-item">✓ Scales horizontally with P2P architecture</div>
                 <div class="checklist-item">✓ Battle-tested in production with VDO.Ninja</div>
                 <div class="checklist-item">✓ Active development and community support</div>
-                <div class="checklist-item">✓ Multiple platform support (Web, Node.js, Mobile)</div>
+                <div class="checklist-item">✓ Multiple platform support: Web browsers, Node.js (full support), Python (via Raspberry.Ninja), Mobile (Flutter app)</div>
             </div>
         </div>
     </section>

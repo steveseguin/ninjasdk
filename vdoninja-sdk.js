@@ -308,6 +308,15 @@
 
     class VDONinjaSDK extends EventTarget {
         /**
+         * SDK Version
+         * @static
+         * @returns {string} Current SDK version
+         */
+        static get VERSION() {
+            return '1.1.0'; // Minor version bump for label-in-info-object support
+        }
+        
+        /**
          * Sanitize stream ID
          * @private
          * @param {string} streamID - Stream ID to sanitize
@@ -450,6 +459,9 @@
          */
         constructor(options = {}) {
             super();
+            
+            // SDK Version
+            this.version = VDONinjaSDK.VERSION;
             
             // Core configuration
             this.host = options.host || options.wss || 'wss://wss.vdo.ninja';
@@ -2172,7 +2184,9 @@
                     video: pendingView.options.video !== false
                 };
                 if (pendingView.options.label) {
-                    connection.viewPreferences.label = pendingView.options.label;
+                    connection.viewPreferences.info = {
+                        label: pendingView.options.label
+                    };
                 }
                 // Store viewOptions for reconnection handling
                 connection.viewOptions = pendingView.options;

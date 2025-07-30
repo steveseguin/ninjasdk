@@ -39,10 +39,15 @@ VDO.Ninja SDK is a peer-to-peer (P2P) communication framework that enables direc
 <script src="https://cdn.jsdelivr.net/gh/steveseguin/ninjasdk@latest/vdoninja-sdk.min.js"></script>
 ```
 
-### NPM (Coming Soon)
+### Node.js Support
 ```bash
-npm install vdoninja-sdk
+# Install required dependencies
+npm install ws @roamhq/wrtc  # or node-datachannel instead of @roamhq/wrtc
+
+# Use the Node.js version
+const VDONinjaSDK = require('./vdoninja-sdk-node.js');
 ```
+See [README-NODE.md](README-NODE.md) for detailed Node.js setup.
 
 ## Core Concepts
 
@@ -544,10 +549,10 @@ await vdo.announce({ room: 'langchain-demo' });
 ## Platform Support
 
 - **Web Browsers**: Chrome 80+, Firefox 75+, Safari 14+, Edge 80+
-- **Node.js**: Coming soon with WebRTC polyfill
+- **Node.js**: Full support available with WebRTC implementations - See [README-NODE.md](README-NODE.md)
 - **React Native**: In development
-- **Flutter**: Sample app available
-- **Python**: Via Raspberry Ninja project
+- **Flutter**: Sample app available at [vdon_flutter](https://github.com/steveseguin/vdon_flutter)
+- **Python**: SDK support via [Raspberry Ninja](https://raspberry.ninja)
 
 ## Related Projects
 
