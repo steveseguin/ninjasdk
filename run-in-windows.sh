@@ -13,7 +13,7 @@ cd /mnt/c/Users/steve/Code/ninjasdk
 
 # Run the overlay listener using Windows node.exe
 echo "Starting overlay listener on Windows..."
-echo "Room: stever123"
+echo "Room: testroom"
 echo "Password: disabled"
 echo ""
 
