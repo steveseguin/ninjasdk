@@ -36,7 +36,7 @@ npm install node-datachannel
 
 Start the SSN listener:
 ```bash
-node socialstreamninja-listener.js you-ssn-session-ID-here
+node socialstreamninja-listener.js your-ssn-session-ID-here
 ```
 
 The listener will connect to your Social Stream Ninja room and receive all chat messages sent to "dock" clients.
@@ -46,10 +46,10 @@ Note: The example uses `password: false` to disable password protection. Modify 
 ### Command Line Arguments
 
 ```
-node socialstreamninja-listener.js [you-ssn-session-ID-here]
+node socialstreamninja-listener.js [your-ssn-session-ID-here]
 
 Arguments:
-  you-ssn-session-ID-here  - The SSN session to join (default: 'testroom')
+  your-ssn-session-ID-here  - The SSN session to join (default: 'testroom')
 ```
 
 ## Message Format
