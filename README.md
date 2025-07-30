@@ -382,6 +382,50 @@ Full Node.js support is available with WebRTC implementations. See [README-NODE.
 - **Python**: Use [Raspberry.Ninja](https://raspberry.ninja) for VDO.Ninja Python SDK support
 - **Mobile (Flutter)**: See [vdon_flutter](https://github.com/steveseguin/vdon_flutter) for a sample mobile app with VDO.Ninja support
 
+## Social Stream Ninja Integration
+
+[Social Stream Ninja](https://socialstream.ninja) consolidates live chat from multiple platforms into a unified stream. The SDK provides seamless two-way integration:
+
+### Supported Platforms
+- Twitch
+- YouTube
+- TikTok
+- Kick
+- X (Twitter)
+- Facebook
+- Discord
+- Instagram
+- And many more...
+
+### Quick Integration
+```javascript
+const sdk = new VDONinjaSDK({
+    host: 'wss://wss.socialstream.ninja',
+    room: 'your-session-id',  // Note: SSN calls this "session ID" not "room ID"
+    password: false
+});
+
+// Listen for live chat messages
+sdk.on('dataReceived', (event) => {
+    const data = event.detail?.data || event.data;
+    if (data?.overlayNinja) {
+        console.log(`${data.overlayNinja.chatname}: ${data.overlayNinja.chatmessage}`);
+        console.log(`Platform: ${data.overlayNinja.type}`);
+    }
+});
+
+// Connect as a "dock" client to receive messages
+await sdk.connect();
+await sdk.joinRoom();
+await sdk.view('your-session-id', { 
+    audio: false, 
+    video: false, 
+    label: "dock" 
+});
+```
+
+See `demos/socialstreamninja-listener.js` for a complete example.
+
 ## Security
 
 - End-to-end encryption by default

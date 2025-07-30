@@ -1,30 +1,37 @@
 /**
- * Node.js Social Stream Ninja (SSN) Overlay Listener Example
+ * Node.js Social Stream Ninja (SSN) Two-Way Live Chat Integration
  * 
- * This example shows how to connect to Social Stream Ninja as a data-only client
- * with a specific label ("dock") to receive consolidated chat messages from
- * platforms like YouTube, Twitch, Discord, Facebook, etc.
+ * This example shows how to connect to Social Stream Ninja to receive
+ * consolidated live chat messages from multiple social media platforms.
  * 
- * Social Stream Ninja (socialstream.ninja) is a service that consolidates
- * messages from various chat platforms into a unified overlay format.
+ * Social Stream Ninja (socialstream.ninja) provides two-way live chat with:
+ * - Twitch, YouTube, TikTok, Kick, X (Twitter), Facebook, Discord, Instagram, and more
  * 
- * Usage: node node-overlay-listener.js [roomName]
+ * IMPORTANT: In Social Stream Ninja, the room ID is called a "session ID"
+ * 
+ * Usage: node socialstreamninja-listener.js [sessionID]
+ * 
+ * To set up:
+ * 1. Go to https://socialstream.ninja
+ * 2. Create a new session and note your session ID
+ * 3. Connect your social media accounts
+ * 4. Run this script with your session ID
  */
 
 const VDONinjaSDK = require('../vdoninja-sdk-node.js');
 
 async function main() {
-    const roomName = process.argv[2] || 'testroom';
+    const sessionID = process.argv[2] || 'testroom';
     
-    console.log('\n=== Social Stream Ninja (SSN) Overlay Listener ===');
-    console.log(`Room: ${roomName}`);
-    console.log(`Stream: ${roomName}`);
-    console.log('Label: dock\n');
+    console.log('\n=== Social Stream Ninja (SSN) Two-Way Live Chat ===');
+    console.log(`Session ID: ${sessionID}`);
+    console.log('Platforms: Twitch, YouTube, TikTok, Kick, X, Facebook, Discord, Instagram, and more');
+    console.log('Label: dock (identifies us as a chat overlay client)\n');
     
     // Initialize SDK with socialstream.ninja host
     const sdk = new VDONinjaSDK({
         host: 'wss://wss.socialstream.ninja',  // SSN WebSocket server
-        room: roomName,
+        room: sessionID,  // SSN calls this "session ID" not "room ID"
         password: false,  // Disable password
         debug: false
     });
@@ -63,13 +70,13 @@ async function main() {
         await sdk.connect();
         console.log('✅ Connected to Social Stream Ninja');
         
-        // Join the room
+        // Join the session
         await sdk.joinRoom();
-        console.log('✅ Joined room');
+        console.log('✅ Joined session');
         
         // View the stream with label "dock"
         // The SDK will send: { audio: false, video: false, info: { label: "dock" } }
-        await sdk.view(roomName, {
+        await sdk.view(sessionID, {
             audio: false,
             video: false,
             label: "dock"

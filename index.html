@@ -87,6 +87,74 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
+    
+    <style>
+        /* Social Stream Ninja Section Styles */
+        .ssn-features {
+            display: grid;
+            gap: 2rem;
+            margin: 3rem 0;
+        }
+        
+        .ssn-feature {
+            background: #f8f9fa;
+            padding: 2rem;
+            border-radius: 8px;
+        }
+        
+        .ssn-feature h3 {
+            margin-bottom: 1rem;
+            color: #2c3e50;
+        }
+        
+        .platform-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+        
+        .platform-badge {
+            background: #007bff;
+            color: white;
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.9rem;
+        }
+        
+        .ssn-feature ul {
+            list-style: none;
+            padding: 0;
+        }
+        
+        .ssn-feature ul li {
+            padding: 0.5rem 0;
+            padding-left: 1.5rem;
+            position: relative;
+        }
+        
+        .ssn-feature ul li:before {
+            content: "✓";
+            position: absolute;
+            left: 0;
+            color: #28a745;
+        }
+        
+        .ssn-cta {
+            text-align: center;
+            margin-top: 3rem;
+        }
+        
+        .ssn-cta .btn {
+            margin: 0 0.5rem;
+        }
+        
+        .section-subtitle {
+            text-align: center;
+            font-size: 1.25rem;
+            color: #6c757d;
+            margin-bottom: 2rem;
+        }
+    </style>
 </head>
 <body>
     <nav class="navbar">
@@ -101,6 +169,7 @@
                 <li><a href="#try-live">Try Live</a></li>
                 <li><a href="#features">Features</a></li>
                 <li><a href="#quickstart">Quick Start</a></li>
+                <li><a href="#social-stream-ninja">💬 Social Stream</a></li>
                 <li><a href="#ai-integration" class="nav-ai">🤖 AI Integration</a></li>
                 <li><a href="#examples">Examples</a></li>
                 <li><a href="#faq">FAQ</a></li>
@@ -516,6 +585,69 @@ await vdo.publish(stream, { room: "videoroom" });</code></pre>
                     <h3>Track Management</h3>
                     <p>Fine-grained control over individual media tracks</p>
                 </a>
+            </div>
+        </div>
+    </section>
+
+    <section id="social-stream-ninja" class="section section-alt">
+        <div class="container">
+            <h2 class="section-title">💬 Social Stream Ninja Integration</h2>
+            <p class="section-subtitle">Two-way live chat with all major social media platforms in one unified stream</p>
+            
+            <div class="ssn-features">
+                <div class="ssn-feature">
+                    <h3>🌐 Supported Platforms</h3>
+                    <div class="platform-grid">
+                        <span class="platform-badge">Twitch</span>
+                        <span class="platform-badge">YouTube</span>
+                        <span class="platform-badge">TikTok</span>
+                        <span class="platform-badge">Kick</span>
+                        <span class="platform-badge">X (Twitter)</span>
+                        <span class="platform-badge">Facebook</span>
+                        <span class="platform-badge">Discord</span>
+                        <span class="platform-badge">Instagram</span>
+                        <span class="platform-badge">And more...</span>
+                    </div>
+                </div>
+                
+                <div class="ssn-feature">
+                    <h3>🚀 Simple Integration</h3>
+                    <pre><code class="language-javascript">// Connect to Social Stream Ninja
+const sdk = new VDONinjaSDK({
+    host: 'wss://wss.socialstream.ninja',
+    room: 'your-session-id',  // Note: SSN calls this "session ID"
+    password: false
+});
+
+// Receive live chat from all platforms
+sdk.on('dataReceived', (event) => {
+    const data = event.detail?.data || event.data;
+    if (data?.overlayNinja) {
+        console.log(`[${data.overlayNinja.type}] ${data.overlayNinja.chatname}: ${data.overlayNinja.chatmessage}`);
+    }
+});
+
+// Connect as a dock client
+await sdk.connect();
+await sdk.joinRoom();
+await sdk.view('your-session-id', { audio: false, video: false, label: "dock" });</code></pre>
+                </div>
+                
+                <div class="ssn-feature">
+                    <h3>📊 Use Cases</h3>
+                    <ul>
+                        <li>Stream overlays with unified chat</li>
+                        <li>Chat moderation across all platforms</li>
+                        <li>Analytics and sentiment analysis</li>
+                        <li>Interactive chat games and polls</li>
+                        <li>Automated responses and chat bots</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="ssn-cta">
+                <a href="https://socialstream.ninja" target="_blank" class="btn btn-primary">Try Social Stream Ninja</a>
+                <a href="demos/socialstreamninja-listener.js" class="btn btn-secondary">View Example Code</a>
             </div>
         </div>
     </section>
