@@ -154,6 +154,72 @@
             color: #6c757d;
             margin-bottom: 2rem;
         }
+        
+        /* Navigation Dropdown Styles */
+        .nav-dropdown {
+            position: relative;
+        }
+        
+        .nav-dropdown-menu {
+            display: none;
+            position: absolute;
+            top: 100%;
+            left: 0;
+            background: white;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            border-radius: 4px;
+            min-width: 200px;
+            padding: 0.5rem 0;
+            z-index: 1000;
+        }
+        
+        .nav-dropdown:hover .nav-dropdown-menu {
+            display: block;
+        }
+        
+        .nav-dropdown-menu li {
+            list-style: none;
+        }
+        
+        .nav-dropdown-menu a {
+            display: block;
+            padding: 0.5rem 1rem;
+            color: #333;
+            text-decoration: none;
+            transition: background 0.2s;
+        }
+        
+        .nav-dropdown-menu a:hover {
+            background: #f8f9fa;
+        }
+        
+        /* Adjust nav spacing */
+        .nav-links {
+            gap: 1rem;
+        }
+        
+        .nav-links > li > a {
+            padding: 0.5rem 1rem;
+        }
+        
+        /* Mobile adjustments */
+        @media (max-width: 768px) {
+            .nav-dropdown-menu {
+                position: static;
+                display: none;
+                box-shadow: none;
+                background: transparent;
+                padding-left: 1rem;
+            }
+            
+            .nav-dropdown.open .nav-dropdown-menu {
+                display: block;
+            }
+            
+            .nav-dropdown > a {
+                cursor: pointer;
+            }
+        }
     </style>
 </head>
 <body>
@@ -167,14 +233,19 @@
             </button>
             <ul class="nav-links" id="navLinks">
                 <li><a href="#try-live">Try Live</a></li>
-                <li><a href="#features">Features</a></li>
                 <li><a href="#quickstart">Quick Start</a></li>
-                <li><a href="#social-stream-ninja">💬 Social Stream</a></li>
-                <li><a href="#ai-integration" class="nav-ai">🤖 AI Integration</a></li>
-                <li><a href="#examples">Examples</a></li>
-                <li><a href="#faq">FAQ</a></li>
+                <li class="nav-dropdown">
+                    <a href="#features">Features ▼</a>
+                    <ul class="nav-dropdown-menu">
+                        <li><a href="#features">Core Features</a></li>
+                        <li><a href="#social-stream-ninja">💬 Social Stream</a></li>
+                        <li><a href="#ai-integration">🤖 AI Integration</a></li>
+                        <li><a href="#examples">Live Examples</a></li>
+                    </ul>
+                </li>
                 <li><a href="#download">Download</a></li>
-                <li><a href="#usage-guidelines">Usage Guidelines</a></li>
+                <li><a href="#faq">FAQ</a></li>
+                <li><a href="#usage-guidelines">Guidelines</a></li>
                 <li><a href="https://github.com/steveseguin/ninjasdk" target="_blank">GitHub</a></li>
             </ul>
         </div>
@@ -1217,13 +1288,28 @@ const VDONinja = require('./vdoninja-sdk-node.js');</code></pre>
             }
         }
 
+        // Handle dropdown click on mobile
+        const dropdownToggle = document.querySelector('.nav-dropdown > a');
+        if (dropdownToggle) {
+            dropdownToggle.addEventListener('click', (e) => {
+                if (window.innerWidth <= 768) {
+                    e.preventDefault();
+                    const dropdown = e.target.parentElement;
+                    dropdown.classList.toggle('open');
+                }
+            });
+        }
+        
         // Close mobile nav on link click
         document.querySelectorAll('.nav-links a').forEach(link => {
-            link.addEventListener('click', () => {
-                const navLinks = document.getElementById('navLinks');
-                const navToggle = document.getElementById('navToggle');
-                navLinks.classList.remove('active');
-                navToggle.classList.remove('active');
+            link.addEventListener('click', (e) => {
+                // Don't close on dropdown toggle click
+                if (!e.target.textContent.includes('▼')) {
+                    const navLinks = document.getElementById('navLinks');
+                    const navToggle = document.getElementById('navToggle');
+                    navLinks.classList.remove('active');
+                    navToggle.classList.remove('active');
+                }
             });
         });
     </script>
