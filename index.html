@@ -827,16 +827,21 @@ vdo.addEventListener('error', (event) => {
                         </a>
                     </div>
                     <div class="download-meta">
-                        <span class="version-badge">v1.0.0</span>
+                        <span class="version-badge">v1.1.0</span>
                         <span class="license-badge">AGPLv3</span>
                     </div>
                 </div>
                 <div class="download-option">
-                    <h3>📱 NPM (Coming Soon)</h3>
-                    <p>Install via Node Package Manager</p>
-                    <pre><code class="language-bash">npm install vdoninja-sdk</code></pre>
+                    <h3>📱 Node.js Support</h3>
+                    <p>Full Node.js support with WebRTC implementations</p>
+                    <pre><code class="language-bash"># Install dependencies
+npm install ws @roamhq/wrtc  # or node-datachannel
+
+# Use in your code
+const VDONinja = require('./vdoninja-sdk-node.js');</code></pre>
                     <div class="download-meta">
-                        <span class="coming-soon">In Development</span>
+                        <span class="version-badge">v1.1.0</span>
+                        <a href="README-NODE.md" style="margin-left: 10px;">Node.js Docs</a>
                     </div>
                 </div>
             </div>
