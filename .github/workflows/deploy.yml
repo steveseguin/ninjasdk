@@ -37,11 +37,19 @@ jobs:
     - name: Create deployment directory
       run: |
         mkdir -p dist
+        mkdir -p dist/demos
         cp vdoninja-sdk.min.js dist/
         cp vdoninja-sdk.js dist/
+        cp vdoninja-sdk-node.js dist/
+        cp webrtc-adapter.js dist/
         cp index.html dist/
         cp style.css dist/
-        cp vdoninja-sdk-*.html dist/
+        cp -r demos/*.html dist/demos/
+        cp -r demos/*.js dist/demos/
+        cp -r demos/*.md dist/demos/
+        cp README.md dist/
+        cp README-NODE.md dist/
+        cp AI-INTEGRATION.md dist/
         
     - name: Upload artifact
       uses: actions/upload-pages-artifact@v3
