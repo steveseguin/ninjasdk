@@ -591,7 +591,7 @@ vdo.addEventListener('data', (event) => {
 // Connect, join room, and announce
 await vdo.connect();
 await vdo.joinRoom({ room: "myroom" });
-await vdo.announce({ room: "myroom" });
+await vdo.announce({ streamID: "ai-bot-1" });
 
 // Send data to all peers
 vdo.sendData({

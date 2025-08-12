@@ -46,7 +46,7 @@ await vdo.connect();
 await vdo.joinRoom({ room: "myroom" });
 
 // Announce as data-only publisher
-await vdo.announce({ room: "myroom" });
+await vdo.announce({ streamID: "myStreamID" });
 
 // Send data to all connected peers
 vdo.sendData({ message: "Hello P2P!" });
@@ -121,7 +121,7 @@ await vdo.publish(mediaStream, {     // Publish media stream
     streamID: "custom-id",           // Optional custom stream ID
     label: "Main Camera"             // Optional label
 });
-await vdo.announce({ room: "myroom" }); // Data-only publisher
+await vdo.announce({ streamID: "myStreamID" }); // Data-only publisher
 await vdo.stopPublishing();          // Stop publishing
 
 // Viewing
@@ -293,7 +293,7 @@ bot.addEventListener('data', async (event) => {
 // Connect, join room, and announce as data-only publisher
 await bot.connect();
 await bot.joinRoom({ room: 'ai-support' });
-await bot.announce({ room: 'ai-support' });
+await bot.announce({ streamID: 'ai-bot-1' });
 ```
 
 ### Collaborative Canvas
@@ -341,7 +341,7 @@ const sensor = new VDONinja();
 // Connect and announce as data-only publisher
 await sensor.connect();
 await sensor.joinRoom({ room: 'sensor-network' });
-await sensor.announce({ room: 'sensor-network' });
+await sensor.announce({ streamID: 'sensor-node-1' });
 
 setInterval(() => {
     sensor.sendData({

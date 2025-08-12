@@ -77,7 +77,7 @@ await vdo.connect();
 await vdo.joinRoom({ room: "my-ai-room" });
 
 // Announce as data-only publisher
-await vdo.announce({ room: "my-ai-room" });
+await vdo.announce({ streamID: "ai-bot-1" });
 
 // Send data to all peers
 vdo.sendData({ type: 'greeting', message: 'Hello from AI!' });
@@ -118,7 +118,7 @@ class AIBot {
         // Connect to server and join room
         await this.vdo.connect();
         await this.vdo.joinRoom({ room: this.roomId });
-        await this.vdo.announce({ room: this.roomId });
+        await this.vdo.announce({ streamID: 'ai-bot-' + Date.now() });
     }
 
     async processMessage(data, uid) {
@@ -176,8 +176,7 @@ await vdo.publish(mediaStream, {
 
 // Announce as data-only publisher
 await vdo.announce({
-    room: 'myroom',                // Room name (optional if already joined)
-    streamID: 'bot-1'              // Stream ID (optional)
+    streamID: 'bot-1'              // Stream ID (recommended)
 });
 
 // View a stream
@@ -311,7 +310,7 @@ supportBot.addEventListener('data', async (event) => {
 // Connect and join support channel
 await supportBot.connect();
 await supportBot.joinRoom({ room: 'support-channel' });
-await supportBot.announce({ room: 'support-channel' });
+await supportBot.announce({ streamID: 'support-bot' });
 ```
 
 ### 2. Real-time Translation Bot
@@ -337,7 +336,7 @@ translatorBot.addEventListener('data', async (event) => {
 
 await translatorBot.connect();
 await translatorBot.joinRoom({ room: 'global-chat' });
-await translatorBot.announce({ room: 'global-chat' });
+await translatorBot.announce({ streamID: 'translator-bot' });
 ```
 
 ### 3. IoT Data Aggregator
@@ -396,7 +395,7 @@ aiAssistant.addEventListener('data', async (event) => {
 
 await aiAssistant.connect();
 await aiAssistant.joinRoom({ room: 'ai-workspace' });
-await aiAssistant.announce({ room: 'ai-workspace' });
+await aiAssistant.announce({ streamID: 'ai-assistant' });
 ```
 
 ## Binary Data Handling
@@ -524,7 +523,7 @@ vdo.addEventListener('data', async (event) => {
 
 await vdo.connect();
 await vdo.joinRoom({ room: 'ai-chat' });
-await vdo.announce({ room: 'ai-chat' });
+await vdo.announce({ streamID: 'openai-bot' });
 ```
 
 ### LangChain Integration Example
@@ -543,7 +542,7 @@ vdo.addEventListener('data', async (event) => {
 
 await vdo.connect();
 await vdo.joinRoom({ room: 'langchain-demo' });
-await vdo.announce({ room: 'langchain-demo' });
+await vdo.announce({ streamID: 'langchain-bot' });
 ```
 
 ## Platform Support
@@ -583,7 +582,7 @@ vdo.addEventListener('data', (event) => {
 });
 await vdo.connect();
 await vdo.joinRoom({ room: "test" });
-await vdo.announce({ room: "test" });
+await vdo.announce({ streamID: "bot-1" });
 vdo.sendData({ message: "Bot is ready!" });
 ```
 
@@ -599,7 +598,7 @@ vdo.addEventListener('data', async (event) => {
 });
 await vdo.connect();
 await vdo.joinRoom({ room: "api-room" });
-await vdo.announce({ room: "api-room" });
+await vdo.announce({ streamID: "api-bot" });
 ```
 
 ### Broadcast Pattern (Copy This)
@@ -607,7 +606,7 @@ await vdo.announce({ room: "api-room" });
 const vdo = new VDONinja();
 await vdo.connect();
 await vdo.joinRoom({ room: "broadcast" });
-await vdo.announce({ room: "broadcast" });
+await vdo.announce({ streamID: "broadcaster" });
 
 setInterval(() => {
     vdo.sendData({ 
