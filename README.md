@@ -37,7 +37,7 @@ See [README-NODE.md](README-NODE.md) for detailed Node.js setup instructions.
 const vdo = new VDONinja();
 
 // Handle incoming messages
-vdo.addEventListener('data', (event) => {
+vdo.addEventListener('dataReceived', (event) => {
     console.log(`Received from ${event.detail.uuid}:`, event.detail.data);
 });
 
@@ -156,7 +156,7 @@ vdo.addEventListener('track', (event) => {
     console.log('Track received:', track.kind, 'from:', uuid);
 });
 
-vdo.addEventListener('data', (event) => {
+vdo.addEventListener('dataReceived', (event) => {
     const { data, uuid, streamID } = event.detail;
     console.log('Data received:', data, 'from:', uuid);
 });
@@ -213,7 +213,7 @@ vdo.addEventListener('error', (event) => {
 ### Pub/Sub Messaging
 ```javascript
 // Subscribe to topics
-vdo.addEventListener('data', (event) => {
+vdo.addEventListener('dataReceived', (event) => {
     const { data, uuid } = event.detail;
     if (data.topic === 'chat') {
         displayMessage(data.message, uuid);
@@ -235,7 +235,7 @@ const buffer = new ArrayBuffer(1024);
 vdo.sendData(buffer);
 
 // Handle binary data
-vdo.addEventListener('data', (event) => {
+vdo.addEventListener('dataReceived', (event) => {
     const { data, uuid } = event.detail;
     if (data instanceof ArrayBuffer) {
         processBinaryData(data);
@@ -254,7 +254,7 @@ vdo.sendData({
     method: 'getStatus'
 }, peerId);
 
-vdo.addEventListener('data', (event) => {
+vdo.addEventListener('dataReceived', (event) => {
     const { data, uuid } = event.detail;
     if (data.type === 'response' && data.id) {
         const handler = requests.get(data.id);
@@ -279,7 +279,7 @@ vdo.addEventListener('data', (event) => {
 // AI bot that joins rooms without human intervention
 const bot = new VDONinja();
 
-bot.addEventListener('data', async (event) => {
+bot.addEventListener('dataReceived', async (event) => {
     const { data, uuid } = event.detail;
     if (data.type === 'question') {
         const response = await processWithAI(data.text);
@@ -324,7 +324,7 @@ canvas.addEventListener('mousemove', (e) => {
 });
 
 // Receive drawing commands
-vdo.addEventListener('data', (event) => {
+vdo.addEventListener('dataReceived', (event) => {
     const { data } = event.detail;
     if (data.type === 'draw') {
         ctx.fillStyle = data.color;
@@ -355,7 +355,7 @@ setInterval(() => {
 // Monitoring station
 const monitor = new VDONinja();
 
-monitor.addEventListener('data', (event) => {
+monitor.addEventListener('dataReceived', (event) => {
     const { data, uuid } = event.detail;
     if (data.type === 'telemetry') {
         updateDashboard(uuid, data);

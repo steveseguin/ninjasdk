@@ -65,7 +65,7 @@ See [README-NODE.md](README-NODE.md) for detailed Node.js setup.
 const vdo = new VDONinja();
 
 // Handle incoming data
-vdo.addEventListener('data', (event) => {
+vdo.addEventListener('dataReceived', (event) => {
     const { data, uuid } = event.detail;
     console.log('Received:', data, 'from:', uuid);
 });
@@ -107,7 +107,7 @@ class AIBot {
         });
 
         // Handle incoming messages
-        this.vdo.addEventListener('data', async (event) => {
+        this.vdo.addEventListener('dataReceived', async (event) => {
             const { data, uuid } = event.detail;
             const response = await this.processMessage(data, uuid);
             if (response) {
@@ -211,7 +211,7 @@ vdo.addEventListener('track', (event) => {
 });
 
 // Data events
-vdo.addEventListener('data', (event) => {
+vdo.addEventListener('dataReceived', (event) => {
     const { data, uuid, streamID } = event.detail;
     console.log('Data received:', data, 'from:', uuid);
 });
@@ -293,7 +293,7 @@ await vdo.quickView(options);            // Connect, join, and view
 ```javascript
 const supportBot = new VDONinja();
 
-supportBot.addEventListener('data', async (event) => {
+supportBot.addEventListener('dataReceived', async (event) => {
     const { data, uuid } = event.detail;
     if (data.type === 'support_request') {
         // Process with AI
@@ -317,7 +317,7 @@ await supportBot.announce({ streamID: 'support-bot' });
 ```javascript
 const translatorBot = new VDONinja();
 
-translatorBot.addEventListener('data', async (event) => {
+translatorBot.addEventListener('dataReceived', async (event) => {
     const { data, uuid } = event.detail;
     if (data.type === 'translate') {
         const translated = await translateText(data.text, data.targetLang);
@@ -344,7 +344,7 @@ await translatorBot.announce({ streamID: 'translator-bot' });
 const iotHub = new VDONinja();
 const sensorData = new Map();
 
-iotHub.addEventListener('data', (event) => {
+iotHub.addEventListener('dataReceived', (event) => {
     const { data, uuid } = event.detail;
     if (data.type === 'sensor_data') {
         // Store sensor data
@@ -380,7 +380,7 @@ const handlers = {
     'chat': async (message) => await chatResponse(message)
 };
 
-aiAssistant.addEventListener('data', async (event) => {
+aiAssistant.addEventListener('dataReceived', async (event) => {
     const { data, uuid } = event.detail;
     const handler = handlers[data.type];
     if (handler) {
@@ -406,7 +406,7 @@ const fileBuffer = await file.arrayBuffer();
 vdo.sendData(fileBuffer);
 
 // Receive binary data
-vdo.addEventListener('data', (event) => {
+vdo.addEventListener('dataReceived', (event) => {
     const { data, uuid } = event.detail;
     if (data instanceof ArrayBuffer) {
         // Process binary data
@@ -506,7 +506,7 @@ vdo.addEventListener('peerConnected', (event) => {
 const vdo = new VDONinja();
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-vdo.addEventListener('data', async (event) => {
+vdo.addEventListener('dataReceived', async (event) => {
     const { data, uuid } = event.detail;
     if (data.type === 'chat') {
         const completion = await openai.chat.completions.create({
@@ -531,7 +531,7 @@ await vdo.announce({ streamID: 'openai-bot' });
 const vdo = new VDONinja();
 const chain = new ConversationalChain({ /* config */ });
 
-vdo.addEventListener('data', async (event) => {
+vdo.addEventListener('dataReceived', async (event) => {
     const { data, uuid } = event.detail;
     const response = await chain.call({ input: data.message });
     vdo.sendData({ 
@@ -577,7 +577,7 @@ AGPLv3 - Free for all uses including commercial. Must share modifications.
 ### Minimal Bot Setup (Copy This)
 ```javascript
 const vdo = new VDONinja();
-vdo.addEventListener('data', (event) => {
+vdo.addEventListener('dataReceived', (event) => {
     console.log('Received:', event.detail.data, 'from:', event.detail.uuid);
 });
 await vdo.connect();
@@ -589,7 +589,7 @@ vdo.sendData({ message: "Bot is ready!" });
 ### Request-Response Pattern (Copy This)
 ```javascript
 const vdo = new VDONinja();
-vdo.addEventListener('data', async (event) => {
+vdo.addEventListener('dataReceived', async (event) => {
     const { data, uuid } = event.detail;
     if (data.request) {
         const response = await processRequest(data.request);

@@ -505,7 +505,7 @@
                     updatePublisherUI();
                 });
                 
-                publisher.addEventListener('data', (event) => {
+                publisher.addEventListener('dataReceived', (event) => {
                     const { data, uuid } = event.detail;
                     
                     if (data.type === 'subscribe') {
@@ -717,7 +717,7 @@
                     sendSubscriptionUpdate();
                 });
                 
-                subscriber.addEventListener('data', (event) => {
+                subscriber.addEventListener('dataReceived', (event) => {
                     const { data } = event.detail;
                     
                     if (data.type === 'welcome') {
