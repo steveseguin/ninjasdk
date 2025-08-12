@@ -313,7 +313,7 @@
          * @returns {string} Current SDK version
          */
         static get VERSION() {
-            return '1.1.0'; // Minor version bump for label-in-info-object support
+            return '1.2.0'; // Added method aliases for AI/LLM compatibility, fixed announce() documentation
         }
         
         /**
@@ -4522,6 +4522,69 @@
                 label: options.label
             });
         }
+
+        // ============================================================================
+        // METHOD ALIASES - For AI/LLM compatibility and common naming patterns
+        // ============================================================================
+        
+        /**
+         * Aliases for common method names that AI systems might hallucinate or expect
+         * These provide alternative names for the same functionality
+         */
+        
+        // Viewing/Playing aliases
+        play(streamID, options) { return this.view(streamID, options); }
+        watch(streamID, options) { return this.view(streamID, options); }
+        subscribe(streamID, options) { return this.view(streamID, options); }
+        startViewing(streamID, options) { return this.view(streamID, options); }
+        
+        // Publishing/Streaming aliases  
+        stream(mediaStream, options) { return this.publish(mediaStream, options); }
+        broadcast(mediaStream, options) { return this.publish(mediaStream, options); }
+        startPublishing(mediaStream, options) { return this.publish(mediaStream, options); }
+        share(mediaStream, options) { return this.publish(mediaStream, options); }
+        
+        // Stop viewing aliases
+        stop(streamID) { return this.stopViewing(streamID); }
+        stopPlaying(streamID) { return this.stopViewing(streamID); }
+        stopWatching(streamID) { return this.stopViewing(streamID); }
+        unsubscribe(streamID) { return this.stopViewing(streamID); }
+        
+        // Stop publishing aliases
+        stopStreaming() { return this.stopPublishing(); }
+        stopBroadcasting() { return this.stopPublishing(); }
+        stopSharing() { return this.stopPublishing(); }
+        unpublish() { return this.stopPublishing(); }
+        
+        // Connection aliases
+        join(options) { return this.joinRoom(options); }
+        enterRoom(options) { return this.joinRoom(options); }
+        enter(options) { return this.joinRoom(options); }
+        
+        leave() { return this.leaveRoom(); }
+        exitRoom() { return this.leaveRoom(); }
+        exit() { return this.leaveRoom(); }
+        
+        // Data sending aliases
+        send(data, target) { return this.sendData(data, target); }
+        sendMessage(data, target) { return this.sendData(data, target); }
+        emit(data, target) { return this.sendData(data, target); }
+        broadcast(data, target) { 
+            // Special case: if first arg is MediaStream, use publish
+            if (data instanceof MediaStream) {
+                return this.publish(data, target);
+            }
+            return this.sendData(data, target); 
+        }
+        
+        // Quick method aliases
+        quickPlay(options) { return this.quickView(options); }
+        quickWatch(options) { return this.quickView(options); }
+        quickSubscribe(options) { return this.quickView(options); }
+        
+        quickStream(options) { return this.quickPublish(options); }
+        quickBroadcast(options) { return this.quickPublish(options); }
+        quickShare(options) { return this.quickPublish(options); }
     }
 
     // ============================================================================

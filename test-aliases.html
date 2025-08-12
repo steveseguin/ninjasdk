@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VDO.Ninja SDK - Method Aliases Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #1a1a1a;
+            color: #e0e0e0;
+        }
+        h1 { color: #4CAF50; }
+        .test { 
+            margin: 10px 0; 
+            padding: 10px;
+            background: #2a2a2a;
+            border-radius: 5px;
+        }
+        .pass { border-left: 3px solid #4CAF50; }
+        .fail { border-left: 3px solid #f44336; }
+        .result { font-family: monospace; margin-top: 5px; }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background-color: #5cbf60; }
+    </style>
+</head>
+<body>
+    <h1>VDO.Ninja SDK - Method Aliases Test</h1>
+    <p>Testing that all method aliases work correctly and point to the right functions.</p>
+    
+    <button onclick="runTests()">Run All Tests</button>
+    <button onclick="clearResults()">Clear Results</button>
+    
+    <div id="results"></div>
+
+    <script src="vdoninja-sdk.js"></script>
+    <script>
+        function runTests() {
+            const results = document.getElementById('results');
+            results.innerHTML = '';
+            
+            const vdo = new VDONinja({ debug: false });
+            const tests = [];
+            
+            // Test viewing aliases
+            tests.push({
+                name: 'Viewing Aliases',
+                checks: [
+                    { alias: 'play', original: 'view', test: () => vdo.play === vdo.view },
+                    { alias: 'watch', original: 'view', test: () => vdo.watch === vdo.view },
+                    { alias: 'subscribe', original: 'view', test: () => vdo.subscribe === vdo.view },
+                    { alias: 'startViewing', original: 'view', test: () => vdo.startViewing === vdo.view }
+                ]
+            });
+            
+            // Test publishing aliases
+            tests.push({
+                name: 'Publishing Aliases',
+                checks: [
+                    { alias: 'stream', original: 'publish', test: () => vdo.stream === vdo.publish },
+                    { alias: 'startPublishing', original: 'publish', test: () => vdo.startPublishing === vdo.publish },
+                    { alias: 'share', original: 'publish', test: () => vdo.share === vdo.publish }
+                ]
+            });
+            
+            // Test stop viewing aliases
+            tests.push({
+                name: 'Stop Viewing Aliases',
+                checks: [
+                    { alias: 'stop', original: 'stopViewing', test: () => vdo.stop === vdo.stopViewing },
+                    { alias: 'stopPlaying', original: 'stopViewing', test: () => vdo.stopPlaying === vdo.stopViewing },
+                    { alias: 'stopWatching', original: 'stopViewing', test: () => vdo.stopWatching === vdo.stopViewing },
+                    { alias: 'unsubscribe', original: 'stopViewing', test: () => vdo.unsubscribe === vdo.stopViewing }
+                ]
+            });
+            
+            // Test stop publishing aliases
+            tests.push({
+                name: 'Stop Publishing Aliases',
+                checks: [
+                    { alias: 'stopStreaming', original: 'stopPublishing', test: () => vdo.stopStreaming === vdo.stopPublishing },
+                    { alias: 'stopBroadcasting', original: 'stopPublishing', test: () => vdo.stopBroadcasting === vdo.stopPublishing },
+                    { alias: 'stopSharing', original: 'stopPublishing', test: () => vdo.stopSharing === vdo.stopPublishing },
+                    { alias: 'unpublish', original: 'stopPublishing', test: () => vdo.unpublish === vdo.stopPublishing }
+                ]
+            });
+            
+            // Test room aliases
+            tests.push({
+                name: 'Room Management Aliases',
+                checks: [
+                    { alias: 'join', original: 'joinRoom', test: () => vdo.join === vdo.joinRoom },
+                    { alias: 'enterRoom', original: 'joinRoom', test: () => vdo.enterRoom === vdo.joinRoom },
+                    { alias: 'enter', original: 'joinRoom', test: () => vdo.enter === vdo.joinRoom },
+                    { alias: 'leave', original: 'leaveRoom', test: () => vdo.leave === vdo.leaveRoom },
+                    { alias: 'exitRoom', original: 'leaveRoom', test: () => vdo.exitRoom === vdo.leaveRoom },
+                    { alias: 'exit', original: 'leaveRoom', test: () => vdo.exit === vdo.leaveRoom }
+                ]
+            });
+            
+            // Test data sending aliases
+            tests.push({
+                name: 'Data Sending Aliases',
+                checks: [
+                    { alias: 'send', original: 'sendData', test: () => vdo.send === vdo.sendData },
+                    { alias: 'sendMessage', original: 'sendData', test: () => vdo.sendMessage === vdo.sendData },
+                    { alias: 'emit', original: 'sendData', test: () => vdo.emit === vdo.sendData }
+                ]
+            });
+            
+            // Test quick method aliases
+            tests.push({
+                name: 'Quick Method Aliases',
+                checks: [
+                    { alias: 'quickPlay', original: 'quickView', test: () => vdo.quickPlay === vdo.quickView },
+                    { alias: 'quickWatch', original: 'quickView', test: () => vdo.quickWatch === vdo.quickView },
+                    { alias: 'quickSubscribe', original: 'quickView', test: () => vdo.quickSubscribe === vdo.quickView },
+                    { alias: 'quickStream', original: 'quickPublish', test: () => vdo.quickStream === vdo.quickPublish },
+                    { alias: 'quickBroadcast', original: 'quickPublish', test: () => vdo.quickBroadcast === vdo.quickPublish },
+                    { alias: 'quickShare', original: 'quickPublish', test: () => vdo.quickShare === vdo.quickPublish }
+                ]
+            });
+            
+            // Test that aliases exist and are functions
+            tests.push({
+                name: 'Alias Type Checks',
+                checks: [
+                    { alias: 'play', original: 'function', test: () => typeof vdo.play === 'function' },
+                    { alias: 'watch', original: 'function', test: () => typeof vdo.watch === 'function' },
+                    { alias: 'stream', original: 'function', test: () => typeof vdo.stream === 'function' },
+                    { alias: 'broadcast', original: 'function', test: () => typeof vdo.broadcast === 'function' },
+                    { alias: 'send', original: 'function', test: () => typeof vdo.send === 'function' }
+                ]
+            });
+            
+            // Run all tests
+            let totalTests = 0;
+            let passedTests = 0;
+            
+            tests.forEach(testGroup => {
+                const groupDiv = document.createElement('div');
+                groupDiv.className = 'test';
+                groupDiv.innerHTML = `<h3>${testGroup.name}</h3>`;
+                
+                let groupPassed = true;
+                testGroup.checks.forEach(check => {
+                    totalTests++;
+                    const passed = check.test();
+                    if (passed) {
+                        passedTests++;
+                    } else {
+                        groupPassed = false;
+                    }
+                    
+                    const resultDiv = document.createElement('div');
+                    resultDiv.className = 'result';
+                    resultDiv.style.color = passed ? '#4CAF50' : '#f44336';
+                    resultDiv.textContent = `${passed ? '✓' : '✗'} ${check.alias} → ${check.original}`;
+                    groupDiv.appendChild(resultDiv);
+                });
+                
+                groupDiv.className += groupPassed ? ' pass' : ' fail';
+                results.appendChild(groupDiv);
+            });
+            
+            // Summary
+            const summaryDiv = document.createElement('div');
+            summaryDiv.className = 'test';
+            summaryDiv.innerHTML = `
+                <h2>Test Summary</h2>
+                <div class="result">Total Tests: ${totalTests}</div>
+                <div class="result" style="color: #4CAF50;">Passed: ${passedTests}</div>
+                <div class="result" style="color: ${passedTests === totalTests ? '#4CAF50' : '#f44336'};">
+                    ${passedTests === totalTests ? '✓ All tests passed!' : `✗ ${totalTests - passedTests} tests failed`}
+                </div>
+            `;
+            summaryDiv.className += passedTests === totalTests ? ' pass' : ' fail';
+            results.appendChild(summaryDiv);
+        }
+        
+        function clearResults() {
+            document.getElementById('results').innerHTML = '';
+        }
+        
+        // Auto-run tests on load
+        window.addEventListener('load', () => {
+            setTimeout(runTests, 500);
+        });
+    </script>
+</body>
+</html>
