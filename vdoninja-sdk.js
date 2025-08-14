@@ -313,7 +313,7 @@
          * @returns {string} Current SDK version
          */
         static get VERSION() {
-            return '1.2.0'; // Added method aliases for AI/LLM compatibility, fixed announce() documentation
+            return '1.3.0'; // Added LLM-friendly property setters, salt documentation, and improved compatibility
         }
         
         /**
@@ -476,6 +476,11 @@
             }
             this.debug = options.debug || false;
             
+            // Store options that might be incorrectly set as properties by LLMs
+            this._pendingStreamID = options.streamID || null;
+            this._pendingLabel = options.label || null;
+            this._pendingRoomID = options.roomid || options.roomID || null;  // Support both cases
+            
             // State management
             this.state = {
                 connected: false,
@@ -545,6 +550,63 @@
             this._setupCryptoUtils();
             
             this._log('SDK initialized with host:', this.host);
+            
+            // Add property setters to help LLMs use the SDK correctly
+            this._addPropertyHelpers();
+        }
+        
+        /**
+         * Add property setters that guide users to correct usage
+         * These properties are commonly misused by LLMs trying to set them directly
+         * @private
+         */
+        _addPropertyHelpers() {
+            // Define property descriptors for commonly misused properties
+            Object.defineProperty(this, 'streamID', {
+                get: function() {
+                    return this.state.streamID;
+                },
+                set: function(value) {
+                    console.warn(`[VDONinja SDK] Setting streamID as a property is not recommended.\n` +
+                        `Please use the streamID option in publish() or announce() methods:\n` +
+                        `  await vdo.publish(stream, { streamID: '${value}' })\n` +
+                        `  await vdo.announce({ streamID: '${value}' })\n` +
+                        `The streamID has been stored and will be used if not specified in the method call.`);
+                    this._pendingStreamID = value;
+                },
+                configurable: true
+            });
+            
+            Object.defineProperty(this, 'roomid', {
+                get: function() {
+                    return this.room;
+                },
+                set: function(value) {
+                    console.warn(`[VDONinja SDK] Setting roomid as a property is not recommended.\n` +
+                        `Please use the room option in connect() or joinRoom() methods:\n` +
+                        `  await vdo.connect({ room: '${value}' })\n` +
+                        `  await vdo.joinRoom({ room: '${value}' })\n` +
+                        `The room has been stored and will be used if not specified in the method call.`);
+                    this._pendingRoomID = value;
+                    this.room = this._sanitizeRoomName(value);
+                },
+                configurable: true
+            });
+            
+            Object.defineProperty(this, 'label', {
+                get: function() {
+                    return this._pendingLabel;
+                },
+                set: function(value) {
+                    console.warn(`[VDONinja SDK] Setting label as a property is not recommended.\n` +
+                        `Please use the label option in publish() or announce() methods:\n` +
+                        `  await vdo.publish(stream, { label: '${value}' })\n` +
+                        `  await vdo.announce({ label: '${value}' })\n` +
+                        `The label has been stored and will be used if not specified in the method call.`);
+                    this._pendingLabel = value;
+                },
+                configurable: true
+            });
         }
 
         // ============================================================================
@@ -578,7 +640,8 @@
             
             // Merge options
             if (options.host) this.host = options.host;
-            if (options.room) this.room = options.room;
+            if (options.room) this.room = this._sanitizeRoomName(options.room);
+            else if (this._pendingRoomID) this.room = this._sanitizeRoomName(this._pendingRoomID);
             if (options.password !== undefined) this.password = options.password;
             
             return new Promise((resolve, reject) => {
@@ -959,7 +1022,8 @@
             }
 
             this.localStream = stream;
-            const streamID = this._sanitizeStreamID(options.streamID) || this._generateStreamID();
+            // Use provided streamID, fall back to pending value from constructor/property, then generate
+            const streamID = this._sanitizeStreamID(options.streamID || this._pendingStreamID) || this._generateStreamID();
 
             // Handle room join if needed
             if (!this.state.roomJoined && options.room) {
@@ -1023,7 +1087,8 @@
                 throw new Error('Not connected to signaling server');
             }
 
-            const streamID = this._sanitizeStreamID(options.streamID) || this._generateStreamID();
+            // Use provided streamID, fall back to pending value from constructor/property, then generate
+            const streamID = this._sanitizeStreamID(options.streamID || this._pendingStreamID) || this._generateStreamID();
 
             // Handle room join if needed
             if (!this.state.roomJoined && options.room) {

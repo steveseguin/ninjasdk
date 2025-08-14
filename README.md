@@ -54,7 +54,9 @@ vdo.sendData({ message: "Hello P2P!" });
 
 ### Audio/Video Example
 ```javascript
-const vdo = new VDONinja();
+const vdo = new VDONinja({
+    salt: "vdo.ninja"  // Required for streams to be viewable on https://vdo.ninja
+});
 
 // Handle incoming tracks
 vdo.addEventListener('track', (event) => {
@@ -75,6 +77,8 @@ const stream = await navigator.mediaDevices.getUserMedia({
 await vdo.connect();
 await vdo.joinRoom({ room: "videoroom" });
 await vdo.publish(stream, { room: "videoroom" });
+
+// Your stream will be viewable at: https://vdo.ninja/?view=YOUR_STREAM_ID
 ```
 
 ## Features
@@ -93,6 +97,9 @@ const vdo = new VDONinja({
     host: 'wss://wss.vdo.ninja',     // WebSocket server URL
     room: "myroom",                   // Initial room name (optional)
     password: "roomPassword",         // Room password (optional, default: "someEncryptionKey123")
+    salt: "vdo.ninja",                // IMPORTANT: Set to "vdo.ninja" for playback on https://vdo.ninja
+                                      // The salt affects streamID hashing. Without this, streams may not be 
+                                      // viewable on vdo.ninja when running from a different domain
     debug: false,                     // Enable debug logging
     turnServers: null,                // null=auto-fetch, false=disable, or array of custom servers
     forceTURN: false,                 // Force relay mode through TURN servers
@@ -141,6 +148,25 @@ vdo.sendData(data, {                 // Advanced targeting
     streamID: "streamID",            // Target stream connections
     allowFallback: true              // Allow WebSocket fallback
 });
+```
+
+## Salt Configuration (Important!)
+
+The `salt` parameter is crucial when you want streams to be viewable on https://vdo.ninja:
+
+- **For Video/Audio Streams**: Set `salt: "vdo.ninja"` to ensure your published streams can be viewed on vdo.ninja
+- **For Data-Only Applications**: The salt can be omitted or set to any consistent value between peers
+- **Default Behavior**: Without explicit salt, the SDK uses your current domain as salt, which may cause incompatibility
+
+```javascript
+// For vdo.ninja compatibility (video/audio streams)
+const vdo = new VDONinja({
+    salt: "vdo.ninja"  // Required for vdo.ninja playback
+    // Use default password for simplest URLs
+});
+
+// Published streams will be viewable at:
+// https://vdo.ninja/?view=YOUR_STREAM_ID
 ```
 
 ## Event Listeners

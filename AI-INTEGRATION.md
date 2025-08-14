@@ -62,7 +62,10 @@ See [README-NODE.md](README-NODE.md) for detailed Node.js setup.
 ### 1. Minimal Data Channel Setup
 ```javascript
 // Create SDK instance
-const vdo = new VDONinja();
+const vdo = new VDONinja({
+    // For data-only applications, salt can be omitted
+    // Set salt: "vdo.ninja" if you need vdo.ninja compatibility
+});
 
 // Handle incoming data
 vdo.addEventListener('dataReceived', (event) => {
@@ -151,6 +154,7 @@ const vdo = new VDONinja({
     host: 'wss://wss.vdo.ninja',  // WebSocket server URL
     room: 'myroom',                // Initial room name (optional)
     password: 'password123',       // Room password (optional)
+    salt: 'vdo.ninja',             // Set for vdo.ninja stream compatibility (important!)
     debug: true,                   // Enable debug logging
     turnServers: null,             // null=auto-fetch, false=disable, array=custom
     forceTURN: false,              // Force relay mode
