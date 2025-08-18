@@ -256,7 +256,7 @@
 
 
 /**
- * VDO.Ninja SDK v1.0 - STILL IN DEVELOPMENT AND MAY CONTAIN BUGS
+ * VDO.Ninja SDK - STILL IN DEVELOPMENT AND MAY CONTAIN BUGS
  * 
  * This version incorporates all fixes from vdoninja-sdk-fix-final.js directly into the SDK.
  * 
