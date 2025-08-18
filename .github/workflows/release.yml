@@ -25,6 +25,10 @@ permissions:
 jobs:
   version:
     runs-on: ubuntu-latest
+    # Skip if the commit message contains [skip ci] or was made by the bot
+    if: |
+      !contains(github.event.head_commit.message, '[skip ci]') &&
+      !contains(github.event.head_commit.message, 'chore: bump version')
     
     steps:
     - uses: actions/checkout@v4
