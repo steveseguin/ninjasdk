@@ -1,0 +1,41 @@
+# Development files
+demos/
+test-*.html
+test-*.js
+*.test.js
+*.spec.js
+
+# Build tools
+run-in-windows.sh
+.github/
+
+# Documentation files not needed in package
+CNAME
+robots.txt
+index.html
+style.css
+
+# Node modules (will be installed via dependencies)
+node_modules/
+
+# Git files
+.git/
+.gitignore
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Log files
+*.log
+npm-debug.log*
+
+# Build artifacts not needed
+*.map

@@ -15,21 +15,54 @@ AI-friendly P2P communication SDK for audio, video, and data streaming. Build pe
 
 By using this SDK, you agree to respect these guidelines to keep the service free for everyone.
 
+## Installation
+
+### NPM Package
+```bash
+npm install vdoninja-sdk
+
+# For Node.js, also install ONE of these WebRTC implementations:
+npm install @roamhq/wrtc  # Recommended for full media support
+# OR
+npm install node-datachannel  # For data channels only
+```
+
+### Browser (CDN)
+```html
+<script src="https://unpkg.com/vdoninja-sdk/vdoninja-sdk.js"></script>
+<!-- OR minified version -->
+<script src="https://unpkg.com/vdoninja-sdk/vdoninja-sdk.min.js"></script>
+```
+
 ## Quick Start
 
-### Browser - Include via CDN
-```html
-<script src="https://cdn.jsdelivr.net/gh/steveseguin/ninjasdk@latest/vdoninja-sdk.min.js"></script>
+### Browser
+```javascript
+const vdo = new VDONinjaSDK();
 ```
 
-### Node.js - Install and Use
-```bash
-npm install ws @roamhq/wrtc  # or node-datachannel instead of @roamhq/wrtc
-```
+### Node.js - Simple Setup
 ```javascript
-const VDONinjaSDK = require('./vdoninja-sdk-node.js');
+// Method 1: Auto-detect WebRTC implementation (uses included adapter)
+const VDONinjaSDK = require('vdoninja-sdk/node');
+const vdo = new VDONinjaSDK();
+
+// Method 2: Manual setup (user's simpler approach)
+const wrtc = require('@roamhq/wrtc');
+const VDONinjaSDK = require('vdoninja-sdk');
+
+// Set global WebRTC objects
+global.RTCPeerConnection = wrtc.RTCPeerConnection;
+global.RTCIceCandidate = wrtc.RTCIceCandidate;
+global.RTCSessionDescription = wrtc.RTCSessionDescription;
+global.document = {
+    createElement: () => ({ innerText: '', textContent: '' })
+};
+
+const vdo = new VDONinjaSDK();
 ```
-See [README-NODE.md](README-NODE.md) for detailed Node.js setup instructions.
+
+See [README-NODE.md](README-NODE.md) for detailed Node.js setup with full adapter support.
 
 ### Basic Data Channel Example
 ```javascript
