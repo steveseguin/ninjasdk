@@ -1,5 +1,5 @@
 {
-  "name": "vdoninja-sdk",
+  "name": "@vdoninja/sdk",
   "version": "1.3.1",
   "description": "AI-friendly P2P communication SDK for audio, video, and data",
   "main": "vdoninja-sdk.js",

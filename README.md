@@ -1,5 +1,9 @@
 # VDO.Ninja SDK
 
+[![npm version](https://img.shields.io/npm/v/@vdoninja/sdk.svg)](https://www.npmjs.com/package/@vdoninja/sdk)
+[![npm downloads](https://img.shields.io/npm/dm/@vdoninja/sdk.svg)](https://www.npmjs.com/package/@vdoninja/sdk)
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
+
 AI-friendly P2P communication SDK for audio, video, and data streaming. Build peer-to-peer applications without servers, user accounts, or complex infrastructure.
 
 ## ⚠️ IMPORTANT: Usage Guidelines
@@ -19,7 +23,7 @@ By using this SDK, you agree to respect these guidelines to keep the service fre
 
 ### NPM Package
 ```bash
-npm install vdoninja-sdk
+npm install @vdoninja/sdk
 
 # For Node.js, also install ONE of these WebRTC implementations:
 npm install @roamhq/wrtc  # Recommended for full media support
@@ -30,8 +34,8 @@ npm install node-datachannel  # For data channels only
 ### Browser (CDN)
 ```html
 <script src="https://unpkg.com/vdoninja-sdk/vdoninja-sdk.js"></script>
-<!-- OR minified version -->
-<script src="https://unpkg.com/vdoninja-sdk/vdoninja-sdk.min.js"></script>
+<!-- OR from NPM CDN -->
+<script src="https://unpkg.com/@vdoninja/sdk/vdoninja-sdk.js"></script>
 ```
 
 ## Quick Start
@@ -44,12 +48,12 @@ const vdo = new VDONinjaSDK();
 ### Node.js - Simple Setup
 ```javascript
 // Method 1: Auto-detect WebRTC implementation (uses included adapter)
-const VDONinjaSDK = require('vdoninja-sdk/node');
+const VDONinjaSDK = require('@vdoninja/sdk/node');
 const vdo = new VDONinjaSDK();
 
 // Method 2: Manual setup (user's simpler approach)
 const wrtc = require('@roamhq/wrtc');
-const VDONinjaSDK = require('vdoninja-sdk');
+const VDONinjaSDK = require('@vdoninja/sdk');
 
 // Set global WebRTC objects
 global.RTCPeerConnection = wrtc.RTCPeerConnection;
