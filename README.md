@@ -33,9 +33,11 @@ npm install node-datachannel  # For data channels only
 
 ### Browser (CDN)
 ```html
-<script src="https://unpkg.com/vdoninja-sdk/vdoninja-sdk.js"></script>
-<!-- OR from NPM CDN -->
 <script src="https://unpkg.com/@vdoninja/sdk/vdoninja-sdk.js"></script>
+<!-- OR minified version -->
+<script src="https://unpkg.com/@vdoninja/sdk/vdoninja-sdk.min.js"></script>
+<!-- OR from GitHub CDN -->
+<script src="https://cdn.jsdelivr.net/gh/steveseguin/ninjasdk@latest/vdoninja-sdk.min.js"></script>
 ```
 
 ## Quick Start
@@ -71,7 +73,7 @@ See [README-NODE.md](README-NODE.md) for detailed Node.js setup with full adapte
 ### Basic Data Channel Example
 ```javascript
 // Create instance
-const vdo = new VDONinja();
+const vdo = new VDONinjaSDK();
 
 // Handle incoming messages
 vdo.addEventListener('dataReceived', (event) => {
@@ -91,7 +93,7 @@ vdo.sendData({ message: "Hello P2P!" });
 
 ### Audio/Video Example
 ```javascript
-const vdo = new VDONinja({
+const vdo = new VDONinjaSDK({
     salt: "vdo.ninja"  // Required for streams to be viewable on https://vdo.ninja
 });
 
@@ -130,7 +132,7 @@ await vdo.publish(stream, { room: "videoroom" });
 ## Constructor Options
 
 ```javascript
-const vdo = new VDONinja({
+const vdo = new VDONinjaSDK({
     host: 'wss://wss.vdo.ninja',     // WebSocket server URL
     room: "myroom",                   // Initial room name (optional)
     password: "roomPassword",         // Room password (optional, default: "someEncryptionKey123")
@@ -197,7 +199,7 @@ The `salt` parameter is crucial when you want streams to be viewable on https://
 
 ```javascript
 // For vdo.ninja compatibility (video/audio streams)
-const vdo = new VDONinja({
+const vdo = new VDONinjaSDK({
     salt: "vdo.ninja"  // Required for vdo.ninja playback
     // Use default password for simplest URLs
 });
@@ -340,7 +342,7 @@ vdo.addEventListener('dataReceived', (event) => {
 ### AI Bot Integration
 ```javascript
 // AI bot that joins rooms without human intervention
-const bot = new VDONinja();
+const bot = new VDONinjaSDK();
 
 bot.addEventListener('dataReceived', async (event) => {
     const { data, uuid } = event.detail;
@@ -362,7 +364,7 @@ await bot.announce({ streamID: 'ai-bot-1' });
 ### Collaborative Canvas
 ```javascript
 // Shared drawing application
-const vdo = new VDONinja();
+const vdo = new VDONinjaSDK();
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
 
@@ -399,7 +401,7 @@ vdo.addEventListener('dataReceived', (event) => {
 ### IoT Sensor Network
 ```javascript
 // Sensor node
-const sensor = new VDONinja();
+const sensor = new VDONinjaSDK();
 
 // Connect and announce as data-only publisher
 await sensor.connect();
@@ -416,7 +418,7 @@ setInterval(() => {
 }, 5000);
 
 // Monitoring station
-const monitor = new VDONinja();
+const monitor = new VDONinjaSDK();
 
 monitor.addEventListener('dataReceived', (event) => {
     const { data, uuid } = event.detail;
