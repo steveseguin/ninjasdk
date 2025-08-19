@@ -1,4 +1,4 @@
-// VDO.Ninja SDK v1.3.5
+// VDO.Ninja SDK v1.3.6
 /**
  * VDO.Ninja SDK - OFFICIAL SDK FOR VDO.NINJA WEBSOCKET API
  * Copyright (C) 2025 Steve Seguin and contributors
