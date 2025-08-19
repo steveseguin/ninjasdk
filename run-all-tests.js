@@ -38,10 +38,12 @@ const tests = [
         code: `
 const wrtc = require('${webrtcLib}');
 const WebSocket = require('ws');
+const crypto = require('crypto');
 const VDONinjaSDK = require('./vdoninja-sdk.js');
 
 // Polyfills for Node.js
 global.WebSocket = WebSocket;
+global.crypto = crypto.webcrypto || crypto;
 if (wrtc.RTCPeerConnection) {
     global.RTCPeerConnection = wrtc.RTCPeerConnection;
     global.RTCIceCandidate = wrtc.RTCIceCandidate;
@@ -54,6 +56,8 @@ global.CustomEvent = class CustomEvent extends Event {
         this.detail = options?.detail;
     }
 };
+global.btoa = (str) => Buffer.from(str).toString('base64');
+global.atob = (str) => Buffer.from(str, 'base64').toString();
 
 async function test() {
     const vdo = new VDONinjaSDK();
@@ -83,10 +87,12 @@ test();`
         code: `
 const wrtc = require('${webrtcLib}');
 const WebSocket = require('ws');
+const crypto = require('crypto');
 const VDONinjaSDK = require('./vdoninja-sdk.js');
 
 // Polyfills for Node.js
 global.WebSocket = WebSocket;
+global.crypto = crypto.webcrypto || crypto;
 if (wrtc.RTCPeerConnection) {
     global.RTCPeerConnection = wrtc.RTCPeerConnection;
     global.RTCIceCandidate = wrtc.RTCIceCandidate;
@@ -99,6 +105,8 @@ global.CustomEvent = class CustomEvent extends Event {
         this.detail = options?.detail;
     }
 };
+global.btoa = (str) => Buffer.from(str).toString('base64');
+global.atob = (str) => Buffer.from(str, 'base64').toString();
 
 const TEST_ROOM = 'local-p2p-' + Math.random().toString(36).substr(2, 9) + '-' + Date.now();
 const PUBLISHER_STREAM = 'pub-' + Math.random().toString(36).substr(2, 9);
@@ -163,10 +171,12 @@ test();`
         code: `
 const wrtc = require('${webrtcLib}');
 const WebSocket = require('ws');
+const crypto = require('crypto');
 const VDONinjaSDK = require('./vdoninja-sdk.js');
 
 // Polyfills for Node.js
 global.WebSocket = WebSocket;
+global.crypto = crypto.webcrypto || crypto;
 if (wrtc.RTCPeerConnection) {
     global.RTCPeerConnection = wrtc.RTCPeerConnection;
     global.RTCIceCandidate = wrtc.RTCIceCandidate;
@@ -179,6 +189,8 @@ global.CustomEvent = class CustomEvent extends Event {
         this.detail = options?.detail;
     }
 };
+global.btoa = (str) => Buffer.from(str).toString('base64');
+global.atob = (str) => Buffer.from(str, 'base64').toString();
 
 const TEST_ROOM = 'local-bidir-' + Math.random().toString(36).substr(2, 9) + '-' + Date.now();
 const PUB_STREAM = 'pub-' + Math.random().toString(36).substr(2, 9);
@@ -235,10 +247,12 @@ test();`
         code: `
 const wrtc = require('${webrtcLib}');
 const WebSocket = require('ws');
+const crypto = require('crypto');
 const VDONinjaSDK = require('./vdoninja-sdk.js');
 
 // Polyfills for Node.js
 global.WebSocket = WebSocket;
+global.crypto = crypto.webcrypto || crypto;
 if (wrtc.RTCPeerConnection) {
     global.RTCPeerConnection = wrtc.RTCPeerConnection;
     global.RTCIceCandidate = wrtc.RTCIceCandidate;
@@ -251,6 +265,8 @@ global.CustomEvent = class CustomEvent extends Event {
         this.detail = options?.detail;
     }
 };
+global.btoa = (str) => Buffer.from(str).toString('base64');
+global.atob = (str) => Buffer.from(str, 'base64').toString();
 
 const TEST_ROOM = 'local-dup-' + Math.random().toString(36).substr(2, 9) + '-' + Date.now();
 const PEER1_STREAM = 'p1-' + Math.random().toString(36).substr(2, 9);

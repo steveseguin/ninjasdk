@@ -38,10 +38,12 @@ jobs:
         cat > test-connectivity.js << 'EOF'
         const wrtc = require('@roamhq/wrtc');
         const WebSocket = require('ws');
+        const crypto = require('crypto');
         const VDONinjaSDK = require('./vdoninja-sdk.js');
         
-        // Polyfill for Node.js
+        // Polyfills for Node.js
         global.WebSocket = WebSocket;
+        global.crypto = crypto.webcrypto || crypto;
         global.RTCPeerConnection = wrtc.RTCPeerConnection;
         global.RTCIceCandidate = wrtc.RTCIceCandidate;
         global.RTCSessionDescription = wrtc.RTCSessionDescription;
@@ -52,6 +54,8 @@ jobs:
                 this.detail = options?.detail;
             }
         };
+        global.btoa = (str) => Buffer.from(str).toString('base64');
+        global.atob = (str) => Buffer.from(str, 'base64').toString();
         
         async function test() {
             const vdo = new VDONinjaSDK();
@@ -83,10 +87,12 @@ jobs:
         cat > test-p2p-datachannel.js << 'EOF'
         const wrtc = require('@roamhq/wrtc');
         const WebSocket = require('ws');
+        const crypto = require('crypto');
         const VDONinjaSDK = require('./vdoninja-sdk.js');
         
-        // Polyfill for Node.js
+        // Polyfills for Node.js
         global.WebSocket = WebSocket;
+        global.crypto = crypto.webcrypto || crypto;
         global.RTCPeerConnection = wrtc.RTCPeerConnection;
         global.RTCIceCandidate = wrtc.RTCIceCandidate;
         global.RTCSessionDescription = wrtc.RTCSessionDescription;
@@ -97,6 +103,8 @@ jobs:
                 this.detail = options?.detail;
             }
         };
+        global.btoa = (str) => Buffer.from(str).toString('base64');
+        global.atob = (str) => Buffer.from(str, 'base64').toString();
         
         const TEST_ROOM = 'ci-p2p-' + Math.random().toString(36).substr(2, 9) + '-' + Date.now();
         const PUBLISHER_STREAM = 'pub-' + Math.random().toString(36).substr(2, 9);
@@ -166,10 +174,12 @@ jobs:
         cat > test-bidirectional.js << 'EOF'
         const wrtc = require('@roamhq/wrtc');
         const WebSocket = require('ws');
+        const crypto = require('crypto');
         const VDONinjaSDK = require('./vdoninja-sdk.js');
         
-        // Polyfill for Node.js
+        // Polyfills for Node.js
         global.WebSocket = WebSocket;
+        global.crypto = crypto.webcrypto || crypto;
         global.RTCPeerConnection = wrtc.RTCPeerConnection;
         global.RTCIceCandidate = wrtc.RTCIceCandidate;
         global.RTCSessionDescription = wrtc.RTCSessionDescription;
@@ -180,6 +190,8 @@ jobs:
                 this.detail = options?.detail;
             }
         };
+        global.btoa = (str) => Buffer.from(str).toString('base64');
+        global.atob = (str) => Buffer.from(str, 'base64').toString();
         
         const TEST_ROOM = 'ci-bidir-' + Math.random().toString(36).substr(2, 9) + '-' + Date.now();
         const PUB_STREAM = 'pub-' + Math.random().toString(36).substr(2, 9);
@@ -239,10 +251,12 @@ jobs:
         cat > test-no-duplicates.js << 'EOF'
         const wrtc = require('@roamhq/wrtc');
         const WebSocket = require('ws');
+        const crypto = require('crypto');
         const VDONinjaSDK = require('./vdoninja-sdk.js');
         
-        // Polyfill for Node.js
+        // Polyfills for Node.js
         global.WebSocket = WebSocket;
+        global.crypto = crypto.webcrypto || crypto;
         global.RTCPeerConnection = wrtc.RTCPeerConnection;
         global.RTCIceCandidate = wrtc.RTCIceCandidate;
         global.RTCSessionDescription = wrtc.RTCSessionDescription;
@@ -253,6 +267,8 @@ jobs:
                 this.detail = options?.detail;
             }
         };
+        global.btoa = (str) => Buffer.from(str).toString('base64');
+        global.atob = (str) => Buffer.from(str, 'base64').toString();
         
         const TEST_ROOM = 'ci-dup-' + Math.random().toString(36).substr(2, 9) + '-' + Date.now();
         const PEER1_STREAM = 'p1-' + Math.random().toString(36).substr(2, 9);
@@ -312,10 +328,12 @@ jobs:
         cat > test-aliases.js << 'EOF'
         const wrtc = require('@roamhq/wrtc');
         const WebSocket = require('ws');
+        const crypto = require('crypto');
         const VDONinjaSDK = require('./vdoninja-sdk.js');
         
-        // Polyfill for Node.js
+        // Polyfills for Node.js
         global.WebSocket = WebSocket;
+        global.crypto = crypto.webcrypto || crypto;
         global.RTCPeerConnection = wrtc.RTCPeerConnection;
         global.RTCIceCandidate = wrtc.RTCIceCandidate;
         global.RTCSessionDescription = wrtc.RTCSessionDescription;
@@ -326,6 +344,8 @@ jobs:
                 this.detail = options?.detail;
             }
         };
+        global.btoa = (str) => Buffer.from(str).toString('base64');
+        global.atob = (str) => Buffer.from(str, 'base64').toString();
         
         async function test() {
             try {
