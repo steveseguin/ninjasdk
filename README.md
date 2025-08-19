@@ -81,12 +81,14 @@ vdo.addEventListener('dataReceived', (event) => {
     console.log(`Received from ${event.detail.uuid}:`, event.detail.data);
 });
 
-// Connect and join room
+// Connect and join room (use unique room names to avoid collisions)
 await vdo.connect();
-await vdo.joinRoom({ room: "myroom" });
+const roomId = 'room-' + Math.random().toString(36).substr(2, 9);
+await vdo.joinRoom({ room: roomId });
 
 // Announce as data-only publisher
-await vdo.announce({ streamID: "myStreamID" });
+const streamId = 'stream-' + Math.random().toString(36).substr(2, 9);
+await vdo.announce({ streamID: streamId });
 
 // Send data to all connected peers
 vdo.sendData({ message: "Hello P2P!" });

@@ -82,7 +82,8 @@ if (wrtc.RTCPeerConnection) {
 }
 global.document = { createElement: () => ({ innerText: '', textContent: '' }) };
 
-const TEST_ROOM = 'test-' + Date.now();
+const TEST_ROOM = 'local-p2p-' + Math.random().toString(36).substr(2, 9) + '-' + Date.now();
+const PUBLISHER_STREAM = 'pub-' + Math.random().toString(36).substr(2, 9);
 let messageReceived = false;
 
 async function createPublisher() {
@@ -152,7 +153,8 @@ if (wrtc.RTCPeerConnection) {
 }
 global.document = { createElement: () => ({ innerText: '', textContent: '' }) };
 
-const TEST_ROOM = 'bidir-' + Date.now();
+const TEST_ROOM = 'local-bidir-' + Math.random().toString(36).substr(2, 9) + '-' + Date.now();
+const PUB_STREAM = 'pub-' + Math.random().toString(36).substr(2, 9);
 let pubRecv = false, viewRecv = false;
 
 async function test() {
@@ -214,7 +216,9 @@ if (wrtc.RTCPeerConnection) {
 }
 global.document = { createElement: () => ({ innerText: '', textContent: '' }) };
 
-const TEST_ROOM = 'dup-' + Date.now();
+const TEST_ROOM = 'local-dup-' + Math.random().toString(36).substr(2, 9) + '-' + Date.now();
+const PEER1_STREAM = 'p1-' + Math.random().toString(36).substr(2, 9);
+const PEER2_STREAM = 'p2-' + Math.random().toString(36).substr(2, 9);
 let messagesReceived = [];
 
 async function test() {
@@ -229,16 +233,16 @@ async function test() {
         // Both announce and view each other (dual connection)
         await peer1.connect();
         await peer1.joinRoom({ room: TEST_ROOM });
-        await peer1.announce({ streamID: 'peer1' });
+        await peer1.announce({ streamID: PEER1_STREAM });
         
         await peer2.connect();
         await peer2.joinRoom({ room: TEST_ROOM });
-        await peer2.announce({ streamID: 'peer2' });
+        await peer2.announce({ streamID: PEER2_STREAM });
         
         await new Promise(r => setTimeout(r, 1000));
         
-        await peer1.view('peer2');
-        await peer2.view('peer1');
+        await peer1.view(PEER2_STREAM);
+        await peer2.view(PEER1_STREAM);
         
         await new Promise(r => setTimeout(r, 3000));
         

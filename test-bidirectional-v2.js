@@ -10,7 +10,8 @@ global.document = {
     createElement: () => ({ innerText: '', textContent: '' })
 };
 
-const TEST_ROOM = 'bidirectional-v2-' + Date.now();
+const TEST_ROOM = 'test-bidir-' + Math.random().toString(36).substr(2, 9) + '-' + Date.now();
+const PUB_STREAM = 'pub-' + Math.random().toString(36).substr(2, 9);
 let publisherReceived = [];
 let viewerReceived = [];
 let viewerConnected = false;
@@ -32,7 +33,7 @@ async function createPublisher() {
     
     await publisher.connect();
     await publisher.joinRoom({ room: TEST_ROOM });
-    await publisher.announce({ streamID: 'test-publisher' });
+    await publisher.announce({ streamID: PUB_STREAM });
     console.log('[Publisher] Ready');
     
     return publisher;
@@ -50,7 +51,7 @@ async function createViewer() {
     
     await viewer.connect();
     await viewer.joinRoom({ room: TEST_ROOM });
-    await viewer.view('test-publisher');
+    await viewer.view(PUB_STREAM);
     console.log('[Viewer] Connected to publisher');
     
     return viewer;

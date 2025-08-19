@@ -10,7 +10,7 @@ global.document = {
     createElement: () => ({ innerText: '', textContent: '' })
 };
 
-const TEST_ROOM = 'improved-test-' + Date.now();
+const TEST_ROOM = 'test-improved-' + Math.random().toString(36).substr(2, 9) + '-' + Date.now();
 let allPeer1Received = [];
 let allPeer2Received = [];
 
@@ -55,8 +55,10 @@ async function runTest() {
     
     try {
         // Create both peers
-        const peer1Promise = createPeer('Peer1', 'stream-1', 'stream-2');
-        const peer2Promise = createPeer('Peer2', 'stream-2', 'stream-1');
+        const stream1 = 's1-' + Math.random().toString(36).substr(2, 9);
+        const stream2 = 's2-' + Math.random().toString(36).substr(2, 9);
+        const peer1Promise = createPeer('Peer1', stream1, stream2);
+        const peer2Promise = createPeer('Peer2', stream2, stream1);
         
         const [peer1, peer2] = await Promise.all([peer1Promise, peer2Promise]);
         

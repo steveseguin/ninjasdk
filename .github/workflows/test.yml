@@ -50,10 +50,11 @@ jobs:
                 await vdo.connect();
                 console.log('✅ Connected to signaling server');
                 
-                await vdo.joinRoom({ room: "test-room-" + Date.now() });
+                const roomId = 'ci-' + Math.random().toString(36).substr(2, 9) + '-' + Date.now();
+                await vdo.joinRoom({ room: roomId });
                 console.log('✅ Joined room');
                 
-                await vdo.announce({ streamID: "test-stream" });
+                await vdo.announce({ streamID: "stream-" + Math.random().toString(36).substr(2, 9) });
                 console.log('✅ Announced stream');
                 
                 vdo.disconnect();
@@ -79,7 +80,8 @@ jobs:
         global.RTCSessionDescription = wrtc.RTCSessionDescription;
         global.document = { createElement: () => ({ innerText: '', textContent: '' }) };
         
-        const TEST_ROOM = 'github-test-' + Date.now();
+        const TEST_ROOM = 'ci-p2p-' + Math.random().toString(36).substr(2, 9) + '-' + Date.now();
+        const PUBLISHER_STREAM = 'pub-' + Math.random().toString(36).substr(2, 9);
         let messageReceived = false;
         
         async function createPublisher() {
@@ -95,7 +97,7 @@ jobs:
             
             await publisher.connect();
             await publisher.joinRoom({ room: TEST_ROOM });
-            await publisher.announce({ streamID: 'test-publisher' });
+            await publisher.announce({ streamID: PUBLISHER_STREAM });
             console.log('[Publisher] Ready');
             return publisher;
         }
@@ -110,7 +112,7 @@ jobs:
             
             await viewer.connect();
             await viewer.joinRoom({ room: TEST_ROOM });
-            await viewer.view('test-publisher');
+            await viewer.view(PUBLISHER_STREAM);
             console.log('[Viewer] Connected to publisher');
             return viewer;
         }
@@ -152,7 +154,8 @@ jobs:
         global.RTCSessionDescription = wrtc.RTCSessionDescription;
         global.document = { createElement: () => ({ innerText: '', textContent: '' }) };
         
-        const TEST_ROOM = 'bidir-test-' + Date.now();
+        const TEST_ROOM = 'ci-bidir-' + Math.random().toString(36).substr(2, 9) + '-' + Date.now();
+        const PUB_STREAM = 'pub-' + Math.random().toString(36).substr(2, 9);
         let pubRecv = false, viewRecv = false;
         
         async function test() {
@@ -172,11 +175,11 @@ jobs:
                 
                 await publisher.connect();
                 await publisher.joinRoom({ room: TEST_ROOM });
-                await publisher.announce({ streamID: 'pub-stream' });
+                await publisher.announce({ streamID: PUB_STREAM });
                 
                 await viewer.connect();
                 await viewer.joinRoom({ room: TEST_ROOM });
-                await viewer.view('pub-stream');
+                await viewer.view(PUB_STREAM);
                 
                 await new Promise(r => setTimeout(r, 2000));
                 
@@ -215,7 +218,9 @@ jobs:
         global.RTCSessionDescription = wrtc.RTCSessionDescription;
         global.document = { createElement: () => ({ innerText: '', textContent: '' }) };
         
-        const TEST_ROOM = 'dup-test-' + Date.now();
+        const TEST_ROOM = 'ci-dup-' + Math.random().toString(36).substr(2, 9) + '-' + Date.now();
+        const PEER1_STREAM = 'p1-' + Math.random().toString(36).substr(2, 9);
+        const PEER2_STREAM = 'p2-' + Math.random().toString(36).substr(2, 9);
         let messagesReceived = [];
         
         async function test() {
@@ -231,16 +236,16 @@ jobs:
                 // Both announce and view each other (dual connection)
                 await peer1.connect();
                 await peer1.joinRoom({ room: TEST_ROOM });
-                await peer1.announce({ streamID: 'peer1' });
+                await peer1.announce({ streamID: PEER1_STREAM });
                 
                 await peer2.connect();
                 await peer2.joinRoom({ room: TEST_ROOM });
-                await peer2.announce({ streamID: 'peer2' });
+                await peer2.announce({ streamID: PEER2_STREAM });
                 
                 await new Promise(r => setTimeout(r, 1000));
                 
-                await peer1.view('peer2');
-                await peer2.view('peer1');
+                await peer1.view(PEER2_STREAM);
+                await peer2.view(PEER1_STREAM);
                 
                 await new Promise(r => setTimeout(r, 3000));
                 
