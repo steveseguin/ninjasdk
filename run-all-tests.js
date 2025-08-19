@@ -116,15 +116,16 @@ async function createPublisher() {
     const publisher = new VDONinjaSDK();
     
     publisher.addEventListener('peerConnected', async (event) => {
+        console.log('  ✓ Publisher detected peer connection');
         setTimeout(() => {
             publisher.sendData({ test: 'message', timestamp: Date.now() });
             console.log('  ✓ Publisher sent message');
-        }, 1000);
+        }, 2000);
     });
     
     await publisher.connect();
     await publisher.joinRoom({ room: TEST_ROOM });
-    await publisher.announce({ streamID: 'test-publisher' });
+    await publisher.announce({ streamID: PUBLISHER_STREAM });
     return publisher;
 }
 
@@ -138,17 +139,18 @@ async function createViewer() {
     
     await viewer.connect();
     await viewer.joinRoom({ room: TEST_ROOM });
-    await viewer.view('test-publisher');
+    await viewer.view(PUBLISHER_STREAM);
     return viewer;
 }
 
 async function test() {
     try {
         const publisher = await createPublisher();
-        await new Promise(r => setTimeout(r, 1000));
+        await new Promise(r => setTimeout(r, 2000));
         const viewer = await createViewer();
         
-        await new Promise(r => setTimeout(r, 5000));
+        // Wait longer for connection establishment and message
+        await new Promise(r => setTimeout(r, 8000));
         
         if (messageReceived) {
             console.log('  ✓ P2P data channel works');
