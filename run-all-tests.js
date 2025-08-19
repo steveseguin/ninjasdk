@@ -40,6 +40,7 @@ const wrtc = require('${webrtcLib}');
 const WebSocket = require('ws');
 const VDONinjaSDK = require('./vdoninja-sdk.js');
 
+// Polyfills for Node.js
 global.WebSocket = WebSocket;
 if (wrtc.RTCPeerConnection) {
     global.RTCPeerConnection = wrtc.RTCPeerConnection;
@@ -47,6 +48,12 @@ if (wrtc.RTCPeerConnection) {
     global.RTCSessionDescription = wrtc.RTCSessionDescription;
 }
 global.document = { createElement: () => ({ innerText: '', textContent: '' }) };
+global.CustomEvent = class CustomEvent extends Event {
+    constructor(type, options) {
+        super(type, options);
+        this.detail = options?.detail;
+    }
+};
 
 async function test() {
     const vdo = new VDONinjaSDK();
@@ -78,6 +85,7 @@ const wrtc = require('${webrtcLib}');
 const WebSocket = require('ws');
 const VDONinjaSDK = require('./vdoninja-sdk.js');
 
+// Polyfills for Node.js
 global.WebSocket = WebSocket;
 if (wrtc.RTCPeerConnection) {
     global.RTCPeerConnection = wrtc.RTCPeerConnection;
@@ -85,6 +93,12 @@ if (wrtc.RTCPeerConnection) {
     global.RTCSessionDescription = wrtc.RTCSessionDescription;
 }
 global.document = { createElement: () => ({ innerText: '', textContent: '' }) };
+global.CustomEvent = class CustomEvent extends Event {
+    constructor(type, options) {
+        super(type, options);
+        this.detail = options?.detail;
+    }
+};
 
 const TEST_ROOM = 'local-p2p-' + Math.random().toString(36).substr(2, 9) + '-' + Date.now();
 const PUBLISHER_STREAM = 'pub-' + Math.random().toString(36).substr(2, 9);
@@ -151,6 +165,7 @@ const wrtc = require('${webrtcLib}');
 const WebSocket = require('ws');
 const VDONinjaSDK = require('./vdoninja-sdk.js');
 
+// Polyfills for Node.js
 global.WebSocket = WebSocket;
 if (wrtc.RTCPeerConnection) {
     global.RTCPeerConnection = wrtc.RTCPeerConnection;
@@ -158,6 +173,12 @@ if (wrtc.RTCPeerConnection) {
     global.RTCSessionDescription = wrtc.RTCSessionDescription;
 }
 global.document = { createElement: () => ({ innerText: '', textContent: '' }) };
+global.CustomEvent = class CustomEvent extends Event {
+    constructor(type, options) {
+        super(type, options);
+        this.detail = options?.detail;
+    }
+};
 
 const TEST_ROOM = 'local-bidir-' + Math.random().toString(36).substr(2, 9) + '-' + Date.now();
 const PUB_STREAM = 'pub-' + Math.random().toString(36).substr(2, 9);
@@ -216,6 +237,7 @@ const wrtc = require('${webrtcLib}');
 const WebSocket = require('ws');
 const VDONinjaSDK = require('./vdoninja-sdk.js');
 
+// Polyfills for Node.js
 global.WebSocket = WebSocket;
 if (wrtc.RTCPeerConnection) {
     global.RTCPeerConnection = wrtc.RTCPeerConnection;
@@ -223,6 +245,12 @@ if (wrtc.RTCPeerConnection) {
     global.RTCSessionDescription = wrtc.RTCSessionDescription;
 }
 global.document = { createElement: () => ({ innerText: '', textContent: '' }) };
+global.CustomEvent = class CustomEvent extends Event {
+    constructor(type, options) {
+        super(type, options);
+        this.detail = options?.detail;
+    }
+};
 
 const TEST_ROOM = 'local-dup-' + Math.random().toString(36).substr(2, 9) + '-' + Date.now();
 const PEER1_STREAM = 'p1-' + Math.random().toString(36).substr(2, 9);

@@ -40,11 +40,18 @@ jobs:
         const WebSocket = require('ws');
         const VDONinjaSDK = require('./vdoninja-sdk.js');
         
+        // Polyfill for Node.js
         global.WebSocket = WebSocket;
         global.RTCPeerConnection = wrtc.RTCPeerConnection;
         global.RTCIceCandidate = wrtc.RTCIceCandidate;
         global.RTCSessionDescription = wrtc.RTCSessionDescription;
         global.document = { createElement: () => ({ innerText: '', textContent: '' }) };
+        global.CustomEvent = class CustomEvent extends Event {
+            constructor(type, options) {
+                super(type, options);
+                this.detail = options?.detail;
+            }
+        };
         
         async function test() {
             const vdo = new VDONinjaSDK();
@@ -78,11 +85,18 @@ jobs:
         const WebSocket = require('ws');
         const VDONinjaSDK = require('./vdoninja-sdk.js');
         
+        // Polyfill for Node.js
         global.WebSocket = WebSocket;
         global.RTCPeerConnection = wrtc.RTCPeerConnection;
         global.RTCIceCandidate = wrtc.RTCIceCandidate;
         global.RTCSessionDescription = wrtc.RTCSessionDescription;
         global.document = { createElement: () => ({ innerText: '', textContent: '' }) };
+        global.CustomEvent = class CustomEvent extends Event {
+            constructor(type, options) {
+                super(type, options);
+                this.detail = options?.detail;
+            }
+        };
         
         const TEST_ROOM = 'ci-p2p-' + Math.random().toString(36).substr(2, 9) + '-' + Date.now();
         const PUBLISHER_STREAM = 'pub-' + Math.random().toString(36).substr(2, 9);
@@ -154,11 +168,18 @@ jobs:
         const WebSocket = require('ws');
         const VDONinjaSDK = require('./vdoninja-sdk.js');
         
+        // Polyfill for Node.js
         global.WebSocket = WebSocket;
         global.RTCPeerConnection = wrtc.RTCPeerConnection;
         global.RTCIceCandidate = wrtc.RTCIceCandidate;
         global.RTCSessionDescription = wrtc.RTCSessionDescription;
         global.document = { createElement: () => ({ innerText: '', textContent: '' }) };
+        global.CustomEvent = class CustomEvent extends Event {
+            constructor(type, options) {
+                super(type, options);
+                this.detail = options?.detail;
+            }
+        };
         
         const TEST_ROOM = 'ci-bidir-' + Math.random().toString(36).substr(2, 9) + '-' + Date.now();
         const PUB_STREAM = 'pub-' + Math.random().toString(36).substr(2, 9);
@@ -220,11 +241,18 @@ jobs:
         const WebSocket = require('ws');
         const VDONinjaSDK = require('./vdoninja-sdk.js');
         
+        // Polyfill for Node.js
         global.WebSocket = WebSocket;
         global.RTCPeerConnection = wrtc.RTCPeerConnection;
         global.RTCIceCandidate = wrtc.RTCIceCandidate;
         global.RTCSessionDescription = wrtc.RTCSessionDescription;
         global.document = { createElement: () => ({ innerText: '', textContent: '' }) };
+        global.CustomEvent = class CustomEvent extends Event {
+            constructor(type, options) {
+                super(type, options);
+                this.detail = options?.detail;
+            }
+        };
         
         const TEST_ROOM = 'ci-dup-' + Math.random().toString(36).substr(2, 9) + '-' + Date.now();
         const PEER1_STREAM = 'p1-' + Math.random().toString(36).substr(2, 9);
@@ -286,11 +314,18 @@ jobs:
         const WebSocket = require('ws');
         const VDONinjaSDK = require('./vdoninja-sdk.js');
         
+        // Polyfill for Node.js
         global.WebSocket = WebSocket;
         global.RTCPeerConnection = wrtc.RTCPeerConnection;
         global.RTCIceCandidate = wrtc.RTCIceCandidate;
         global.RTCSessionDescription = wrtc.RTCSessionDescription;
         global.document = { createElement: () => ({ innerText: '', textContent: '' }) };
+        global.CustomEvent = class CustomEvent extends Event {
+            constructor(type, options) {
+                super(type, options);
+                this.detail = options?.detail;
+            }
+        };
         
         async function test() {
             try {
