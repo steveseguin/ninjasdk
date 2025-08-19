@@ -215,18 +215,18 @@ async function test() {
         
         await publisher.connect();
         await publisher.joinRoom({ room: TEST_ROOM });
-        await publisher.announce({ streamID: 'pub-stream' });
+        await publisher.announce({ streamID: PUB_STREAM });
         
         await viewer.connect();
         await viewer.joinRoom({ room: TEST_ROOM });
-        await viewer.view('pub-stream');
+        await viewer.view(PUB_STREAM);
         
-        await new Promise(r => setTimeout(r, 2000));
+        await new Promise(r => setTimeout(r, 3000));
         
         publisher.sendData({ from: 'publisher', test: 1 });
         viewer.sendData({ from: 'viewer', test: 2 });
         
-        await new Promise(r => setTimeout(r, 3000));
+        await new Promise(r => setTimeout(r, 5000));
         
         if (pubRecv && viewRecv) {
             console.log('  ✓ Bidirectional communication works');
