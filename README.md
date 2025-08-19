@@ -1,5 +1,6 @@
 # VDO.Ninja SDK
 
+[![SDK Tests](https://github.com/steveseguin/ninjasdk/actions/workflows/test.yml/badge.svg)](https://github.com/steveseguin/ninjasdk/actions/workflows/test.yml)
 [![npm version](https://img.shields.io/npm/v/@vdoninja/sdk.svg)](https://www.npmjs.com/package/@vdoninja/sdk)
 [![npm downloads](https://img.shields.io/npm/dm/@vdoninja/sdk.svg)](https://www.npmjs.com/package/@vdoninja/sdk)
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
@@ -188,6 +189,88 @@ vdo.sendData(data, {                 // Advanced targeting
     allowFallback: true              // Allow WebSocket fallback
 });
 ```
+
+## P2P Connection Patterns
+
+### Pattern 1: Publisher-Viewer (Recommended for Data Channels)
+
+One peer announces (publisher), the other views (viewer). Creates a **single bidirectional data channel**.
+
+```javascript
+// Peer A - Publisher
+const publisher = new VDONinjaSDK();
+await publisher.connect();
+await publisher.joinRoom({ room: "myroom" });
+await publisher.announce({ streamID: "peer-a" });
+
+// Peer B - Viewer  
+const viewer = new VDONinjaSDK();
+await viewer.connect();
+await viewer.joinRoom({ room: "myroom" });
+await viewer.view("peer-a");
+
+// BOTH can send/receive on the SAME data channel (verified!)
+publisher.sendData("Hello from publisher");  // Viewer receives this
+viewer.sendData("Hello from viewer");        // Publisher receives this
+```
+
+**✅ Verified behavior:**
+- Creates ONE P2P connection with bidirectional data channel
+- Both peers can send and receive messages
+- Most efficient for data-only applications
+
+### Pattern 2: Dual Connection (Required for Media Exchange)
+
+Both peers announce AND view each other. Creates **two separate P2P connections**.
+
+```javascript
+// Peer A
+const peerA = new VDONinjaSDK();
+await peerA.connect();
+await peerA.joinRoom({ room: "myroom" });
+await peerA.announce({ streamID: "peer-a" });
+await peerA.view("peer-b");  // View peer B
+
+// Peer B
+const peerB = new VDONinjaSDK();
+await peerB.connect();
+await peerB.joinRoom({ room: "myroom" });
+await peerB.announce({ streamID: "peer-b" });
+await peerB.view("peer-a");  // View peer A
+
+// Smart routing prevents duplicates by default
+peerA.sendData("Hello");  // peerB receives ONCE (via publisher channel preferred)
+
+// To intentionally use both channels:
+peerA.sendData("Hello", { preference: 'all' });  // peerB receives TWICE
+```
+
+### Data Routing Control
+
+The SDK intelligently routes messages to prevent duplicates when dual connections exist:
+
+```javascript
+// Default behavior (no options needed)
+peer.sendData(data);  // Uses 'any' preference: publisher channel first, viewer if needed
+
+// Explicit channel selection (optional)
+peer.sendData(data, { preference: 'publisher' });  // ONLY use publisher channel
+peer.sendData(data, { preference: 'viewer' });     // ONLY use viewer channel  
+peer.sendData(data, { preference: 'any' });        // Publisher first, viewer fallback (default)
+peer.sendData(data, { preference: 'all' });        // Use ALL channels (duplicates!)
+
+// Target specific peer
+peer.sendData(data, "uuid");                       // Send to specific UUID (uses 'any')
+peer.sendData(data, { uuid: "...", preference: 'viewer' }); // Force viewer channel
+```
+
+**Preference options:**
+- `'any'` **(default)**: Try publisher channel first, automatically fallback to viewer if needed
+- `'publisher'`: Use ONLY publisher channel (no fallback)
+- `'viewer'`: Use ONLY viewer channel (no fallback)
+- `'all'`: Send via ALL available connections (intentional duplicates)
+
+**Note:** The default `'any'` preference ensures messages always get through while preventing duplicates. It tries the publisher channel first (as that's typically the announcing peer's primary channel), but automatically uses the viewer channel if the publisher channel isn't available.
 
 ## Salt Configuration (Important!)
 

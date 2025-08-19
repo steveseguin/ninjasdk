@@ -17,7 +17,9 @@
     "build": "npm run minify",
     "minify": "terser vdoninja-sdk.js -o vdoninja-sdk.min.js --compress --mangle",
     "watch": "npm-watch",
+    "test": "node run-all-tests.js",
     "test:node": "node demos/node-example.js",
+    "test:all": "node run-all-tests.js",
     "check:webrtc": "node -e \"console.log(require('./vdoninja-sdk-node.js').checkWebRTCSupport())\"",
     "ssn:listen": "node demos/socialstreamninja-listener.js",
     "prepublishOnly": "npm run build"

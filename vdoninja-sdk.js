@@ -1161,7 +1161,7 @@
                     connection.dataChannel.readyState === 'open') {
                     try {
                         const byeMsg = { bye: true };
-                        this._sendDataInternal(byeMsg, uuid);
+                        this._sendDataInternal(byeMsg, uuid, null, 'publisher');
                         this._log('Sent bye message to viewer:', uuid);
                         
                         // Create a promise that resolves when bufferedAmount reaches 0
@@ -1636,7 +1636,7 @@
                 // Send track preferences for viewers
                 if (connection.type === 'viewer' && connection.viewPreferences) {
                     try {
-                        this._sendDataInternal(connection.viewPreferences, connection.uuid);
+                        this._sendDataInternal(connection.viewPreferences, connection.uuid, null, 'publisher');
                         this._log('Sent track preferences:', connection.viewPreferences);
                     } catch (error) {
                         this._log('Failed to send preferences:', error.message);
@@ -1736,7 +1736,7 @@
                         // Viewers respond to publisher pings with pong
                         if (connection.type === 'viewer') {
                             try {
-                                this._sendDataInternal({ pong: msg.ping }, connection.uuid);
+                                this._sendDataInternal({ pong: msg.ping }, connection.uuid, null, 'publisher');
                                 this._log('Sent pong response to publisher');
                             } catch (error) {
                                 this._log('Failed to send pong:', error.message);
@@ -3975,54 +3975,113 @@
          * @param {string} type - Connection type (optional)
          * @param {boolean} allowFallback - Whether to use WebSocket fallback (default: false)
          */
-        _sendDataInternal(data, uuid = null, type = null, allowFallback = false) {
+        _sendDataInternal(data, uuid = null, type = null, preference = 'any', allowFallback = false) {
             let sent = false;
             const message = typeof data === 'string' ? data : JSON.stringify(data);
 
+            const sentConnections = new Set(); // Track which connections we've sent to
+
             if (uuid && !type) {
-                // When UUID is specified but no type, try to send through ANY available connection
-                // with preference order: viewer first (more likely to have data channel), then publisher
+                // When UUID is specified but no type, use preference to determine order
                 const connections = this.connections.get(uuid);
                 if (connections) {
-                    // Try viewer connection first
-                    if (connections.viewer && connections.viewer.dataChannel && 
-                        connections.viewer.dataChannel.readyState === 'open') {
-                        try {
-                            this._logMessage('OUT', data, 'DataChannel');
-                            connections.viewer.dataChannel.send(message);
-                            sent = true;
-                            this._log(`Sent to ${uuid} via viewer connection`);
-                        } catch (error) {
-                            this._log('Error sending via viewer connection:', error);
+                    const tryConnection = (connType) => {
+                        const conn = connections[connType];
+                        if (conn && conn.dataChannel && 
+                            conn.dataChannel.readyState === 'open' &&
+                            !sentConnections.has(conn)) {
+                            try {
+                                this._logMessage('OUT', data, 'DataChannel');
+                                conn.dataChannel.send(message);
+                                sentConnections.add(conn);
+                                sent = true;
+                                this._log(`Sent to ${uuid} via ${connType} connection`);
+                                return true;
+                            } catch (error) {
+                                this._log(`Error sending via ${connType} connection:`, error);
+                            }
                         }
-                    }
-                    
-                    // If viewer failed or doesn't exist, try publisher
-                    if (!sent && connections.publisher && connections.publisher.dataChannel && 
-                        connections.publisher.dataChannel.readyState === 'open') {
-                        try {
-                            this._logMessage('OUT', data, 'DataChannel');
-                            connections.publisher.dataChannel.send(message);
-                            sent = true;
-                            this._log(`Sent to ${uuid} via publisher connection`);
-                        } catch (error) {
-                            this._log('Error sending via publisher connection:', error);
+                        return false;
+                    };
+
+                    if (preference === 'publisher') {
+                        // ONLY use publisher channel, no fallback
+                        tryConnection('publisher');
+                    } else if (preference === 'viewer') {
+                        // ONLY use viewer channel, no fallback
+                        tryConnection('viewer');
+                    } else if (preference === 'any') {
+                        // Default: Try publisher first, then viewer if needed
+                        if (!tryConnection('publisher')) {
+                            tryConnection('viewer');
                         }
+                    } else if (preference === 'all') {
+                        // Send to both connections if they exist
+                        tryConnection('publisher');
+                        tryConnection('viewer');
                     }
                 }
             } else {
-                // Original behavior: get specific connections based on filters
+                // Get connections based on filters
                 const connections = this._getConnections({ uuid, type });
                 
-                for (const connection of connections) {
-                    if (connection && connection.dataChannel && 
-                        connection.dataChannel.readyState === 'open') {
-                        try {
-                            this._logMessage('OUT', data, 'DataChannel');
-                            connection.dataChannel.send(message);
-                            sent = true;
-                        } catch (error) {
-                            this._log('Error sending data:', error);
+                if (preference === 'all') {
+                    // Send to all matching connections
+                    for (const connection of connections) {
+                        if (connection && connection.dataChannel && 
+                            connection.dataChannel.readyState === 'open' &&
+                            !sentConnections.has(connection)) {
+                            try {
+                                this._logMessage('OUT', data, 'DataChannel');
+                                connection.dataChannel.send(message);
+                                sentConnections.add(connection);
+                                sent = true;
+                            } catch (error) {
+                                this._log('Error sending data:', error);
+                            }
+                        }
+                    }
+                } else {
+                    // Group connections by UUID to avoid duplicates
+                    const connectionsByUuid = new Map();
+                    for (const conn of connections) {
+                        if (!connectionsByUuid.has(conn.uuid)) {
+                            connectionsByUuid.set(conn.uuid, {});
+                        }
+                        connectionsByUuid.get(conn.uuid)[conn.type] = conn;
+                    }
+
+                    // Send to each UUID using preference
+                    for (const [connUuid, conns] of connectionsByUuid) {
+                        const tryConnection = (connType) => {
+                            const conn = conns[connType];
+                            if (conn && conn.dataChannel && 
+                                conn.dataChannel.readyState === 'open' &&
+                                !sentConnections.has(conn)) {
+                                try {
+                                    this._logMessage('OUT', data, 'DataChannel');
+                                    conn.dataChannel.send(message);
+                                    sentConnections.add(conn);
+                                    sent = true;
+                                    return true;
+                                } catch (error) {
+                                    this._log('Error sending data:', error);
+                                }
+                            }
+                            return false;
+                        };
+
+                        if (preference === 'publisher') {
+                            // ONLY use publisher channel
+                            tryConnection('publisher');
+                        } else if (preference === 'viewer') {
+                            // ONLY use viewer channel
+                            tryConnection('viewer');
+                        } else if (preference === 'any' || !preference) {
+                            // Default: Try publisher first, then viewer if needed
+                            if (!tryConnection('publisher')) {
+                                tryConnection('viewer');
+                            }
                         }
                     }
                 }
@@ -4078,71 +4137,68 @@
          * - This ensures messages reach the peer even in mesh scenarios or when data channels fail
          * 
          * Examples:
-         * - sendData(data) // Send to all with fallback
-         * - sendData(data, "uuid123") // Try viewer first, fallback to publisher, then WebSocket
-         * - sendData(data, { uuid: "uuid123", type: "viewer" }) // Send to viewer connection only
-         * - sendData(data, { type: "publisher" }) // Send to all publisher connections
-         * - sendData(data, { streamID: "stream1" }) // Send to all connections for stream
+         * - sendData(data) // Send to all via publisher connections (no duplicates)
+         * - sendData(data, "uuid123") // Send to specific peer (publisher channel preferred)
+         * - sendData(data, { preference: 'all' }) // Send via ALL connections (may duplicate)
+         * - sendData(data, { uuid: "uuid123", preference: 'viewer' }) // Use viewer channel
+         * - sendData(data, { type: 'publisher' }) // Send to all publisher connections
          * - sendData(data, { uuid: "uuid123", allowFallback: false }) // No WebSocket fallback
          */
         sendData(data, target = null) {
             const msg = { pipe: data };
             let allowFallback = false;  // Default to false for true P2P
+            let preference = 'any'; // Default preference: publisher first with fallback
             
             // Handle different parameter formats
             if (typeof target === 'string') {
-                // Simple UUID string
-                return this._sendDataInternal(msg, target, null, allowFallback);
+                // Simple UUID string - use default preference
+                return this._sendDataInternal(msg, target, null, preference, allowFallback);
             } else if (typeof target === 'object' && target !== null) {
-                // Extract fallback option if present
+                // Extract options
                 if (target.hasOwnProperty('allowFallback')) {
                     allowFallback = target.allowFallback;
                 }
+                if (target.hasOwnProperty('preference')) {
+                    preference = target.preference;
+                }
                 
                 // Options object
-                if (target.uuid || target.type || target.streamID) {
-                    const connections = this._getConnections(target);
-                    let sent = false;
-                    
-                    for (const connection of connections) {
-                        if (connection && connection.dataChannel && 
-                            connection.dataChannel.readyState === 'open') {
-                            try {
-                                this._logMessage('OUT', msg, 'DataChannel');
-                                connection.dataChannel.send(JSON.stringify(msg));
+                if (target.uuid && !target.type && !target.streamID) {
+                    // Simple UUID case
+                    return this._sendDataInternal(msg, target.uuid, null, preference, allowFallback);
+                } else if (target.uuid || target.type || target.streamID) {
+                    // Complex filtering - need to handle streamID case
+                    if (target.streamID && !target.uuid) {
+                        // Get all connections for this streamID and send using preference
+                        const connections = this._getConnections({ streamID: target.streamID, type: target.type });
+                        
+                        // Group by UUID to handle preference correctly
+                        const connectionsByUuid = new Map();
+                        for (const conn of connections) {
+                            if (!connectionsByUuid.has(conn.uuid)) {
+                                connectionsByUuid.set(conn.uuid, []);
+                            }
+                            connectionsByUuid.get(conn.uuid).push(conn);
+                        }
+                        
+                        let sent = false;
+                        for (const [uuid, conns] of connectionsByUuid) {
+                            // For each UUID, send according to preference
+                            if (this._sendDataInternal(msg, uuid, null, preference, allowFallback)) {
                                 sent = true;
-                            } catch (error) {
-                                this._log('Error sending data:', error);
                             }
                         }
+                        
+                        return sent;
+                    } else {
+                        // UUID with optional type
+                        return this._sendDataInternal(msg, target.uuid, target.type, preference, allowFallback);
                     }
-                    
-                    // If no data channel available and fallback is allowed, use WebSocket
-                    if (!sent && allowFallback && this.state.connected && this.signaling && this.signaling.readyState === WebSocket.OPEN) {
-                        try {
-                            const fallbackMsg = {
-                                ...msg,
-                                __fallback: true
-                            };
-                            
-                            if (target.uuid) {
-                                fallbackMsg.UUID = target.uuid;
-                            }
-                            
-                            this._sendMessageWS(fallbackMsg);
-                            sent = true;
-                            this._log(`Sent via WebSocket fallback${target.uuid ? ` to ${target.uuid}` : ''}`);
-                        } catch (error) {
-                            this._log('Error sending via WebSocket fallback:', error);
-                        }
-                    }
-                    
-                    return sent;
                 }
             }
             
-            // Default: send to all
-            return this._sendDataInternal(msg, null, null, allowFallback);
+            // Default: send to all with preference
+            return this._sendDataInternal(msg, null, null, preference, allowFallback);
         }
         
         /**
@@ -4180,7 +4236,7 @@
             
             // IMPORTANT: Never use fallback for ping/pong
             // The whole point is to test the WebRTC connection
-            return this._sendDataInternal({ ping: timestamp }, uuid, null, false);
+            return this._sendDataInternal({ ping: timestamp }, uuid, null, 'publisher', false);
         }
 
         // ============================================================================
