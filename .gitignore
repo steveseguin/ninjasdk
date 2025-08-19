@@ -31,3 +31,49 @@ Thumbs.db
 *.tmp
 *.temp
 .cache/
+
+# Claude-specific files
+.claude/
+claude.json
+.claude-settings
+.claude/settings.local.json
+
+# Package manager files
+package-lock.json
+pnpm-lock.yaml
+yarn.lock
+
+# Test coverage
+coverage/
+*.lcov
+.nyc_output/
+
+# Logs
+logs/
+*.log
+lerna-debug.log*
+
+# Environment variables
+.env
+.env.*
+
+# Build artifacts
+*.min.js.map
+*.tgz
+
+# IDE specific
+*.sublime-project
+*.sublime-workspace
+.project
+.classpath
+.c9/
+*.launch
+.settings/
+
+# OS specific
+Desktop.ini
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+*.swp
+*~
