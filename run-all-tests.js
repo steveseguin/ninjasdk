@@ -37,8 +37,10 @@ const tests = [
         file: 'test-connectivity.js',
         code: `
 const wrtc = require('${webrtcLib}');
+const WebSocket = require('ws');
 const VDONinjaSDK = require('./vdoninja-sdk.js');
 
+global.WebSocket = WebSocket;
 if (wrtc.RTCPeerConnection) {
     global.RTCPeerConnection = wrtc.RTCPeerConnection;
     global.RTCIceCandidate = wrtc.RTCIceCandidate;
@@ -73,8 +75,10 @@ test();`
         file: 'test-p2p-datachannel.js',
         code: `
 const wrtc = require('${webrtcLib}');
+const WebSocket = require('ws');
 const VDONinjaSDK = require('./vdoninja-sdk.js');
 
+global.WebSocket = WebSocket;
 if (wrtc.RTCPeerConnection) {
     global.RTCPeerConnection = wrtc.RTCPeerConnection;
     global.RTCIceCandidate = wrtc.RTCIceCandidate;
@@ -144,8 +148,10 @@ test();`
         file: 'test-bidirectional.js',
         code: `
 const wrtc = require('${webrtcLib}');
+const WebSocket = require('ws');
 const VDONinjaSDK = require('./vdoninja-sdk.js');
 
+global.WebSocket = WebSocket;
 if (wrtc.RTCPeerConnection) {
     global.RTCPeerConnection = wrtc.RTCPeerConnection;
     global.RTCIceCandidate = wrtc.RTCIceCandidate;
@@ -207,8 +213,10 @@ test();`
         file: 'test-no-duplicates.js', 
         code: `
 const wrtc = require('${webrtcLib}');
+const WebSocket = require('ws');
 const VDONinjaSDK = require('./vdoninja-sdk.js');
 
+global.WebSocket = WebSocket;
 if (wrtc.RTCPeerConnection) {
     global.RTCPeerConnection = wrtc.RTCPeerConnection;
     global.RTCIceCandidate = wrtc.RTCIceCandidate;

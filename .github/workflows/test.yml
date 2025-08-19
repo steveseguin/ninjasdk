@@ -37,8 +37,10 @@ jobs:
       run: |
         cat > test-connectivity.js << 'EOF'
         const wrtc = require('@roamhq/wrtc');
+        const WebSocket = require('ws');
         const VDONinjaSDK = require('./vdoninja-sdk.js');
         
+        global.WebSocket = WebSocket;
         global.RTCPeerConnection = wrtc.RTCPeerConnection;
         global.RTCIceCandidate = wrtc.RTCIceCandidate;
         global.RTCSessionDescription = wrtc.RTCSessionDescription;
@@ -73,8 +75,10 @@ jobs:
       run: |
         cat > test-p2p-datachannel.js << 'EOF'
         const wrtc = require('@roamhq/wrtc');
+        const WebSocket = require('ws');
         const VDONinjaSDK = require('./vdoninja-sdk.js');
         
+        global.WebSocket = WebSocket;
         global.RTCPeerConnection = wrtc.RTCPeerConnection;
         global.RTCIceCandidate = wrtc.RTCIceCandidate;
         global.RTCSessionDescription = wrtc.RTCSessionDescription;
@@ -147,8 +151,10 @@ jobs:
       run: |
         cat > test-bidirectional.js << 'EOF'
         const wrtc = require('@roamhq/wrtc');
+        const WebSocket = require('ws');
         const VDONinjaSDK = require('./vdoninja-sdk.js');
         
+        global.WebSocket = WebSocket;
         global.RTCPeerConnection = wrtc.RTCPeerConnection;
         global.RTCIceCandidate = wrtc.RTCIceCandidate;
         global.RTCSessionDescription = wrtc.RTCSessionDescription;
@@ -211,8 +217,10 @@ jobs:
       run: |
         cat > test-no-duplicates.js << 'EOF'
         const wrtc = require('@roamhq/wrtc');
+        const WebSocket = require('ws');
         const VDONinjaSDK = require('./vdoninja-sdk.js');
         
+        global.WebSocket = WebSocket;
         global.RTCPeerConnection = wrtc.RTCPeerConnection;
         global.RTCIceCandidate = wrtc.RTCIceCandidate;
         global.RTCSessionDescription = wrtc.RTCSessionDescription;
@@ -275,8 +283,10 @@ jobs:
       run: |
         cat > test-aliases.js << 'EOF'
         const wrtc = require('@roamhq/wrtc');
+        const WebSocket = require('ws');
         const VDONinjaSDK = require('./vdoninja-sdk.js');
         
+        global.WebSocket = WebSocket;
         global.RTCPeerConnection = wrtc.RTCPeerConnection;
         global.RTCIceCandidate = wrtc.RTCIceCandidate;
         global.RTCSessionDescription = wrtc.RTCSessionDescription;
