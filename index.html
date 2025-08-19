@@ -575,12 +575,12 @@ function handleCustomData(data) {
                 <p><strong>For Node.js:</strong></p>
                 <pre><code class="language-bash">npm install ws @roamhq/wrtc  # or node-datachannel
 # Then in your code:
-const VDONinja = require('./vdoninja-sdk-node.js');</code></pre>
+const VDONinjaSDK = require('./vdoninja-sdk-node.js');</code></pre>
                 <p>See <a href="README-NODE.md">README-NODE.md</a> for detailed Node.js setup instructions.</p>
                 
                 <h3>2. Basic Data Channel Example</h3>
-                <pre><code class="language-javascript">// Create a new VDO.Ninja instance (both names work)
-const vdo = new VDONinja();  // or new VDONinjaSDK()
+                <pre><code class="language-javascript">// Create a new VDO.Ninja SDK instance
+const vdo = new VDONinjaSDK();
 
 // Set up data channel handling
 vdo.addEventListener('data', (event) => {
@@ -601,7 +601,7 @@ vdo.sendData({
 
                 <h3>3. Audio/Video Example</h3>
                 <pre><code class="language-javascript">// Create instance for audio/video
-const vdo = new VDONinja();
+const vdo = new VDONinjaSDK();
 
 // Set up track handling
 vdo.addEventListener('track', (event) => {
@@ -762,7 +762,7 @@ await sdk.view('your-session-id', { audio: false, video: false, label: "dock" })
                 <div class="ai-preview">
                     <h4>Quick Example for Your AI:</h4>
                     <pre><code class="language-javascript">// Minimal AI Bot Setup
-const vdo = new VDONinja();
+const vdo = new VDONinjaSDK();
 vdo.onDataMessage = (data, uid) => {
     // AI processes incoming data
     const response = processWithAI(data);
@@ -1090,7 +1090,7 @@ vdo.addEventListener('error', (event) => {
 npm install ws @roamhq/wrtc  # or node-datachannel
 
 # Use in your code
-const VDONinja = require('./vdoninja-sdk-node.js');</code></pre>
+const VDONinjaSDK = require('./vdoninja-sdk-node.js');</code></pre>
                     <div class="download-meta">
                         <span class="version-badge">v1.1.0</span>
                         <a href="README-NODE.md" style="margin-left: 10px;">Node.js Docs</a>

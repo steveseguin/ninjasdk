@@ -62,7 +62,7 @@ See [README-NODE.md](README-NODE.md) for detailed Node.js setup.
 ### 1. Minimal Data Channel Setup
 ```javascript
 // Create SDK instance
-const vdo = new VDONinja({
+const vdo = new VDONinjaSDK({
     // For data-only applications, salt can be omitted
     // Set salt: "vdo.ninja" if you need vdo.ninja compatibility
 });
@@ -90,7 +90,7 @@ vdo.sendData({ type: 'greeting', message: 'Hello from AI!' });
 ```javascript
 class AIBot {
     constructor(roomId) {
-        this.vdo = new VDONinja();
+        this.vdo = new VDONinjaSDK();
         this.roomId = roomId;
         this.peers = new Map();
     }
@@ -150,7 +150,7 @@ await bot.start();
 
 ```javascript
 // Constructor options
-const vdo = new VDONinja({
+const vdo = new VDONinjaSDK({
     host: 'wss://wss.vdo.ninja',  // WebSocket server URL
     room: 'myroom',                // Initial room name (optional)
     password: 'password123',       // Room password (optional)
@@ -295,7 +295,7 @@ await vdo.quickView(options);            // Connect, join, and view
 
 ### 1. Customer Support Bot
 ```javascript
-const supportBot = new VDONinja();
+const supportBot = new VDONinjaSDK();
 
 supportBot.addEventListener('dataReceived', async (event) => {
     const { data, uuid } = event.detail;
@@ -319,7 +319,7 @@ await supportBot.announce({ streamID: 'support-bot' });
 
 ### 2. Real-time Translation Bot
 ```javascript
-const translatorBot = new VDONinja();
+const translatorBot = new VDONinjaSDK();
 
 translatorBot.addEventListener('dataReceived', async (event) => {
     const { data, uuid } = event.detail;
@@ -345,7 +345,7 @@ await translatorBot.announce({ streamID: 'translator-bot' });
 
 ### 3. IoT Data Aggregator
 ```javascript
-const iotHub = new VDONinja();
+const iotHub = new VDONinjaSDK();
 const sensorData = new Map();
 
 iotHub.addEventListener('dataReceived', (event) => {
@@ -374,7 +374,7 @@ await iotHub.joinRoom({ room: 'sensor-network' });
 
 ### 4. Collaborative AI Assistant
 ```javascript
-const aiAssistant = new VDONinja();
+const aiAssistant = new VDONinjaSDK();
 
 // Handle different request types
 const handlers = {
@@ -480,7 +480,7 @@ vdo.addEventListener('connectionFailed', (event) => {
 
 ```javascript
 // Enable verbose logging in constructor
-const vdo = new VDONinja({ debug: true });
+const vdo = new VDONinjaSDK({ debug: true });
 
 // Or enable after creation
 vdo.debug = true;
@@ -507,7 +507,7 @@ vdo.addEventListener('peerConnected', (event) => {
 
 ### OpenAI Integration Example
 ```javascript
-const vdo = new VDONinja();
+const vdo = new VDONinjaSDK();
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 vdo.addEventListener('dataReceived', async (event) => {
@@ -532,7 +532,7 @@ await vdo.announce({ streamID: 'openai-bot' });
 
 ### LangChain Integration Example
 ```javascript
-const vdo = new VDONinja();
+const vdo = new VDONinjaSDK();
 const chain = new ConversationalChain({ /* config */ });
 
 vdo.addEventListener('dataReceived', async (event) => {
@@ -580,7 +580,7 @@ AGPLv3 - Free for all uses including commercial. Must share modifications.
 
 ### Minimal Bot Setup (Copy This)
 ```javascript
-const vdo = new VDONinja();
+const vdo = new VDONinjaSDK();
 vdo.addEventListener('dataReceived', (event) => {
     console.log('Received:', event.detail.data, 'from:', event.detail.uuid);
 });
@@ -592,7 +592,7 @@ vdo.sendData({ message: "Bot is ready!" });
 
 ### Request-Response Pattern (Copy This)
 ```javascript
-const vdo = new VDONinja();
+const vdo = new VDONinjaSDK();
 vdo.addEventListener('dataReceived', async (event) => {
     const { data, uuid } = event.detail;
     if (data.request) {
@@ -607,7 +607,7 @@ await vdo.announce({ streamID: "api-bot" });
 
 ### Broadcast Pattern (Copy This)
 ```javascript
-const vdo = new VDONinja();
+const vdo = new VDONinjaSDK();
 await vdo.connect();
 await vdo.joinRoom({ room: "broadcast" });
 await vdo.announce({ streamID: "broadcaster" });

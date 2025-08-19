@@ -17,28 +17,65 @@ on:
           - patch
           - minor
           - major
+      publish_npm:
+        description: 'Publish to NPM'
+        required: true
+        default: true
+        type: boolean
 
 permissions:
   contents: write
   pull-requests: write
 
 jobs:
+  # First, run all tests
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [18, 20]
+        webrtc-lib: ['@roamhq/wrtc']
+    
+    name: Test Node ${{ matrix.node-version }}
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ matrix.node-version }}
+    
+    - name: Install dependencies
+      run: |
+        npm install
+        npm install ${{ matrix.webrtc-lib }}
+    
+    - name: Run tests
+      run: npm test
+      
   version:
+    needs: test  # Only run if tests pass
     runs-on: ubuntu-latest
     # Skip if the commit message contains [skip ci] or was made by the bot
     if: |
       !contains(github.event.head_commit.message, '[skip ci]') &&
       !contains(github.event.head_commit.message, 'chore: bump version')
     
+    outputs:
+      new_version: ${{ steps.version.outputs.new_version }}
+    
     steps:
     - uses: actions/checkout@v4
       with:
         fetch-depth: 0
+        token: ${{ secrets.PAT_TOKEN || secrets.GITHUB_TOKEN }}
         
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
         node-version: '20'
+        registry-url: 'https://registry.npmjs.org'
         
     - name: Configure Git
       run: |
@@ -46,7 +83,7 @@ jobs:
         git config user.email "actions@github.com"
         
     - name: Determine version bump
-      id: version
+      id: version_type
       run: |
         if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
           VERSION_TYPE="${{ inputs.version_type }}"
@@ -64,14 +101,19 @@ jobs:
         echo "version_type=$VERSION_TYPE" >> $GITHUB_OUTPUT
         
     - name: Bump version
+      id: version
       run: |
-        npm version ${{ steps.version.outputs.version_type }} --no-git-tag-version
+        npm version ${{ steps.version_type.outputs.version_type }} --no-git-tag-version
         NEW_VERSION=$(node -p "require('./package.json').version")
-        echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
+        echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
         
     - name: Update SDK version in file
       run: |
-        sed -i "1s/.*/\/\/ VDO.Ninja SDK v${{ env.NEW_VERSION }}/" vdoninja-sdk.js
+        # Update header comment
+        sed -i "1s/.*/\/\/ VDO.Ninja SDK v${{ steps.version.outputs.new_version }}/" vdoninja-sdk.js
+        
+        # Update static VERSION getter
+        sed -i "s/return '[0-9]\+\.[0-9]\+\.[0-9]\+';/return '${{ steps.version.outputs.new_version }}';/" vdoninja-sdk.js
         
     - name: Install dependencies
       run: npm install
@@ -79,55 +121,86 @@ jobs:
     - name: Build minified version
       run: npm run build
       
-    - name: Create Pull Request
-      uses: peter-evans/create-pull-request@v6
+    - name: Commit version bump
+      run: |
+        git add package.json package-lock.json vdoninja-sdk.js vdoninja-sdk.min.js
+        git commit -m "chore: bump version to v${{ steps.version.outputs.new_version }} [skip ci]"
+        git push
+        
+    - name: Create Git Tag
+      run: |
+        git tag v${{ steps.version.outputs.new_version }}
+        git push origin v${{ steps.version.outputs.new_version }}
+
+  publish-npm:
+    needs: version
+    runs-on: ubuntu-latest
+    if: |
+      (github.event_name == 'workflow_dispatch' && inputs.publish_npm) ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    
+    steps:
+    - uses: actions/checkout@v4
       with:
-        token: ${{ secrets.PAT_TOKEN || secrets.GITHUB_TOKEN }}
-        commit-message: "chore: bump version to v${{ env.NEW_VERSION }}"
-        title: "Release v${{ env.NEW_VERSION }}"
-        body: |
-          ## 🚀 Release v${{ env.NEW_VERSION }}
-          
-          This PR was automatically generated to bump the version.
-          
-          ### Changes
-          - Version bumped to v${{ env.NEW_VERSION }}
-          - Updated vdoninja-sdk.js with new version
-          - Regenerated minified build
-          
-          ### Checklist
-          - [ ] Review changes
-          - [ ] Merge to trigger release
-        branch: release/v${{ env.NEW_VERSION }}
-        delete-branch: true
+        ref: main  # Get the latest with version bump
+        
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        registry-url: 'https://registry.npmjs.org'
+        
+    - name: Install dependencies
+      run: npm install
+      
+    - name: Publish to NPM
+      run: npm publish --access public
+      env:
+        NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        
+  create-release:
+    needs: [version, publish-npm]
+    if: always() && needs.version.result == 'success'
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        ref: main  # Get the latest with version bump
         
     - name: Create Release
-      if: github.event_name == 'push'
       uses: softprops/action-gh-release@v2
       with:
-        tag_name: v${{ env.NEW_VERSION }}
-        name: Release v${{ env.NEW_VERSION }}
+        tag_name: v${{ needs.version.outputs.new_version }}
+        name: Release v${{ needs.version.outputs.new_version }}
         body: |
-          ## VDO.Ninja SDK v${{ env.NEW_VERSION }}
+          ## VDO.Ninja SDK v${{ needs.version.outputs.new_version }}
           
           ### Installation
           
-          CDN:
-          ```html
-          <script src="https://cdn.jsdelivr.net/gh/steveseguin/ninjasdk@v${{ env.NEW_VERSION }}/vdoninja-sdk.min.js"></script>
+          NPM:
+          ```bash
+          npm install @vdoninja/sdk@${{ needs.version.outputs.new_version }}
           ```
           
-          NPM (coming soon):
-          ```bash
-          npm install vdoninja-sdk@${{ env.NEW_VERSION }}
+          CDN:
+          ```html
+          <!-- From NPM CDN -->
+          <script src="https://unpkg.com/@vdoninja/sdk@${{ needs.version.outputs.new_version }}/vdoninja-sdk.min.js"></script>
+          
+          <!-- From GitHub CDN -->
+          <script src="https://cdn.jsdelivr.net/gh/steveseguin/ninjasdk@v${{ needs.version.outputs.new_version }}/vdoninja-sdk.min.js"></script>
           ```
           
           ### What's Changed
-          See [commit history](https://github.com/steveseguin/ninjasdk/commits/v${{ env.NEW_VERSION }}) for details.
+          See [commit history](https://github.com/steveseguin/ninjasdk/compare/v${{ needs.version.outputs.new_version }}...HEAD) for details.
           
         files: |
           vdoninja-sdk.js
           vdoninja-sdk.min.js
+          vdoninja-sdk-node.js
+          webrtc-adapter.js
+          package.json
           README.md
         draft: false
         prerelease: false

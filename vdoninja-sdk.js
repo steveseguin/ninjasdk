@@ -327,7 +327,7 @@
          * @returns {string} Current SDK version
          */
         static get VERSION() {
-            return '1.3.0'; // Added LLM-friendly property setters, salt documentation, and improved compatibility
+            return '1.3.5';
         }
         
         /**
