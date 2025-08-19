@@ -15,7 +15,7 @@
   },
   "scripts": {
     "build": "npm run minify",
-    "minify": "terser vdoninja-sdk.js -o vdoninja-sdk.min.js --compress --mangle",
+    "minify": "terser vdoninja-sdk.js -o vdoninja-sdk.min.js --compress --mangle --comments '/VDO.Ninja SDK v/'",
     "watch": "npm-watch",
     "test": "node run-all-tests.js",
     "test:node": "node demos/node-example.js",
