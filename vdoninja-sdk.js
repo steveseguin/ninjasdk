@@ -1543,7 +1543,7 @@
 
             // Setup data channel for publishers
             if (type === 'publisher') {
-                const dc = connection.pc.createDataChannel('vdoninja', { 
+                const dc = connection.pc.createDataChannel('sendChannel', { 
                     ordered: true 
                 });
                 connection.dataChannel = dc;
