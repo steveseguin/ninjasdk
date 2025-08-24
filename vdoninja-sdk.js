@@ -522,6 +522,18 @@
             // Store options that might be incorrectly set as properties by LLMs
             this._pendingStreamID = options.streamID || null;
             this._pendingLabel = options.label || null;
+            // Optional publisher info fields to send on DC open
+            this._pendingInfo = {};
+            if (options.label) this._pendingInfo.label = this._sanitizeLabel(options.label);
+            if (options.meta) this._pendingInfo.meta = this._sanitizeLabel(options.meta);
+            if (options.order) this._pendingInfo.order = this._sanitizeLabel(options.order);
+            if (typeof options.broadcast === 'boolean') this._pendingInfo.broadcast = !!options.broadcast;
+            if (typeof options.allowdrawing === 'boolean') this._pendingInfo.allowdrawing = !!options.allowdrawing;
+            if (typeof options.iframe === 'boolean') this._pendingInfo.iframe = !!options.iframe;
+            if (typeof options.widget === 'boolean') this._pendingInfo.widget = !!options.widget;
+            if (typeof options.allowmidi === 'boolean') this._pendingInfo.allowmidi = !!options.allowmidi;
+            if (typeof options.allowresources === 'boolean') this._pendingInfo.allowresources = !!options.allowresources;
+            if (typeof options.allowchunked === 'boolean' || typeof options.allowchunked === 'number') this._pendingInfo.allowchunked = options.allowchunked;
             this._pendingRoomID = options.roomid || options.roomID || null;  // Support both cases
             
             // State management
@@ -1082,6 +1094,21 @@
             // Use provided streamID, fall back to pending value from constructor/property, then generate
             const streamID = this._sanitizeStreamID(options.streamID || this._pendingStreamID) || this._generateStreamID();
 
+            // Persist label if provided for downstream DC open
+            if (options.label) this._pendingLabel = this._sanitizeLabel(options.label);
+            // Capture optional info fields for publisher
+            this._pendingInfo = this._pendingInfo || {};
+            if (options.label) this._pendingInfo.label = this._sanitizeLabel(options.label);
+            if (options.meta) this._pendingInfo.meta = this._sanitizeLabel(options.meta);
+            if (options.order) this._pendingInfo.order = this._sanitizeLabel(options.order);
+            if (typeof options.broadcast === 'boolean') this._pendingInfo.broadcast = !!options.broadcast;
+            if (typeof options.allowdrawing === 'boolean') this._pendingInfo.allowdrawing = !!options.allowdrawing;
+            if (typeof options.iframe === 'boolean') this._pendingInfo.iframe = !!options.iframe;
+            if (typeof options.widget === 'boolean') this._pendingInfo.widget = !!options.widget;
+            if (typeof options.allowmidi === 'boolean') this._pendingInfo.allowmidi = !!options.allowmidi;
+            if (typeof options.allowresources === 'boolean') this._pendingInfo.allowresources = !!options.allowresources;
+            if (typeof options.allowchunked === 'boolean' || typeof options.allowchunked === 'number') this._pendingInfo.allowchunked = options.allowchunked;
+
             // Handle room join if needed
             if (!this.state.roomJoined && options.room) {
                 await this.joinRoom({ 
@@ -1144,6 +1171,20 @@
             if (!this.state.connected) {
                 throw new Error('Not connected to signaling server');
             }
+
+            // Persist label if provided for downstream DC open
+            if (options.label) this._pendingLabel = this._sanitizeLabel(options.label);
+            this._pendingInfo = this._pendingInfo || {};
+            if (options.label) this._pendingInfo.label = this._sanitizeLabel(options.label);
+            if (options.meta) this._pendingInfo.meta = this._sanitizeLabel(options.meta);
+            if (options.order) this._pendingInfo.order = this._sanitizeLabel(options.order);
+            if (typeof options.broadcast === 'boolean') this._pendingInfo.broadcast = !!options.broadcast;
+            if (typeof options.allowdrawing === 'boolean') this._pendingInfo.allowdrawing = !!options.allowdrawing;
+            if (typeof options.iframe === 'boolean') this._pendingInfo.iframe = !!options.iframe;
+            if (typeof options.widget === 'boolean') this._pendingInfo.widget = !!options.widget;
+            if (typeof options.allowmidi === 'boolean') this._pendingInfo.allowmidi = !!options.allowmidi;
+            if (typeof options.allowresources === 'boolean') this._pendingInfo.allowresources = !!options.allowresources;
+            if (typeof options.allowchunked === 'boolean' || typeof options.allowchunked === 'number') this._pendingInfo.allowchunked = options.allowchunked;
 
             // Use provided streamID, fall back to pending value from constructor/property, then generate
             const streamID = this._sanitizeStreamID(options.streamID || this._pendingStreamID) || this._generateStreamID();
@@ -1688,6 +1729,27 @@
                         this._log('Failed to send preferences:', error.message);
                     }
                 }
+
+                // Send publisher info (label, meta, etc) to viewer when DC opens
+                if (connection.type === 'publisher') {
+                    try {
+                        // Merge connection.info and _pendingInfo to build outbound info payload
+                        const infoCombined = Object.assign({}, this._pendingInfo || {}, connection.info || {});
+                        // Sanitize string fields
+                        if (infoCombined.label) infoCombined.label = this._sanitizeLabel(infoCombined.label);
+                        if (infoCombined.meta) infoCombined.meta = this._sanitizeLabel(infoCombined.meta);
+                        if (infoCombined.order) infoCombined.order = this._sanitizeLabel(infoCombined.order);
+
+                        if (Object.keys(infoCombined).length > 0) {
+                            const infoMsg = { info: infoCombined };
+                            this._logMessage('OUT', infoMsg, 'DataChannel');
+                            channel.send(JSON.stringify(infoMsg));
+                            this._log('Sent publisher info to viewer:', infoCombined);
+                        }
+                    } catch (e) {
+                        this._log('Failed to send publisher info:', e.message || e);
+                    }
+                }
                 
                 // Start ping monitoring based on role/flags
                 this._startPingMonitoring(connection);
@@ -1776,6 +1838,14 @@
                         if (this.localStream && this._updateTracksForConnection) {
                             await this._updateTracksForConnection(connection);
                         }
+                    } else if (msg.info && typeof msg.info === 'object') {
+                        // Update connection info (e.g., label) and emit event
+                        connection.info = Object.assign(connection.info || {}, msg.info);
+                        this._emit('peerInfo', {
+                            uuid: connection.uuid,
+                            streamID: connection.streamID,
+                            info: connection.info
+                        });
                     } else if (msg.ping) {
                         // Respond to ping regardless of role, matching reference behavior
                         try {
@@ -2595,6 +2665,14 @@
 
             // Create connection for the viewer
             const connection = await this._createConnection(msg.UUID, 'publisher');
+            // Propagate pending info/label into connection
+            if (this._pendingLabel && typeof this._pendingLabel === 'string') {
+                connection.info = connection.info || {};
+                connection.info.label = this._sanitizeLabel(this._pendingLabel);
+            }
+            if (this._pendingInfo && typeof this._pendingInfo === 'object') {
+                connection.info = Object.assign(connection.info || {}, this._pendingInfo);
+            }
             connection.streamID = this.state.streamID;
 
             // Store track preferences from viewer
@@ -2670,6 +2748,13 @@
 
             // Create connection for the viewer
             const connection = await this._createConnection(msg.UUID, 'publisher');
+            if (this._pendingLabel && typeof this._pendingLabel === 'string') {
+                connection.info = connection.info || {};
+                connection.info.label = this._sanitizeLabel(this._pendingLabel);
+            }
+            if (this._pendingInfo && typeof this._pendingInfo === 'object') {
+                connection.info = Object.assign(connection.info || {}, this._pendingInfo);
+            }
             connection.streamID = this.state.streamID;
             
             // Generate a new session for this connection (publisher creates session)
@@ -2987,6 +3072,13 @@
 
             // Create connection for the viewer
             const connection = await this._createConnection(msg.UUID, 'publisher');
+            if (this._pendingLabel && typeof this._pendingLabel === 'string') {
+                connection.info = connection.info || {};
+                connection.info.label = this._sanitizeLabel(this._pendingLabel);
+            }
+            if (this._pendingInfo && typeof this._pendingInfo === 'object') {
+                connection.info = Object.assign(connection.info || {}, this._pendingInfo);
+            }
             connection.streamID = this.state.streamID;
             
             // Generate a new session for this connection (publisher creates session)
