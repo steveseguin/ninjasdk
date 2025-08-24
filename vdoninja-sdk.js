@@ -2399,11 +2399,14 @@
         async _handleOfferSDP(msg) {
             this._log('Handling offer from:', msg.UUID, 'session:', msg.session);
 
+            // Normalize streamID to original (strip hash suffix if present)
+            const cleanStreamID = this._stripHashFromStreamID(msg.streamID);
+
             // Check if we have an existing viewer connection with different session
             const existingConnections = this.connections.get(msg.UUID);
             if (existingConnections && existingConnections.viewer) {
                 const existingConnection = existingConnections.viewer;
-                if (existingConnection.streamID === msg.streamID && 
+                if (existingConnection.streamID === cleanStreamID && 
                     existingConnection.session && existingConnection.session !== msg.session) {
                     this._log('Found existing connection with different session:', existingConnection.session, 'vs', msg.session);
                     this._log('Closing old connection due to session mismatch');
@@ -2417,11 +2420,11 @@
 
             // Create new connection
             const connection = await this._createConnection(msg.UUID, 'viewer');
-            connection.streamID = msg.streamID;
+            connection.streamID = cleanStreamID;
             connection.session = msg.session;  // Store the publisher's session
             
             // Check if we have pending view preferences for this streamID
-            const pendingView = this._pendingViews.get(msg.streamID);
+            const pendingView = this._pendingViews.get(cleanStreamID);
             if (pendingView && pendingView.options) {
                 connection.viewPreferences = {
                     audio: pendingView.options.audio !== false,
@@ -2446,7 +2449,7 @@
                 this._log('No pending view found, using default preferences:', connection.viewPreferences);
             }
             
-            this._log(`Created viewer connection for offer - UUID: ${msg.UUID}, streamID: ${msg.streamID}, session: ${msg.session}`);
+            this._log(`Created viewer connection for offer - UUID: ${msg.UUID}, streamID: ${cleanStreamID}, session: ${msg.session}`);
 
             try {
                 // Set remote description
@@ -2781,7 +2784,10 @@
         async _handlePlayRequest(msg) {
             this._log('Received play request for:', msg.streamID, 'from:', msg.UUID);
 
-            if (!this.state.publishing || this.state.streamID !== msg.streamID) {
+            // Normalize requested streamID (strip hash suffix if present)
+            const requestedStream = this._stripHashFromStreamID(msg.streamID);
+
+            if (!this.state.publishing || this.state.streamID !== requestedStream) {
                 this._log('Not publishing this stream');
                 return;
             }
@@ -4388,8 +4394,9 @@
         sendData(data, target = null) {
             const msg = { pipe: data };
             let allowFallback = false;  // Default to false for true P2P
-            // Default to publisher-only when broadcasting (prevents duplicates in dual-connection setups)
-            let preference = (target === null) ? 'publisher' : 'any';
+            // Default to any-channel; SDK will try publisher first, then viewer.
+            // Do NOT assign the entire target as a preference (target may be a UUID or options object).
+            let preference = 'any';
             
             // Handle different parameter formats
             if (typeof target === 'string') {
