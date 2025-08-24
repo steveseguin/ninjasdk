@@ -534,6 +534,20 @@
             if (typeof options.allowmidi === 'boolean') this._pendingInfo.allowmidi = !!options.allowmidi;
             if (typeof options.allowresources === 'boolean') this._pendingInfo.allowresources = !!options.allowresources;
             if (typeof options.allowchunked === 'boolean' || typeof options.allowchunked === 'number') this._pendingInfo.allowchunked = options.allowchunked;
+            // Also accept a nested info object for convenience
+            if (options.info && typeof options.info === 'object') {
+                const inf = options.info;
+                if (inf.label) { this._pendingInfo.label = this._sanitizeLabel(inf.label); this._pendingLabel = this._pendingInfo.label; }
+                if (inf.meta) this._pendingInfo.meta = this._sanitizeLabel(inf.meta);
+                if (inf.order) this._pendingInfo.order = this._sanitizeLabel(inf.order);
+                if (typeof inf.broadcast === 'boolean') this._pendingInfo.broadcast = !!inf.broadcast;
+                if (typeof inf.allowdrawing === 'boolean') this._pendingInfo.allowdrawing = !!inf.allowdrawing;
+                if (typeof inf.iframe === 'boolean') this._pendingInfo.iframe = !!inf.iframe;
+                if (typeof inf.widget === 'boolean') this._pendingInfo.widget = !!inf.widget;
+                if (typeof inf.allowmidi === 'boolean') this._pendingInfo.allowmidi = !!inf.allowmidi;
+                if (typeof inf.allowresources === 'boolean') this._pendingInfo.allowresources = !!inf.allowresources;
+                if (typeof inf.allowchunked === 'boolean' || typeof inf.allowchunked === 'number') this._pendingInfo.allowchunked = inf.allowchunked;
+            }
             this._pendingRoomID = options.roomid || options.roomID || null;  // Support both cases
             
             // State management
@@ -1108,6 +1122,19 @@
             if (typeof options.allowmidi === 'boolean') this._pendingInfo.allowmidi = !!options.allowmidi;
             if (typeof options.allowresources === 'boolean') this._pendingInfo.allowresources = !!options.allowresources;
             if (typeof options.allowchunked === 'boolean' || typeof options.allowchunked === 'number') this._pendingInfo.allowchunked = options.allowchunked;
+            if (options.info && typeof options.info === 'object') {
+                const inf = options.info;
+                if (inf.label) { this._pendingInfo.label = this._sanitizeLabel(inf.label); this._pendingLabel = this._pendingInfo.label; }
+                if (inf.meta) this._pendingInfo.meta = this._sanitizeLabel(inf.meta);
+                if (inf.order) this._pendingInfo.order = this._sanitizeLabel(inf.order);
+                if (typeof inf.broadcast === 'boolean') this._pendingInfo.broadcast = !!inf.broadcast;
+                if (typeof inf.allowdrawing === 'boolean') this._pendingInfo.allowdrawing = !!inf.allowdrawing;
+                if (typeof inf.iframe === 'boolean') this._pendingInfo.iframe = !!inf.iframe;
+                if (typeof inf.widget === 'boolean') this._pendingInfo.widget = !!inf.widget;
+                if (typeof inf.allowmidi === 'boolean') this._pendingInfo.allowmidi = !!inf.allowmidi;
+                if (typeof inf.allowresources === 'boolean') this._pendingInfo.allowresources = !!inf.allowresources;
+                if (typeof inf.allowchunked === 'boolean' || typeof inf.allowchunked === 'number') this._pendingInfo.allowchunked = inf.allowchunked;
+            }
 
             // Handle room join if needed
             if (!this.state.roomJoined && options.room) {
@@ -1185,6 +1212,19 @@
             if (typeof options.allowmidi === 'boolean') this._pendingInfo.allowmidi = !!options.allowmidi;
             if (typeof options.allowresources === 'boolean') this._pendingInfo.allowresources = !!options.allowresources;
             if (typeof options.allowchunked === 'boolean' || typeof options.allowchunked === 'number') this._pendingInfo.allowchunked = options.allowchunked;
+            if (options.info && typeof options.info === 'object') {
+                const inf = options.info;
+                if (inf.label) { this._pendingInfo.label = this._sanitizeLabel(inf.label); this._pendingLabel = this._pendingInfo.label; }
+                if (inf.meta) this._pendingInfo.meta = this._sanitizeLabel(inf.meta);
+                if (inf.order) this._pendingInfo.order = this._sanitizeLabel(inf.order);
+                if (typeof inf.broadcast === 'boolean') this._pendingInfo.broadcast = !!inf.broadcast;
+                if (typeof inf.allowdrawing === 'boolean') this._pendingInfo.allowdrawing = !!inf.allowdrawing;
+                if (typeof inf.iframe === 'boolean') this._pendingInfo.iframe = !!inf.iframe;
+                if (typeof inf.widget === 'boolean') this._pendingInfo.widget = !!inf.widget;
+                if (typeof inf.allowmidi === 'boolean') this._pendingInfo.allowmidi = !!inf.allowmidi;
+                if (typeof inf.allowresources === 'boolean') this._pendingInfo.allowresources = !!inf.allowresources;
+                if (typeof inf.allowchunked === 'boolean' || typeof inf.allowchunked === 'number') this._pendingInfo.allowchunked = inf.allowchunked;
+            }
 
             // Use provided streamID, fall back to pending value from constructor/property, then generate
             const streamID = this._sanitizeStreamID(options.streamID || this._pendingStreamID) || this._generateStreamID();
@@ -4348,7 +4388,8 @@
         sendData(data, target = null) {
             const msg = { pipe: data };
             let allowFallback = false;  // Default to false for true P2P
-            let preference = 'any'; // Default preference: publisher first with fallback
+            // Default to publisher-only when broadcasting (prevents duplicates in dual-connection setups)
+            let preference = (target === null) ? 'publisher' : 'any';
             
             // Handle different parameter formats
             if (typeof target === 'string') {

@@ -263,8 +263,8 @@ peerA.sendData("Hello", { preference: 'all' });  // peerB receives TWICE
 The SDK intelligently routes messages to prevent duplicates when dual connections exist:
 
 ```javascript
-// Default behavior (no options needed)
-peer.sendData(data);  // Uses 'any' preference: publisher channel first, viewer if needed
+// Default behavior (no target): uses publisher-only to avoid duplicates
+peer.sendData(data);  // Sends via publisher channel only when broadcasting
 
 // Explicit channel selection (optional)
 peer.sendData(data, { preference: 'publisher' });  // ONLY use publisher channel
@@ -278,7 +278,8 @@ peer.sendData(data, { uuid: "...", preference: 'viewer' }); // Force viewer chan
 ```
 
 **Preference options:**
-- `'any'` **(default)**: Try publisher channel first, automatically fallback to viewer if needed
+- `'publisher'` **(default when no target)**: Use ONLY publisher channel
+- `'any'`: Try publisher first, automatically fallback to viewer if needed
 - `'publisher'`: Use ONLY publisher channel (no fallback)
 - `'viewer'`: Use ONLY viewer channel (no fallback)
 - `'all'`: Send via ALL available connections (intentional duplicates)
@@ -363,7 +364,11 @@ When a publisher’s data channel (label `sendChannel`) opens, the SDK sends a p
 }}
 ```
 
-Provide these in `publish()`/`announce()` options. The viewer receives `peerInfo` with the merged `info` object.
+Provide these in `publish()`/`announce()` options. You can either:
+- Pass fields at the top level: `{ label, meta, order, ... }`
+- Or pass an `info` object: `{ info: { label, meta, order, ... } }`
+
+The viewer receives `peerInfo` with the merged `info` object.
 
 vdo.addEventListener('peerConnected', (event) => {
     const { uuid, connection } = event.detail;
