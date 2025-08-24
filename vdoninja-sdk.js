@@ -455,6 +455,33 @@
         }
         
         /**
+         * Determine the effective password to use for hashing/encryption
+         * - false or null: explicitly disabled -> return null
+         * - undefined or empty string: use default "someEncryptionKey123"
+         * - otherwise: use current password string
+         * @private
+         * @returns {string|null} Effective password or null if disabled
+         */
+        _getEffectivePassword() {
+            if (this.password === false || this.password === null) {
+                return null; // explicitly disabled
+            }
+            if (this.password === undefined || this.password === "") {
+                return "someEncryptionKey123";
+            }
+            // Ensure string and trimmed
+            let pwd = this.password;
+            if (typeof pwd !== 'string') {
+                pwd = String(pwd);
+            }
+            pwd = pwd.trim();
+            if (pwd.length < 1) {
+                return "someEncryptionKey123";
+            }
+            return pwd;
+        }
+        
+        /**
          * Create a new VDONinjaSDK instance
          * @param {Object} options - Configuration options
          * @param {string} options.host - WebSocket signaling server URL (default: 'wss://wss.vdo.ninja')
@@ -470,6 +497,8 @@
          * @param {Array} options.stunServers - STUN server configuration (default: Google & VDO.Ninja STUN)
          * @param {number} options.maxReconnectAttempts - Maximum reconnection attempts (default: 5)
          * @param {number} options.reconnectDelay - Initial reconnection delay in ms (default: 1000)
+         * @param {boolean} options.autoPingViewer - Enable viewer-side auto ping (default: false)
+         * @param {number} options.autoPingInterval - Auto ping interval in ms (default: 10000)
          */
         constructor(options = {}) {
             super();
@@ -559,6 +588,10 @@
             // Initialize salt before setting up crypto
             this.salt = options.salt || "vdo.ninja";
             this._saltProvidedViaOptions = !!options.salt;
+            
+            // Auto-ping settings (viewer-only)
+            this.autoPingViewer = options.autoPingViewer || false;
+            this.autoPingInterval = options.autoPingInterval || 10000;
             
             // Setup crypto utilities
             this._setupCryptoUtils();
@@ -656,7 +689,16 @@
             if (options.host) this.host = options.host;
             if (options.room) this.room = this._sanitizeRoomName(options.room);
             else if (this._pendingRoomID) this.room = this._sanitizeRoomName(this._pendingRoomID);
-            if (options.password !== undefined) this.password = options.password;
+            // Sanitize and apply password only if explicitly provided
+            if (options.password !== undefined) {
+                if (options.password === false) {
+                    this.password = false;
+                } else if (options.password === null || options.password === '') {
+                    this.password = this._sanitizePassword("someEncryptionKey123");
+                } else {
+                    this.password = this._sanitizePassword(options.password);
+                }
+            }
             
             return new Promise((resolve, reject) => {
                 try {
@@ -952,8 +994,9 @@
 
             // Hash room name if password is not explicitly false
             let hashedRoom = room;
-            if (this.password !== false && this.password !== null) {
-                hashedRoom = await this._hashRoom(room, this.password);
+            const __effectivePasswordForRoom = this._getEffectivePassword();
+            if (__effectivePasswordForRoom !== null) {
+                hashedRoom = await this._hashRoom(room, __effectivePasswordForRoom);
             }
 
             this._log('Joining room:', room, 'with hash:', hashedRoom);
@@ -1049,10 +1092,11 @@
 
             // Generate hashed streamID
             let hashedStreamID = streamID;
-            if (this.password !== false && this.password !== null) {
-                // Use default password if empty string
-                const effectivePassword = (this.password === '' || this.password === undefined) ? "someEncryptionKey123" : this.password;
-                hashedStreamID = await this._hashStreamID(streamID, effectivePassword);
+            {
+                const __effectivePassword = this._getEffectivePassword();
+                if (__effectivePassword !== null) {
+                    hashedStreamID = await this._hashStreamID(streamID, __effectivePassword);
+                }
             }
 
             this._log('Publishing with streamID:', streamID, 'as:', hashedStreamID);
@@ -1114,10 +1158,11 @@
 
             // Generate hashed streamID
             let hashedStreamID = streamID;
-            if (this.password !== false && this.password !== null) {
-                // Use default password if empty string
-                const effectivePassword = (this.password === '' || this.password === undefined) ? "someEncryptionKey123" : this.password;
-                hashedStreamID = await this._hashStreamID(streamID, effectivePassword);
+            {
+                const __effectivePassword = this._getEffectivePassword();
+                if (__effectivePassword !== null) {
+                    hashedStreamID = await this._hashStreamID(streamID, __effectivePassword);
+                }
             }
 
             this._log('Announcing availability with streamID:', streamID, 'as:', hashedStreamID);
@@ -1261,10 +1306,11 @@
             try {
                 // Hash the streamID if password is set
                 let hashedStreamID = streamID;
-                if (this.password !== false && this.password !== null) {
-                    // Use default password if empty string
-                    const effectivePassword = (this.password === '' || this.password === undefined) ? "someEncryptionKey123" : this.password;
-                    hashedStreamID = await this._hashStreamID(streamID, effectivePassword);
+                {
+                    const __effectivePassword = this._getEffectivePassword();
+                    if (__effectivePassword !== null) {
+                        hashedStreamID = await this._hashStreamID(streamID, __effectivePassword);
+                    }
                 }
                 
                 // Track pending view so we know we initiated this
@@ -1643,10 +1689,8 @@
                     }
                 }
                 
-                // Start ping monitoring for publisher connections
-                if (connection.type === 'publisher') {
-                    this._startPingMonitoring(connection);
-                }
+                // Start ping monitoring based on role/flags
+                this._startPingMonitoring(connection);
                 
                 this._emit('dataChannelOpen', {
                     uuid: connection.uuid,
@@ -1733,33 +1777,26 @@
                             await this._updateTracksForConnection(connection);
                         }
                     } else if (msg.ping) {
-                        // Viewers respond to publisher pings with pong
-                        if (connection.type === 'viewer') {
-                            try {
-                                this._sendDataInternal({ pong: msg.ping }, connection.uuid, null, 'publisher');
-                                this._log('Sent pong response to publisher');
-                            } catch (error) {
-                                this._log('Failed to send pong:', error.message);
-                            }
+                        // Respond to ping regardless of role, matching reference behavior
+                        try {
+                            this._sendDataInternal({ pong: msg.ping }, connection.uuid, null, 'any');
+                            this._log('Sent pong response');
+                        } catch (error) {
+                            this._log('Failed to send pong:', error.message);
                         }
                     } else if (msg.pong) {
-                        // Publishers receive pong responses from viewers
-                        if (connection.type === 'publisher') {
-                            const latency = Date.now() - msg.pong;
-                            
-                            // Clear pending ping and reset missed counter
-                            if (connection.pendingPing === msg.pong) {
-                                connection.pendingPing = null;
-                                connection.missedPings = 0;
-                            }
-                            
-                            this._emit('peerLatency', { 
-                                uuid: connection.uuid, 
-                                latency: latency,
-                                streamID: connection.streamID 
-                            });
-                            this._log(`Latency to viewer ${connection.uuid}: ${latency}ms`);
+                        // Handle pong for either role (whoever initiated ping)
+                        const latency = Date.now() - msg.pong;
+                        if (connection.pendingPing === msg.pong) {
+                            connection.pendingPing = null;
+                            connection.missedPings = 0;
                         }
+                        this._emit('peerLatency', { 
+                            uuid: connection.uuid, 
+                            latency: latency,
+                            streamID: connection.streamID 
+                        });
+                        this._log(`Latency to ${connection.type === 'publisher' ? 'viewer' : 'publisher'} ${connection.uuid}: ${latency}ms`);
                     } else if (msg.bye) {
                         this._log('Received bye message via data channel');
                         this._handleBye({ UUID: connection.uuid });
@@ -1798,24 +1835,26 @@
                             };
                             
                             // Encrypt and send via data channel
-                            if (this.password && this.password !== false) {
+                            if (this._getEffectivePassword() !== null) {
                                 try {
                                     const [encrypted, vector] = await this._encryptMessage(JSON.stringify(offer));
-                                    const restartMsg = { 
-                                        description: encrypted,
-                                        vector: vector,
-                                        session: connection.session
-                                    };
+                            const restartMsg = { 
+                                UUID: connection.uuid,
+                                description: encrypted,
+                                vector: vector,
+                                session: connection.session
+                            };
                                     this._logMessage('OUT', restartMsg, 'DataChannel');
                                     channel.send(JSON.stringify(restartMsg));
                                 } catch (error) {
                                     this._log('Failed to encrypt offer for ICE restart:', error);
                                 }
                             } else {
-                                const restartMsg = { 
-                                    description: offer,
-                                    session: connection.session
-                                };
+                            const restartMsg = { 
+                                UUID: connection.uuid,
+                                description: offer,
+                                session: connection.session
+                            };
                                 this._logMessage('OUT', restartMsg, 'DataChannel');
                                 channel.send(JSON.stringify(restartMsg));
                             }
@@ -1953,7 +1992,8 @@
                 return;
             }
 
-            // Try data channel first for individual candidates
+            // Try data channel first for individual candidates; if it succeeds, do NOT also send via WebSocket.
+            // This matches reference webrtc.js behavior: once DC is open, signaling uses DC instead of WSS.
             if (connection.dataChannel && connection.dataChannel.readyState === 'open') {
                 try {
                     const msg = {
@@ -1961,13 +2001,28 @@
                     // - If we are a VIEWER, we send type:'remote' (going TO publisher's pcs)
                     // - If we are a PUBLISHER, we send type:'local' (going TO viewer's rpcs)
                     type: connection.type === 'viewer' ? 'remote' : 'local',
-                        candidates: [{
-                            candidate: event.candidate.candidate,
-                            sdpMLineIndex: event.candidate.sdpMLineIndex,
-                            sdpMid: event.candidate.sdpMid
-                        }],
+                        UUID: connection.uuid,
+                        candidates: null,
                         session: connection.session
                     };
+                    // Encrypt candidates for DC if password set (match webrtc.js behavior)
+                    const candidatesArr = [{
+                        candidate: event.candidate.candidate,
+                        sdpMLineIndex: event.candidate.sdpMLineIndex,
+                        sdpMid: event.candidate.sdpMid
+                    }];
+                    if (this._getEffectivePassword() !== null) {
+                        try {
+                            const [encrypted, vector] = await this._encryptMessage(JSON.stringify(candidatesArr));
+                            msg.candidates = encrypted;
+                            msg.vector = vector;
+                        } catch (e) {
+                            // Fall back to plaintext if encryption fails
+                            msg.candidates = candidatesArr;
+                        }
+                    } else {
+                        msg.candidates = candidatesArr;
+                    }
                     this._logMessage('OUT', msg, 'DataChannel');
                     connection.dataChannel.send(JSON.stringify(msg));
                     this._log('Sent ICE via data channel');
@@ -2011,7 +2066,7 @@
                 connection.iceBundleDelay = Math.min(1000, connection.iceBundleDelay * 2);
 
                 // Encrypt candidates if password is set
-                if (this.password && this.password !== false && this.password !== null && this.password !== '') {
+                if (this._getEffectivePassword() !== null) {
                     try {
                         const [encrypted, vector] = await this._encryptMessage(JSON.stringify(candidates));
                         bundleMsg.candidates = encrypted;
@@ -2208,7 +2263,7 @@
          */
         async _handleSDP(msg) {
             // Check if description is encrypted
-            if (this.password && msg.vector && typeof msg.description === 'string') {
+            if (this._getEffectivePassword() !== null && msg.vector && typeof msg.description === 'string') {
                 try {
                     const decrypted = await this._decryptMessage(msg.description, msg.vector);
                     msg.description = JSON.parse(decrypted);
@@ -2297,7 +2352,7 @@
                 };
 
                 // Encrypt description if password is set
-                if (this.password && this.password !== false && this.password !== null && this.password !== '') {
+                if (this._getEffectivePassword() !== null) {
                     try {
                         const [encrypted, vector] = await this._encryptMessage(JSON.stringify(answer));
                         answerMsg.description = encrypted;
@@ -2314,7 +2369,7 @@
                 // Try data channel first, fall back to WebSocket
                 if (connection.dataChannel && connection.dataChannel.readyState === 'open') {
                     // For data channel, we need to handle encryption differently
-                    if (this.password && this.password !== false && this.password !== null && this.password !== '') {
+                    if (this._getEffectivePassword() !== null) {
                         const dcMsg = { 
                             description: answerMsg.description,
                             vector: answerMsg.vector 
@@ -2385,7 +2440,7 @@
          */
         async _handleRemoteICECandidate(msg) {
             // Check if candidate is encrypted
-            if (this.password && msg.vector && typeof msg.candidate === 'string') {
+            if (this._getEffectivePassword() !== null && msg.vector && typeof msg.candidate === 'string') {
                 try {
                     const decrypted = await this._decryptMessage(msg.candidate, msg.vector);
                     msg.candidate = JSON.parse(decrypted);
@@ -2458,7 +2513,7 @@
          */
         async _handleRemoteICECandidates(msg) {
             // Check if candidates are encrypted
-            if (this.password && msg.vector && typeof msg.candidates === 'string') {
+            if (this._getEffectivePassword() !== null && msg.vector && typeof msg.candidates === 'string') {
                 try {
                     const decrypted = await this._decryptMessage(msg.candidates, msg.vector);
                     msg.candidates = JSON.parse(decrypted);
@@ -2552,10 +2607,23 @@
             try {
                 const offer = await this._createOffer(connection);
 
+                // Compute streamID to send (append hash suffix if encryption is enabled)
+                let streamIDToSend = this.state.streamID;
+                {
+                    const __effectivePassword = this._getEffectivePassword();
+                    if (__effectivePassword !== null) {
+                        // Ensure password hash exists
+                        if (!this._passwordHash) {
+                            this._passwordHash = await this._generateHash(__effectivePassword + this.salt, 6);
+                        }
+                        streamIDToSend = this.state.streamID + this._passwordHash;
+                    }
+                }
+
                 const offerMsg = {
                     UUID: this.state.uuid,
                     session: msg.session || connection.uuid,
-                    streamID: this.state.streamID
+                    streamID: streamIDToSend
                 };
 
                 // Store session IDs
@@ -2565,7 +2633,7 @@
                 }
 
                 // Encrypt description if password is set
-                if (this.password && this.password !== false && this.password !== null && this.password !== '') {
+                if (this._getEffectivePassword() !== null) {
                     try {
                         const [encrypted, vector] = await this._encryptMessage(JSON.stringify(offer));
                         offerMsg.description = encrypted;
@@ -2617,14 +2685,26 @@
             try {
                 const offer = await this._createOffer(connection);
 
+                // Compute streamID to send (append hash suffix if encryption is enabled)
+                let streamIDToSend2 = this.state.streamID;
+                {
+                    const __effectivePassword = this._getEffectivePassword();
+                    if (__effectivePassword !== null) {
+                        if (!this._passwordHash) {
+                            this._passwordHash = await this._generateHash(__effectivePassword + this.salt, 6);
+                        }
+                        streamIDToSend2 = this.state.streamID + this._passwordHash;
+                    }
+                }
+
                 const offerMsg = {
                     UUID: msg.UUID,  // Target UUID for routing
                     session: connection.session,  // Use the connection's session
-                    streamID: this.state.streamID
+                    streamID: streamIDToSend2
                 };
 
                 // Encrypt description if password is set
-                if (this.password && this.password !== false && this.password !== null && this.password !== '') {
+                if (this._getEffectivePassword() !== null) {
                     try {
                         const [encrypted, vector] = await this._encryptMessage(JSON.stringify(offer));
                         offerMsg.description = encrypted;
@@ -2916,12 +2996,38 @@
             try {
                 const offer = await this._createOffer(connection);
 
+                // Compute streamID to send (append hash suffix if encryption is enabled)
+                let streamIDToSend3 = this.state.streamID;
+                {
+                    const __effectivePassword = this._getEffectivePassword();
+                    if (__effectivePassword !== null) {
+                        if (!this._passwordHash) {
+                            this._passwordHash = await this._generateHash(__effectivePassword + this.salt, 6);
+                        }
+                        streamIDToSend3 = this.state.streamID + this._passwordHash;
+                    }
+                }
+
                 const offerMsg = {
-                    description: offer,
                     UUID: msg.UUID,  // Target UUID for routing
                     session: connection.session,  // Use the connection's session
-                    streamID: this.state.streamID
+                    streamID: streamIDToSend3
                 };
+
+                // Encrypt description if password is set
+                if (this._getEffectivePassword() !== null) {
+                    try {
+                        const [encrypted, vector] = await this._encryptMessage(JSON.stringify(offer));
+                        offerMsg.description = encrypted;
+                        offerMsg.vector = vector;
+                        this._log('Encrypted offer SDP');
+                    } catch (error) {
+                        this._log('Failed to encrypt offer:', error);
+                        offerMsg.description = offer;
+                    }
+                } else {
+                    offerMsg.description = offer;
+                }
 
                 this._sendMessageWS(offerMsg);
                 this._log('Sent offer to viewer with session:', connection.session);
@@ -3274,12 +3380,13 @@
          * @returns {Promise<[string, string]>} [encrypted data, vector] as hex strings
          */
         async _encryptMessage(message, phrase = null) {
-            if (!this.password || this.password === false || this.password === null || this.password === '') {
-                throw new Error('Password not set for encryption');
-            }
-
+            // Determine effective password unless a custom phrase is provided
             if (!phrase) {
-                phrase = this.password + this.salt;
+                const pass = this._getEffectivePassword();
+                if (pass === null) {
+                    throw new Error('Password not set for encryption');
+                }
+                phrase = pass + this.salt;
             }
 
             const vector = crypto.getRandomValues(new Uint8Array(16));
@@ -3322,12 +3429,13 @@
          * @returns {Promise<string>} Decrypted message
          */
         async _decryptMessage(encryptedData, vector, phrase = null) {
-            if (!this.password || this.password === false || this.password === null || this.password === '') {
-                throw new Error('Password not set for decryption');
-            }
-
+            // Determine effective password unless a custom phrase is provided
             if (!phrase) {
-                phrase = this.password + this.salt;
+                const pass = this._getEffectivePassword();
+                if (pass === null) {
+                    throw new Error('Password not set for decryption');
+                }
+                phrase = pass + this.salt;
             }
 
             const encryptedBytes = this._toByteArray(encryptedData);
@@ -3419,8 +3527,9 @@
          */
         async _getHashedRoom() {
             if (!this.state.room) return null;
-            if (this.password === false || this.password === null) return this.state.room;
-            return await this._hashRoom(this.state.room, this.password);
+            const pass = this._getEffectivePassword();
+            if (pass === null) return this.state.room;
+            return await this._hashRoom(this.state.room, pass);
         }
 
         // ============================================================================
@@ -3791,7 +3900,7 @@
                         };
                         
                         // Encrypt if needed
-                        if (this.password && this.password !== false && this.password !== null && this.password !== '') {
+                        if (this._getEffectivePassword() !== null) {
                             try {
                                 const [encrypted, vector] = await this._encryptMessage(JSON.stringify(offer));
                                 offerMsg.description = encrypted;
@@ -3859,7 +3968,7 @@
                             };
                             
                             // Encrypt if needed
-                            if (this.password && this.password !== false && this.password !== null && this.password !== '') {
+                            if (this._getEffectivePassword() !== null) {
                                 try {
                                     const [encrypted, vector] = await this._encryptMessage(JSON.stringify(offer));
                                     offerMsg.description = encrypted;
@@ -4202,41 +4311,32 @@
         }
         
         /**
-         * Send a ping to measure latency (PUBLISHER ONLY)
-         * Publishers can ping viewers to measure latency
-         * @param {string} uuid - Target UUID (optional, null = all viewers)
+         * Send a ping to measure latency (manual)
+         * By convention, viewers ping publishers; publishers reply with pong.
+         * This helper sends a ping on the data channel; use from the appropriate side.
+         * @param {string} uuid - Target UUID (optional, null = all peers by preference)
          * @returns {boolean} True if ping was sent
-         * 
-         * Note: Ping/pong messages are NEVER sent via WebSocket fallback
-         * as they are specifically for testing WebRTC data channel connectivity
+         * Note: Never uses WebSocket fallback.
          */
         sendPing(uuid = null) {
-            // Only publishers should send pings
-            if (!this.state.publishing) {
-                this._log('Warning: Only publishers should send pings');
-                return false;
-            }
-            
             const timestamp = Date.now();
             
             // If targeting specific viewer, update their pending ping
             if (uuid) {
                 const connections = this.connections.get(uuid);
-                if (connections && connections.publisher) {
-                    connections.publisher.pendingPing = timestamp;
-                }
+                if (connections && connections.publisher) connections.publisher.pendingPing = timestamp;
+                if (connections && connections.viewer) connections.viewer.pendingPing = timestamp;
             } else {
                 // Update all publisher connections
                 for (const [connUuid, connections] of this.connections) {
-                    if (connections.publisher) {
-                        connections.publisher.pendingPing = timestamp;
-                    }
+                    if (connections.publisher) connections.publisher.pendingPing = timestamp;
+                    if (connections.viewer) connections.viewer.pendingPing = timestamp;
                 }
             }
             
             // IMPORTANT: Never use fallback for ping/pong
             // The whole point is to test the WebRTC connection
-            return this._sendDataInternal({ ping: timestamp }, uuid, null, 'publisher', false);
+            return this._sendDataInternal({ ping: timestamp }, uuid, null, 'any', false);
         }
 
         // ============================================================================
@@ -4491,44 +4591,48 @@
          * @param {Object} connection - Connection to monitor
          */
         _startPingMonitoring(connection) {
-            // Only monitor publisher connections (viewers we're publishing to)
-            if (connection.type !== 'publisher' || !this.state.publishing) {
-                return;
-            }
-            
+            // Only auto-ping from viewer connections when enabled
+            if (!this.autoPingViewer) return;
+            if (!connection || connection.type !== 'viewer') return;
+
             // Clear any existing timer
             if (connection.pingTimer) {
                 clearInterval(connection.pingTimer);
             }
-            
+
             connection.pingTimer = setInterval(() => {
+                // Only if data channel is open
+                if (!connection.dataChannel || connection.dataChannel.readyState !== 'open') return;
+
                 const now = Date.now();
-                const timeSinceLastMessage = now - connection.lastMessageTime;
-                
-                // If we haven't received any message in 10 seconds
-                if (timeSinceLastMessage >= 10000) {
-                    // Check if we have a pending ping that wasn't answered
-                    if (connection.pendingPing) {
-                        connection.missedPings++;
-                        this._log(`Missed ping #${connection.missedPings} for viewer ${connection.uuid}`);
-                        
+
+                // If we have an unanswered ping for too long, count as missed and maybe restart ICE
+                if (connection.pendingPing) {
+                    const elapsed = now - connection.pendingPing;
+                    const timeoutMs = Math.max(this.autoPingInterval * 1.5, this.autoPingInterval + 5000);
+                    if (elapsed >= timeoutMs) {
+                        connection.missedPings = (connection.missedPings || 0) + 1;
+                        this._log(`Viewer auto-ping missed #${connection.missedPings} for ${connection.uuid}`);
+
                         if (connection.missedPings >= 2) {
-                            // After 2 missed pings (30 seconds), initiate ICE restart
-                            this._log(`Initiating ICE restart for viewer ${connection.uuid} after ${connection.missedPings} missed pings`);
+                            this._log(`Viewer initiating ICE restart after ${connection.missedPings} missed pings for ${connection.uuid}`);
                             this._initiateICERestart(connection);
-                            
-                            // Reset counters
+                            // Reset counters so we don't thrash
                             connection.missedPings = 0;
                             connection.pendingPing = null;
                             return;
                         }
+                        // Clear pendingPing to allow a new ping to be sent on next tick
+                        connection.pendingPing = null;
+                    } else {
+                        // Still waiting for pong
+                        return;
                     }
-                    
-                    // Send a ping
-                    this._log(`Sending automated ping to viewer ${connection.uuid} (${timeSinceLastMessage}ms since last message)`);
-                    this.sendPing(connection.uuid);
                 }
-            }, 10000); // Check every 10 seconds
+
+                // No pending ping; send a new one
+                this.sendPing(connection.uuid);
+            }, Math.max(1000, this.autoPingInterval));
         }
 
         /**
@@ -4565,14 +4669,26 @@
                 const offer = await connection.pc.createOffer({ iceRestart: true });
                 await connection.pc.setLocalDescription(offer);
                 
+                // Compute streamID to send for ICE restart via WebSocket
+                let streamIDToSend = connection.streamID;
+                {
+                    const __effectivePassword = this._getEffectivePassword();
+                    if (__effectivePassword !== null) {
+                        if (!this._passwordHash) {
+                            this._passwordHash = await this._generateHash(__effectivePassword + this.salt, 6);
+                        }
+                        streamIDToSend = connection.streamID + this._passwordHash;
+                    }
+                }
+
                 const offerMsg = {
                     UUID: connection.uuid,
                     session: connection.session,
-                    streamID: connection.streamID
+                    streamID: streamIDToSend
                 };
                 
                 // Send the new offer
-                if (this.password && this.password !== false && this.password !== null && this.password !== '') {
+                if (this._getEffectivePassword() !== null) {
                     try {
                         const [encrypted, vector] = await this._encryptMessage(JSON.stringify(offer));
                         offerMsg.description = encrypted;

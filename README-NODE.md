@@ -33,7 +33,9 @@ const VDONinjaSDK = require('./vdoninja-sdk-node.js');
 const sdk = new VDONinjaSDK({
     host: 'wss://wss.vdo.ninja',  // or 'wss://wss.socialstream.ninja' for overlays
     room: 'myroom',
-    password: false  // Set to false to disable password
+    password: false,           // Set to false to disable password; omit or "" to use default
+    salt: 'vdo.ninja',         // Recommended if viewers are on https://vdo.ninja
+    autoPingViewer: false      // Optional: enable viewer-side auto ping in Node viewers
 });
 
 // Connect and join room
@@ -92,11 +94,15 @@ node demos/socialstreamninja-listener.js roomname
 
 1. **Windows Subsystem for Linux (WSL)**: WebRTC may have issues in WSL due to UDP traffic limitations. Run Node.js directly on Windows for best results.
 
-2. **Password Parameter**: Use `password: false` (boolean) to disable password, not an empty string.
+2. **Password & Encryption**:
+   - Omit `password` or set `""` to use the default `"someEncryptionKey123"`.
+   - Set `password: false` to disable encryption entirely.
+   - With an effective password, SDP and ICE are encrypted and a `vector` is included; streamIDs gain a 6‑char hash suffix for compatibility with VDO.Ninja viewers.
 
-3. **Host Selection**: 
+3. **Salt & Host Selection**: 
    - Use `wss://wss.vdo.ninja` for general WebRTC streaming
    - Use `wss://wss.socialstream.ninja` for Social Stream Ninja chat consolidation
+   - Set `salt: 'vdo.ninja'` when you want streams to be viewable on https://vdo.ninja
 
 ## Troubleshooting
 

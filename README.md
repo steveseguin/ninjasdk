@@ -151,7 +151,9 @@ const vdo = new VDONinjaSDK({
     }],
     maxReconnectAttempts: 5,          // Maximum reconnection attempts
     reconnectDelay: 1000,             // Initial reconnection delay in ms
-    videoElement: null                // DOM element to auto-attach streams (optional)
+    videoElement: null,               // DOM element to auto-attach streams (optional)
+    autoPingViewer: false,            // Optional: auto ping from viewer side only
+    autoPingInterval: 10000           // Optional: viewer auto-ping interval (ms)
 });
 ```
 
@@ -293,6 +295,22 @@ const vdo = new VDONinjaSDK({
 // https://vdo.ninja/?view=YOUR_STREAM_ID
 ```
 
+## Password & Encryption
+
+- Default password: if `password` is `undefined`, `null`, or `""`, the SDK uses `"someEncryptionKey123"`.
+- Disable encryption explicitly with `password: false`.
+- When effective password is set, the SDK:
+  - Encrypts SDP and ICE (WebSocket and DataChannel) with AES‑CBC and includes a `vector`.
+  - Appends a 6‑char hex suffix to the streamID for hashing. Offers include this hashed streamID so viewers can match allow‑lists.
+- Set `salt: "vdo.ninja"` when you want streams to be viewable on https://vdo.ninja (affects hash compatibility).
+
+## Data Channel Signaling
+
+- The publisher creates a data channel named `sendChannel` (matching VDO.Ninja core).
+- Before the data channel opens, signaling uses WebSocket. After it opens, ICE is sent via DataChannel only (no duplication).
+- Pings are DC‑only: use `sendPing(uuid)` manually or enable viewer auto‑ping with `autoPingViewer: true`.
+```
+
 ## Event Listeners
 
 ```javascript
@@ -344,7 +362,7 @@ vdo.addEventListener('error', (event) => {
 
 ### Data Communication
 - `sendData(data, target)` - Send data with flexible targeting
-- `sendPing(uuid)` - Send ping (publishers only)
+- `sendPing(uuid)` - Send ping (manual; either role; DC-only)
 
 ### Track Management
 - `async addTrack(track, stream)` - Add track to publishers
