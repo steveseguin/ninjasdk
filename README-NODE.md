@@ -48,6 +48,26 @@ await sdk.view('streamID', {
     video: true,
     label: 'mylabel'  // Optional label for identification
 });
+
+// Publisher Info (optional) sent to viewers on DC open
+await sdk.publish(stream, {
+  streamID: 'node-pub-1',
+  label: 'Main Camera',
+  meta: 'Studio A',
+  order: '1',
+  broadcast: false,
+  allowdrawing: false,
+  iframe: false,
+  widget: false,
+  allowmidi: false,
+  allowresources: false,
+  allowchunked: true
+});
+
+// Viewers can listen for peer info updates
+sdk.addEventListener('peerInfo', (e) => {
+  console.log('Peer info:', e.detail.info);
+});
 ```
 
 ## WebRTC Adapter

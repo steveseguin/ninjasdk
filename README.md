@@ -170,7 +170,16 @@ vdo.disconnect();                    // Disconnect entirely
 await vdo.publish(mediaStream, {     // Publish media stream
     room: "myroom",                  // Optional if already in room
     streamID: "custom-id",           // Optional custom stream ID
-    label: "Main Camera"             // Optional label
+    label: "Main Camera",            // Optional label; sent to viewers on DC open
+    meta: "Desk Cam",                // Optional metadata string
+    order: "1",                      // Optional ordering hint
+    broadcast: false,                 // Optional flags (example set)
+    allowdrawing: false,
+    iframe: false,
+    widget: false,
+    allowmidi: false,
+    allowresources: false,
+    allowchunked: true                // true/false or 1/2 per your needs
 });
 await vdo.announce({ streamID: "myStreamID" }); // Data-only publisher
 await vdo.stopPublishing();          // Stop publishing
@@ -328,6 +337,33 @@ vdo.addEventListener('dataReceived', (event) => {
     const { data, uuid, streamID } = event.detail;
     console.log('Data received:', data, 'from:', uuid);
 });
+
+// Publisher and viewer info (e.g., labels)
+vdo.addEventListener('peerInfo', (event) => {
+    const { uuid, streamID, info } = event.detail;
+    console.log('Peer info updated:', uuid, streamID, info); // info.label available
+});
+
+## Publisher Info (Data Channel)
+
+When a publisher’s data channel (label `sendChannel`) opens, the SDK sends a publisher info payload to the viewer:
+
+```
+{ info: {
+    label: "Main Camera",   // optional string
+    meta: "Desk Cam",       // optional string
+    order: "1",             // optional string/number (stringified)
+    broadcast: false,        // optional boolean
+    allowdrawing: false,     // optional boolean
+    iframe: false,           // optional boolean
+    widget: false,           // optional boolean
+    allowmidi: false,        // optional boolean
+    allowresources: false,   // optional boolean
+    allowchunked: true       // optional boolean/number
+}}
+```
+
+Provide these in `publish()`/`announce()` options. The viewer receives `peerInfo` with the merged `info` object.
 
 vdo.addEventListener('peerConnected', (event) => {
     const { uuid, connection } = event.detail;

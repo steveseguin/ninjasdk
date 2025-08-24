@@ -39,7 +39,7 @@ const tests = [
 const wrtc = require('${webrtcLib}');
 const WebSocket = require('ws');
 const crypto = require('crypto');
-const VDONinjaSDK = require('./vdoninja-sdk.js');
+const VDONinjaSDK = require('./vdoninja-sdk-node.js');
 
 // Polyfills for Node.js
 global.WebSocket = WebSocket;
@@ -88,7 +88,7 @@ test();`
 const wrtc = require('${webrtcLib}');
 const WebSocket = require('ws');
 const crypto = require('crypto');
-const VDONinjaSDK = require('./vdoninja-sdk.js');
+const VDONinjaSDK = require('./vdoninja-sdk-node.js');
 
 // Polyfills for Node.js
 global.WebSocket = WebSocket;
@@ -174,7 +174,7 @@ test();`
 const wrtc = require('${webrtcLib}');
 const WebSocket = require('ws');
 const crypto = require('crypto');
-const VDONinjaSDK = require('./vdoninja-sdk.js');
+const VDONinjaSDK = require('./vdoninja-sdk-node.js');
 
 // Polyfills for Node.js
 global.WebSocket = WebSocket;
