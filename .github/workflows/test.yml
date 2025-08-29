@@ -355,15 +355,55 @@ jobs:
                 dp('[DP] peer2.view(PEER1_STREAM)');
                 await peer2.view(PEER1_STREAM);
                 
-                // Retry sending until the SDK confirms sent (up to 12s)
+                // Helper: wait until a data channel is open between peers
+                async function waitForOpenDC(sdk, uuid, timeoutMs = 15000) {
+                  const start = Date.now();
+                  return new Promise((resolve) => {
+                    const check = () => {
+                      try {
+                        for (const [id, conns] of sdk.connections || []) {
+                          if (uuid && id !== uuid) continue;
+                          for (const t of ['publisher','viewer']) {
+                            const c = conns[t];
+                            if (c && c.dataChannel && c.dataChannel.readyState === 'open') {
+                              return resolve(true);
+                            }
+                          }
+                        }
+                      } catch (e) {}
+                      if (Date.now() - start >= timeoutMs) return resolve(false);
+                      setTimeout(check, 200);
+                    };
+                    const onOpen = (e) => {
+                      if (!uuid || e.detail?.uuid === uuid) {
+                        resolve(true);
+                      }
+                    };
+                    try { sdk.addEventListener('dataChannelOpen', onOpen); } catch (e) {}
+                    check();
+                  });
+                }
+
+                // If we know peer2's UUID, wait for DC to open before sending (more reliable on Node 18)
+                if (PEER2_UUID) {
+                  const ok = await waitForOpenDC(peer1, PEER2_UUID, 15000);
+                  dp('[DP] waitForOpenDC result:', ok);
+                }
+
+                // Retry sending until the SDK confirms sent (up to 20s)
                 const payload = { test: 'no-duplicate', id: 1 };
                 let sent = false;
                 let attempts = 0;
-                const deadline = Date.now() + 12000;
+                const deadline = Date.now() + 20000;
                 while (!sent && Date.now() < deadline) {
                   attempts++;
-                  sent = peer1.sendData(payload, { streamID: PEER2_STREAM, type: 'viewer' });
-                  dp('[DP] send attempt', attempts, 'sent=', sent);
+                  if (PEER2_UUID) {
+                    sent = peer1.sendData(payload, PEER2_UUID);
+                    dp('[DP] send attempt', attempts, '(uuid)', PEER2_UUID, 'sent=', sent);
+                  } else {
+                    sent = peer1.sendData(payload, { streamID: PEER2_STREAM, type: 'viewer' });
+                    dp('[DP] send attempt', attempts, '(streamID viewer)', PEER2_STREAM, 'sent=', sent);
+                  }
                   if (!sent) {
                     logConnections(peer1, 'peer1 pre-wait');
                     logConnections(peer2, 'peer2 pre-wait');
@@ -393,7 +433,7 @@ jobs:
         }
         test();
         EOF
-        timeout 30s node test-no-duplicates.js
+        timeout 45s node test-no-duplicates.js
     
     - name: Run alias compatibility test
       run: |
