@@ -340,11 +340,48 @@ async function test() {
         await peer1.view(PEER2_STREAM);
         dp('[DP] peer2.view(PEER1_STREAM)');
         await peer2.view(PEER1_STREAM);
+
+        // Wait for a data channel to open between peers (robust across Node versions)
+        async function waitForOpenDC(sdk, uuid, timeoutMs = 15000) {
+            const start = Date.now();
+            return new Promise((resolve) => {
+                const check = () => {
+                    try {
+                        // Inspect any open DC to that UUID
+                        for (const [id, conns] of sdk.connections || []) {
+                            if (uuid && id !== uuid) continue;
+                            for (const t of ['publisher','viewer']) {
+                                const c = conns[t];
+                                if (c && c.dataChannel && c.dataChannel.readyState === 'open') {
+                                    return resolve(true);
+                                }
+                            }
+                        }
+                    } catch (e) {}
+                    if (Date.now() - start >= timeoutMs) return resolve(false);
+                    setTimeout(check, 200);
+                };
+                // Also resolve on dataChannelOpen just in case
+                const onOpen = (e) => {
+                    if (!uuid || e.detail?.uuid === uuid) {
+                        resolve(true);
+                    }
+                };
+                try { sdk.addEventListener('dataChannelOpen', onOpen); } catch (e) {}
+                check();
+            });
+        }
+
+        // If we already know peer2 UUID, wait for DC open; otherwise continue and rely on retries
+        if (PEER2_UUID) {
+            const ok = await waitForOpenDC(peer1, PEER2_UUID, 15000);
+            dp('[DP] waitForOpenDC result:', ok);
+        }
         // Retry sending until the SDK confirms sent (up to 12s)
         const payload = { test: 'no-duplicate', id: 1 };
         let sent = false;
         let attempts = 0;
-        const deadline = Date.now() + 12000;
+        const deadline = Date.now() + 20000; // allow more time on slower setups (Node 18 + wrtc)
         while (!sent && Date.now() < deadline) {
             attempts++;
             if (PEER2_UUID) {
