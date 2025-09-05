@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>VDO.Ninja SDK – Auto Connect (Minimal)</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 720px; margin: 24px auto; padding: 0 12px; }
+    h1 { font-size: 20px; }
+    .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 12px 0; }
+    input, select, button { padding: 8px 10px; font-size: 14px; }
+    #logs { background: #111; color: #eee; padding: 10px; min-height: 180px; border-radius: 6px; font-family: ui-monospace, Menlo, monospace; }
+    .small { color: #666; font-size: 12px; }
+  </style>
+  <script src="../vdoninja-sdk.js"></script>
+</head>
+<body>
+  <h1>VDO.Ninja SDK – Auto Connect (Minimal)</h1>
+  <div class="row">
+    <label>Room:</label>
+    <input id="room" placeholder="myroom" />
+    <label>Mode:</label>
+    <select id="mode">
+      <option value="half">Half (data only)</option>
+      <option value="full">Full (A/V)</option>
+    </select>
+    <button id="start">Start</button>
+    <button id="stop" disabled>Stop</button>
+  </div>
+  <div class="row small">Open this page in two tabs with the same room to see messages flow.</div>
+  <div id="logs"></div>
+
+  <script>
+    const logs = document.getElementById('logs');
+    const roomInput = document.getElementById('room');
+    const modeSel = document.getElementById('mode');
+    const startBtn = document.getElementById('start');
+    const stopBtn = document.getElementById('stop');
+
+    roomInput.value = 'room_' + Math.random().toString(36).slice(2, 7);
+
+    const log = (...a) => { logs.innerHTML += a.map(x => typeof x==='string'? x : JSON.stringify(x)).join(' ') + '\n'; logs.scrollTop = logs.scrollHeight; };
+
+    let sdk = null;
+    let ctl = null;
+
+    startBtn.onclick = async () => {
+      startBtn.disabled = true; stopBtn.disabled = false;
+      const room = roomInput.value.trim();
+      const mode = modeSel.value;
+      sdk = new VDONinjaSDK({ debug: true });
+
+      sdk.addEventListener('connected', () => log('Connected'));
+      sdk.addEventListener('dataChannelOpen', (e) => {
+        log('Data channel open with', e.detail.uuid, 'type', e.detail.type);
+        sdk.sendData({ hello: 'world', at: Date.now() });
+      });
+      sdk.addEventListener('dataReceived', (e) => log('Received:', e.detail.data, 'from', e.detail.uuid));
+      sdk.addEventListener('error', (e) => log('Error:', e.detail?.error || e.detail));
+
+      try {
+        ctl = await sdk.autoConnect({ room, mode });
+        log('Announced as', ctl.streamID, 'in', room, 'mode=', mode);
+      } catch (err) {
+        log('Failed:', err.message);
+      }
+    };
+
+    stopBtn.onclick = () => {
+      try { ctl && ctl.stop && ctl.stop(); } catch (e) {}
+      try { sdk && sdk.disconnect && sdk.disconnect(); } catch (e) {}
+      startBtn.disabled = false; stopBtn.disabled = true;
+      log('Stopped');
+    };
+  </script>
+</body>
+</html>
+

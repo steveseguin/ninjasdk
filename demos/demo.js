@@ -129,7 +129,8 @@ async function connectPeer(peerId) {
                     // Use quickView with dataOnly flag like the other demos
                     await peer.vdo.quickView({
                         streamID: streamID,
-                        dataOnly: true
+                        audio: false,
+                        video: false
                     });
                     
                     peer.viewingStreamID = streamID;

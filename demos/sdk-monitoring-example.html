@@ -134,7 +134,7 @@
         <p>This demo shows how to monitor active connections, room streams, and handle disconnect events.</p>
         
         <div class="controls">
-            <input type="text" id="roomInput" placeholder="Room name" value="monitor-demo" style="padding: 8px; margin-right: 10px;">
+            <input type="text" id="roomInput" placeholder="Room name" value="monitor_demo" style="padding: 8px; margin-right: 10px;">
             <button onclick="connect()">Connect</button>
             <button onclick="disconnect()">Disconnect</button>
             <button onclick="publishStream()">Publish Stream</button>
@@ -282,7 +282,7 @@
                 await disconnect();
             }
             
-            const room = document.getElementById('roomInput').value || 'monitor-demo';
+            const room = document.getElementById('roomInput').value || 'monitor_demo';
             
             vdo = new VDONinjaSDK({
                 room: room,
@@ -384,7 +384,7 @@
             
             try {
                 await vdo.connect();
-                await vdo.joinRoom(room);
+                await vdo.joinRoom({ room });
                 logEvent('roomJoined', { room });
                 
                 // Refresh display

@@ -52,26 +52,32 @@ async function main() {
     console.log('Room joined!');
     
     // Set up event handlers
-    sdk.on('newstream', (event) => {
-        console.log('\n🎥 New stream available:', event.streamID);
-        console.log('From UUID:', event.uuid);
+    sdk.on('listing', (event) => {
+        if (event.detail?.streamID) {
+            console.log('\n🎥 New stream announced:', event.detail.streamID, 'from UUID:', event.detail.uuid || '(unknown)');
+        } else if (Array.isArray(event.detail?.list)) {
+            console.log('\n📃 Room listing:', event.detail.list.map(it => (typeof it === 'string' ? it : it.streamID)).join(', '));
+        }
     });
-    
-    sdk.on('message', (event) => {
-        console.log('\n💬 Data channel message:', event.data);
-        console.log('From:', event.uuid);
+
+    sdk.on('videoaddedtoroom', (event) => {
+        console.log('\n➕ Stream added to room:', event.detail?.streamID, 'from UUID:', event.detail?.uuid);
     });
-    
-    sdk.on('viewerconnected', (event) => {
-        console.log('\n👀 Viewer connected:', event.uuid);
+
+    sdk.on('dataReceived', (event) => {
+        console.log('\n💬 Data channel message:', event.detail?.data, 'from:', event.detail?.uuid);
+    });
+
+    sdk.on('peerConnected', (event) => {
+        console.log('\n🔗 Peer connected:', event.detail?.uuid, 'type:', event.detail?.connection?.type);
     });
     
     // Example 1: Data channel communication
     console.log('\n--- Setting up as data channel publisher ---');
     
-    // Publish with data channel only (works with all implementations)
-    await sdk.publish({
-        streamID: 'node-data-' + Math.random().toString(36).substr(2, 9)
+    // Announce as data-only publisher (works with all implementations)
+    await sdk.announce({
+        streamID: 'node_data_' + Math.random().toString(36).substr(2, 9)
     });
     
     console.log('Publishing data channel as:', sdk.state.streamID);
@@ -98,10 +104,12 @@ async function main() {
         //     video: true, 
         //     audio: true 
         // });
-        // await sdk.publish({
-        //     stream: stream,
-        //     streamID: 'node-media-' + Math.random().toString(36).substr(2, 9)
-        // });
+        // await sdk.publish(
+        //     stream,
+        //     {
+        //         streamID: 'node_media_' + Math.random().toString(36).substr(2, 9)
+        //     }
+        // );
     } else {
         console.log('\n--- Media streaming not available ---');
         console.log('Install @roamhq/wrtc for audio/video support');

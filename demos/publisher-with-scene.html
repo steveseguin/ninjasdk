@@ -363,7 +363,7 @@
                 await vdo.connect();
                 
                 // Join room
-                await vdo.joinRoom(room);
+                await vdo.joinRoom({ room });
                 
                 // Publish stream
                 await vdo.publish(localStream, { streamID });

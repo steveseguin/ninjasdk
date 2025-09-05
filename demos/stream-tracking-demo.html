@@ -308,7 +308,7 @@
             
             try {
                 await vdo.connect();
-                await vdo.joinRoom(room);
+                await vdo.joinRoom({ room });
                 
                 document.getElementById('connectBtn').disabled = true;
                 document.getElementById('disconnectBtn').disabled = false;
@@ -418,7 +418,7 @@
                 });
                 
                 await publisherVdo.connect();
-                await publisherVdo.joinRoom(vdo.state.room);
+                await publisherVdo.joinRoom({ room: vdo.state.room });
                 await publisherVdo.publish(stream, { streamID });
                 
                 // Store publisher instance
@@ -680,7 +680,7 @@
         
         // Generate random room name on load
         window.addEventListener('DOMContentLoaded', () => {
-            const randomRoom = 'stream-tracking-' + Math.random().toString(36).substring(2, 8);
+            const randomRoom = 'stream_tracking_' + Math.random().toString(36).substring(2, 8);
             document.getElementById('roomInput').value = randomRoom;
         });
     </script>

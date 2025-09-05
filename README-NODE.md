@@ -51,7 +51,7 @@ await sdk.view('streamID', {
 
 // Publisher Info (optional) sent to viewers on DC open
 await sdk.publish(stream, {
-  streamID: 'node-pub-1',
+  streamID: 'node_pub_1',
   label: 'Main Camera',
   meta: 'Studio A',
   order: '1',
@@ -69,6 +69,8 @@ sdk.addEventListener('peerInfo', (e) => {
   console.log('Peer info:', e.detail.info);
 });
 ```
+
+Note: Stream and room IDs support alphanumeric and underscore; hyphens and other non-word characters are automatically sanitized to `_`.
 
 ## WebRTC Adapter
 

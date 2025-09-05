@@ -828,7 +828,7 @@
             // Room is already set in constructor, so joinRoom is optional
             // But we'll call it anyway for clarity
             console.log('Joining room:', ROOM_ID);
-            await vdo.joinRoom(ROOM_ID);
+            await vdo.joinRoom({ room: ROOM_ID });
             console.log('Joined room successfully');
 			
 			

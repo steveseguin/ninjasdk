@@ -80,7 +80,7 @@ await vdo.connect();
 await vdo.joinRoom({ room: "my-ai-room" });
 
 // Announce as data-only publisher
-await vdo.announce({ streamID: "ai-bot-1" });
+await vdo.announce({ streamID: "ai_bot_1" });
 
 // Send data to all peers
 vdo.sendData({ type: 'greeting', message: 'Hello from AI!' });
@@ -121,7 +121,7 @@ class AIBot {
         // Connect to server and join room
         await this.vdo.connect();
         await this.vdo.joinRoom({ room: this.roomId });
-        await this.vdo.announce({ streamID: 'ai-bot-' + Date.now() });
+        await this.vdo.announce({ streamID: 'ai_bot_' + Date.now() });
     }
 
     async processMessage(data, uid) {
@@ -173,14 +173,14 @@ await vdo.joinRoom({
 
 // Publish a media stream
 await vdo.publish(mediaStream, {
-    streamID: 'custom-id',         // Custom stream ID (optional)
+    streamID: 'custom_id',         // Custom stream ID (optional)
     room: 'myroom',                // Room name (optional if already joined)
     label: 'Main Camera'           // Stream label (optional)
 });
 
 // Announce as data-only publisher
 await vdo.announce({
-    streamID: 'bot-1'              // Stream ID (recommended)
+    streamID: 'bot_1'              // Stream ID (recommended)
 });
 
 // View a stream
@@ -263,7 +263,7 @@ vdo.stopViewing(streamID);               // Stop viewing a stream
 ### Data Communication
 ```javascript
 vdo.sendData(data, target);              // Send data with flexible targeting
-vdo.sendPing(uuid);                      // Send ping (publishers only)
+vdo.sendPing(uuid);                      // Send ping (either role; DC-only)
 
 // Target options:
 // - null or undefined: Send to all peers
@@ -313,8 +313,8 @@ supportBot.addEventListener('dataReceived', async (event) => {
 
 // Connect and join support channel
 await supportBot.connect();
-await supportBot.joinRoom({ room: 'support-channel' });
-await supportBot.announce({ streamID: 'support-bot' });
+await supportBot.joinRoom({ room: 'support_channel' });
+await supportBot.announce({ streamID: 'support_bot' });
 ```
 
 ### 2. Real-time Translation Bot
@@ -339,8 +339,8 @@ translatorBot.addEventListener('dataReceived', async (event) => {
 });
 
 await translatorBot.connect();
-await translatorBot.joinRoom({ room: 'global-chat' });
-await translatorBot.announce({ streamID: 'translator-bot' });
+await translatorBot.joinRoom({ room: 'global_chat' });
+await translatorBot.announce({ streamID: 'translator_bot' });
 ```
 
 ### 3. IoT Data Aggregator
@@ -369,7 +369,7 @@ iotHub.addEventListener('dataReceived', (event) => {
 });
 
 await iotHub.connect();
-await iotHub.joinRoom({ room: 'sensor-network' });
+await iotHub.joinRoom({ room: 'sensor_network' });
 ```
 
 ### 4. Collaborative AI Assistant
@@ -398,8 +398,8 @@ aiAssistant.addEventListener('dataReceived', async (event) => {
 });
 
 await aiAssistant.connect();
-await aiAssistant.joinRoom({ room: 'ai-workspace' });
-await aiAssistant.announce({ streamID: 'ai-assistant' });
+await aiAssistant.joinRoom({ room: 'ai_workspace' });
+await aiAssistant.announce({ streamID: 'ai_assistant' });
 ```
 
 ## Binary Data Handling
@@ -470,7 +470,7 @@ vdo.addEventListener('connectionFailed', (event) => {
 
 ## Performance Optimization
 
-1. **Data Mode**: Use `datamode: 1` for data-only applications (no media overhead)
+1. **Data Only**: Use `announce()` (publisher) and `view()` (viewer) for data-only applications; `datamode` is not used
 2. **Binary Format**: Use ArrayBuffer for large data transfers
 3. **Compression**: Compress data before sending if needed
 4. **Batching**: Batch multiple small messages together
@@ -526,8 +526,8 @@ vdo.addEventListener('dataReceived', async (event) => {
 });
 
 await vdo.connect();
-await vdo.joinRoom({ room: 'ai-chat' });
-await vdo.announce({ streamID: 'openai-bot' });
+await vdo.joinRoom({ room: 'ai_chat' });
+await vdo.announce({ streamID: 'openai_bot' });
 ```
 
 ### LangChain Integration Example
@@ -545,8 +545,8 @@ vdo.addEventListener('dataReceived', async (event) => {
 });
 
 await vdo.connect();
-await vdo.joinRoom({ room: 'langchain-demo' });
-await vdo.announce({ streamID: 'langchain-bot' });
+await vdo.joinRoom({ room: 'langchain_demo' });
+await vdo.announce({ streamID: 'langchain_bot' });
 ```
 
 ## Platform Support
@@ -586,7 +586,7 @@ vdo.addEventListener('dataReceived', (event) => {
 });
 await vdo.connect();
 await vdo.joinRoom({ room: "test" });
-await vdo.announce({ streamID: "bot-1" });
+await vdo.announce({ streamID: "bot_1" });
 vdo.sendData({ message: "Bot is ready!" });
 ```
 

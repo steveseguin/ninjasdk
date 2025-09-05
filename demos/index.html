@@ -267,6 +267,24 @@
     <div class="category">
         <h2>📡 Core Communication</h2>
         <div class="demos-grid">
+            <a href="auto-connect.html" class="demo-card">
+                <h3>⚡ Auto Connect Mesh</h3>
+                <p>Minimal example that joins a room and automatically connects to peers. Sends and receives a message on connect.</p>
+                <div class="demo-features">
+                    <span class="feature-tag">Half/Full Mesh</span>
+                    <span class="feature-tag">Auto View</span>
+                    <span class="feature-tag">Data Channel</span>
+                </div>
+            </a>
+            <a href="clipboard.html" class="demo-card">
+                <h3>📋 Clipboard Sync</h3>
+                <p>Share clipboard content peer‑to‑peer in real time across connected clients.</p>
+                <div class="demo-features">
+                    <span class="feature-tag">P2P</span>
+                    <span class="feature-tag">Data Channel</span>
+                    <span class="feature-tag">JSON</span>
+                </div>
+            </a>
             <a href="vdoninja-sdk-datachannel-demo.html" class="demo-card">
                 <h3>📨 Data Channel Messaging</h3>
                 <p>Comprehensive demonstration of P2P data messaging with multiple nodes, pub/sub patterns, and advanced filtering.</p>
@@ -368,6 +386,16 @@
                 </div>
             </a>
             
+            <a href="sdk-monitoring-example.html" class="demo-card">
+                <h3>🧰 SDK Monitoring</h3>
+                <p>Inspect connections, streams, and SDK state with live updates and controls.</p>
+                <div class="demo-features">
+                    <span class="feature-tag">Monitoring</span>
+                    <span class="feature-tag">State</span>
+                    <span class="feature-tag">Stats</span>
+                </div>
+            </a>
+            
             <a href="vdoninja-sdk-tracks-demo.html" class="demo-card">
                 <h3>🎚️ Track Management</h3>
                 <p>Fine-grained control over individual media tracks with quality switching and constraints.</p>
@@ -402,6 +430,35 @@
                     <span class="feature-tag">Discord</span>
                 </div>
             </a>
+        </div>
+    </div>
+
+    <div class="category">
+        <h2>🧰 Node Demos</h2>
+        <div class="demos-grid">
+            <a href="node-example.js" class="demo-card">
+                <h3>📦 Node.js Example</h3>
+                <p>Minimal Node usage with auto‑detected WebRTC. Announces a data‑only stream and logs P2P messages.</p>
+                <div class="demo-features">
+                    <span class="feature-tag">Node.js</span>
+                    <span class="feature-tag">Data Channel</span>
+                    <span class="feature-tag">Auto‑detect</span>
+                </div>
+            </a>
+            <a href="socialstreamninja-listener.js" class="demo-card">
+                <h3>🗨️ Social Stream Ninja Listener</h3>
+                <p>Connect to Social Stream Ninja (SSN) and receive consolidated live chat via P2P data channels.</p>
+                <div class="demo-features">
+                    <span class="feature-tag">Node.js</span>
+                    <span class="feature-tag">Social Stream</span>
+                    <span class="feature-tag">Data Channel</span>
+                </div>
+            </a>
+        </div>
+        <div class="info-box">
+            <h3>ℹ️ Running Node Demos</h3>
+            <p>Install dependencies: <code>npm install ws @roamhq/wrtc</code> (or <code>node-datachannel</code>).</p>
+            <p>Run examples: <code>node demos/node-example.js</code> or <code>node demos/socialstreamninja-listener.js &lt;session-id&gt;</code></p>
         </div>
     </div>
     

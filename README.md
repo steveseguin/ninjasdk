@@ -58,6 +58,10 @@ const vdo = new VDONinjaSDK();
 const wrtc = require('@roamhq/wrtc');
 const VDONinjaSDK = require('@vdoninja/sdk');
 
+// Required polyfills when using the browser build in Node.js
+global.WebSocket = require('ws');
+global.crypto = require('crypto').webcrypto || require('crypto');
+
 // Set global WebRTC objects
 global.RTCPeerConnection = wrtc.RTCPeerConnection;
 global.RTCIceCandidate = wrtc.RTCIceCandidate;
@@ -83,16 +87,18 @@ vdo.addEventListener('dataReceived', (event) => {
 
 // Connect and join room (use unique room names to avoid collisions)
 await vdo.connect();
-const roomId = 'room-' + Math.random().toString(36).substr(2, 9);
+const roomId = 'room_' + Math.random().toString(36).substr(2, 9); // use _ (hyphens get sanitized)
 await vdo.joinRoom({ room: roomId });
 
 // Announce as data-only publisher
-const streamId = 'stream-' + Math.random().toString(36).substr(2, 9);
+const streamId = 'stream_' + Math.random().toString(36).substr(2, 9); // use _ (hyphens get sanitized)
 await vdo.announce({ streamID: streamId });
 
 // Send data to all connected peers
 vdo.sendData({ message: "Hello P2P!" });
 ```
+
+Note: Stream and room IDs accept alphanumeric and underscore. Any hyphens or non‑word characters are automatically sanitized to `_`.
 
 ### Audio/Video Example
 ```javascript
@@ -263,8 +269,8 @@ peerA.sendData("Hello", { preference: 'all' });  // peerB receives TWICE
 The SDK intelligently routes messages to prevent duplicates when dual connections exist:
 
 ```javascript
-// Default behavior (no target): uses publisher-only to avoid duplicates
-peer.sendData(data);  // Sends via publisher channel only when broadcasting
+// Default behavior (no target): publisher preferred (no duplicates)
+peer.sendData(data);  // Tries publisher first, viewer fallback if needed
 
 // Explicit channel selection (optional)
 peer.sendData(data, { preference: 'publisher' });  // ONLY use publisher channel
@@ -278,8 +284,7 @@ peer.sendData(data, { uuid: "...", preference: 'viewer' }); // Force viewer chan
 ```
 
 **Preference options:**
-- `'publisher'` **(default when no target)**: Use ONLY publisher channel
-- `'any'`: Try publisher first, automatically fallback to viewer if needed
+- `'any'` (default): Try publisher first, automatically fallback to viewer if needed
 - `'publisher'`: Use ONLY publisher channel (no fallback)
 - `'viewer'`: Use ONLY viewer channel (no fallback)
 - `'all'`: Send via ALL available connections (intentional duplicates)
@@ -416,6 +421,41 @@ vdo.addEventListener('error', (event) => {
 ### Utility Methods
 - `async quickPublish(options)` - Connect, join, and publish
 - `async quickView(options)` - Connect, join, and view
+- `async autoConnect(roomOrOptions, [filter])` - Connect, join, announce, and auto‑view peers (mesh helper)
+
+## Auto‑Connect Mesh
+
+Use `autoConnect` to make room meshes effortless. It connects, joins a room, announces a streamID, and automatically views other peers. Two modes:
+
+- Half mesh (default): One P2P connection per pair (best for data‑only). Each pair connects exactly once using a deterministic rule to avoid duplicates.
+- Full mesh: Two P2P connections per pair (needed for audio/video exchange).
+
+Examples:
+
+```javascript
+// Minimal: half mesh, data-only
+const sdk = new VDONinjaSDK({ debug: true });
+await sdk.autoConnect('myroom');
+
+// Full mesh with AV viewing defaults
+await sdk.autoConnect({ room: 'stage', mode: 'full' });
+
+// Custom filters
+await sdk.autoConnect('sensors', /^sensor_/);                  // regex on streamID
+await sdk.autoConnect('chat', (item) => item.label === 'chat'); // function filter
+await sdk.autoConnect({ room: 'lab', filter: { prefix: 'node_' }});
+
+// Controller to stop auto-connect
+const ctl = await sdk.autoConnect('team');
+// ... later
+ctl.stop();
+
+// Send and receive after connection
+sdk.addEventListener('dataChannelOpen', () => sdk.sendData({ hello: 'world' }));
+sdk.addEventListener('dataReceived', (e) => console.log('Got', e.detail.data));
+```
+
+See the minimal demo at `demos/auto-connect.html`.
 
 ## Data Channel Patterns
 
@@ -474,12 +514,12 @@ vdo.addEventListener('dataReceived', (event) => {
 
 ## Examples
 
-- [Data Channel Demo](vdoninja-sdk-datachannel-demo.html) - Real-time messaging
-- [Broadcast Demo](vdoninja-sdk-broadcast-demo.html) - One-to-many streaming
-- [Canvas Streaming](vdoninja-sdk-canvas-demo.html) - Stream canvas as video
-- [Dynamic Media](vdoninja-sdk-dynamic-media-demo.html) - Add/remove streams
-- [Pub/Sub Channels](vdoninja-sdk-pubsub-channels.html) - Topic-based messaging
-- [Track Management](vdoninja-sdk-tracks-demo.html) - Fine-grained control
+- [Data Channel Demo](demos/vdoninja-sdk-datachannel-demo.html) - Real-time messaging
+- [Broadcast Demo](demos/vdoninja-sdk-broadcast-demo.html) - One-to-many streaming
+- [Canvas Streaming](demos/vdoninja-sdk-canvas-demo.html) - Stream canvas as video
+- [Dynamic Media](demos/vdoninja-sdk-dynamic-media-demo.html) - Add/remove streams
+- [Pub/Sub Channels](demos/vdoninja-sdk-pubsub-channels.html) - Topic-based messaging
+- [Track Management](demos/vdoninja-sdk-tracks-demo.html) - Fine-grained control
 
 ## Use Cases
 
@@ -502,7 +542,7 @@ bot.addEventListener('dataReceived', async (event) => {
 // Connect, join room, and announce as data-only publisher
 await bot.connect();
 await bot.joinRoom({ room: 'ai-support' });
-await bot.announce({ streamID: 'ai-bot-1' });
+await bot.announce({ streamID: 'ai_bot_1' });
 ```
 
 ### Collaborative Canvas
@@ -549,8 +589,8 @@ const sensor = new VDONinjaSDK();
 
 // Connect and announce as data-only publisher
 await sensor.connect();
-await sensor.joinRoom({ room: 'sensor-network' });
-await sensor.announce({ streamID: 'sensor-node-1' });
+await sensor.joinRoom({ room: 'sensor_network' });
+await sensor.announce({ streamID: 'sensor_node_1' });
 
 setInterval(() => {
     sensor.sendData({
@@ -572,7 +612,7 @@ monitor.addEventListener('dataReceived', (event) => {
 });
 
 await monitor.connect();
-await monitor.joinRoom({ room: 'sensor-network' });
+await monitor.joinRoom({ room: 'sensor_network' });
 ```
 
 ## Platform Support
@@ -645,7 +685,7 @@ See `demos/socialstreamninja-listener.js` for a complete example.
 
 ## Performance Tips
 
-1. **Data Channels**: Use `datamode: 1` for data-only applications
+1. **Data Channels**: Use `announce()` (publisher) and `view()` (viewer) for data-only applications; `datamode` is not used
 2. **Bitrate**: Adjust based on network conditions
 3. **Codec**: H264 for compatibility, VP8/VP9 for quality
 4. **Broadcast**: Use broadcast mode for one-to-many

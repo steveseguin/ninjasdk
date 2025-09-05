@@ -728,7 +728,8 @@
                 await viewer.connect();
                 await viewer.quickView({
                     streamID: STREAM_ID,
-                    dataOnly: true  // Start with data-only expectation
+                    audio: false,
+                    video: false
                 });
                 
                 // Update UI

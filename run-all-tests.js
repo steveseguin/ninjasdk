@@ -84,6 +84,69 @@ async function test() {
 test();`
     },
     {
+        name: 'Auto Connect Mesh (half)',
+        file: 'test-auto-connect.js',
+        code: `
+const wrtc = require('${webrtcLib}');
+const WebSocket = require('ws');
+const crypto = require('crypto');
+const VDONinjaSDK = require('./vdoninja-sdk-node.js');
+
+// Polyfills for Node.js
+global.WebSocket = WebSocket;
+global.crypto = crypto.webcrypto || crypto;
+if (wrtc.RTCPeerConnection) {
+  global.RTCPeerConnection = wrtc.RTCPeerConnection;
+  global.RTCIceCandidate = wrtc.RTCIceCandidate;
+  global.RTCSessionDescription = wrtc.RTCSessionDescription;
+}
+global.document = { createElement: () => ({ innerText: '', textContent: '' }) };
+global.CustomEvent = class CustomEvent extends Event {
+  constructor(type, options) { super(type, options); this.detail = options?.detail; }
+};
+global.btoa = (str) => Buffer.from(str).toString('base64');
+global.atob = (str) => Buffer.from(str, 'base64').toString();
+
+const WSS = process.env.WSS_URL || 'wss://apibackup.vdo.ninja';
+const ROOM = 'auto-' + Math.random().toString(36).slice(2,8) + '-' + Date.now();
+
+async function test() {
+  const a = new VDONinjaSDK({ host: WSS });
+  const b = new VDONinjaSDK({ host: WSS });
+
+  let gotA = false, gotB = false;
+
+  a.addEventListener('dataReceived', (e) => { if (e?.detail?.data) gotA = true; });
+  b.addEventListener('dataReceived', (e) => { if (e?.detail?.data) gotB = true; });
+
+  // Send on DC open from both ends to validate bidirectional on single DC
+  a.addEventListener('dataChannelOpen', () => a.sendData({ from: 'A' }));
+  b.addEventListener('dataChannelOpen', () => b.sendData({ from: 'B' }));
+
+  try {
+    await a.autoConnect({ room: ROOM, mode: 'half' });
+    await b.autoConnect({ room: ROOM, mode: 'half' });
+
+    // Allow time for connect and exchange
+    const start = Date.now();
+    while (Date.now() - start < 15000) {
+      if (gotA && gotB) break;
+      await new Promise(r => setTimeout(r, 300));
+    }
+
+    if (!gotA || !gotB) throw new Error('Auto connect messages not exchanged');
+    a.disconnect(); b.disconnect();
+    process.exit(0);
+  } catch (err) {
+    console.error('  ✗ AutoConnect failed:', err.message);
+    try { a.disconnect(); } catch (e) {}
+    try { b.disconnect(); } catch (e) {}
+    process.exit(1);
+  }
+}
+test();`
+    },
+    {
         name: 'P2P Data Channel',
         file: 'test-p2p-datachannel.js',
         code: `

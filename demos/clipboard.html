@@ -473,7 +473,7 @@
             }
             
             // Generate unique stream ID for this instance
-            streamId = 'clipboard-' + Math.random().toString(36).substr(2, 9);
+            streamId = 'clipboard_' + Math.random().toString(36).substr(2, 9);
             
             // Update share link
             const shareLink = window.location.origin + window.location.pathname + '?room=' + roomId;
@@ -501,7 +501,7 @@
                 await sdk.announce({
                     streamID: streamId,
                     room: roomId,
-                    label: 'shared-clipboard'
+                    label: 'shared_clipboard'
                 });
                 
                 // Join room to discover other peers
@@ -718,7 +718,7 @@
             const adj = adjectives[Math.floor(Math.random() * adjectives.length)];
             const noun = nouns[Math.floor(Math.random() * nouns.length)];
             const num = Math.floor(Math.random() * 1000);
-            return `${adj}-${noun}-${num}`;
+            return `${adj}_${noun}_${num}`;
         }
         
         function updateStatus(text, isConnected) {
