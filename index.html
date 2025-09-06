@@ -350,20 +350,10 @@
                 </div>
                 <div class="demo-code">
                     <h4>This demo uses just these few lines:</h4>
-                    <pre><code class="language-javascript">// Setup
+                    <pre><code class="language-javascript">// Minimal mesh with autoConnect (data-only by default)
 const vdo = new VDONinjaSDK();
 vdo.addEventListener('dataReceived', (e) => displayMessage(e.detail.data));
-
-// Connect and announce yourself
-await vdo.connect();
-await vdo.joinRoom({ room: "demo-room" });
-await vdo.announce({ streamID: "myPeerID" });
-
-// View another peer to establish P2P connection
-await vdo.quickView({ streamID: "otherPeerID", dataOnly: true });
-
-// Send messages
-vdo.sendData({ message: "Hello P2P!" });</code></pre>
+await vdo.autoConnect('demo-room'); // streamID is auto-generated</code></pre>
                 </div>
             </div>
         </div>

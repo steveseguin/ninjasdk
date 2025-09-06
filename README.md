@@ -538,7 +538,7 @@ vdo.addEventListener('dataReceived', (event) => {
 - [Broadcast Demo](demos/vdoninja-sdk-broadcast-demo.html) - One-to-many streaming
 - [Canvas Streaming](demos/vdoninja-sdk-canvas-demo.html) - Stream canvas as video
 - [Dynamic Media](demos/vdoninja-sdk-dynamic-media-demo.html) - Add/remove streams
-- [Pub/Sub Channels](demos/vdoninja-sdk-pubsub-channels.html) - Topic-based messaging
+- [Pub/Sub Channels](demos/vdoninja-sdk-pubsub-channels.html) - SDK-managed channels and subscriptions with simple helpers
 - [Track Management](demos/vdoninja-sdk-tracks-demo.html) - Fine-grained control
 
 ## Use Cases

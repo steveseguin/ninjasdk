@@ -1423,16 +1423,24 @@
                     }
                 }
                 
+                // Normalize legacy dataOnly into audio/video flags for pending view
+                const normalizedOptions = (() => {
+                    if (options && options.dataOnly === true) {
+                        return { ...options, audio: false, video: false };
+                    }
+                    return options || {};
+                })();
+
                 // Track pending view so we know we initiated this
                 this._pendingViews.set(streamID, {
-                    options: options,
+                    options: normalizedOptions,
                     timestamp: Date.now(),
                     hashedStreamID: hashedStreamID  // Store the hashed version for comparison
                 });
                 
                 // Store view options for potential reconnection
                 this._lastViewOptions = this._lastViewOptions || {};
-                this._lastViewOptions[streamID] = options;
+                this._lastViewOptions[streamID] = normalizedOptions;
 
                 // Send view request first (don't create connection yet)
                 const viewRequest = {
@@ -5074,9 +5082,12 @@
             }
 
             // View stream
+            // Support legacy dataOnly: true (maps to audio:false, video:false)
+            const audio = options && options.dataOnly === true ? false : options.audio;
+            const video = options && options.dataOnly === true ? false : options.video;
             return await this.view(options.streamID, {
-                audio: options.audio,
-                video: options.video,
+                audio,
+                video,
                 label: options.label
             });
         }
@@ -5251,7 +5262,6 @@
         stop(streamID) { return this.stopViewing(streamID); }
         stopPlaying(streamID) { return this.stopViewing(streamID); }
         stopWatching(streamID) { return this.stopViewing(streamID); }
-        unsubscribe(streamID) { return this.stopViewing(streamID); }
         
         // Stop publishing aliases
         stopStreaming() { return this.stopPublishing(); }
@@ -5283,7 +5293,14 @@
         // Quick method aliases
         quickPlay(options) { return this.quickView(options); }
         quickWatch(options) { return this.quickView(options); }
-        quickSubscribe(options) { return this.quickView(options); }
+        // Quick subscribe helper: defaults to dataOnly unless explicitly overridden
+        quickSubscribe(options = {}) {
+            const opts = { ...options };
+            if (!('dataOnly' in opts) && !('audio' in opts) && !('video' in opts)) {
+                opts.dataOnly = true;
+            }
+            return this.quickView(opts);
+        }
         
         quickStream(options) { return this.quickPublish(options); }
         quickBroadcast(options) { return this.quickPublish(options); }
