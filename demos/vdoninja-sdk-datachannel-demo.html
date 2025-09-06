@@ -535,7 +535,7 @@
             <div class="ping-section">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
                     <h3 style="margin: 0;">🏓 Network Latency</h3>
-                    <button onclick="sendPing(1)" class="secondary">Send Ping</button>
+                    <button id="node1PingBtn" onclick="sendPing(1)" class="secondary" disabled>Send Ping</button>
                 </div>
                 <div class="ping-results" id="node1PingResults">
                     <div class="no-pings">No pings sent yet</div>
@@ -667,7 +667,7 @@
             <div class="ping-section">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
                     <h3 style="margin: 0;">🏓 Network Latency</h3>
-                    <button onclick="sendPing(2)" class="secondary">Send Ping</button>
+                    <button id="node2PingBtn" onclick="sendPing(2)" class="secondary" disabled>Send Ping</button>
                 </div>
                 <div class="ping-results" id="node2PingResults">
                     <div class="no-pings">No pings sent yet</div>
@@ -719,8 +719,8 @@
     <script>
         // Node instances
         const nodes = {
-            1: { sdk: null, stats: { sent: 0, received: 0, latencies: [] }, topics: new Set() },
-            2: { sdk: null, stats: { sent: 0, received: 0, latencies: [] }, topics: new Set() }
+            1: { sdk: null, stats: { sent: 0, received: 0, latencies: [] }, topics: new Set(), dcReady: false },
+            2: { sdk: null, stats: { sent: 0, received: 0, latencies: [] }, topics: new Set(), dcReady: false }
         };
         
         // Example messages
@@ -812,6 +812,10 @@
                 updateStatus(nodeId, false);
                 document.getElementById(`node${nodeId}Connect`).disabled = false;
                 document.getElementById(`node${nodeId}Disconnect`).disabled = true;
+                // Disable ping button and mark DC as not ready
+                nodes[nodeId].dcReady = false;
+                const pingBtn = document.getElementById(`node${nodeId}PingBtn`);
+                if (pingBtn) pingBtn.disabled = true;
                 
                 // Re-enable connection settings
                 document.getElementById(`node${nodeId}Room`).disabled = false;
@@ -841,6 +845,10 @@
             
             sdk.addEventListener('dataChannelOpen', (event) => {
                 logMessage(nodeId, `Data channel opened with: ${event.detail.uuid}`, 'system');
+                // Enable ping button once any DC is open
+                nodes[nodeId].dcReady = true;
+                const pingBtn = document.getElementById(`node${nodeId}PingBtn`);
+                if (pingBtn) pingBtn.disabled = false;
             });
             
             sdk.addEventListener('dataReceived', (event) => {
@@ -848,7 +856,15 @@
             });
             
             sdk.addEventListener('peerLatency', (event) => {
-                nodes[nodeId].stats.latencies.push(event.detail.latency);
+                // Show visual ping result for built-in SDK ping/pong
+                const latency = event.detail.latency;
+                try {
+                    displayPingResult(nodeId, 'Pong received', latency);
+                } catch (e) {
+                    // no-op if UI not ready
+                }
+
+                nodes[nodeId].stats.latencies.push(latency);
                 if (nodes[nodeId].stats.latencies.length > 10) {
                     nodes[nodeId].stats.latencies.shift();
                 }
@@ -925,6 +941,10 @@
                 nodes[nodeId].topics.clear();
                 updatePeersList(nodeId);
                 updateTopicsList(nodeId);
+                // Reset DC readiness and disable ping button
+                nodes[nodeId].dcReady = false;
+                const pingBtn = document.getElementById(`node${nodeId}PingBtn`);
+                if (pingBtn) pingBtn.disabled = true;
                 
                 // Clear chat
                 document.getElementById(`node${nodeId}Chat`).innerHTML = '';
@@ -1140,7 +1160,7 @@
                 topicDiv.innerHTML = `
                     <span class="topic-name">${topic}</span>
                     <div class="topic-actions">
-                        <button onclick="publishToTopic(${nodeId}, '${topic}')" class="example-button">Publish</button>
+                        <button onclick="publishToTopic(${nodeId}, '${topic}')" class="example-button">Click me to publish a Message</button>
                         <button onclick="unsubscribeTopic(${nodeId}, '${topic}')" class="example-button danger">Unsubscribe</button>
                     </div>
                 `;
@@ -1189,6 +1209,10 @@
             const sdk = nodes[nodeId].sdk;
             if (!sdk) {
                 alert('Not connected');
+                return;
+            }
+            if (!nodes[nodeId].dcReady) {
+                logMessage(nodeId, 'Data channel not open yet. Wait for "Data channel opened" before sending ping.', 'system');
                 return;
             }
             
