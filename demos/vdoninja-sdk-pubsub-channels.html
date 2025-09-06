@@ -805,6 +805,11 @@
         const defaultRoom = `pubsub_channels_demo_${randomSuffix}`;
         document.getElementById('pubRoom').value = defaultRoom;
         document.getElementById('subRoom').value = defaultRoom;
+
+        // Randomize default stream IDs to avoid collisions
+        const randStreamID = `channel_publisher_${Math.random().toString(36).substring(2, 11)}`; // ~9 chars
+        document.getElementById('pubStreamID').value = randStreamID;
+        document.getElementById('subStreamID').value = randStreamID;
     </script>
 </body>
 </html>
