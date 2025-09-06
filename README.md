@@ -532,6 +532,20 @@ vdo.addEventListener('dataReceived', (event) => {
 });
 ```
 
+## API Reference
+
+For a full list of methods, helpers, aliases, and events, see:
+
+- docs/api-reference.md (Markdown)
+- docs/api-reference.html (HTML)
+
+Quick highlights:
+- Core: `connect`, `disconnect`, `joinRoom`, `leaveRoom`, `publish`, `announce`, `view`, `stopViewing`, `stopPublishing`
+- Quick: `quickPublish`, `quickView`, `autoConnect`, `quickSubscribe`
+- Data: `sendData`, `sendPing`, `request`, `respond`, `onRequest`
+- Pub/Sub: `subscribe`, `unsubscribe`, `publishToChannel`, `getSubscriptions`, `getPeerSubscriptions` with events `channelMessage`, `peerSubscribed`, `peerUnsubscribed`
+- Tip: avoid reserved types ('subscribe'|'unsubscribe'|'channelMessage') for custom protocols
+
 ## Examples
 
 - [Data Channel Demo](demos/vdoninja-sdk-datachannel-demo.html) - Real-time messaging

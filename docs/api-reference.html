@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VDO.Ninja SDK — API Reference</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 900px; margin: 0 auto; padding: 24px; line-height: 1.5; color: #e0e0e0; background: #1a1a1a; }
+    h1, h2, h3 { color: #fff; }
+    code { background: #2a2a2a; padding: 2px 4px; border-radius: 4px; }
+    pre { background: #2a2a2a; padding: 12px; border-radius: 6px; overflow: auto; }
+    a { color: #4CAF50; }
+    .tip { font-size: 14px; color: #bbb; }
+    ul { margin-top: 6px; }
+  </style>
+  </head>
+  <body>
+    <h1>VDO.Ninja SDK — API Reference</h1>
+    <p class="tip">Tip: avoid reserved SDK types (<code>subscribe</code> | <code>unsubscribe</code> | <code>channelMessage</code>) for custom protocols.</p>
+
+    <h2>Constructor</h2>
+    <pre><code>const vdo = new VDONinjaSDK(options)</code></pre>
+    <ul>
+      <li><b>host</b>: WebSocket URL (default: <code>wss://wss.vdo.ninja</code>)</li>
+      <li><b>room</b>: Initial room to join (optional)</li>
+      <li><b>password</b>: Room password or false to disable encryption</li>
+      <li><b>label</b>: Optional human-readable label</li>
+      <li><b>debug</b>: Enable verbose logs</li>
+      <li><b>turnServers</b>: null=auto, false=disable, or custom ICE servers</li>
+      <li><b>forceTURN</b>: Force relay mode (boolean)</li>
+    </ul>
+
+    <h2>Connection</h2>
+    <ul>
+      <li><code>connect()</code>, <code>disconnect()</code></li>
+      <li><code>joinRoom({ room, password })</code>, <code>leaveRoom()</code></li>
+      <li><code>autoConnect(roomOrOptions, filter?)</code> → <code>{ stop, streamID }</code></li>
+    </ul>
+
+    <h2>Publishing</h2>
+    <ul>
+      <li><code>publish(stream, { streamID, room?, label?, password? })</code></li>
+      <li><code>announce({ streamID?, room?, label?, password? })</code></li>
+      <li><code>stopPublishing()</code></li>
+    </ul>
+
+    <h2>Viewing</h2>
+    <ul>
+      <li><code>view(streamID, { audio=true, video=true, label? })</code></li>
+      <li><code>stopViewing(streamID)</code></li>
+    </ul>
+
+    <h2>Quick Helpers</h2>
+    <ul>
+      <li><code>quickPublish({ stream, room?, streamID?, label?, password? })</code></li>
+      <li><code>quickView({ streamID, room?, audio?, video?, label?, password?, dataOnly? })</code></li>
+      <li><code>quickSubscribe({ streamID, room?, ... })</code> (defaults to data-only)</li>
+    </ul>
+
+    <h2>Data Communication</h2>
+    <ul>
+      <li><code>sendData(data, target?)</code> — flexible targeting with DC and fallback</li>
+      <li><code>sendPing(uuid?)</code></li>
+      <li><code>request(type, data, targetUUID, timeout?)</code>, <code>respond(id, data, targetUUID)</code></li>
+      <li><code>onRequest(type, handler)</code></li>
+    </ul>
+
+    <h2>Pub/Sub</h2>
+    <ul>
+      <li><code>subscribe(channels)</code>, <code>unsubscribe(channels)</code>, <code>getSubscriptions()</code></li>
+      <li><code>publishToChannel(channel, data, target='all')</code></li>
+      <li><code>getPeerSubscriptions(uuid)</code></li>
+      <li>Events: <code>channelMessage</code>, <code>peerSubscribed</code>, <code>peerUnsubscribed</code></li>
+    </ul>
+
+    <h2>Utilities & Aliases</h2>
+    <ul>
+      <li><code>getStats(uuid?)</code></li>
+      <li>Aliases: <code>play|watch|startViewing → view</code>, <code>stream|broadcast|startPublishing|share → publish</code>, <code>quickStream|quickBroadcast|quickShare → quickPublish</code>, <code>stop|stopPlaying|stopWatching → stopViewing</code>, <code>stopStreaming|stopBroadcasting|stopSharing|unpublish → stopPublishing</code>, <code>join|enterRoom|enter → joinRoom</code>, <code>leave|exitRoom → leaveRoom</code></li>
+    </ul>
+
+    <h2>Events (Selected)</h2>
+    <ul>
+      <li>Connection: <code>connected</code>, <code>disconnected</code>, <code>reconnecting</code>, <code>reconnected</code>, <code>reconnectFailed</code></li>
+      <li>Room: <code>roomJoined</code>, <code>roomLeft</code>, <code>listing</code>, <code>peerListing</code></li>
+      <li>Peer/DC: <code>peerConnected</code>, <code>peerDisconnected</code>, <code>dataChannelOpen</code>, <code>dataChannelClose</code>, <code>peerInfo</code>, <code>peerLatency</code></li>
+      <li>Data: <code>dataReceived</code> (<code>dataRecieved</code> alias), <code>data</code></li>
+      <li>Media: <code>track</code>, <code>trackAdded</code>, <code>trackRemoved</code>, <code>trackReplaced</code></li>
+      <li>State: <code>publishing</code>, <code>publishingStopped</code>, <code>viewingStopped</code>, <code>iceRestart</code>, <code>connectionFailed</code>, <code>alert</code>, <code>error</code></li>
+    </ul>
+
+    <p>See <a href="../README.md">README</a> and <a href="../demos/index.html">demos</a> for examples.</p>
+  </body>
+  </html>
+
