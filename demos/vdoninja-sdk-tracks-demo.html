@@ -588,18 +588,17 @@
                     if (!remoteVideo.srcObject) {
                         remoteVideo.srcObject = new MediaStream();
                     }
-                    remoteVideo.srcObject.addTrack(track);
+                    const stream = remoteVideo.srcObject;
+                    // Enforce a single track per kind (especially single video track)
+                    try {
+                        stream.getTracks().filter(t => t.kind === track.kind).forEach(t => stream.removeTrack(t));
+                    } catch (e) {}
+                    try { stream.addTrack(track); } catch (e) {}
                     
-                    // Ensure video plays
                     if (track.kind === 'video') {
-                        remoteVideo.play().then(() => {
-                            log('viewLog', 'Video playback started', 'success');
-                        }).catch(err => {
-                            log('viewLog', `Video play error: ${err.message}`, 'error');
-                            // Try playing on user interaction
-                            remoteVideo.muted = true;
-                            remoteVideo.play().catch(() => {});
-                        });
+                        // Avoid reassigning srcObject; just ensure playback
+                        remoteVideo.muted = true;
+                        remoteVideo.play().catch(() => {});
                     }
                     
                     updateViewerTracks();
@@ -670,16 +669,9 @@
                 
                 viewTracks.innerHTML = trackInfo || '<div class="track-item">No tracks received yet</div>';
                 
-                // Force video element to update by re-assigning srcObject
-                // This helps with frozen frame issues
+                // Ensure video is playing if present
                 const stream = remoteVideo.srcObject;
-                remoteVideo.srcObject = null;
-                remoteVideo.srcObject = stream;
-                
-                // Ensure video is playing
-                if (stream.getVideoTracks().length > 0) {
-                    remoteVideo.play().catch(() => {});
-                }
+                if (stream.getVideoTracks().length > 0) remoteVideo.play().catch(() => {});
             } else {
                 viewTracks.innerHTML = '<div class="track-item">No connection</div>';
             }

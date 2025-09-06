@@ -268,8 +268,7 @@
     <div class="subtitle">Start with data-only connection, dynamically add/remove media tracks</div>
     
     <div class="warning">
-        ⚠️ Note: The SDK doesn't fully support adding tracks after announce() yet. 
-        This demo shows the intended pattern for future implementation.
+        ✅ This demo dynamically adds/removes media tracks after announce() using the SDK’s track APIs.
     </div>
     
     <div class="main-grid">
@@ -525,13 +524,16 @@
                     localStream = new MediaStream();
                     document.getElementById('localVideo').srcObject = localStream;
                 }
-                localStream.addTrack(videoTrack);
-                
-                // TODO: When SDK supports it, this would be:
-                // await publisher.addTrack(videoTrack);
-                
-                log('pubLog', '⚠️ SDK limitation: Cannot add track to existing connections yet', 'error');
-                log('pubLog', 'In a full implementation, this would update all peer connections', 'system');
+                // If there is an existing local video (camera or screen), replace it; otherwise add
+                const existingLocalVideo = localStream.getVideoTracks()[0];
+                if (existingLocalVideo) {
+                    await publisher.replaceTrack(existingLocalVideo, videoTrack);
+                    try { localStream.removeTrack(existingLocalVideo); } catch (e) {}
+                    try { localStream.addTrack(videoTrack); } catch (e) {}
+                } else {
+                    try { localStream.addTrack(videoTrack); } catch (e) {}
+                    await publisher.addTrack(videoTrack, localStream);
+                }
                 
                 document.getElementById('toggleVideo').disabled = false;
                 document.getElementById('removeAllTracks').disabled = false;
@@ -554,13 +556,15 @@
                     localStream = new MediaStream();
                     document.getElementById('localVideo').srcObject = localStream;
                 }
-                localStream.addTrack(audioTrack);
-                
-                // TODO: When SDK supports it, this would be:
-                // await publisher.addTrack(audioTrack);
-                
-                log('pubLog', '⚠️ SDK limitation: Cannot add track to existing connections yet', 'error');
-                log('pubLog', 'In a full implementation, this would update all peer connections', 'system');
+                const existingLocalAudio = localStream.getAudioTracks()[0];
+                if (existingLocalAudio) {
+                    await publisher.replaceTrack(existingLocalAudio, audioTrack);
+                    try { localStream.removeTrack(existingLocalAudio); } catch (e) {}
+                    try { localStream.addTrack(audioTrack); } catch (e) {}
+                } else {
+                    try { localStream.addTrack(audioTrack); } catch (e) {}
+                    await publisher.addTrack(audioTrack, localStream);
+                }
                 
                 document.getElementById('toggleAudio').disabled = false;
                 document.getElementById('removeAllTracks').disabled = false;
@@ -578,35 +582,41 @@
                 const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
                 screenTrack = stream.getVideoTracks()[0];
                 
-                // Replace video track with screen share
-                if (videoTrack && localStream) {
-                    localStream.removeTrack(videoTrack);
-                    videoTrack.stop();
-                }
-                
+                // Ensure we have a local preview stream
                 if (!localStream) {
                     localStream = new MediaStream();
                     document.getElementById('localVideo').srcObject = localStream;
                 }
-                localStream.addTrack(screenTrack);
+
+                // If a camera video track exists, replace it; otherwise, add as a new video track
+                if (videoTrack) {
+                    await publisher.replaceTrack(videoTrack, screenTrack);
+                    try { localStream.removeTrack(videoTrack); } catch (e) {}
+                    try { localStream.addTrack(screenTrack); } catch (e) {}
+                    try { videoTrack.stop(); } catch (e) {}
+                    videoTrack = null;
+                } else {
+                    await publisher.addTrack(screenTrack, localStream);
+                    try { localStream.addTrack(screenTrack); } catch (e) {}
+                }
                 
                 // Handle screen share ending
                 screenTrack.onended = () => {
                     log('pubLog', 'Screen share ended', 'system');
+                    try { if (publisher && screenTrack) publisher.removeTrack(screenTrack).catch(() => {}); } catch (e) {}
+                    try { if (localStream && screenTrack) localStream.removeTrack(screenTrack); } catch (e) {}
+                    try { if (screenTrack) screenTrack.stop(); } catch (e) {}
                     screenTrack = null;
                     updateTrackDisplay();
                 };
                 
-                // TODO: When SDK supports it, this would be:
-                // await publisher.replaceTrack(videoTrack, screenTrack);
-                
-                log('pubLog', '⚠️ SDK limitation: Cannot replace track in existing connections yet', 'error');
+                log('pubLog', 'Screen share active', 'success');
                 
                 document.getElementById('removeAllTracks').disabled = false;
                 updateTrackDisplay();
                 
             } catch (error) {
-                log('pubLog', `Failed to add screen share: ${error.message}`, 'error');
+                log('pubLog', `Failed to add screen: ${error.message}`, 'error');
             }
         }
         
@@ -626,27 +636,30 @@
             }
         }
         
-        function removeAllTracks() {
-            if (localStream) {
-                localStream.getTracks().forEach(track => {
-                    track.stop();
-                    localStream.removeTrack(track);
-                });
+        async function removeAllTracks() {
+            if (publisher) {
+                try { if (videoTrack) await publisher.removeTrack(videoTrack); } catch (e) {}
+                try { if (audioTrack) await publisher.removeTrack(audioTrack); } catch (e) {}
+                try { if (screenTrack) await publisher.removeTrack(screenTrack); } catch (e) {}
+            } else if (localStream) {
+                try {
+                    localStream.getTracks().forEach(track => {
+                        try { track.stop(); } catch (e) {}
+                        try { localStream.removeTrack(track); } catch (e) {}
+                    });
+                } catch (e) {}
             }
-            
+
             videoTrack = null;
             audioTrack = null;
             screenTrack = null;
-            
+
             document.getElementById('toggleVideo').disabled = true;
             document.getElementById('toggleAudio').disabled = true;
             document.getElementById('removeAllTracks').disabled = true;
-            
+
             log('pubLog', 'All tracks removed', 'system');
             updateTrackDisplay();
-            
-            // TODO: When SDK supports it, this would be:
-            // await publisher.removeAllTracks();
         }
         
         function sendPublisherMessage() {
@@ -728,8 +741,8 @@
                 await viewer.connect();
                 await viewer.quickView({
                     streamID: STREAM_ID,
-                    audio: false,
-                    video: false
+                    audio: true,
+                    video: true
                 });
                 
                 // Update UI

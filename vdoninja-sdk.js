@@ -2461,57 +2461,54 @@
         async _handleOfferSDP(msg) {
             this._log('Handling offer from:', msg.UUID, 'session:', msg.session);
 
-            // Normalize streamID to original (strip hash suffix if present)
-            const cleanStreamID = this._stripHashFromStreamID(msg.streamID);
+            // Normalize streamID to original (strip hash suffix if present), if provided
+            const cleanStreamID = (msg.streamID !== undefined) ? this._stripHashFromStreamID(msg.streamID) : undefined;
 
-            // Check if we have an existing viewer connection with different session
+            // Reuse existing viewer connection when renegotiating; create only if needed
             const existingConnections = this.connections.get(msg.UUID);
-            if (existingConnections && existingConnections.viewer) {
-                const existingConnection = existingConnections.viewer;
-                if (existingConnection.streamID === cleanStreamID && 
-                    existingConnection.session && existingConnection.session !== msg.session) {
-                    this._log('Found existing connection with different session:', existingConnection.session, 'vs', msg.session);
-                    this._log('Closing old connection due to session mismatch');
-                    
-                    if (existingConnection.pc) {
-                        existingConnection.pc.close();
-                    }
-                    delete existingConnections.viewer;
-                }
+            let connection = (existingConnections && existingConnections.viewer) ? existingConnections.viewer : null;
+
+            if (connection && connection.session && msg.session && connection.session !== msg.session) {
+                // Session mismatch: close and drop, then recreate
+                this._log('Found existing connection with different session:', connection.session, 'vs', msg.session);
+                this._log('Closing old connection due to session mismatch');
+                try { connection.pc && connection.pc.close(); } catch (e) {}
+                if (existingConnections) delete existingConnections.viewer;
+                connection = null;
             }
 
-            // Create new connection
-            const connection = await this._createConnection(msg.UUID, 'viewer');
-            connection.streamID = cleanStreamID;
-            connection.session = msg.session;  // Store the publisher's session
-            
-            // Check if we have pending view preferences for this streamID
-            const pendingView = this._pendingViews.get(cleanStreamID);
-            if (pendingView && pendingView.options) {
-                connection.viewPreferences = {
-                    audio: pendingView.options.audio !== false,
-                    video: pendingView.options.video !== false
-                };
-                if (pendingView.options.label) {
-                    connection.viewPreferences.info = {
-                        label: pendingView.options.label
+            if (!connection) {
+                // Create new connection
+                connection = await this._createConnection(msg.UUID, 'viewer');
+                // Only set streamID if supplied in this offer; otherwise leave as default/previous
+                if (cleanStreamID !== undefined) connection.streamID = cleanStreamID;
+                connection.session = msg.session;  // Store the publisher's session
+
+                // Attach view preferences if we initiated a view for this streamID
+                const pendingView = cleanStreamID !== undefined ? this._pendingViews.get(cleanStreamID) : null;
+                if (pendingView && pendingView.options) {
+                    connection.viewPreferences = {
+                        audio: pendingView.options.audio !== false,
+                        video: pendingView.options.video !== false
                     };
+                    if (pendingView.options.label) {
+                        connection.viewPreferences.info = { label: pendingView.options.label };
+                    }
+                    connection.viewOptions = pendingView.options;
+                    this._log('Attached view preferences to connection:', connection.viewPreferences);
+                } else {
+                    // Default to requesting both audio and video if no preferences specified
+                    connection.viewPreferences = { audio: true, video: true };
+                    connection.viewOptions = { audio: true, video: true };
+                    this._log('No pending view found, using default preferences:', connection.viewPreferences);
                 }
-                // Store viewOptions for reconnection handling
-                connection.viewOptions = pendingView.options;
-                this._log('Attached view preferences to connection:', connection.viewPreferences);
+
+                this._log(`Created viewer connection for offer - UUID: ${msg.UUID}, streamID: ${connection.streamID}, session: ${msg.session}`);
             } else {
-                // Default to requesting both audio and video if no preferences specified
-                connection.viewPreferences = {
-                    audio: true,
-                    video: true
-                };
-                // Store default viewOptions for reconnection handling
-                connection.viewOptions = { audio: true, video: true };
-                this._log('No pending view found, using default preferences:', connection.viewPreferences);
+                // Existing connection: keep streamID and preferences as-is; ensure session recorded
+                if (!connection.session && msg.session) connection.session = msg.session;
+                if (!connection.streamID && cleanStreamID !== undefined) connection.streamID = cleanStreamID;
             }
-            
-            this._log(`Created viewer connection for offer - UUID: ${msg.UUID}, streamID: ${cleanStreamID}, session: ${msg.session}`);
 
             try {
                 // Set remote description
