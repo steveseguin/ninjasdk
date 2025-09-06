@@ -1792,7 +1792,8 @@
                 // Send track preferences for viewers
                 if (connection.type === 'viewer' && connection.viewPreferences) {
                     try {
-                        this._sendDataInternal(connection.viewPreferences, connection.uuid, null, 'publisher');
+                        // Send strictly via the viewer-side data channel to the publisher (VDO.Ninja compatibility)
+                        this._sendDataInternal(connection.viewPreferences, connection.uuid, null, 'viewer');
                         this._log('Sent track preferences:', connection.viewPreferences);
                     } catch (error) {
                         this._log('Failed to send preferences:', error.message);
@@ -3364,6 +3365,16 @@
             const cleanMsg = { ...msg };
             delete cleanMsg.__fallback;
             
+            // If this is a pub/sub subscription update, mirror DC handling to emit peer events
+            try {
+                if (cleanMsg && cleanMsg.pipe && typeof cleanMsg.pipe === 'object') {
+                    const t = cleanMsg.pipe.type;
+                    if (t === 'subscribe' || t === 'unsubscribe') {
+                        this._handleDataChannelMessage(cleanMsg.pipe, msg.UUID);
+                    }
+                }
+            } catch (e) {}
+            
             // Emit the same events as regular data channel messages
             this._emit('dataReceived', {
                 data: cleanMsg.pipe,
@@ -4674,6 +4685,17 @@
         }
 
         /**
+         * Get current subscriptions for a connected peer by UUID
+         * @param {string} uuid - Peer UUID
+         * @returns {Array<string>} List of channels the peer is subscribed to (empty if none/unknown)
+         */
+        getPeerSubscriptions(uuid) {
+            if (!uuid || !this._peerSubscriptions) return [];
+            const set = this._peerSubscriptions.get(uuid);
+            return set ? Array.from(set) : [];
+        }
+
+        /**
          * Publish a message to a channel
          * @param {string} channel - Channel to publish to
          * @param {*} data - Data to publish
@@ -4781,15 +4803,33 @@
                     this._peerSubscriptions = new Map();
                 }
                 
+                const list = Array.isArray(data.channels)
+                    ? data.channels
+                    : (data.channels != null ? [data.channels] : []);
                 if (data.type === 'subscribe') {
                     const peerSubs = this._peerSubscriptions.get(uuid) || new Set();
-                    data.channels.forEach(ch => peerSubs.add(ch));
+                    list.forEach(ch => peerSubs.add(ch));
                     this._peerSubscriptions.set(uuid, peerSubs);
+                    // Emit non-breaking peer subscription event
+                    try {
+                        this._emit('peerSubscribed', {
+                            uuid,
+                            channels: list.slice(),
+                            allChannels: Array.from(peerSubs)
+                        });
+                    } catch (e) {}
                 } else {
-                    const peerSubs = this._peerSubscriptions.get(uuid);
-                    if (peerSubs) {
-                        data.channels.forEach(ch => peerSubs.delete(ch));
-                    }
+                    const peerSubs = this._peerSubscriptions.get(uuid) || new Set();
+                    list.forEach(ch => peerSubs.delete(ch));
+                    this._peerSubscriptions.set(uuid, peerSubs);
+                    // Emit non-breaking peer unsubscription event
+                    try {
+                        this._emit('peerUnsubscribed', {
+                            uuid,
+                            channels: list.slice(),
+                            allChannels: Array.from(peerSubs)
+                        });
+                    } catch (e) {}
                 }
                 return;
             }
@@ -5199,7 +5239,6 @@
         // Viewing/Playing aliases
         play(streamID, options) { return this.view(streamID, options); }
         watch(streamID, options) { return this.view(streamID, options); }
-        subscribe(streamID, options) { return this.view(streamID, options); }
         startViewing(streamID, options) { return this.view(streamID, options); }
         
         // Publishing/Streaming aliases  

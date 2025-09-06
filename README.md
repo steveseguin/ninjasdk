@@ -459,23 +459,43 @@ See the minimal demo at `demos/auto-connect.html`.
 
 ## Data Channel Patterns
 
-### Pub/Sub Messaging
+### Pub/Sub Messaging (SDK helpers)
 ```javascript
-// Subscribe to topics
-vdo.addEventListener('dataReceived', (event) => {
-    const { data, uuid } = event.detail;
-    if (data.topic === 'chat') {
-        displayMessage(data.message, uuid);
-    }
+const sdk = new VDONinjaSDK({ room: 'lobby', debug: true });
+await sdk.connect();
+await sdk.joinRoom({ room: 'lobby' });
+
+// Viewer/subscriber side
+sdk.addEventListener('dataChannelOpen', () => {
+  // Subscribe to one or many channels
+  sdk.subscribe(['general', 'alerts']);
 });
 
-// Publish to topic
-vdo.sendData({
-    topic: 'chat',
-    message: 'Hello everyone!',
-    timestamp: Date.now()
+// Receive channel messages (emitted only if locally subscribed)
+sdk.addEventListener('channelMessage', (e) => {
+  const { channel, data, timestamp, uuid } = e.detail;
+  console.log(`[${channel}]`, data, 'from', uuid, 'at', new Date(timestamp));
 });
+
+// Publisher side: send to a channel; only subscribed peers will receive
+sdk.publishToChannel('general', { message: 'Hello subscribers!' });
+
+// Optional: monitor peer subscription changes (publisher UI)
+sdk.addEventListener('peerSubscribed', (e) => {
+  console.log('peerSubscribed', e.detail.uuid, e.detail.channels, e.detail.allChannels);
+});
+sdk.addEventListener('peerUnsubscribed', (e) => {
+  console.log('peerUnsubscribed', e.detail.uuid, e.detail.channels, e.detail.allChannels);
+});
+
+// Query local subscriptions and per-peer subscriptions
+sdk.getSubscriptions();                // ['general','alerts']
+sdk.getPeerSubscriptions('peer-uuid'); // ['general']
 ```
+
+Note: The SDK reserves pipe messages with `type: 'subscribe'|'unsubscribe'|'channelMessage'` for its
+pub/sub system and emits `channelMessage` events accordingly. For custom app-level protocols,
+prefer distinct type names to avoid collisions (e.g., `topicSubscribe`).
 
 ### Binary Data
 ```javascript

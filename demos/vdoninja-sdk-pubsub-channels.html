@@ -427,7 +427,7 @@
         // Publisher state
         let publisher = null;
         let isPublishing = false;
-        let connectedViewers = new Map(); // uuid -> {channels: Set, joinedAt: Date}
+        let connectedViewers = new Map(); // uuid -> { joinedAt: Date }
         let pubMessageCount = 0;
         
         // Subscriber state
@@ -489,11 +489,8 @@
                     const uuid = event.detail.uuid;
                     logPublisher(`Data channel opened with viewer: ${uuid.substring(0, 8)}...`);
                     
-                    // Initialize viewer with no channels subscribed
-                    connectedViewers.set(uuid, {
-                        channels: new Set(),
-                        joinedAt: new Date()
-                    });
+                    // Track viewer connection
+                    connectedViewers.set(uuid, { joinedAt: new Date() });
                     
                     // Send welcome message
                     publisher.sendData({
@@ -505,24 +502,7 @@
                     updatePublisherUI();
                 });
                 
-                publisher.addEventListener('dataReceived', (event) => {
-                    const { data, uuid } = event.detail;
-                    
-                    if (data.type === 'subscribe') {
-                        handleSubscription(uuid, data.channels, true);
-                    } else if (data.type === 'unsubscribe') {
-                        handleSubscription(uuid, data.channels, false);
-                    } else if (data.type === 'getChannels') {
-                        // Send current subscription state
-                        const viewer = connectedViewers.get(uuid);
-                        if (viewer) {
-                            publisher.sendData({
-                                type: 'channelList',
-                                subscribedChannels: Array.from(viewer.channels)
-                            }, uuid);
-                        }
-                    }
-                });
+                // No need to handle subscribe/unsubscribe here when using SDK pub/sub API
                 
                 publisher.addEventListener('disconnected', () => {
                     logPublisher('Disconnected from server');
@@ -567,28 +547,7 @@
             updatePublisherUI();
         }
         
-        function handleSubscription(uuid, channels, subscribe) {
-            const viewer = connectedViewers.get(uuid);
-            if (!viewer) return;
-            
-            channels.forEach(channel => {
-                if (subscribe) {
-                    viewer.channels.add(channel);
-                    logPublisher(`Viewer ${uuid.substring(0, 8)}... subscribed to: ${channel}`);
-                } else {
-                    viewer.channels.delete(channel);
-                    logPublisher(`Viewer ${uuid.substring(0, 8)}... unsubscribed from: ${channel}`);
-                }
-            });
-            
-            // Send confirmation
-            publisher.sendData({
-                type: 'subscriptionUpdate',
-                subscribedChannels: Array.from(viewer.channels)
-            }, uuid);
-            
-            updatePublisherUI();
-        }
+        // Using SDK pub/sub; no manual subscription tracking on publisher side
         
         function sendChannelMessage() {
             if (!publisher) return;
@@ -603,25 +562,11 @@
                 return;
             }
             
-            // Send to all viewers subscribed to this channel
-            let sentCount = 0;
-            connectedViewers.forEach((viewer, uuid) => {
-                if (viewer.channels.has(channel)) {
-                    publisher.sendData({
-                        type: 'channelMessage',
-                        channel: channel,
-                        message: message,
-                        timestamp: Date.now()
-                    }, uuid);
-                    sentCount++;
-                }
-            });
+            // Use SDK helper; only subscribed clients will emit channelMessage
+            publisher.publishToChannel(channel, { message: message, timestamp: Date.now() });
             
             pubMessageCount++;
-            logPublisher(
-                `<span class="message-channel">${channel}</span>Sent: "${message}" (${sentCount} recipients)`,
-                'sent'
-            );
+            logPublisher(`<span class="message-channel">${channel}</span>Sent: "${message}"`, 'sent');
             
             // Clear inputs
             document.getElementById('messageContent').value = '';
@@ -661,7 +606,7 @@
             document.getElementById('pubViewerCount').textContent = connectedViewers.size;
             document.getElementById('pubMessageCount').textContent = pubMessageCount;
             
-            // Update connection list
+            // Update connection list (no per-viewer channel tracking when using SDK pub/sub)
             const connectionList = document.getElementById('pubConnections');
             if (connectedViewers.size === 0) {
                 connectionList.innerHTML = '<div style="text-align: center; color: #666;">No viewers connected</div>';
@@ -671,14 +616,10 @@
                     const item = document.createElement('div');
                     item.className = 'connection-item';
                     
-                    const channelList = viewer.channels.size > 0 
-                        ? Array.from(viewer.channels).join(', ')
-                        : 'No subscriptions';
-                    
                     item.innerHTML = `
                         <div>
                             <strong>${uuid.substring(0, 8)}...</strong>
-                            <div class="connection-channels">Channels: ${channelList}</div>
+                            <div class="connection-channels">Connected: ${viewer.joinedAt.toLocaleTimeString()}</div>
                         </div>
                         <small>${viewer.joinedAt.toLocaleTimeString()}</small>
                     `;
@@ -712,33 +653,20 @@
                 
                 subscriber.addEventListener('dataChannelOpen', (event) => {
                     logSubscriber('Data channel opened with publisher');
-                    
-                    // Send initial subscription
-                    sendSubscriptionUpdate();
+                    // Subscribe to initial channels using SDK API
+                    if (subscribedChannels.size > 0) {
+                        subscriber.subscribe(Array.from(subscribedChannels));
+                    }
                 });
                 
+                // Generic data handling for non-pubsub messages
                 subscriber.addEventListener('dataReceived', (event) => {
                     const { data } = event.detail;
-                    
                     if (data.type === 'welcome') {
                         logSubscriber(`Welcome message: ${data.message}`, 'system');
                         if (data.availableChannels) {
                             logSubscriber(`Available channels: ${data.availableChannels.join(', ')}`, 'system');
                         }
-                    } else if (data.type === 'channelMessage') {
-                        // Check if we're subscribed to this channel
-                        if (subscribedChannels.has(data.channel)) {
-                            subMessageCount++;
-                            logSubscriber(
-                                `<span class="message-channel">${data.channel}</span>Received: "${data.message}"`,
-                                'received'
-                            );
-                        } else {
-                            subFilteredCount++;
-                            // Optionally log filtered messages
-                            // logSubscriber(`[Filtered] Channel: ${data.channel}`, 'system');
-                        }
-                        updateSubscriberUI();
                     } else if (data.type === 'broadcast') {
                         subMessageCount++;
                         logSubscriber(
@@ -746,9 +674,17 @@
                             'received'
                         );
                         updateSubscriberUI();
-                    } else if (data.type === 'subscriptionUpdate') {
-                        logSubscriber(`Subscription confirmed: ${data.subscribedChannels.join(', ')}`, 'system');
                     }
+                });
+
+                // Handle SDK pub/sub channel messages
+                subscriber.addEventListener('channelMessage', (event) => {
+                    const { channel, data, timestamp } = event.detail;
+                    // Only emitted when locally subscribed; no need to filter
+                    subMessageCount++;
+                    const msg = typeof data === 'object' && data !== null && 'message' in data ? data.message : JSON.stringify(data);
+                    logSubscriber(`<span class="message-channel">${channel}</span>Received: "${msg}"`, 'received');
+                    updateSubscriberUI();
                 });
                 
                 // Connect to server, join room, and view the publisher's stream
@@ -809,14 +745,14 @@
             document.getElementById('newChannel').value = '';
             
             logSubscriber(`Subscribed to channel: ${channel}`, 'system');
-            sendSubscriptionUpdate();
+            if (subscriber) subscriber.subscribe(channel);
             updateSubscriberUI();
         }
         
         function unsubscribeFromChannel(channel) {
             subscribedChannels.delete(channel);
             logSubscriber(`Unsubscribed from channel: ${channel}`, 'system');
-            sendSubscriptionUpdate();
+            if (subscriber) subscriber.unsubscribe(channel);
             updateSubscriberUI();
         }
         
@@ -826,26 +762,18 @@
             allChannels.forEach(channel => subscribedChannels.add(channel));
             
             logSubscriber('Subscribed to all standard channels', 'system');
-            sendSubscriptionUpdate();
+            if (subscriber) subscriber.subscribe(allChannels);
             updateSubscriberUI();
         }
         
         function unsubscribeFromAll() {
+            const toRemove = Array.from(subscribedChannels);
             subscribedChannels.clear();
             logSubscriber('Unsubscribed from all channels', 'system');
-            sendSubscriptionUpdate();
+            if (subscriber && toRemove.length) subscriber.unsubscribe(toRemove);
             updateSubscriberUI();
         }
-        
-        function sendSubscriptionUpdate() {
-            if (!subscriber || !isSubscribing) return;
-            
-            // Send current subscriptions to publisher
-            subscriber.sendData({
-                type: 'subscribe',
-                channels: Array.from(subscribedChannels)
-            });
-        }
+        // No sendSubscriptionUpdate(); using SDK subscribe()/unsubscribe()
         
         function updateSubscriberUI() {
             // Update stats
@@ -874,7 +802,7 @@
         
         // Set default room names with random number
         const randomSuffix = Math.floor(Math.random() * 10000);
-        const defaultRoom = `pubsub-channels-demo-${randomSuffix}`;
+        const defaultRoom = `pubsub_channels_demo_${randomSuffix}`;
         document.getElementById('pubRoom').value = defaultRoom;
         document.getElementById('subRoom').value = defaultRoom;
     </script>

@@ -458,7 +458,7 @@
         // Publisher state
         let publisher = null;
         let isPublishing = false;
-        let connectedViewers = new Map(); // uuid -> {channels: Set, joinedAt: Date, dataChannelOpen: boolean}
+        let connectedViewers = new Map(); // uuid -> { joinedAt: Date, dataChannelOpen: boolean }
         let pubMessageCount = 0;
         
         // Subscriber state
@@ -525,11 +525,7 @@
                     logPublisher(`🔗 Data channel opened with viewer: ${uuid.substring(0, 8)}... (P2P established)`);
                     
                     // Initialize viewer with no channels subscribed
-                    connectedViewers.set(uuid, {
-                        channels: new Set(),
-                        joinedAt: new Date(),
-                        dataChannelOpen: true
-                    });
+                    connectedViewers.set(uuid, { joinedAt: new Date(), dataChannelOpen: true });
                     
                     // Send welcome message via P2P
                     publisher.sendData({
@@ -551,19 +547,7 @@
                     }
                 });
                 
-                publisher.addEventListener('dataReceived', (event) => {
-                    const data = event.detail.data;
-                    const uuid = event.detail.uuid;
-                    
-                    // Handle subscription messages
-                    if (data && typeof data === 'object') {
-                        if (data.type === 'subscribe') {
-                            handleSubscription(uuid, data.channels, true);
-                        } else if (data.type === 'unsubscribe') {
-                            handleSubscription(uuid, data.channels, false);
-                        }
-                    }
-                });
+                // No need to process subscribe/unsubscribe when using SDK pub/sub API
                 
                 publisher.addEventListener('bye', (event) => {
                     const uuid = event.detail.UUID;
@@ -617,28 +601,7 @@
             updatePublisherUI();
         }
         
-        function handleSubscription(uuid, channels, subscribe) {
-            const viewer = connectedViewers.get(uuid);
-            if (!viewer) return;
-            
-            channels.forEach(channel => {
-                if (subscribe) {
-                    viewer.channels.add(channel);
-                    logPublisher(`Viewer ${uuid.substring(0, 8)}... subscribed to: ${channel}`);
-                } else {
-                    viewer.channels.delete(channel);
-                    logPublisher(`Viewer ${uuid.substring(0, 8)}... unsubscribed from: ${channel}`);
-                }
-            });
-            
-            // Send confirmation via P2P only
-            publisher.sendData({
-                type: 'subscriptionUpdate',
-                subscribedChannels: Array.from(viewer.channels)
-            }, uuid);
-            
-            updatePublisherUI();
-        }
+        // Using SDK pub/sub; publisher does not track per-viewer subscriptions
         
         function sendChannelMessage() {
             if (!publisher) return;
@@ -653,39 +616,12 @@
                 return;
             }
             
-            // Count viewers with open data channels subscribed to this channel
-            let sentCount = 0;
-            let failedCount = 0;
-            
-            connectedViewers.forEach((viewer, uuid) => {
-                if (viewer.channels.has(channel)) {
-                    if (viewer.dataChannelOpen) {
-                        // Send via P2P only
-                        publisher.sendData({
-                            pipe: 'pubsub',
-                            channel: channel,
-                            data: { message: message }
-                        }, uuid);
-                        sentCount++;
-                    } else {
-                        failedCount++;
-                    }
-                }
-            });
+            // Send via P2P using SDK helper; only subscribed clients will emit channelMessage
+            publisher.publishToChannel(channel, { message: message, timestamp: Date.now() });
             
             pubMessageCount++;
             
-            if (failedCount > 0) {
-                logPublisher(
-                    `<span class="message-channel">${channel}</span>Sent: "${message}" (${sentCount} delivered, ${failedCount} failed - no P2P)`,
-                    'sent'
-                );
-            } else {
-                logPublisher(
-                    `<span class="message-channel">${channel}</span>Sent: "${message}" (${sentCount} recipients via P2P)`,
-                    'sent'
-                );
-            }
+            logPublisher(`<span class="message-channel">${channel}</span>Sent: "${message}" (P2P)`, 'sent');
             
             // Clear inputs
             document.getElementById('messageContent').value = '';
@@ -755,16 +691,12 @@
                     const item = document.createElement('div');
                     item.className = 'connection-item';
                     
-                    const channelList = viewer.channels.size > 0 
-                        ? Array.from(viewer.channels).join(', ')
-                        : 'No subscriptions';
-                    
                     const dcStatus = viewer.dataChannelOpen ? '🟢' : '🔴';
                     
                     item.innerHTML = `
                         <div>
                             <strong>${uuid.substring(0, 8)}...</strong> ${dcStatus}
-                            <div class="connection-channels">Channels: ${channelList}</div>
+                            <div class="connection-channels">Connected: ${viewer.joinedAt.toLocaleTimeString()}</div>
                         </div>
                         <small>${viewer.joinedAt.toLocaleTimeString()}</small>
                     `;
@@ -808,14 +740,9 @@
                     document.getElementById('subConnStatus').className = 'connection-status datachannel';
                     document.getElementById('subDataChannelStatus').textContent = 'Connected';
                     
-                    // Send pending subscriptions if any
-                    if (pendingSubscriptions) {
-                        logSubscriber('Sending pending subscription update...');
-                        sendSubscriptionUpdate();
-                        pendingSubscriptions = null;
-                    } else {
-                        // Send initial subscription
-                        sendSubscriptionUpdate();
+                    // Subscribe to initial channels using SDK API (P2P path)
+                    if (subscribedChannels.size > 0) {
+                        subscriber.subscribe(Array.from(subscribedChannels));
                     }
                 });
                 
@@ -829,19 +756,10 @@
                     document.getElementById('subDataChannelStatus').textContent = 'Disconnected';
                 });
                 
-                // Handle raw data messages
+                // Handle raw data messages (non pub/sub)
                 subscriber.addEventListener('dataReceived', (event) => {
                     const data = event.detail.data;
-                    
-                    // Handle pipe protocol messages
-                    if (data.pipe === 'pubsub' && data.channel && subscribedChannels.has(data.channel)) {
-                        subMessageCount++;
-                        logSubscriber(
-                            `<span class="message-channel">${data.channel}</span>Received: "${data.data.message}"`,
-                            'received'
-                        );
-                        updateSubscriberUI();
-                    } else if (data.type === 'welcome') {
+                    if (data.type === 'welcome') {
                         logSubscriber(`Welcome message: ${data.message}`, 'system');
                         if (data.availableChannels) {
                             logSubscriber(`Available channels: ${data.availableChannels.join(', ')}`, 'system');
@@ -853,9 +771,16 @@
                             'received'
                         );
                         updateSubscriberUI();
-                    } else if (data.type === 'subscriptionUpdate') {
-                        logSubscriber(`Subscription confirmed: ${data.subscribedChannels.join(', ')}`, 'system');
                     }
+                });
+
+                // Use SDK pub/sub event for channel messages
+                subscriber.addEventListener('channelMessage', (event) => {
+                    const { channel, data } = event.detail;
+                    subMessageCount++;
+                    const msg = typeof data === 'object' && data !== null && 'message' in data ? data.message : JSON.stringify(data);
+                    logSubscriber(`<span class="message-channel">${channel}</span>Received: "${msg}"`, 'received');
+                    updateSubscriberUI();
                 });
                 
                 // Connect and view
@@ -922,13 +847,7 @@
             document.getElementById('newChannel').value = '';
             
             logSubscriber(`Subscribed to channel: ${channel}`, 'system');
-            
-            if (isDataChannelOpen) {
-                sendSubscriptionUpdate();
-            } else {
-                logSubscriber('⏳ Subscription will be sent when P2P connection is established', 'system');
-                pendingSubscriptions = Array.from(subscribedChannels);
-            }
+            if (isDataChannelOpen && subscriber) subscriber.subscribe(channel);
             
             updateSubscriberUI();
         }
@@ -937,9 +856,7 @@
             subscribedChannels.delete(channel);
             logSubscriber(`Unsubscribed from channel: ${channel}`, 'system');
             
-            if (isDataChannelOpen) {
-                sendSubscriptionUpdate();
-            }
+            if (isDataChannelOpen && subscriber) subscriber.unsubscribe(channel);
             
             updateSubscriberUI();
         }
@@ -951,44 +868,22 @@
             
             logSubscriber('Subscribed to all standard channels', 'system');
             
-            if (isDataChannelOpen) {
-                sendSubscriptionUpdate();
-            } else {
-                logSubscriber('⏳ Subscriptions will be sent when P2P connection is established', 'system');
-                pendingSubscriptions = Array.from(subscribedChannels);
-            }
+            if (isDataChannelOpen && subscriber) subscriber.subscribe(allChannels);
             
             updateSubscriberUI();
         }
         
         function unsubscribeFromAll() {
+            const toRemove = Array.from(subscribedChannels);
             subscribedChannels.clear();
             logSubscriber('Unsubscribed from all channels', 'system');
             
-            if (isDataChannelOpen) {
-                sendSubscriptionUpdate();
-            }
+            if (isDataChannelOpen && subscriber && toRemove.length) subscriber.unsubscribe(toRemove);
             
             updateSubscriberUI();
         }
         
-        function sendSubscriptionUpdate() {
-            if (!subscriber || !isSubscribing) return;
-            
-            if (!isDataChannelOpen) {
-                logSubscriber('⚠️ Cannot send subscription - P2P data channel not open', 'error');
-                pendingSubscriptions = Array.from(subscribedChannels);
-                return;
-            }
-            
-            // Send subscription update via P2P only
-            subscriber.sendData({
-                type: 'subscribe',
-                channels: Array.from(subscribedChannels)
-            });
-            
-            logSubscriber(`Sent subscription update via P2P: ${Array.from(subscribedChannels).join(', ')}`);
-        }
+        // No raw sendSubscriptionUpdate(); using SDK subscribe()/unsubscribe()
         
         function updateSubscriberUI() {
             // Update stats
@@ -1017,8 +912,8 @@
         // Set random room name and stream ID
         const randomRoom = Math.floor(Math.random() * 10000);
         const randomStream = Math.floor(Math.random() * 1000);
-        const roomName = `p2p-pubsub-demo-${randomRoom}`;
-        const streamId = `p2p-publisher-${randomStream}`;
+        const roomName = `p2p_pubsub_demo_${randomRoom}`;
+        const streamId = `p2p_publisher_${randomStream}`;
         
         document.getElementById('pubRoom').value = roomName;
         document.getElementById('subRoom').value = roomName;

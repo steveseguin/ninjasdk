@@ -754,7 +754,7 @@
                 data: { username: 'User123', timestamp: Date.now() }
             },
             subscribe: {
-                type: 'subscribe',
+                type: 'topicSubscribe',
                 topic: 'sensor/temperature',
                 callback: 'temp_updates'
             },
@@ -1076,7 +1076,7 @@
             
             // Send subscription message
             const subMsg = {
-                type: 'subscribe',
+                type: 'topicSubscribe',
                 topic: topic,
                 subscriber: nodes[nodeId].streamID || `Node ${nodeId}`
             };
@@ -1094,7 +1094,7 @@
             const sdk = nodes[nodeId].sdk;
             if (sdk) {
                 const unsubMsg = {
-                    type: 'unsubscribe',
+                    type: 'topicUnsubscribe',
                     topic: topic,
                     subscriber: nodes[nodeId].streamID || `Node ${nodeId}`
                 };
@@ -1252,10 +1252,10 @@
                         // Could also display in a special pub/sub message area
                     }
                 }
-                else if (data.type === 'subscribe') {
+                else if (data.type === 'topicSubscribe') {
                     logMessage(nodeId, `${data.subscriber} subscribed to ${data.topic}${fallbackIndicator}`, 'system');
                 }
-                else if (data.type === 'unsubscribe') {
+                else if (data.type === 'topicUnsubscribe') {
                     logMessage(nodeId, `${data.subscriber} unsubscribed from ${data.topic}${fallbackIndicator}`, 'system');
                 }
                 // Handle ping/pong
@@ -1450,7 +1450,7 @@
         window.addEventListener('load', () => {
             // Set random room name and stream IDs
             const randomRoom = Math.floor(Math.random() * 10000);
-            const roomName = `datachannel-demo-${randomRoom}`;
+            const roomName = `datachannel_demo_${randomRoom}`;
             document.getElementById('node1Room').value = roomName;
             document.getElementById('node2Room').value = roomName;
             
