@@ -1,4 +1,4 @@
-// VDO.Ninja SDK v1.3.13
+// VDO.Ninja SDK v1.3.14
 /**
  * VDO.Ninja SDK - OFFICIAL SDK FOR VDO.NINJA WEBSOCKET API
  * Copyright (C) 2025 Steve Seguin and contributors
@@ -327,7 +327,7 @@
          * @returns {string} Current SDK version
          */
         static get VERSION() {
-            return '1.3.13';
+            return '1.3.14';
         }
         
         /**
