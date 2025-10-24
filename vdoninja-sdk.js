@@ -2923,17 +2923,25 @@
          * @returns {string} Clean stream ID without hash
          */
         _stripHashFromStreamID(streamID) {
-            if (!streamID || typeof streamID !== 'string') return streamID;
-            
-            // Hash suffixes are 6 characters long and are lowercase hex
-            if (streamID.length > 6) {
-                const lastSix = streamID.slice(-6);
-                // Check if last 6 chars are hex (0-9, a-f)
-                if (/^[a-f0-9]{6}$/.test(lastSix)) {
-                    return streamID.slice(0, -6);
-                }
+            if (!streamID || typeof streamID !== 'string') {
+                return streamID;
             }
-            
+
+            // Only strip when we have a cached password hash to compare against
+            if (!this._passwordHash || typeof this._passwordHash !== 'string') {
+                return streamID;
+            }
+
+            const suffixLength = this._passwordHash.length;
+            if (suffixLength === 0 || streamID.length <= suffixLength) {
+                return streamID;
+            }
+
+            const possibleHash = streamID.slice(-suffixLength);
+            if (possibleHash === this._passwordHash) {
+                return streamID.slice(0, -suffixLength);
+            }
+
             return streamID;
         }
 
