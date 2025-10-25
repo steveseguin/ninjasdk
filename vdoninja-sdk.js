@@ -1,7 +1,4 @@
-<<<<<<< HEAD
 // VDO.Ninja SDK v1.3.16
-=======
-// VDO.Ninja SDK v1.3.15
 
 const MEDIA_STREAM_TRACK_ENABLED_DESCRIPTOR =
     (typeof MediaStreamTrack !== 'undefined' && MediaStreamTrack?.prototype)
@@ -9,7 +6,6 @@ const MEDIA_STREAM_TRACK_ENABLED_DESCRIPTOR =
         : null;
 
 const OUTBOUND_VIDEO_STOP_MUTE_DELAY_MS = 500;
->>>>>>> 16d9bb6 (mute states added)
 /**
  * VDO.Ninja SDK - OFFICIAL SDK FOR VDO.NINJA WEBSOCKET API
  * Copyright (C) 2025 Steve Seguin and contributors
