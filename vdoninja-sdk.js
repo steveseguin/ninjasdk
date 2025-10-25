@@ -550,6 +550,9 @@
             }
             this._pendingRoomID = options.roomid || options.roomID || null;  // Support both cases
             
+            // Preferred media configuration for outgoing WebRTC tracks
+            this._publishMediaConfig = null;
+            
             // Convenience event aliases for common patterns (Node-style)
             // sdk.on('event', handler), sdk.off('event', handler), sdk.once('event', handler)
             this.on = (evt, handler) => { try { this.addEventListener(evt, handler); } catch (e) {} return this; };
@@ -1132,6 +1135,16 @@
             }
 
             this.localStream = stream;
+            
+            // Resolve desired media preferences for outgoing tracks
+            const mediaPreferences = await this._extractPublisherMediaOptions(options);
+            if (mediaPreferences) {
+                this._publishMediaConfig = mediaPreferences;
+            }
+            if (this._publishMediaConfig) {
+                await this._applyLocalMediaPreferences(this.localStream, this._publishMediaConfig);
+            }
+
             // Use provided streamID, fall back to pending value from constructor/property, then generate
             const streamID = this._sanitizeStreamID(options.streamID || this._pendingStreamID) || this._generateStreamID();
 
@@ -2115,6 +2128,9 @@
                         });
                     }
                 }
+                
+                // Apply encoding preferences (bitrate/codec) if requested
+                await this._applyEncodingPreferencesToConnection(connection);
 
                 // Create offer
                 const offer = await connection.pc.createOffer();
@@ -2127,6 +2143,565 @@
                 this._log('Error creating offer:', error.message);
                 throw error;
             }
+        }
+
+        /**
+         * Apply codec and encoding preferences to outgoing senders for a connection.
+         * @private
+         * @param {Object} connection - Connection object
+         * @param {Object} [configOverride] - Optional override config
+         */
+        async _applyEncodingPreferencesToConnection(connection, configOverride) {
+            if (!connection || !connection.pc || connection.type !== 'publisher') return;
+
+            const config = configOverride || this._publishMediaConfig;
+            if (!config) return;
+            if (typeof connection.pc.getSenders !== 'function') return;
+
+            const senders = connection.pc.getSenders();
+            if (!Array.isArray(senders) || senders.length === 0) return;
+
+            const transceivers = (typeof connection.pc.getTransceivers === 'function')
+                ? connection.pc.getTransceivers()
+                : [];
+
+            const tasks = [];
+
+            for (const sender of senders) {
+                if (!sender || !sender.track) continue;
+                const kind = sender.track.kind;
+                if (!kind) continue;
+
+                const mediaConfig = kind === 'video' ? config.video : (kind === 'audio' ? config.audio : null);
+                if (!mediaConfig) continue;
+
+                if (mediaConfig.codec) {
+                    this._preferCodecOnSender(sender, mediaConfig.codec, kind, transceivers);
+                }
+
+                if (typeof mediaConfig.maxBitrate === 'number' ||
+                    typeof mediaConfig.minBitrate === 'number' ||
+                    typeof mediaConfig.maxFramerate === 'number' ||
+                    typeof mediaConfig.scaleResolutionDownBy === 'number') {
+                    tasks.push(this._applySenderEncodingParameters(sender, mediaConfig, kind));
+                }
+            }
+
+            if (tasks.length > 0) {
+                await Promise.all(
+                    tasks.map(task => task.catch(error => this._log('Failed to apply RTP sender parameters:', error)))
+                );
+            }
+        }
+
+        /**
+         * Reset any explicit encoding preferences applied to a connection.
+         * @private
+         * @param {Object} connection - Connection to reset
+         */
+        async _resetEncodingPreferencesForConnection(connection) {
+            if (!connection || !connection.pc || typeof connection.pc.getSenders !== 'function') return;
+
+            const senders = connection.pc.getSenders();
+            if (!Array.isArray(senders) || senders.length === 0) return;
+
+            const tasks = senders.map(sender => this._clearSenderEncodingParameters(sender));
+            await Promise.all(
+                tasks.map(task => task.catch(error => this._log('Failed to clear RTP sender parameters:', error)))
+            );
+        }
+
+        /**
+         * Prioritize a codec on a transceiver when supported.
+         * @private
+         * @param {RTCRtpSender} sender - Sender to adjust
+         * @param {string} codecName - Desired codec (e.g. "VP9", "video/VP9")
+         * @param {string} kind - "audio" or "video"
+         * @param {RTCRtpTransceiver[]} transceivers - Available transceivers
+         */
+        _preferCodecOnSender(sender, codecName, kind, transceivers = []) {
+            if (!sender || !codecName) return;
+            if (typeof RTCRtpSender === 'undefined' || typeof RTCRtpSender.getCapabilities !== 'function') return;
+
+            const normalizedCodec = this._normalizeCodecName(codecName, kind);
+            if (!normalizedCodec) return;
+
+            const transceiver = Array.isArray(transceivers)
+                ? transceivers.find(t => t && t.sender === sender)
+                : null;
+
+            if (!transceiver || typeof transceiver.setCodecPreferences !== 'function') return;
+
+            const capabilities = RTCRtpSender.getCapabilities(kind);
+            if (!capabilities || !Array.isArray(capabilities.codecs) || capabilities.codecs.length === 0) return;
+
+            const preferenceList = this._buildCodecPreferenceList(capabilities.codecs, normalizedCodec);
+            if (!preferenceList) return;
+
+            try {
+                transceiver.setCodecPreferences(preferenceList);
+                this._log(`Applied codec preference ${normalizedCodec} for ${kind}`);
+            } catch (error) {
+                this._log('Codec preference application failed:', error);
+            }
+        }
+
+        /**
+         * Apply RTP sender encoding parameters such as bitrate.
+         * @private
+         * @param {RTCRtpSender} sender - Sender to adjust
+         * @param {Object} mediaConfig - Media configuration
+         * @param {string} kind - "audio" or "video"
+         */
+        async _applySenderEncodingParameters(sender, mediaConfig, kind) {
+            if (!sender || typeof sender.getParameters !== 'function' || typeof sender.setParameters !== 'function') return;
+
+            let params;
+            try {
+                params = sender.getParameters();
+            } catch (error) {
+                this._log('Unable to read RTP sender parameters:', error);
+                return;
+            }
+
+            if (!params) return;
+
+            if (!Array.isArray(params.encodings) || params.encodings.length === 0) {
+                params.encodings = [{}];
+            }
+
+            const encoding = params.encodings[0];
+            let changed = false;
+
+            if (typeof mediaConfig.maxBitrate === 'number') {
+                encoding.maxBitrate = mediaConfig.maxBitrate;
+                changed = true;
+            }
+
+            if (typeof mediaConfig.minBitrate === 'number') {
+                encoding.minBitrate = mediaConfig.minBitrate;
+                changed = true;
+            }
+
+            if (typeof mediaConfig.maxFramerate === 'number') {
+                encoding.maxFramerate = mediaConfig.maxFramerate;
+                changed = true;
+            }
+
+            if (typeof mediaConfig.scaleResolutionDownBy === 'number') {
+                encoding.scaleResolutionDownBy = mediaConfig.scaleResolutionDownBy;
+                changed = true;
+            }
+
+            if (!changed) return;
+
+            try {
+                await sender.setParameters(params);
+            } catch (error) {
+                this._log('Failed to set RTP sender parameters:', error);
+            }
+        }
+
+        /**
+         * Clear custom RTP sender parameters.
+         * @private
+         * @param {RTCRtpSender} sender - Sender to reset
+         */
+        async _clearSenderEncodingParameters(sender) {
+            if (!sender || typeof sender.getParameters !== 'function' || typeof sender.setParameters !== 'function') return;
+
+            let params;
+            try {
+                params = sender.getParameters();
+            } catch (error) {
+                this._log('Unable to read RTP sender parameters:', error);
+                return;
+            }
+
+            if (!params || !Array.isArray(params.encodings) || params.encodings.length === 0) return;
+
+            const encoding = params.encodings[0];
+            let changed = false;
+
+            for (const key of ['maxBitrate', 'minBitrate', 'maxFramerate', 'scaleResolutionDownBy']) {
+                if (encoding[key] !== undefined) {
+                    delete encoding[key];
+                    changed = true;
+                }
+            }
+
+            if (!changed) return;
+
+            try {
+                await sender.setParameters(params);
+            } catch (error) {
+                this._log('Failed to clear RTP sender parameters:', error);
+            }
+        }
+
+        /**
+         * Normalize codec name to match the format used by WebRTC capabilities.
+         * @private
+         * @param {string} codecName - Codec identifier
+         * @param {string} kind - "audio" or "video"
+         * @returns {string|null} Normalized codec string
+         */
+        _normalizeCodecName(codecName, kind) {
+            if (typeof codecName !== 'string') return null;
+
+            let normalized = codecName.trim();
+            if (!normalized) return null;
+
+            if (normalized.startsWith('/')) {
+                normalized = `${kind}${normalized}`;
+            } else if (!normalized.includes('/')) {
+                normalized = `${kind}/${normalized}`;
+            }
+
+            const parts = normalized.split('/');
+            if (parts.length !== 2) return null;
+
+            const prefix = parts[0].toLowerCase();
+            const suffix = parts[1].trim().toUpperCase();
+
+            if (!prefix || !suffix) return null;
+
+            return `${prefix}/${suffix}`;
+        }
+
+        /**
+         * Build a codec preference list prioritizing the requested codec.
+         * @private
+         * @param {Array} codecs - Codec capabilities
+         * @param {string} requestedCodec - Normalized codec string
+         * @returns {Array|null} Reordered codec list
+         */
+        _buildCodecPreferenceList(codecs, requestedCodec) {
+            if (!Array.isArray(codecs) || !requestedCodec) return null;
+
+            const target = requestedCodec.toLowerCase();
+            const primary = [];
+            const associated = [];
+            const fallback = [];
+
+            for (const codec of codecs) {
+                const mime = (codec && codec.mimeType ? codec.mimeType : '').toLowerCase();
+                if (!mime) {
+                    fallback.push(codec);
+                    continue;
+                }
+
+                if (mime === target) {
+                    primary.push(codec);
+                } else if (mime.endsWith('/rtx')) {
+                    associated.push(codec);
+                } else {
+                    fallback.push(codec);
+                }
+            }
+
+            if (primary.length === 0) return null;
+
+            const payloads = new Set(
+                primary
+                    .map(codec => codec && codec.preferredPayloadType)
+                    .filter(value => value !== undefined)
+            );
+
+            const orderedAssociated = associated.filter(codec => {
+                if (!codec || !codec.sdpFmtpLine) return false;
+                const match = codec.sdpFmtpLine.match(/apt=(\d+)/);
+                if (!match) return false;
+                return payloads.has(Number(match[1]));
+            });
+
+            return [...primary, ...orderedAssociated, ...fallback];
+        }
+
+        /**
+         * Apply local media constraints such as resolution.
+         * @private
+         * @param {MediaStream} stream - Local media stream
+         * @param {Object} config - Media configuration
+         */
+        async _applyLocalMediaPreferences(stream, config) {
+            if (!stream || !config) return;
+
+            const videoSettings = config.video;
+            if (!videoSettings || !videoSettings.resolution) return;
+
+            const constraints = {};
+            const { width, height, frameRate } = videoSettings.resolution;
+
+            if (typeof width === 'number' && width > 0) {
+                constraints.width = { ideal: width };
+            }
+
+            if (typeof height === 'number' && height > 0) {
+                constraints.height = { ideal: height };
+            }
+
+            if (typeof frameRate === 'number' && frameRate > 0) {
+                constraints.frameRate = { ideal: frameRate };
+            }
+
+            if (Object.keys(constraints).length === 0) return;
+
+            const videoTracks = stream.getVideoTracks ? stream.getVideoTracks() : [];
+            for (const track of videoTracks) {
+                if (!track || typeof track.applyConstraints !== 'function') continue;
+                try {
+                    await track.applyConstraints(constraints);
+                    this._log('Applied video constraints:', constraints);
+                } catch (error) {
+                    this._log('Failed to apply video constraints:', error);
+                }
+            }
+        }
+
+        /**
+         * Extract and normalize publisher media preferences from options.
+         * Accepts the same shape as publish() options (media/webrtc).
+         * @private
+         * @param {Object} options - Options provided to publish()/updatePublisherMedia()
+         * @returns {Object|null} Normalized configuration
+         */
+        async _extractPublisherMediaOptions(options = {}) {
+            if (!options) return null;
+
+            const sources = [];
+            if (options.media && typeof options.media === 'object') sources.push(options.media);
+            if (options.mediaSettings && typeof options.mediaSettings === 'object') sources.push(options.mediaSettings);
+            if (options.webrtc && typeof options.webrtc === 'object') sources.push(options.webrtc);
+            if (options.encoding && typeof options.encoding === 'object') sources.push(options.encoding);
+
+            const collected = { video: {}, audio: {} };
+            let hasValues = false;
+
+            const applySource = (source) => {
+                if (!source || typeof source !== 'object') return;
+
+                if (typeof source.video === 'object' && source.video !== null) {
+                    if (source.video.codec !== undefined) { collected.video.codec = source.video.codec; hasValues = true; }
+                    if (source.video.bitrate !== undefined) { collected.video.maxBitrate = source.video.bitrate; hasValues = true; }
+                    if (source.video.maxBitrate !== undefined) { collected.video.maxBitrate = source.video.maxBitrate; hasValues = true; }
+                    if (source.video.minBitrate !== undefined) { collected.video.minBitrate = source.video.minBitrate; hasValues = true; }
+                    if (source.video.resolution !== undefined) { collected.video.resolution = source.video.resolution; hasValues = true; }
+                    if (source.video.width !== undefined) { collected.video.width = source.video.width; hasValues = true; }
+                    if (source.video.height !== undefined) { collected.video.height = source.video.height; hasValues = true; }
+                    if (source.video.frameRate !== undefined) { collected.video.frameRate = source.video.frameRate; hasValues = true; }
+                }
+
+                if (source.videoCodec !== undefined) { collected.video.codec = source.videoCodec; hasValues = true; }
+                if (source.videoBitrate !== undefined) { collected.video.maxBitrate = source.videoBitrate; hasValues = true; }
+                if (source.videoResolution !== undefined) { collected.video.resolution = source.videoResolution; hasValues = true; }
+                if (source.videoWidth !== undefined) { collected.video.width = source.videoWidth; hasValues = true; }
+                if (source.videoHeight !== undefined) { collected.video.height = source.videoHeight; hasValues = true; }
+                if (source.videoFrameRate !== undefined) { collected.video.frameRate = source.videoFrameRate; hasValues = true; }
+
+                if (typeof source.audio === 'object' && source.audio !== null) {
+                    if (source.audio.codec !== undefined) { collected.audio.codec = source.audio.codec; hasValues = true; }
+                    if (source.audio.bitrate !== undefined) { collected.audio.maxBitrate = source.audio.bitrate; hasValues = true; }
+                    if (source.audio.maxBitrate !== undefined) { collected.audio.maxBitrate = source.audio.maxBitrate; hasValues = true; }
+                    if (source.audio.minBitrate !== undefined) { collected.audio.minBitrate = source.audio.minBitrate; hasValues = true; }
+                }
+
+                if (source.audioCodec !== undefined) { collected.audio.codec = source.audioCodec; hasValues = true; }
+                if (source.audioBitrate !== undefined) { collected.audio.maxBitrate = source.audioBitrate; hasValues = true; }
+            };
+
+            sources.forEach(applySource);
+
+            if (options.videoCodec !== undefined) { collected.video.codec = options.videoCodec; hasValues = true; }
+            if (options.videoBitrate !== undefined) { collected.video.maxBitrate = options.videoBitrate; hasValues = true; }
+            if (options.videoResolution !== undefined) { collected.video.resolution = options.videoResolution; hasValues = true; }
+            if (options.videoWidth !== undefined) { collected.video.width = options.videoWidth; hasValues = true; }
+            if (options.videoHeight !== undefined) { collected.video.height = options.videoHeight; hasValues = true; }
+            if (options.videoFrameRate !== undefined) { collected.video.frameRate = options.videoFrameRate; hasValues = true; }
+            if (options.audioCodec !== undefined) { collected.audio.codec = options.audioCodec; hasValues = true; }
+            if (options.audioBitrate !== undefined) { collected.audio.maxBitrate = options.audioBitrate; hasValues = true; }
+
+            if (!hasValues) return null;
+
+            const normalized = {};
+
+            const videoConfig = {};
+            if (collected.video.codec !== undefined) {
+                videoConfig.codec = collected.video.codec;
+            }
+            const parsedVideoBitrate = this._parseBitrateSetting(collected.video.maxBitrate);
+            if (parsedVideoBitrate !== null) {
+                videoConfig.maxBitrate = parsedVideoBitrate;
+            }
+            const parsedVideoMinBitrate = this._parseBitrateSetting(collected.video.minBitrate);
+            if (parsedVideoMinBitrate !== null) {
+                videoConfig.minBitrate = parsedVideoMinBitrate;
+            }
+            const parsedResolution = this._parseResolutionSetting(
+                collected.video.resolution,
+                collected.video.width,
+                collected.video.height,
+                collected.video.frameRate
+            );
+            if (parsedResolution) {
+                videoConfig.resolution = parsedResolution;
+            }
+
+            if (Object.keys(videoConfig).length > 0) {
+                normalized.video = videoConfig;
+            }
+
+            const audioConfig = {};
+            if (collected.audio.codec !== undefined) {
+                audioConfig.codec = collected.audio.codec;
+            }
+            const parsedAudioBitrate = this._parseBitrateSetting(collected.audio.maxBitrate);
+            if (parsedAudioBitrate !== null) {
+                audioConfig.maxBitrate = parsedAudioBitrate;
+            }
+            const parsedAudioMinBitrate = this._parseBitrateSetting(collected.audio.minBitrate);
+            if (parsedAudioMinBitrate !== null) {
+                audioConfig.minBitrate = parsedAudioMinBitrate;
+            }
+
+            if (Object.keys(audioConfig).length > 0) {
+                normalized.audio = audioConfig;
+            }
+
+            return Object.keys(normalized).length > 0 ? normalized : null;
+        }
+
+        /**
+         * Parse bitrate values provided in various formats and normalize to bits per second.
+         * @private
+         * @param {number|string} value - Bitrate input
+         * @returns {number|null} Normalized bitrate in bps
+         */
+        _parseBitrateSetting(value) {
+            if (value === undefined || value === null || value === '') return null;
+
+            let numericValue = value;
+            let multiplier = 1;
+
+            if (typeof value === 'string') {
+                const trimmed = value.trim().toLowerCase();
+                const match = trimmed.match(/^([\d.]+)\s*(kbps|mbps|bps|k|m)?$/);
+                if (!match) return null;
+                numericValue = parseFloat(match[1]);
+                if (Number.isNaN(numericValue)) return null;
+
+                const unit = match[2];
+                if (!unit) {
+                    multiplier = numericValue < 10000 ? 1000 : 1;
+                } else if (unit === 'mbps' || unit === 'm') {
+                    multiplier = 1000000;
+                } else if (unit === 'kbps' || unit === 'k') {
+                    multiplier = 1000;
+                } else {
+                    multiplier = 1;
+                }
+            } else if (typeof value === 'number') {
+                numericValue = value;
+                if (numericValue < 0) return null;
+                if (numericValue > 0 && numericValue < 10000) {
+                    multiplier = 1000;
+                }
+            } else {
+                return null;
+            }
+
+            const result = Math.round(numericValue * multiplier);
+            return result > 0 ? result : null;
+        }
+
+        /**
+         * Normalize resolution values expressed as objects or strings.
+         * @private
+         * @param {Object|string} resolution - Resolution descriptor
+         * @param {number} [widthAlias] - Explicit width override
+         * @param {number} [heightAlias] - Explicit height override
+         * @param {number} [frameRateAlias] - Explicit frame rate override
+         * @returns {Object|null} Normalized resolution constraints
+         */
+        _parseResolutionSetting(resolution, widthAlias, heightAlias, frameRateAlias) {
+            let width = widthAlias !== undefined ? Number(widthAlias) : undefined;
+            let height = heightAlias !== undefined ? Number(heightAlias) : undefined;
+            let frameRate = frameRateAlias !== undefined ? Number(frameRateAlias) : undefined;
+
+            if (resolution && typeof resolution === 'string') {
+                const trimmed = resolution.trim().toLowerCase();
+                const match = trimmed.match(/(\d+)x(\d+)(?:@([\d.]+))?/);
+                if (match) {
+                    width = Number(match[1]);
+                    height = Number(match[2]);
+                    if (match[3] !== undefined) {
+                        frameRate = Number(match[3]);
+                    }
+                }
+            } else if (resolution && typeof resolution === 'object') {
+                if (resolution.width !== undefined) width = Number(resolution.width);
+                if (resolution.height !== undefined) height = Number(resolution.height);
+                if (resolution.frameRate !== undefined) frameRate = Number(resolution.frameRate);
+                if (resolution.fps !== undefined && frameRate === undefined) frameRate = Number(resolution.fps);
+            }
+
+            const normalized = {};
+            if (Number.isFinite(width) && width > 0) normalized.width = Math.round(width);
+            if (Number.isFinite(height) && height > 0) normalized.height = Math.round(height);
+            if (Number.isFinite(frameRate) && frameRate > 0) normalized.frameRate = Math.round(frameRate);
+
+            return Object.keys(normalized).length > 0 ? normalized : null;
+        }
+
+        /**
+         * Merge existing media configuration with updates.
+         * @private
+         * @param {Object|null} baseConfig - Existing configuration
+         * @param {Object|null} updateConfig - New configuration
+         * @returns {Object|null} Merged configuration
+         */
+        _mergeMediaConfigs(baseConfig, updateConfig) {
+            const result = {};
+
+            if (baseConfig && baseConfig.video) {
+                result.video = { ...baseConfig.video };
+            }
+            if (baseConfig && baseConfig.audio) {
+                result.audio = { ...baseConfig.audio };
+            }
+
+            if (updateConfig) {
+                const mergeSection = (sectionName) => {
+                    const updateSection = updateConfig[sectionName];
+                    if (updateSection === null) {
+                        delete result[sectionName];
+                        return;
+                    }
+                    if (!updateSection || typeof updateSection !== 'object') return;
+
+                    if (!result[sectionName]) {
+                        result[sectionName] = {};
+                    }
+
+                    for (const [key, value] of Object.entries(updateSection)) {
+                        if (value === undefined) continue;
+                        if (value === null) {
+                            delete result[sectionName][key];
+                        } else {
+                            result[sectionName][key] = value;
+                        }
+                    }
+
+                    if (Object.keys(result[sectionName]).length === 0) {
+                        delete result[sectionName];
+                    }
+                };
+
+                mergeSection('video');
+                mergeSection('audio');
+            }
+
+            return Object.keys(result).length > 0 ? result : null;
         }
 
         /**
@@ -4228,6 +4803,7 @@
                     try {
                         // Add the track and create a new offer
                         connection.pc.addTrack(track, stream);
+                        await this._applyEncodingPreferencesToConnection(connection);
                         
                         // Renegotiate connection
                         const offer = await connection.pc.createOffer();
@@ -4369,6 +4945,7 @@
                         try {
                             // Use replaceTrack for seamless switching (no renegotiation needed)
                             await sender.replaceTrack(newTrack);
+                            await this._applyEncodingPreferencesToConnection(connection);
                             this._log(`Replaced ${newTrack.kind} track in connection: ${uuid}`);
                             
                             // Emit event
@@ -4387,6 +4964,66 @@
 
             // Stop the old track
             oldTrack.stop();
+        }
+
+        /**
+         * Update media encoding preferences for the active publisher.
+         * Accepts the same structure as publish() media options.
+         * @param {Object} options - Media configuration overrides
+         * @returns {Promise<Object|null>} Applied configuration
+         */
+        async updatePublisherMedia(options = {}) {
+            if (options === null || options === undefined) {
+                return this._publishMediaConfig;
+            }
+
+            const shouldClear = options.clear === true || options.reset === true || options.media === null;
+            if (shouldClear) {
+                this._publishMediaConfig = null;
+
+                if (this.state && this.state.publishing && this.connections && typeof this.connections.values === 'function') {
+                    const tasks = [];
+                    for (const connectionGroup of this.connections.values()) {
+                        if (connectionGroup && connectionGroup.publisher) {
+                            tasks.push(this._resetEncodingPreferencesForConnection(connectionGroup.publisher));
+                        }
+                    }
+                    if (tasks.length > 0) {
+                        await Promise.all(
+                            tasks.map(task => task.catch(error => this._log('Failed to reset encoding preferences:', error)))
+                        );
+                    }
+                }
+
+                return null;
+            }
+
+            const newConfig = await this._extractPublisherMediaOptions(options);
+            if (!newConfig) {
+                return this._publishMediaConfig;
+            }
+
+            this._publishMediaConfig = this._mergeMediaConfigs(this._publishMediaConfig, newConfig);
+
+            if (this.localStream) {
+                await this._applyLocalMediaPreferences(this.localStream, this._publishMediaConfig);
+            }
+
+            if (this.state && this.state.publishing && this.connections && typeof this.connections.values === 'function') {
+                const tasks = [];
+                for (const connectionGroup of this.connections.values()) {
+                    if (connectionGroup && connectionGroup.publisher) {
+                        tasks.push(this._applyEncodingPreferencesToConnection(connectionGroup.publisher));
+                    }
+                }
+                if (tasks.length > 0) {
+                    await Promise.all(
+                        tasks.map(task => task.catch(error => this._log('Failed to update encoding preferences:', error)))
+                    );
+                }
+            }
+
+            return this._publishMediaConfig;
         }
 
         /**

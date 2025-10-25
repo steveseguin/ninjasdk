@@ -31,10 +31,13 @@ const vdo = new VDONinjaSDK(options)
 
 ## Publishing (Sender)
 
-- publish(stream, { streamID, room?, label?, password? }): Promise<string>
+- publish(stream, { streamID, room?, label?, password?, media? }): Promise<string>
+  - media: { video?: { codec?, maxBitrate?, resolution?, frameRate? }, audio?: { codec?, maxBitrate? } }
 - announce({ streamID?, room?, label?, password? }): Promise<string>
   - Data-only publishing; generates a streamID if not provided.
 - stopPublishing(): void
+- updatePublisherMedia({ media?, videoBitrate?, videoCodec?, clear? }): Promise<Object|null>
+  - Re-applies bitrate/codec/resolution preferences to the active publisher; use `clear:true` to reset.
 
 ## Viewing (Receiver)
 
