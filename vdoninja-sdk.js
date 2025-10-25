@@ -1,4 +1,15 @@
+<<<<<<< HEAD
 // VDO.Ninja SDK v1.3.16
+=======
+// VDO.Ninja SDK v1.3.15
+
+const MEDIA_STREAM_TRACK_ENABLED_DESCRIPTOR =
+    (typeof MediaStreamTrack !== 'undefined' && MediaStreamTrack?.prototype)
+        ? Object.getOwnPropertyDescriptor(MediaStreamTrack.prototype, 'enabled')
+        : null;
+
+const OUTBOUND_VIDEO_STOP_MUTE_DELAY_MS = 500;
+>>>>>>> 16d9bb6 (mute states added)
 /**
  * VDO.Ninja SDK - OFFICIAL SDK FOR VDO.NINJA WEBSOCKET API
  * Copyright (C) 2025 Steve Seguin and contributors
@@ -629,6 +640,10 @@
             this._viewRetryTimers = new Map();
             this._viewRetryInterval = 15 * 60 * 1000; // 15 minutes
             
+            // Track monitoring for outbound video tracks
+            this._outboundVideoMonitors = new Map();
+            this._pendingVideoMuteFinalizers = new Set();
+            
             // Initialize salt before setting up crypto
             this.salt = options.salt || "vdo.ninja";
             this._saltProvidedViaOptions = !!options.salt;
@@ -873,19 +888,21 @@
                     }
                 }
                 this.connections.clear();
-                
+
+                this._clearAllVideoTrackMonitors();
+
                 // Clear all retry timers
                 for (const [streamID, timer] of this._viewRetryTimers) {
                     clearTimeout(timer);
                 }
                 this._viewRetryTimers.clear();
-                
+
                 // Close WebSocket
                 if (this.signaling) {
                     this.signaling.close();
                     this.signaling = null;
                 }
-                
+
                 // Reset state
                 this.state = {
                     connected: false,
@@ -895,7 +912,7 @@
                     roomJoined: false,
                     publishing: false
                 };
-                
+
                 this._emit('disconnected');
             });
         }
@@ -1199,6 +1216,13 @@
             this.state.streamID = streamID;
             this.state.publishing = true;
 
+            // Start monitoring outbound video tracks for mute state changes
+            this._clearAllVideoTrackMonitors();
+            if (this.localStream) {
+                const videoTracks = this.localStream.getVideoTracks ? this.localStream.getVideoTracks() : [];
+                videoTracks.forEach(track => this._monitorOutboundVideoTrack(track));
+            }
+
             // Send seed message
             const seedMessage = {
                 request: "seed",
@@ -1323,6 +1347,12 @@
                 return;
             }
 
+            if (this._outboundVideoMonitors && this._outboundVideoMonitors.size) {
+                for (const monitor of this._outboundVideoMonitors.values()) {
+                    this._sendVideoMutedState(monitor.track, true, null, 'stopPublishing');
+                }
+            }
+
             // Send bye message to all viewers via data channels
             const byePromises = [];
             
@@ -1379,6 +1409,8 @@
                         }
                     }
                 }
+
+                this._clearAllVideoTrackMonitors();
 
                 // Stop local stream tracks
                 if (this.localStream) {
@@ -1749,6 +1781,447 @@
         }
 
         /**
+         * Determine if a track is effectively muted for viewers.
+         * @private
+         * @param {MediaStreamTrack} track
+         * @returns {boolean}
+         */
+        _isTrackEffectivelyMuted(track) {
+            if (!track) return true;
+            if (track.readyState === 'ended') return true;
+            if (track.enabled === false) return true;
+            if (track.muted === true) return true;
+            return false;
+        }
+
+        /**
+         * Broadcast publisher video mute state to viewers.
+         * @private
+         * @param {MediaStreamTrack} track
+         * @param {boolean} muted
+         * @param {string|null} targetUuid
+         */
+        _sendVideoMutedState(track, muted, targetUuid = null, reason = null) {
+            if (!this.state || !this.state.publishing) {
+                return;
+            }
+
+            const payload = { videoMuted: !!muted };
+            if (track && typeof track.id === 'string') {
+                payload.trackId = track.id;
+            }
+            if (reason) {
+                this._log(`Broadcasting videoMuted:${payload.videoMuted} (${reason})`);
+            }
+
+            if (targetUuid) {
+                this._sendDataInternal(payload, targetUuid, null, 'publisher');
+            } else {
+                this._sendDataInternal(payload, null, 'publisher', 'publisher');
+            }
+        }
+
+        /**
+         * Start monitoring an outbound video track for mute state changes.
+         * @private
+         * @param {MediaStreamTrack} track
+         */
+        _monitorOutboundVideoTrack(track) {
+            if (!track || track.kind !== 'video') return;
+            if (this._pendingVideoMuteFinalizers && this._pendingVideoMuteFinalizers.size) {
+                this._cancelPendingVideoMuteFinalizers();
+            }
+            if (!this._outboundVideoMonitors) {
+                this._outboundVideoMonitors = new Map();
+            }
+            if (this._outboundVideoMonitors.has(track)) {
+                // Refresh state in case external code toggled before monitoring
+                const monitor = this._outboundVideoMonitors.get(track);
+                const currentState = this._isTrackEffectivelyMuted(track);
+                if (monitor) {
+                    monitor.lastState = currentState;
+                }
+                if (this.state?.publishing) {
+                    this._sendVideoMutedState(track, currentState, null, 'refresh');
+                }
+                return;
+            }
+
+            const monitor = {
+                track,
+                lastState: this._isTrackEffectivelyMuted(track),
+                restoreEnabled: null,
+                restoreStop: null,
+                listeners: [],
+                poller: null,
+                pendingFinalizer: null,
+                finalizing: false
+            };
+
+            const broadcastState = (muted, reasonLabel) => {
+                const label = reasonLabel || 'update';
+                this._sendVideoMutedState(track, muted, null, label);
+                this._emit('publisherVideoMuteState', {
+                    track,
+                    muted,
+                    reason: label
+                });
+            };
+
+            const emitState = (reason, options = {}) => {
+                const { force = false, delay = 0, cleanup = false } = options;
+                const evaluateMuted = () => this._isTrackEffectivelyMuted(track);
+
+                const dispatch = () => {
+                    if (monitor.pendingFinalizer) {
+                        monitor.pendingFinalizer = null;
+                    }
+                    const mutedNow = evaluateMuted();
+                    if (!force && mutedNow === monitor.lastState) {
+                        if (cleanup) {
+                            this._unmonitorOutboundVideoTrack(track, { skipSend: true });
+                        }
+                        return;
+                    }
+
+                    monitor.lastState = mutedNow;
+                    broadcastState(mutedNow, reason || 'update');
+
+                    if (cleanup) {
+                        this._unmonitorOutboundVideoTrack(track, { skipSend: true });
+                    }
+                };
+
+                if (monitor.pendingFinalizer) {
+                    try {
+                        monitor.pendingFinalizer.cancel();
+                    } catch (err) {
+                        this._log('Error cancelling pending mute finalizer:', err);
+                    }
+                    monitor.pendingFinalizer = null;
+                }
+
+                if (delay > 0) {
+                    monitor.pendingFinalizer = this._scheduleVideoMuteFinalizer(delay, dispatch, () => {
+                        monitor.pendingFinalizer = null;
+                    });
+                } else {
+                    dispatch();
+                }
+            };
+
+            const finalizeOnce = (reasonLabel) => {
+                if (monitor.finalizing) return;
+                monitor.finalizing = true;
+                emitState(reasonLabel, {
+                    force: true,
+                    delay: OUTBOUND_VIDEO_STOP_MUTE_DELAY_MS,
+                    cleanup: true
+                });
+            };
+
+            const handleMute = () => emitState('mute');
+            const handleUnmute = () => emitState('unmute');
+            const handleEnded = () => finalizeOnce('ended');
+
+            if (typeof track.addEventListener === 'function') {
+                track.addEventListener('mute', handleMute);
+                track.addEventListener('unmute', handleUnmute);
+                track.addEventListener('ended', handleEnded);
+                monitor.listeners.push(['mute', handleMute], ['unmute', handleUnmute], ['ended', handleEnded]);
+            }
+
+            if (typeof track.stop === 'function') {
+                const originalStop = track.stop.bind(track);
+                try {
+                    track.stop = (...args) => {
+                        finalizeOnce('stop');
+                        return originalStop(...args);
+                    };
+                    monitor.restoreStop = () => {
+                        try {
+                            track.stop = originalStop;
+                        } catch (err) {
+                            this._log('Failed to restore track.stop:', err);
+                        }
+                    };
+                } catch (error) {
+                    this._log('Unable to wrap MediaStreamTrack.stop for monitoring:', error);
+                }
+            }
+
+            let trackExtensible = false;
+            try {
+                trackExtensible = Object.isExtensible(track);
+            } catch (err) {
+                this._log('Unable to inspect MediaStreamTrack extensibility:', err);
+            }
+
+            const canRedefineEnabled =
+                !!MEDIA_STREAM_TRACK_ENABLED_DESCRIPTOR &&
+                typeof MEDIA_STREAM_TRACK_ENABLED_DESCRIPTOR.get === 'function' &&
+                typeof MEDIA_STREAM_TRACK_ENABLED_DESCRIPTOR.set === 'function' &&
+                (MEDIA_STREAM_TRACK_ENABLED_DESCRIPTOR.configurable !== false) &&
+                trackExtensible;
+
+            if (canRedefineEnabled) {
+                const { get: baseGet, set: baseSet } = MEDIA_STREAM_TRACK_ENABLED_DESCRIPTOR;
+                try {
+                    Object.defineProperty(track, 'enabled', {
+                        configurable: true,
+                        enumerable: true,
+                        get() {
+                            return baseGet.call(track);
+                        },
+                        set: (value) => {
+                            const before = baseGet.call(track);
+                            baseSet.call(track, value);
+                            const after = baseGet.call(track);
+                            if (before !== after) {
+                                emitState('enabled-toggle');
+                            }
+                        }
+                    });
+                    monitor.restoreEnabled = () => {
+                        try {
+                            delete track.enabled;
+                        } catch (err) {
+                            this._log('Failed to restore track.enabled descriptor:', err);
+                        }
+                    };
+                } catch (error) {
+                    this._log('Unable to wrap MediaStreamTrack.enabled for monitoring:', error);
+                }
+            } else {
+                this._log('Skipping MediaStreamTrack.enabled override; falling back to polling.');
+            }
+
+            if (!monitor.restoreEnabled) {
+                // Poll as a Safari/iOS fallback so we still detect state updates when redefine fails.
+                monitor.poller = setInterval(() => emitState('poll'), 250);
+            }
+
+            this._outboundVideoMonitors.set(track, monitor);
+
+            // Send initial state so viewers immediately know current mute status
+            if (this.state?.publishing) {
+                broadcastState(monitor.lastState, 'initial');
+            } else {
+                this._emit('publisherVideoMuteState', {
+                    track,
+                    muted: monitor.lastState,
+                    reason: 'initial'
+                });
+            }
+        }
+
+        /**
+         * Stop monitoring an outbound video track.
+         * @private
+         * @param {MediaStreamTrack} track
+         * @param {Object} options
+         * @param {boolean} options.skipSend - If true, do not send final state
+         * @param {boolean} options.forceMuted - Optional final state override
+         */
+        _unmonitorOutboundVideoTrack(track, options = {}) {
+            if (!track || !this._outboundVideoMonitors || !this._outboundVideoMonitors.has(track)) {
+                return;
+            }
+
+            const monitor = this._outboundVideoMonitors.get(track);
+
+            if (monitor) {
+                if (monitor.pendingFinalizer) {
+                    try {
+                        monitor.pendingFinalizer.cancel();
+                    } catch (err) {
+                        this._log('Error cancelling monitor pending finalizer:', err);
+                    }
+                    monitor.pendingFinalizer = null;
+                }
+
+                const shouldSendFinal = !options.skipSend && this.state?.publishing && !monitor.finalizing;
+                if (shouldSendFinal) {
+                    const finalMuted = typeof options.forceMuted === 'boolean'
+                        ? options.forceMuted
+                        : true;
+                    const finalReason = typeof options.forceMuted === 'boolean'
+                        ? 'force-muted'
+                        : 'monitor-stopped';
+                    const delayMs = typeof options.delayMs === 'number'
+                        ? Math.max(0, options.delayMs)
+                        : (finalMuted ? OUTBOUND_VIDEO_STOP_MUTE_DELAY_MS : 0);
+
+                    const dispatch = () => {
+                        this._sendVideoMutedState(track, finalMuted, null, finalReason);
+                        this._emit('publisherVideoMuteState', {
+                            track,
+                            muted: finalMuted,
+                            reason: finalReason
+                        });
+                    };
+
+                    if (delayMs > 0) {
+                        monitor.pendingFinalizer = this._scheduleVideoMuteFinalizer(delayMs, dispatch, () => {
+                            monitor.pendingFinalizer = null;
+                        });
+                    } else {
+                        dispatch();
+                    }
+                }
+                if (monitor.restoreEnabled) {
+                    try {
+                        monitor.restoreEnabled();
+                    } catch (err) {
+                        this._log('Failed to restore track.enabled descriptor:', err);
+                    }
+                }
+                if (monitor.restoreStop) {
+                    try {
+                        monitor.restoreStop();
+                    } catch (err) {
+                        this._log('Failed to restore track.stop override:', err);
+                    }
+                }
+                if (monitor.poller) {
+                    clearInterval(monitor.poller);
+                    monitor.poller = null;
+                }
+                if (monitor.listeners && typeof track.removeEventListener === 'function') {
+                    for (const [evt, handler] of monitor.listeners) {
+                        try {
+                            track.removeEventListener(evt, handler);
+                        } catch (err) {
+                            // Ignore cleanup errors
+                        }
+                    }
+                }
+            }
+
+            this._outboundVideoMonitors.delete(track);
+        }
+
+        /**
+         * Schedule a delayed videoMute broadcast that can be flushed later.
+         * @private
+         * @param {number} delayMs
+         * @param {Function} dispatch
+         * @param {Function} onFinish
+         * @returns {Object} finalizer handle with flush() and cancel()
+         */
+        _scheduleVideoMuteFinalizer(delayMs, dispatch, onFinish) {
+            if (!this._pendingVideoMuteFinalizers) {
+                this._pendingVideoMuteFinalizers = new Set();
+            }
+
+            const self = this;
+            const finalizer = {
+                timerId: null,
+                finished: false,
+                flush() {
+                    if (finalizer.finished) return;
+                    finalizer.finished = true;
+                    if (finalizer.timerId) {
+                        clearTimeout(finalizer.timerId);
+                        finalizer.timerId = null;
+                    }
+                    self._pendingVideoMuteFinalizers.delete(finalizer);
+                    try {
+                        dispatch();
+                    } catch (err) {
+                        self._log('Error dispatching videoMuted finalizer:', err);
+                    }
+                    if (typeof onFinish === 'function') {
+                        try {
+                            onFinish(true);
+                        } catch (err) {
+                            self._log('Error running mute finalizer onFinish handler:', err);
+                        }
+                    }
+                },
+                cancel() {
+                    if (finalizer.finished) return;
+                    finalizer.finished = true;
+                    if (finalizer.timerId) {
+                        clearTimeout(finalizer.timerId);
+                        finalizer.timerId = null;
+                    }
+                    self._pendingVideoMuteFinalizers.delete(finalizer);
+                    if (typeof onFinish === 'function') {
+                        try {
+                            onFinish(false);
+                        } catch (err) {
+                            self._log('Error running mute finalizer cancel handler:', err);
+                        }
+                    }
+                }
+            };
+
+            finalizer.timerId = setTimeout(() => finalizer.flush(), delayMs);
+            this._pendingVideoMuteFinalizers.add(finalizer);
+            return finalizer;
+        }
+
+        /**
+         * Cancel any pending delayed mute broadcasts.
+         * @private
+         */
+        _cancelPendingVideoMuteFinalizers() {
+            if (!this._pendingVideoMuteFinalizers || this._pendingVideoMuteFinalizers.size === 0) {
+                return;
+            }
+            const pending = Array.from(this._pendingVideoMuteFinalizers);
+            for (const finalizer of pending) {
+                try {
+                    finalizer.flush();
+                } catch (err) {
+                    this._log('Error flushing pending mute finalizer:', err);
+                }
+            }
+        }
+
+        /**
+         * Clear all outbound track monitors.
+         * @private
+         */
+        _clearAllVideoTrackMonitors() {
+            if (!this._outboundVideoMonitors || this._outboundVideoMonitors.size === 0) {
+                if (this._pendingVideoMuteFinalizers && this._pendingVideoMuteFinalizers.size) {
+                    this._cancelPendingVideoMuteFinalizers();
+                }
+                return;
+            }
+            this._cancelPendingVideoMuteFinalizers();
+            const tracks = Array.from(this._outboundVideoMonitors.keys());
+            for (const track of tracks) {
+                this._unmonitorOutboundVideoTrack(track, { skipSend: true });
+            }
+            this._outboundVideoMonitors.clear();
+            if (this._pendingVideoMuteFinalizers) {
+                this._pendingVideoMuteFinalizers.clear();
+            }
+        }
+
+        /**
+         * Synchronize current mute states with a newly opened data channel.
+         * @private
+         * @param {Object} connection
+         */
+        _syncVideoMuteStateToConnection(connection) {
+            if (!connection || connection.type !== 'publisher') return;
+            if (!this.state || !this.state.publishing) return;
+            if (!this._outboundVideoMonitors || this._outboundVideoMonitors.size === 0) return;
+
+            for (const monitor of this._outboundVideoMonitors.values()) {
+                const track = monitor.track;
+                const muted = typeof monitor.lastState === 'boolean'
+                    ? monitor.lastState
+                    : this._isTrackEffectivelyMuted(track);
+                this._sendVideoMutedState(track, muted, connection.uuid, 'sync');
+            }
+        }
+
+        /**
          * Get connection by UUID and optional type
          * @private
          * @param {string} uuid - Peer UUID
@@ -1843,6 +2316,9 @@
                     } catch (e) {
                         this._log('Failed to send publisher info:', e.message || e);
                     }
+
+                    // Sync current mute state so the viewer blanks immediately if needed
+                    this._syncVideoMuteStateToConnection(connection);
                 }
                 
                 // Start ping monitoring based on role/flags
@@ -1966,6 +2442,28 @@
                     } else if (msg.bye) {
                         this._log('Received bye message via data channel');
                         this._handleBye({ UUID: connection.uuid });
+                    } else if (Object.prototype.hasOwnProperty.call(msg, 'videoMuted')) {
+                        const detail = {
+                            muted: !!msg.videoMuted,
+                            trackId: (typeof msg.trackId === 'string') ? msg.trackId : null,
+                            streamID: connection.streamID || null,
+                            uuid: connection.uuid,
+                            connectionType: connection.type || 'unknown',
+                            timestamp: Date.now(),
+                            raw: msg
+                        };
+                        this._emit('remoteVideoMuteState', detail);
+                        this._emit('dataReceived', {
+                            data: msg,
+                            uuid: connection.uuid,
+                            streamID: connection.streamID
+                        });
+                        // Typo compatibility: also emit 'dataRecieved'
+                        this._emit('dataRecieved', {
+                            data: msg,
+                            uuid: connection.uuid,
+                            streamID: connection.streamID
+                        });
                     } else if (msg.pipe) {
                         // Handle generic data sent via pipe protocol
                         this._log('Received generic data via pipe');
@@ -4790,6 +5288,10 @@
                 this.localStream.addTrack(track);
             }
 
+            if (track.kind === 'video') {
+                this._monitorOutboundVideoTrack(track);
+            }
+
             // Add to all publisher connections (connections we're publishing to)
             for (const [uuid, connections] of this.connections) {
                 const connection = connections.publisher;
@@ -4852,6 +5354,10 @@
         async removeTrack(track) {
             if (!track) {
                 throw new Error('Track is required');
+            }
+
+            if (track.kind === 'video') {
+                this._unmonitorOutboundVideoTrack(track, { forceMuted: true });
             }
 
             // Remove from local stream
@@ -4928,10 +5434,18 @@
                 throw new Error('Tracks must be of the same kind (audio/video)');
             }
 
+            if (oldTrack.kind === 'video') {
+                this._unmonitorOutboundVideoTrack(oldTrack, { skipSend: true });
+            }
+
             // Update local stream
             if (this.localStream) {
                 this.localStream.removeTrack(oldTrack);
                 this.localStream.addTrack(newTrack);
+            }
+
+            if (newTrack.kind === 'video') {
+                this._monitorOutboundVideoTrack(newTrack);
             }
 
             // Replace in all connections

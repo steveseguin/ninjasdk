@@ -1,0 +1,1161 @@
+<!DOCTYPE html>
+<!--
+    VDO.Ninja SDK Demo - Automatic Video Mute Signalling
+    
+    This demo code is released into the public domain (CC0 1.0 Universal).
+    You may use, modify, and distribute this demo code without any restrictions.
+    
+    Note: The VDO.Ninja SDK itself (vdoninja-sdk.js) remains licensed under AGPL-3.0.
+    See: https://github.com/steveseguin/ninjasdk/blob/main/LICENSE
+-->
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VDO.Ninja SDK - Video Mute Signalling Demo</title>
+    <style>
+        :root {
+            color-scheme: dark;
+        }
+
+        body {
+            font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 24px;
+            background-color: #0f131a;
+            color: #e9edf5;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 24px;
+        }
+
+        h1 {
+            margin: 0 0 8px;
+            font-size: 32px;
+        }
+
+        .subtitle {
+            color: #8f9db3;
+            font-size: 16px;
+            margin: 0;
+        }
+
+        .settings {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+            align-items: flex-end;
+            padding: 16px;
+            margin-bottom: 24px;
+            background: linear-gradient(135deg, rgba(40, 52, 88, 0.65), rgba(26, 34, 55, 0.8));
+            border: 1px solid rgba(120, 153, 220, 0.2);
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(15, 19, 26, 0.35);
+        }
+
+        .field {
+            display: flex;
+            flex-direction: column;
+            min-width: 200px;
+        }
+
+        .field label {
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            margin-bottom: 6px;
+            color: #9fb2d6;
+        }
+
+        .field input {
+            padding: 10px 12px;
+            border-radius: 8px;
+            border: 1px solid rgba(120, 153, 220, 0.35);
+            background: rgba(16, 21, 36, 0.8);
+            color: #e9edf5;
+            font-size: 14px;
+        }
+
+        .field input:focus {
+            outline: none;
+            border-color: #4c8dff;
+            box-shadow: 0 0 0 2px rgba(76, 141, 255, 0.25);
+        }
+
+        .settings button {
+            padding: 11px 18px;
+            border-radius: 8px;
+            border: none;
+            background: #4c8dff;
+            color: white;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.2s ease;
+        }
+
+        .settings button:hover {
+            background: #70a5ff;
+        }
+
+        .main-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 20px;
+        }
+
+        .panel {
+            background: linear-gradient(180deg, rgba(26, 32, 48, 0.95), rgba(20, 24, 36, 0.94));
+            border-radius: 14px;
+            border: 1px solid rgba(120, 153, 220, 0.18);
+            box-shadow: 0 12px 24px rgba(10, 12, 20, 0.35);
+            padding: 20px;
+        }
+
+        .panel h2 {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 0 0 10px;
+            font-size: 24px;
+        }
+
+        .status-indicator {
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            border: 2px solid rgba(120, 153, 220, 0.45);
+            background-color: rgba(120, 153, 220, 0.25);
+            transition: background-color 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .status-indicator.connected {
+            background-color: #39d98a;
+            box-shadow: 0 0 10px rgba(57, 217, 138, 0.65);
+        }
+
+        .panel .description {
+            color: #8da0c2;
+            font-size: 14px;
+            margin-bottom: 16px;
+        }
+
+        .controls {
+            display: grid;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .controls .control-row {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .controls label {
+            font-size: 12px;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            color: #8f9db3;
+        }
+
+        .controls input {
+            width: 100%;
+            padding: 10px 12px;
+            border-radius: 8px;
+            border: 1px solid rgba(120, 153, 220, 0.3);
+            background: rgba(12, 16, 28, 0.85);
+            color: #e9edf5;
+            font-size: 14px;
+        }
+
+        .controls input:focus {
+            outline: none;
+            border-color: #4c8dff;
+            box-shadow: 0 0 0 2px rgba(76, 141, 255, 0.25);
+        }
+
+        button {
+            padding: 10px 16px;
+            border-radius: 8px;
+            border: none;
+            background: rgba(76, 141, 255, 0.85);
+            color: white;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.2s ease, transform 0.1s ease;
+        }
+
+        button:hover:not(:disabled) {
+            background: rgba(111, 167, 255, 0.95);
+            transform: translateY(-1px);
+        }
+
+        button:disabled {
+            background: rgba(80, 96, 128, 0.5);
+            color: rgba(200, 214, 240, 0.55);
+            cursor: not-allowed;
+        }
+
+        button.secondary {
+            background: rgba(255, 168, 64, 0.9);
+        }
+
+        button.secondary:hover:not(:disabled) {
+            background: rgba(255, 188, 104, 0.95);
+        }
+
+        button.danger {
+            background: rgba(255, 88, 88, 0.85);
+        }
+
+        button.danger:hover:not(:disabled) {
+            background: rgba(255, 120, 120, 0.95);
+        }
+
+        .video-wrapper {
+            position: relative;
+            border-radius: 12px;
+            overflow: hidden;
+            border: 1px solid rgba(120, 153, 220, 0.2);
+            background: radial-gradient(circle at center, rgba(36, 43, 68, 0.9), rgba(12, 18, 30, 0.95));
+            margin-bottom: 16px;
+        }
+
+        video {
+            width: 100%;
+            max-height: 260px;
+            display: block;
+            background-color: black;
+        }
+
+        video.muted-display {
+            filter: grayscale(1);
+            opacity: 0.15;
+        }
+
+        .overlay {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(8, 12, 24, 0.7);
+            color: #d7e4ff;
+            font-size: 16px;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+            pointer-events: none;
+        }
+
+        .overlay.active {
+            opacity: 1;
+        }
+
+        .badge {
+            position: absolute;
+            top: 12px;
+            left: 12px;
+            padding: 6px 12px;
+            border-radius: 999px;
+            background: rgba(32, 196, 130, 0.15);
+            border: 1px solid rgba(32, 196, 130, 0.35);
+            color: #7fffd3;
+            font-size: 12px;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            backdrop-filter: blur(6px);
+            transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+        }
+
+        .badge.muted {
+            background: rgba(255, 92, 92, 0.18);
+            border-color: rgba(255, 92, 92, 0.35);
+            color: #ffb4b4;
+        }
+
+        .log {
+            height: 220px;
+            overflow-y: auto;
+            padding: 12px;
+            border-radius: 10px;
+            background: rgba(10, 14, 24, 0.8);
+            border: 1px solid rgba(120, 153, 220, 0.18);
+            font-family: "Fira Code", "Consolas", monospace;
+            font-size: 12px;
+            line-height: 1.5;
+        }
+
+        .log-entry {
+            padding: 6px 8px;
+            border-radius: 6px;
+            margin-bottom: 6px;
+            background: rgba(26, 34, 58, 0.8);
+            color: #d7e4ff;
+        }
+
+        .log-entry .log-time {
+            color: #8f9db3;
+            margin-right: 8px;
+        }
+
+        .log-entry.success {
+            border-left: 3px solid rgba(60, 200, 150, 0.8);
+        }
+
+        .log-entry.error {
+            border-left: 3px solid rgba(255, 110, 110, 0.85);
+        }
+
+        .log-entry.warning {
+            border-left: 3px solid rgba(255, 194, 82, 0.85);
+        }
+
+        .log-entry.mute {
+            border-left: 3px solid rgba(138, 180, 255, 0.9);
+            background: rgba(28, 38, 66, 0.85);
+        }
+
+        .help {
+            margin-top: 28px;
+            padding: 18px;
+            background: rgba(18, 24, 38, 0.9);
+            border-radius: 12px;
+            border: 1px solid rgba(120, 153, 220, 0.18);
+        }
+
+        .help h3 {
+            margin-top: 0;
+            margin-bottom: 10px;
+            font-size: 20px;
+        }
+
+        .help ul {
+            margin: 0;
+            padding-left: 20px;
+            color: #9fb2d6;
+            font-size: 14px;
+        }
+
+        @media (max-width: 700px) {
+            body {
+                padding: 16px;
+            }
+
+            .settings {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .field {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>VDO.Ninja SDK &mdash; Auto Video Mute Signals</h1>
+        <p class="subtitle">Publish your camera, toggle the track, and watch the SDK broadcast <code>{ videoMuted }</code> updates to connected viewers.</p>
+    </div>
+
+    <div class="settings">
+        <div class="field">
+            <label for="roomInput">Room</label>
+            <input id="roomInput" autocomplete="off" spellcheck="false">
+        </div>
+        <div class="field">
+            <label for="streamInput">Stream ID</label>
+            <input id="streamInput" autocomplete="off" spellcheck="false">
+        </div>
+        <button id="randomizeStream">Randomize Stream ID</button>
+    </div>
+
+    <div class="main-grid">
+        <section class="panel" id="publisherPanel">
+            <h2><span class="status-indicator" id="publisherStatus"></span> Publisher</h2>
+            <p class="description">Creates a camera stream and publishes it with automatic mute signalling. Use the controls to toggle <code>track.enabled</code> or stop the track entirely.</p>
+
+            <div class="controls">
+                <div class="control-row">
+                    <label for="publisherLabel">Publisher Label</label>
+                    <input id="publisherLabel" value="Mute Demo Publisher" autocomplete="off" spellcheck="false">
+                </div>
+                <div class="control-row">
+                    <button id="startPublisherBtn">Start Publishing</button>
+                    <button id="stopPublisherBtn" class="danger" disabled>Stop Publisher</button>
+                </div>
+                <div class="control-row">
+                    <button id="togglePublisherMute" disabled>Mute Video</button>
+                    <button id="stopTrackBtn" class="secondary" disabled>Stop Track</button>
+                    <button id="replaceTrackBtn" class="secondary" disabled>Acquire New Track</button>
+                </div>
+            </div>
+
+            <div class="video-wrapper">
+                <video id="localVideo" autoplay playsinline muted></video>
+                <div class="overlay" id="localOverlay">Waiting for local track…</div>
+                <div class="badge" id="publisherMuteBadge">No track yet</div>
+            </div>
+
+            <div class="log" id="publisherLog"></div>
+        </section>
+
+        <section class="panel" id="viewerPanel">
+            <h2><span class="status-indicator" id="viewerStatus"></span> Viewer</h2>
+            <p class="description">Subscribes to the same stream, blanks the video when a <code>videoMuted: true</code> payload arrives, and restores playback when unmuted.</p>
+
+            <div class="controls">
+                <div class="control-row">
+                    <label for="viewerLabel">Viewer Label</label>
+                    <input id="viewerLabel" value="Mute Demo Viewer" autocomplete="off" spellcheck="false">
+                </div>
+                <div class="control-row">
+                    <button id="startViewerBtn">Start Viewing</button>
+                    <button id="stopViewerBtn" class="danger" disabled>Stop Viewer</button>
+                </div>
+            </div>
+
+            <div class="video-wrapper">
+                <video id="remoteVideo" autoplay playsinline></video>
+                <div class="overlay" id="viewerOverlay">Waiting for video…</div>
+                <div class="badge" id="viewerMuteBadge">Awaiting signal</div>
+            </div>
+
+            <div class="log" id="viewerLog"></div>
+        </section>
+    </div>
+
+    <div class="help">
+        <h3>How to use this demo</h3>
+        <ul>
+            <li>Pick a room and stream ID. The defaults work locally, or share the same values between devices.</li>
+            <li>Start the publisher to capture your camera, then start the viewer to subscribe to that stream.</li>
+            <li>Toggle the mute button to flip <code>track.enabled</code>; the viewer will receive <code>{ videoMuted }</code> payloads instantly.</li>
+            <li>Use “Stop Track” to trigger the <code>ended</code> path. “Acquire New Track” captures a fresh camera and replaces it on the fly.</li>
+        </ul>
+    </div>
+
+    <script src="../vdoninja-sdk.js"></script>
+    <script>
+        (() => {
+            const roomInput = document.getElementById('roomInput');
+            const streamInput = document.getElementById('streamInput');
+            const publisherLabelInput = document.getElementById('publisherLabel');
+            const viewerLabelInput = document.getElementById('viewerLabel');
+
+            const sanitizeIdentifier = (value) => {
+                const raw = (value || '').trim();
+                if (!raw) {
+                    return '';
+                }
+                return raw.replace(/[^0-9a-zA-Z_]/g, '_');
+            };
+
+            const randomId = () => {
+                const seed = `mute_${Math.random().toString(36).slice(2, 10)}`;
+                const cleaned = sanitizeIdentifier(seed);
+                return cleaned || 'mute_demo';
+            };
+
+            const defaultStreamId = randomId();
+            roomInput.value = sanitizeIdentifier(roomInput.value) || 'auto_mute_demo';
+            streamInput.value = sanitizeIdentifier(streamInput.value) || defaultStreamId;
+            roomInput.addEventListener('blur', () => {
+                roomInput.value = sanitizeIdentifier(roomInput.value);
+            });
+            roomInput.addEventListener('change', () => {
+                roomInput.value = sanitizeIdentifier(roomInput.value);
+            });
+            streamInput.addEventListener('blur', () => {
+                streamInput.value = sanitizeIdentifier(streamInput.value);
+            });
+            streamInput.addEventListener('change', () => {
+                streamInput.value = sanitizeIdentifier(streamInput.value);
+            });
+
+            const setStatus = (id, state) => {
+                const el = document.getElementById(id);
+                if (!el) { return; }
+                el.classList.toggle('connected', !!state);
+            };
+
+            const appendLog = (id, message, level = 'system') => {
+                const container = document.getElementById(id);
+                if (!container) { return; }
+                const entry = document.createElement('div');
+                entry.className = `log-entry ${level}`;
+                const time = document.createElement('span');
+                time.className = 'log-time';
+                time.textContent = new Date().toLocaleTimeString();
+                entry.appendChild(time);
+                entry.appendChild(document.createTextNode(message));
+                container.appendChild(entry);
+                while (container.childNodes.length > 120) {
+                    container.removeChild(container.firstChild);
+                }
+                container.scrollTop = container.scrollHeight;
+            };
+
+            const updateBadge = (id, text, muted = false) => {
+                const badge = document.getElementById(id);
+                if (!badge) { return; }
+                badge.textContent = text;
+                badge.classList.toggle('muted', !!muted);
+            };
+
+            const publisherState = {
+                sdk: null,
+                stream: null,
+                track: null,
+                trackCleanup: null,
+                lastMuted: null
+            };
+
+            const viewerState = {
+                sdk: null,
+                muted: null,
+                dataChannelOpenHandler: null,
+                lastMuteTimestamp: null
+            };
+
+            const localVideo = document.getElementById('localVideo');
+            const localOverlay = document.getElementById('localOverlay');
+            const remoteVideo = document.getElementById('remoteVideo');
+            const viewerOverlay = document.getElementById('viewerOverlay');
+
+            const refreshPublisherControls = () => {
+                const startBtn = document.getElementById('startPublisherBtn');
+                const stopBtn = document.getElementById('stopPublisherBtn');
+                const toggleBtn = document.getElementById('togglePublisherMute');
+                const stopTrackBtn = document.getElementById('stopTrackBtn');
+                const replaceBtn = document.getElementById('replaceTrackBtn');
+
+                const hasSdk = !!publisherState.sdk;
+                const liveTrack = publisherState.track && publisherState.track.readyState === 'live';
+
+                startBtn.disabled = hasSdk;
+                stopBtn.disabled = !hasSdk;
+                toggleBtn.disabled = !liveTrack;
+                stopTrackBtn.disabled = !liveTrack;
+                replaceBtn.disabled = !hasSdk;
+
+                if (!publisherState.track) {
+                    toggleBtn.textContent = 'Mute Video';
+                } else if (publisherState.track.enabled) {
+                    toggleBtn.textContent = 'Mute Video';
+                } else {
+                    toggleBtn.textContent = 'Unmute Video';
+                }
+
+                if (!liveTrack) {
+                    localOverlay.textContent = hasSdk ? 'No active video track' : 'Waiting for local track…';
+                    localOverlay.classList.add('active');
+                } else {
+                    localOverlay.textContent = '';
+                    localOverlay.classList.remove('active');
+                }
+            };
+
+            const refreshViewerControls = () => {
+                const startBtn = document.getElementById('startViewerBtn');
+                const stopBtn = document.getElementById('stopViewerBtn');
+                const hasSdk = !!viewerState.sdk;
+                startBtn.disabled = hasSdk;
+                stopBtn.disabled = !hasSdk;
+            };
+
+            const attachLocalTrack = (track) => {
+                if (publisherState.trackCleanup) {
+                    try { publisherState.trackCleanup(); } catch (e) {}
+                    publisherState.trackCleanup = null;
+                }
+                publisherState.track = track;
+                if (!track) { return; }
+
+                const handleEnded = () => {
+                    appendLog('publisherLog', 'Local video track ended.', 'warning');
+                    publisherState.track = null;
+                    refreshPublisherControls();
+                };
+
+                track.addEventListener('ended', handleEnded);
+                publisherState.trackCleanup = () => track.removeEventListener('ended', handleEnded);
+            };
+
+            const handlePublisherMuteState = (muted, reason, meta = {}) => {
+                publisherState.lastMuted = muted;
+                const text = muted
+                    ? `videoMuted: true (${reason || 'update'})`
+                    : 'videoMuted: false (live video)';
+                appendLog('publisherLog', `${text}${meta.trackId ? ` [track ${meta.trackId}]` : ''}`, 'mute');
+                updateBadge('publisherMuteBadge', text, muted);
+                if (muted) {
+                    localVideo.classList.add('muted-display');
+                } else {
+                    localVideo.classList.remove('muted-display');
+                }
+                refreshPublisherControls();
+            };
+
+            const handleViewerMuteState = (muted, meta = {}) => {
+                viewerState.muted = muted;
+                const summaryParts = [`videoMuted: ${muted ? 'true' : 'false'}`];
+                if (meta.trackId) {
+                    summaryParts.push(`track=${meta.trackId.slice(0, 8)}`);
+                }
+                if (meta.reason) {
+                    summaryParts.push(meta.reason);
+                }
+                updateBadge('viewerMuteBadge', summaryParts.join(' | '), muted);
+                if (muted) {
+                    viewerOverlay.textContent = 'Publisher signalled videoMuted — blanking video';
+                    viewerOverlay.classList.add('active');
+                    remoteVideo.classList.add('muted-display');
+                } else {
+                    viewerOverlay.textContent = '';
+                    viewerOverlay.classList.remove('active');
+                    remoteVideo.classList.remove('muted-display');
+                }
+            };
+
+            const viewerChannelWatchers = new Map();
+            const VIEWER_MONITOR_POLLER = Symbol('viewer-monitor-poller');
+
+            const teardownViewerMuteMonitors = () => {
+                viewerChannelWatchers.forEach((cleanup) => {
+                    try { cleanup(); } catch (error) {}
+                });
+                viewerChannelWatchers.clear();
+            };
+
+            const registerViewerMuteMonitor = (sdkInstance, uuid, type) => {
+                if (!sdkInstance || typeof sdkInstance._getConnection !== 'function') {
+                    return false;
+                }
+                if (type !== 'publisher') {
+                    return false;
+                }
+                const connection = sdkInstance._getConnection(uuid, type);
+                if (!connection || !connection.dataChannel) {
+                    return false;
+                }
+                const channel = connection.dataChannel;
+                if (viewerChannelWatchers.has(channel)) {
+                    return true;
+                }
+
+                const messageHandler = (event) => {
+                    let payload;
+                    try {
+                        payload = JSON.parse(event.data);
+                    } catch (error) {
+                        return;
+                    }
+                    if (!payload || typeof payload !== 'object' || !Object.prototype.hasOwnProperty.call(payload, 'videoMuted')) {
+                        return;
+                    }
+                    const muted = !!payload.videoMuted;
+                    const trackId = typeof payload.trackId === 'string' ? payload.trackId : null;
+                    appendLog('viewerLog', `videoMuted payload: ${JSON.stringify(payload)}`, 'mute');
+                    handleViewerMuteState(muted, { trackId });
+                };
+
+                let isCleaned = false;
+                const cleanup = () => {
+                    if (isCleaned) return;
+                    isCleaned = true;
+                    try { channel.removeEventListener('message', messageHandler); } catch (error) {}
+                    try { channel.removeEventListener('close', cleanup); } catch (error) {}
+                    try { channel.removeEventListener('error', cleanup); } catch (error) {}
+                    viewerChannelWatchers.delete(channel);
+                };
+
+                channel.addEventListener('message', messageHandler);
+                channel.addEventListener('close', cleanup);
+                channel.addEventListener('error', cleanup);
+                viewerChannelWatchers.set(channel, cleanup);
+                appendLog('viewerLog', `Listening for mute signals on channel ${uuid.slice(0, 8)}…`, 'system');
+                return true;
+            };
+
+            const attachMuteMonitorsForActiveConnections = (sdkInstance) => {
+                if (!sdkInstance || !sdkInstance.connections) {
+                    return false;
+                }
+                let attached = false;
+                try {
+                    sdkInstance.connections.forEach((connectionSet) => {
+                        const publisherConn = connectionSet && connectionSet.publisher;
+                        if (publisherConn && publisherConn.uuid) {
+                            attached = registerViewerMuteMonitor(sdkInstance, publisherConn.uuid, 'publisher') || attached;
+                        }
+                    });
+                } catch (error) {
+                    appendLog('viewerLog', `Failed to inspect connections: ${error.message}`, 'warning');
+                }
+                return attached;
+            };
+
+            const scheduleMuteMonitorSweep = (sdkInstance) => {
+                if (!sdkInstance) {
+                    return;
+                }
+                if (attachMuteMonitorsForActiveConnections(sdkInstance)) {
+                    return;
+                }
+                if (viewerChannelWatchers.has(VIEWER_MONITOR_POLLER)) {
+                    return;
+                }
+                const poller = setInterval(() => {
+                    if (!viewerState.sdk) {
+                        clearInterval(poller);
+                        viewerChannelWatchers.delete(VIEWER_MONITOR_POLLER);
+                        return;
+                    }
+                    if (attachMuteMonitorsForActiveConnections(viewerState.sdk)) {
+                        clearInterval(poller);
+                        viewerChannelWatchers.delete(VIEWER_MONITOR_POLLER);
+                    }
+                }, 200);
+                viewerChannelWatchers.set(VIEWER_MONITOR_POLLER, () => clearInterval(poller));
+                appendLog('viewerLog', 'Waiting for publisher data channel…', 'system');
+            };
+
+            const ensureRemoteStream = () => {
+                if (!remoteVideo.srcObject) {
+                    remoteVideo.srcObject = new MediaStream();
+                }
+                return remoteVideo.srcObject;
+            };
+
+            const parsePayload = (payload) => {
+                if (payload && typeof payload === 'object') {
+                    return payload;
+                }
+                if (typeof payload === 'string') {
+                    try {
+                        return JSON.parse(payload);
+                    } catch (e) {
+                        return { raw: payload };
+                    }
+                }
+                return { value: payload };
+            };
+
+            const startPublisher = async () => {
+                if (publisherState.sdk) {
+                    appendLog('publisherLog', 'Publisher already active.', 'warning');
+                    return;
+                }
+
+                let room = sanitizeIdentifier(roomInput.value);
+                roomInput.value = room;
+                if (!room) {
+                    room = null;
+                }
+                let streamID = sanitizeIdentifier(streamInput.value);
+                if (!streamID) {
+                    streamID = randomId();
+                    streamInput.value = streamID;
+                } else {
+                    streamInput.value = streamID;
+                }
+                const label = publisherLabelInput.value.trim() || 'Publisher';
+
+                try {
+                    appendLog('publisherLog', 'Requesting user media…');
+                    const media = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+                    const [track] = media.getVideoTracks();
+                    if (!track) {
+                        appendLog('publisherLog', 'No video track available.', 'error');
+                        media.getTracks().forEach(t => t.stop());
+                        return;
+                    }
+
+                    const stream = new MediaStream([track]);
+                    localVideo.srcObject = stream;
+                    localVideo.play().catch(() => {});
+                    localOverlay.classList.remove('active');
+
+                    publisherState.stream = stream;
+                    attachLocalTrack(track);
+
+                    const sdk = new VDONinjaSDK({
+                        room,
+                        debug: true
+                    });
+                    publisherState.sdk = sdk;
+
+                    sdk.addEventListener('connected', () => {
+                        setStatus('publisherStatus', true);
+                        appendLog('publisherLog', 'Connected to signalling server.', 'success');
+                    });
+
+                    sdk.addEventListener('disconnected', () => {
+                        setStatus('publisherStatus', false);
+                        appendLog('publisherLog', 'Disconnected.', 'warning');
+                    });
+
+                    sdk.addEventListener('publisherVideoMuteState', (event) => {
+                        const detail = event.detail || {};
+                        handlePublisherMuteState(!!detail.muted, detail.reason || 'update', {
+                            trackId: detail.track && detail.track.id ? detail.track.id : undefined
+                        });
+                    });
+
+                    sdk.addEventListener('peerConnected', (event) => {
+                        appendLog('publisherLog', `Peer connected: ${event.detail.uuid?.slice(0, 8) || 'unknown'}`, 'success');
+                    });
+
+                    sdk.addEventListener('peerDisconnected', (event) => {
+                        appendLog('publisherLog', `Peer disconnected: ${event.detail.uuid?.slice(0, 8) || 'unknown'}`, 'warning');
+                    });
+
+                    sdk.addEventListener('dataChannelOpen', (event) => {
+                        appendLog('publisherLog', `Data channel open for ${event.detail.uuid?.slice(0, 8) || 'unknown'}.`, 'success');
+                    });
+
+                    sdk.addEventListener('dataReceived', (event) => {
+                        const payload = parsePayload(event.detail.data);
+                        if (payload && typeof payload === 'object' && payload.videoMuted !== undefined) {
+                            appendLog('publisherLog', `Unexpected videoMuted payload: ${JSON.stringify(payload)}`, 'warning');
+                        }
+                    });
+
+                    await sdk.connect();
+                    appendLog('publisherLog', 'Connected, starting publish…');
+
+                    await sdk.publish(stream, {
+                        room,
+                        streamID,
+                        label
+                    });
+
+                    appendLog('publisherLog', `Publishing stream "${streamID}"${room ? ` in room "${room}"` : ''}.`, 'success');
+                    updateBadge('publisherMuteBadge', 'Video live', false);
+                    refreshPublisherControls();
+                } catch (error) {
+                    appendLog('publisherLog', `Publish error: ${error.message}`, 'error');
+                    stopPublisher();
+                }
+            };
+
+            const stopPublisher = () => {
+                if (publisherState.sdk) {
+                    try { publisherState.sdk.disconnect(); } catch (e) {}
+                }
+                publisherState.sdk = null;
+                publisherState.lastMuted = null;
+                if (publisherState.trackCleanup) {
+                    try { publisherState.trackCleanup(); } catch (e) {}
+                    publisherState.trackCleanup = null;
+                }
+                if (publisherState.stream) {
+                    publisherState.stream.getTracks().forEach(track => track.stop());
+                }
+                publisherState.stream = null;
+                publisherState.track = null;
+                localVideo.srcObject = null;
+                localVideo.classList.remove('muted-display');
+                localOverlay.textContent = 'Publisher stopped.';
+                localOverlay.classList.add('active');
+                updateBadge('publisherMuteBadge', 'No track', false);
+                setStatus('publisherStatus', false);
+                refreshPublisherControls();
+                appendLog('publisherLog', 'Publisher stopped.', 'warning');
+            };
+
+            const togglePublisherTrack = () => {
+                const track = publisherState.track;
+                if (!track) {
+                    appendLog('publisherLog', 'No track to toggle.', 'warning');
+                    return;
+                }
+                const newState = !track.enabled;
+                track.enabled = newState;
+                appendLog('publisherLog', `track.enabled set to ${newState}.`, 'system');
+                refreshPublisherControls();
+            };
+
+            const stopTrack = () => {
+                const track = publisherState.track;
+                if (!track) {
+                    appendLog('publisherLog', 'No track to stop.', 'warning');
+                    return;
+                }
+                appendLog('publisherLog', 'Stopping local video track (will trigger "ended").', 'warning');
+                track.stop();
+                if (publisherState.stream) {
+                    try { publisherState.stream.removeTrack(track); } catch (e) {}
+                }
+                publisherState.track = null;
+                refreshPublisherControls();
+            };
+
+            const replaceTrack = async () => {
+                if (!publisherState.sdk || !publisherState.sdk.state?.publishing) {
+                    appendLog('publisherLog', 'Start publishing before replacing the track.', 'warning');
+                    return;
+                }
+                try {
+                    appendLog('publisherLog', 'Acquiring new camera track…');
+                    const media = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+                    const [newTrack] = media.getVideoTracks();
+                    if (!newTrack) {
+                        appendLog('publisherLog', 'No video track found during replacement.', 'error');
+                        media.getTracks().forEach(t => t.stop());
+                        return;
+                    }
+
+                    const previousTrack = publisherState.track;
+                    if (!publisherState.stream) {
+                        publisherState.stream = new MediaStream();
+                        localVideo.srcObject = publisherState.stream;
+                    }
+
+                    if (previousTrack) {
+                        try { publisherState.stream.removeTrack(previousTrack); } catch (e) {}
+                    }
+                    publisherState.stream.addTrack(newTrack);
+                    localVideo.srcObject = publisherState.stream;
+                    localVideo.play().catch(() => {});
+
+                    if (previousTrack) {
+                        await publisherState.sdk.replaceTrack(previousTrack, newTrack);
+                        appendLog('publisherLog', 'Replaced the outbound video track.', 'success');
+                    } else {
+                        await publisherState.sdk.addTrack(newTrack, publisherState.stream);
+                        appendLog('publisherLog', 'Added a new outbound video track.', 'success');
+                    }
+
+                    attachLocalTrack(newTrack);
+                    refreshPublisherControls();
+                    updateBadge('publisherMuteBadge', 'Video live', false);
+                    localOverlay.classList.remove('active');
+
+                    if (previousTrack && previousTrack !== newTrack) {
+                        try { previousTrack.stop(); } catch (e) {}
+                    }
+                } catch (error) {
+                    appendLog('publisherLog', `Replace failed: ${error.message}`, 'error');
+                }
+            };
+
+            const startViewer = async () => {
+                if (viewerState.sdk) {
+                    appendLog('viewerLog', 'Viewer already active.', 'warning');
+                    return;
+                }
+
+                let room = sanitizeIdentifier(roomInput.value);
+                roomInput.value = room;
+                if (!room) {
+                    room = null;
+                }
+                const streamID = sanitizeIdentifier(streamInput.value);
+                streamInput.value = streamID;
+                if (!streamID) {
+                    appendLog('viewerLog', 'Stream ID required to view.', 'error');
+                    return;
+                }
+                if (!streamID) {
+                    appendLog('viewerLog', 'Stream ID required to view.', 'error');
+                    return;
+                }
+                const label = viewerLabelInput.value.trim() || 'Viewer';
+
+                const sdk = new VDONinjaSDK({
+                    room,
+                    debug: true
+                });
+                viewerState.sdk = sdk;
+                viewerState.lastMuteTimestamp = null;
+                teardownViewerMuteMonitors();
+
+                sdk.addEventListener('connected', () => {
+                    setStatus('viewerStatus', true);
+                    appendLog('viewerLog', 'Connected to signalling server.', 'success');
+                });
+
+                sdk.addEventListener('disconnected', () => {
+                    setStatus('viewerStatus', false);
+                    appendLog('viewerLog', 'Disconnected.', 'warning');
+                });
+
+                sdk.addEventListener('listing', (event) => {
+                    const count = event.detail?.list?.length || 0;
+                    appendLog('viewerLog', `Room listing reported ${count} streams.`, 'system');
+                });
+
+                sdk.addEventListener('peerConnected', (event) => {
+                    appendLog('viewerLog', `Publisher connected: ${event.detail.uuid?.slice(0, 8) || 'unknown'}`, 'success');
+                    scheduleMuteMonitorSweep(sdk);
+                });
+
+                sdk.addEventListener('peerDisconnected', (event) => {
+                    appendLog('viewerLog', `Publisher disconnected: ${event.detail.uuid?.slice(0, 8) || 'unknown'}`, 'warning');
+                    if (remoteVideo.srcObject) {
+                        remoteVideo.srcObject = null;
+                    }
+                    handleViewerMuteState(true, { reason: 'publisher disconnected' });
+                });
+
+                sdk.addEventListener('track', (event) => {
+                    const track = event.detail.track;
+                    if (!track) { return; }
+                    const stream = ensureRemoteStream();
+                    // Replace any existing track of the same kind
+                    stream.getTracks()
+                        .filter(existing => existing.kind === track.kind)
+                        .forEach(existing => stream.removeTrack(existing));
+                    stream.addTrack(track);
+                    remoteVideo.srcObject = stream;
+                    remoteVideo.play().catch(() => {});
+
+                    appendLog('viewerLog', `Received ${track.kind} track from ${event.detail.streamID || 'unknown'}.`, 'success');
+                    if (track.kind === 'video' && viewerState.muted !== true) {
+                        viewerOverlay.textContent = '';
+                        viewerOverlay.classList.remove('active');
+                    }
+
+                    if (track.kind === 'video') {
+                        const muteListener = () => {
+                            appendLog('viewerLog', 'Remote video track mute event fired.', 'warning');
+                            handleViewerMuteState(true, { reason: 'remote track mute event' });
+                        };
+                        const unmuteListener = () => {
+                            appendLog('viewerLog', 'Remote video track unmute event fired.', 'success');
+                            handleViewerMuteState(false, { reason: 'remote track unmuted' });
+                        };
+                        track.addEventListener('mute', muteListener);
+                        track.addEventListener('unmute', unmuteListener);
+                        track.addEventListener('ended', () => {
+                            appendLog('viewerLog', 'Remote video track ended.', 'warning');
+                            handleViewerMuteState(true, { reason: 'remote track ended' });
+                        });
+                    }
+                });
+
+                sdk.addEventListener('trackRemoved', (event) => {
+                    const track = event.detail.track;
+                    appendLog('viewerLog', `Track removed: ${track.kind}`, 'warning');
+                    if (remoteVideo.srcObject) {
+                        try { remoteVideo.srcObject.removeTrack(track); } catch (e) {}
+                    }
+                    if (track.kind === 'video') {
+                        handleViewerMuteState(true, { reason: 'track removed' });
+                    }
+                });
+
+                sdk.addEventListener('remoteVideoMuteState', (event) => {
+                    const detail = event.detail || {};
+                    const muted = !!detail.muted;
+                    const summary = [
+                        `remoteVideoMuteState → ${muted ? 'videoMuted: true' : 'videoMuted: false'}`
+                    ];
+                    if (detail.trackId) {
+                        summary.push(`track=${detail.trackId.slice(0, 8)}`);
+                    }
+                    appendLog('viewerLog', summary.join(' | '), 'mute');
+                    viewerState.lastMuteTimestamp = typeof detail.timestamp === 'number'
+                        ? detail.timestamp
+                        : Date.now();
+                    handleViewerMuteState(muted, { trackId: detail.trackId || null });
+                });
+
+                sdk.addEventListener('dataReceived', (event) => {
+                    const payload = parsePayload(event.detail.data);
+                    if (payload && typeof payload === 'object' && payload.videoMuted !== undefined) {
+                        appendLog('viewerLog', `videoMuted payload: ${JSON.stringify(payload)}`, 'mute');
+                    } else {
+                        appendLog('viewerLog', `Data message: ${JSON.stringify(payload)}`, 'system');
+                    }
+                });
+
+                try {
+                    appendLog('viewerLog', 'Connecting viewer…');
+                    const dcOpenHandler = (event) => {
+                        if (!event.detail) { return; }
+                        if (!registerViewerMuteMonitor(sdk, event.detail.uuid, event.detail.type)) {
+                            setTimeout(() => registerViewerMuteMonitor(sdk, event.detail.uuid, event.detail.type), 0);
+                        }
+                        scheduleMuteMonitorSweep(sdk);
+                    };
+                    sdk.addEventListener('dataChannelOpen', dcOpenHandler);
+                    viewerState.dataChannelOpenHandler = dcOpenHandler;
+                    await sdk.quickView({
+                        room,
+                        streamID,
+                        video: true,
+                        audio: false,
+                        label
+                    });
+                    appendLog('viewerLog', `Viewing "${streamID}".`, 'success');
+                    handleViewerMuteState(false, { reason: 'viewer started' });
+                    scheduleMuteMonitorSweep(sdk);
+                    refreshViewerControls();
+                } catch (error) {
+                    appendLog('viewerLog', `Viewer error: ${error.message}`, 'error');
+                    stopViewer();
+                }
+            };
+
+            const stopViewer = () => {
+                if (viewerState.sdk && viewerState.dataChannelOpenHandler) {
+                    try { viewerState.sdk.removeEventListener('dataChannelOpen', viewerState.dataChannelOpenHandler); } catch (error) {}
+                }
+                if (viewerState.sdk) {
+                    try { viewerState.sdk.disconnect(); } catch (e) {}
+                }
+                viewerState.dataChannelOpenHandler = null;
+                viewerState.sdk = null;
+                viewerState.muted = null;
+                viewerState.lastMuteTimestamp = null;
+                teardownViewerMuteMonitors();
+                if (remoteVideo.srcObject) {
+                    try {
+                        remoteVideo.srcObject.getTracks().forEach(track => remoteVideo.srcObject.removeTrack(track));
+                    } catch (e) {}
+                    remoteVideo.srcObject = null;
+                }
+                viewerOverlay.textContent = 'Viewer stopped.';
+                viewerOverlay.classList.add('active');
+                remoteVideo.classList.remove('muted-display');
+                updateBadge('viewerMuteBadge', 'No connection', false);
+                setStatus('viewerStatus', false);
+                refreshViewerControls();
+                appendLog('viewerLog', 'Viewer stopped.', 'warning');
+            };
+
+            document.getElementById('randomizeStream').addEventListener('click', () => {
+                const newId = randomId();
+                streamInput.value = newId;
+                appendLog('publisherLog', `Stream ID set to "${newId}".`, 'system');
+                appendLog('viewerLog', `Stream ID set to "${newId}".`, 'system');
+            });
+
+            document.getElementById('startPublisherBtn').addEventListener('click', startPublisher);
+            document.getElementById('stopPublisherBtn').addEventListener('click', stopPublisher);
+            document.getElementById('togglePublisherMute').addEventListener('click', togglePublisherTrack);
+            document.getElementById('stopTrackBtn').addEventListener('click', stopTrack);
+            document.getElementById('replaceTrackBtn').addEventListener('click', replaceTrack);
+            document.getElementById('startViewerBtn').addEventListener('click', startViewer);
+            document.getElementById('stopViewerBtn').addEventListener('click', stopViewer);
+
+            refreshPublisherControls();
+            refreshViewerControls();
+            handleViewerMuteState(true, { reason: 'awaiting signal' });
+
+            window.addEventListener('beforeunload', () => {
+                stopPublisher();
+                stopViewer();
+            });
+        })();
+    </script>
+</body>
+</html>
