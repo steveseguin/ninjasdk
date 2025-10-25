@@ -579,6 +579,9 @@
             this._failedViewerConnections = new Map(); // Track failed connections for retry
             this._intentionalDisconnect = false; // Flag for intentional disconnections
             this._passwordHash = null;  // Cached hash for streamID
+            this._passwordHashPromise = null; // Tracks in-flight hash computation
+            this._passwordHashKey = null; // Password+salt signature for cached hash
+            this._passwordHashPromiseKey = null; // Signature for in-flight hash
             this._viewHandlers = new Map();
             this._sessionIDs = {};
             this._remoteSessionIDs = {};
@@ -2401,17 +2404,17 @@
             } else if (msg.request === "play") {
                 await this._handlePlayRequest(msg);
             } else if (msg.request === "listing") {
-                this._handleListing(msg);
+                await this._handleListing(msg);
             } else if (msg.request === "videoaddedtoroom") {
-                this._handleVideoAddedToRoom(msg);
+                await this._handleVideoAddedToRoom(msg);
             } else if (msg.request === "someonejoined") {
-                this._handleSomeoneJoined(msg);
+                await this._handleSomeoneJoined(msg);
             } else if (msg.request === "error") {
                 this._handleError(msg);
             } else if (msg.request === "alert") {
                 this._handleAlert(msg);
             } else if (msg.request === "transferred") {
-                this._handleTransferred(msg);
+                await this._handleTransferred(msg);
             } else if (msg.request === "offerSDP") {
                 this._handleOfferSDPRequest(msg);
             } else if (msg.rejected) {
@@ -2460,6 +2463,10 @@
          */
         async _handleOfferSDP(msg) {
             this._log('Handling offer from:', msg.UUID, 'session:', msg.session);
+
+            if (msg.streamID !== undefined) {
+                await this._ensurePasswordHash();
+            }
 
             // Normalize streamID to original (strip hash suffix if present), if provided
             const cleanStreamID = (msg.streamID !== undefined) ? this._stripHashFromStreamID(msg.streamID) : undefined;
@@ -2843,6 +2850,8 @@
         async _handlePlayRequest(msg) {
             this._log('Received play request for:', msg.streamID, 'from:', msg.UUID);
 
+            await this._ensurePasswordHash();
+
             // Normalize requested streamID (strip hash suffix if present)
             const requestedStream = this._stripHashFromStreamID(msg.streamID);
 
@@ -2917,6 +2926,75 @@
         }
 
         /**
+         * Ensure cached password hash is ready before stripping hashed stream IDs
+         * @private
+         * @returns {Promise<void>}
+         */
+        async _ensurePasswordHash() {
+            if (this.password === false || this.password === null) {
+                this._passwordHash = null;
+                this._passwordHashKey = null;
+                this._passwordHashPromise = null;
+                this._passwordHashPromiseKey = null;
+                return;
+            }
+
+            const effectivePassword = this._getEffectivePassword();
+            if (effectivePassword === null) {
+                this._passwordHash = null;
+                this._passwordHashKey = null;
+                this._passwordHashPromise = null;
+                this._passwordHashPromiseKey = null;
+                return;
+            }
+
+            const saltForHash = this.salt;
+            const hashKey = `${effectivePassword}:${saltForHash}`;
+
+            if (this._passwordHashKey && this._passwordHashKey !== hashKey) {
+                this._passwordHash = null;
+                this._passwordHashKey = null;
+            }
+
+            if (this._passwordHash && this._passwordHashKey === hashKey && typeof this._passwordHash === 'string' && this._passwordHash.length > 0) {
+                return;
+            }
+
+            if (this._passwordHashPromise) {
+                try {
+                    await this._passwordHashPromise;
+                } catch (error) {
+                    this._log('Failed to ensure password hash:', error);
+                }
+                if (this._passwordHash && this._passwordHashKey === hashKey && typeof this._passwordHash === 'string' && this._passwordHash.length > 0) {
+                    return;
+                }
+            }
+
+            const passwordForHash = effectivePassword;
+
+            const promise = this._generateHash(passwordForHash + saltForHash, 6);
+
+            this._passwordHashPromise = promise;
+            this._passwordHashPromiseKey = hashKey;
+
+            try {
+                const hash = await promise;
+                if (this._passwordHashPromise === promise && this._passwordHashPromiseKey === hashKey) {
+                    this._passwordHash = hash;
+                    this._passwordHashKey = hashKey;
+                }
+            } catch (error) {
+                this._log('Failed to precompute password hash:', error);
+            } finally {
+                if (this._passwordHashPromise === promise) {
+                    this._passwordHashPromise = null;
+                    this._passwordHashPromiseKey = null;
+                }
+            }
+        }
+
+        /**
          * Strip hash suffix from stream ID
          * @private
          * @param {string} streamID - Stream ID potentially with hash suffix
@@ -2950,8 +3028,10 @@
          * @private
          * @param {Object} msg - Listing message
          */
-        _handleListing(msg) {
+        async _handleListing(msg) {
             this._log('Processing listing');
+
+            await this._ensurePasswordHash();
 
             // Emit internal event for room joined
             this._emit('_roomJoined');
@@ -3020,7 +3100,9 @@
          * @private
          * @param {Object} msg - Video added message
          */
-        _handleVideoAddedToRoom(msg) {
+        async _handleVideoAddedToRoom(msg) {
+            await this._ensurePasswordHash();
+
             const cleanStreamID = this._stripHashFromStreamID(msg.streamID);
             this._log('Video added to room:', cleanStreamID);
 
@@ -3078,7 +3160,9 @@
          * @private
          * @param {Object} msg - User joined message
          */
-        _handleSomeoneJoined(msg) {
+        async _handleSomeoneJoined(msg) {
+            await this._ensurePasswordHash();
+
             const cleanStreamID = msg.streamID ? this._stripHashFromStreamID(msg.streamID) : null;
             this._log('Someone joined:', cleanStreamID || msg.UUID);
 
@@ -3160,7 +3244,7 @@
          * @private
          * @param {Object} msg - Transferred message
          */
-        _handleTransferred(msg) {
+        async _handleTransferred(msg) {
             this._log('Transferred to new room');
             // Similar to listing, but indicates we were moved
             this._emit('transferred', {
@@ -3169,7 +3253,7 @@
                 raw: msg
             });
             // Also emit as listing for compatibility
-            this._handleListing(msg);
+            await this._handleListing(msg);
         }
 
         /**
