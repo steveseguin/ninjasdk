@@ -1,4 +1,4 @@
-// VDO.Ninja SDK v1.3.16
+// VDO.Ninja SDK v1.3.17
 
 const MEDIA_STREAM_TRACK_ENABLED_DESCRIPTOR =
     (typeof MediaStreamTrack !== 'undefined' && MediaStreamTrack?.prototype)
@@ -334,7 +334,7 @@ const OUTBOUND_VIDEO_STOP_MUTE_DELAY_MS = 500;
          * @returns {string} Current SDK version
          */
         static get VERSION() {
-            return '1.3.16';
+            return '1.3.17';
         }
         
         /**
