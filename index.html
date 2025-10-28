@@ -646,6 +646,9 @@ await vdo.publish(stream, { room: "videoroom" });</code></pre>
     <section id="examples" class="section">
         <div class="container">
             <h2 class="section-title">Live Examples</h2>
+            <p class="section-subtitle">
+                <strong>Node Room Audio Recorder</strong> — Run <code>node demos/node-room-audio-recorder.js [&lt;room&gt;]</code> to auto-join a room, discover every active publisher, and save each remote audio track as its own WAV file.
+            </p>
             <div class="examples-grid">
                 <a href="demos/vdoninja-sdk-datachannel-demo.html" class="example-card">
                     <h3>Data Channel Demo</h3>
@@ -666,6 +669,10 @@ await vdo.publish(stream, { room: "videoroom" });</code></pre>
                 <a href="demos/vdoninja-sdk-pubsub-channels.html" class="example-card">
                     <h3>Pub/Sub Channels</h3>
                     <p>SDK-managed channels and subscriptions with simple helpers</p>
+                </a>
+                <a href="demos/node-room-audio-recorder.js" class="example-card">
+                    <h3>Node Audio Room Recorder</h3>
+                    <p>CLI sample that records every room participant’s audio track to timestamped WAV files.</p>
                 </a>
                 <a href="demos/" class="example-card">
                     <h3>All Demos</h3>
