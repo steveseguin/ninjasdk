@@ -507,6 +507,165 @@ test();`
     }
 ];
 
+if (webrtcLib === '@roamhq/wrtc') {
+    tests.push({
+        name: 'Audio Streaming (sine wave)',
+        file: 'test-audio-sine.js',
+        code: `
+const wrtc = require('${webrtcLib}');
+const WebSocket = require('ws');
+const crypto = require('crypto');
+const VDONinjaSDK = require('./vdoninja-sdk-node.js');
+
+global.WebSocket = WebSocket;
+global.crypto = crypto.webcrypto || crypto;
+global.RTCPeerConnection = wrtc.RTCPeerConnection;
+global.RTCIceCandidate = wrtc.RTCIceCandidate;
+global.RTCSessionDescription = wrtc.RTCSessionDescription;
+global.MediaStream = wrtc.MediaStream;
+global.MediaStreamTrack = wrtc.MediaStreamTrack;
+global.document = { createElement: () => ({ innerText: '', textContent: '' }) };
+global.CustomEvent = class CustomEvent extends Event {
+    constructor(type, options) {
+        super(type, options);
+        this.detail = options?.detail;
+    }
+};
+global.btoa = (str) => Buffer.from(str).toString('base64');
+global.atob = (str) => Buffer.from(str, 'base64').toString();
+
+const nonstandard = wrtc.nonstandard || {};
+if (!nonstandard.RTCAudioSource || !nonstandard.RTCAudioSink) {
+    console.error('RTCAudioSource/RTCAudioSink not available; ensure @roamhq/wrtc is installed with media support.');
+    process.exit(0);
+}
+
+const WSS = process.env.WSS_URL || 'wss://apibackup.vdo.ninja';
+const ROOM_BASE = 'audio_' + Math.random().toString(36).slice(2, 9);
+const ROOM = ROOM_BASE + '_' + Date.now();
+const STREAM_ID = 'audio_' + Math.random().toString(36).slice(2, 9);
+
+function sleep(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function createSinePublisherTrack(freq = 440, sampleRate = 48000) {
+    const source = new nonstandard.RTCAudioSource();
+    const track = source.createTrack();
+    const framesPerBuffer = Math.floor(sampleRate / 100);
+    const amplitude = 0.25;
+    const bitsPerSample = 16;
+    const channelCount = 1;
+    let phase = 0;
+    const omega = 2 * Math.PI * freq / sampleRate;
+    const timer = setInterval(() => {
+        const samples = new Int16Array(framesPerBuffer);
+        for (let i = 0; i < framesPerBuffer; i += 1) {
+            const sample = Math.sin(phase) * amplitude;
+            samples[i] = Math.max(-32767, Math.min(32767, Math.round(sample * 32767)));
+            phase += omega;
+            if (phase > Math.PI * 2) {
+                phase -= Math.PI * 2;
+            }
+        }
+        source.onData({
+            samples,
+            sampleRate,
+            bitsPerSample,
+            channelCount,
+            numberOfFrames: framesPerBuffer
+        });
+    }, 10);
+
+    const stop = () => {
+        clearInterval(timer);
+        try { track.stop(); } catch (err) {}
+        if (typeof source.close === 'function') {
+            source.close();
+        }
+    };
+
+    return { track, stop };
+}
+
+async function run() {
+    const publisher = new VDONinjaSDK({ host: WSS });
+    const viewer = new VDONinjaSDK({ host: WSS });
+
+    const { track, stop } = createSinePublisherTrack();
+    const outgoingStream = new wrtc.MediaStream([track]);
+
+    await publisher.connect();
+    await publisher.joinRoom({ room: ROOM });
+    await publisher.publish(outgoingStream, {
+        streamID: STREAM_ID,
+        info: { label: 'sdk-node-audio-test' }
+    });
+
+    await viewer.connect();
+    await viewer.joinRoom({ room: ROOM });
+
+    let sampleCount = 0;
+    let peak = 0;
+    let sink = null;
+
+    viewer.on('track', (event) => {
+        const detail = event.detail || {};
+        const incomingTrack = detail.track || detail.mediaStreamTrack || detail.streams?.[0]?.getAudioTracks?.()?.[0];
+        if (!incomingTrack || incomingTrack.kind !== 'audio' || sink) {
+            return;
+        }
+
+        sink = new nonstandard.RTCAudioSink(incomingTrack);
+        sink.ondata = (data) => {
+            const samples = data.samples;
+            sampleCount += samples.length;
+            for (let i = 0; i < samples.length; i += 1) {
+                const abs = Math.abs(samples[i]);
+                if (abs > peak) {
+                    peak = abs;
+                }
+            }
+        };
+    });
+
+    const publishedStreamID = publisher.state?.streamID || STREAM_ID;
+    await viewer.view(publishedStreamID, { audio: true, video: false, label: 'node-audio-test' });
+
+    const start = Date.now();
+    const timeout = 20000;
+    while (Date.now() - start < timeout) {
+        if (sampleCount > 4800 && peak > 500) {
+            break;
+        }
+        await sleep(200);
+    }
+
+    if (sampleCount <= 4800 || peak <= 500) {
+        throw new Error('Audio samples were not received as expected (count=' + sampleCount + ', peak=' + peak + ')');
+    }
+
+    console.log('  ✓ Received ' + sampleCount + ' audio samples; peak amplitude ' + peak);
+
+    if (sink) {
+        try { sink.stop(); } catch (err) {}
+    }
+    stop();
+    await sleep(500);
+    publisher.disconnect();
+    viewer.disconnect();
+    process.exit(0);
+}
+
+run().catch(async (err) => {
+    console.error('  ✗ Audio streaming test failed:', err && err.stack ? err.stack : err);
+    process.exit(1);
+});`
+    });
+} else {
+    console.log('ℹ️  Skipping audio streaming test: media support not available via', webrtcLib);
+}
+
 async function runTest(test) {
     return new Promise((resolve) => {
         console.log(`\n📝 Testing: ${test.name}`);

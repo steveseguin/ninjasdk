@@ -119,6 +119,10 @@ const sdkContext = {
     RTCPeerConnection: webrtcAdapter.RTCPeerConnection,
     RTCSessionDescription: webrtcAdapter.RTCSessionDescription,
     RTCIceCandidate: webrtcAdapter.RTCIceCandidate,
+    MediaStream: webrtcAdapter.MediaStream,
+    MediaStreamTrack: webrtcAdapter.MediaStreamTrack,
+    RTCAudioSource: webrtcAdapter.nonstandard?.RTCAudioSource,
+    RTCAudioSink: webrtcAdapter.nonstandard?.RTCAudioSink,
     fetch: fetch
 };
 
@@ -195,17 +199,36 @@ class VDONinjaSDKNode extends OriginalVDONinjaSDK {
     /**
      * Override publish to check media support
      */
-    async publish(options = {}) {
-        if (options.stream || options.audio || options.video) {
-            if (!this.webrtcAdapter.hasMediaSupport()) {
-                throw new Error(
-                    `Media publishing not supported with ${this.webrtcAdapter.getImplementation()}. ` +
-                    `Please install @roamhq/wrtc for audio/video support.`
-                );
-            }
+    async publish(streamOrOptions, maybeOptions = {}) {
+        const MediaStreamCtor = this.webrtcAdapter.MediaStream || global.MediaStream;
+        let stream = streamOrOptions;
+        let options = maybeOptions;
+
+        // Support legacy style: publish({ stream, ...options })
+        if (
+            streamOrOptions &&
+            typeof streamOrOptions === 'object' &&
+            !(MediaStreamCtor && streamOrOptions instanceof MediaStreamCtor) &&
+            !(typeof streamOrOptions.getTracks === 'function') &&
+            streamOrOptions.stream
+        ) {
+            stream = streamOrOptions.stream;
+            options = { ...streamOrOptions };
+            delete options.stream;
         }
-        
-        return super.publish(options);
+
+        const isMediaStream = MediaStreamCtor && stream instanceof MediaStreamCtor;
+        const isMediaLike = isMediaStream || (stream && typeof stream.getTracks === 'function');
+        const wantsMedia = isMediaLike || options.audio || options.video;
+
+        if (wantsMedia && !this.webrtcAdapter.hasMediaSupport()) {
+            throw new Error(
+                `Media publishing not supported with ${this.webrtcAdapter.getImplementation()}. ` +
+                `Please install @roamhq/wrtc for audio/video support.`
+            );
+        }
+
+        return super.publish(stream, options);
     }
     
     /**

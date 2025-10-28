@@ -112,6 +112,22 @@ See `demos/socialstreamninja-listener.js` for a complete example of receiving th
 node demos/socialstreamninja-listener.js roomname
 ```
 
+### Node Sine-Wave Audio Publisher
+Need an end-to-end Node example that publishes audio? The new `demos/node-audio-sine.js` script uses `@roamhq/wrtc`'s `RTCAudioSource` to emit a continuous tone.
+
+```bash
+npm install @roamhq/wrtc ws
+node demos/node-audio-sine.js
+```
+
+By default it joins room `node_audio_demo_xxxxx` and stream `node_sine_demo_xxxxx`, where a short random suffix avoids collisions. Override the base identifiers with:
+
+```bash
+VDON_ROOM=my_room VDON_STREAM_ID=my_audio node demos/node-audio-sine.js
+```
+
+The script sanitizes identifiers to underscores, appends the random suffix automatically, keeps the default encryption password, and logs view-only URLs using `?scene` so listeners can tune in immediately (no `&password=0` required). It prints both a room view link (`?scene&room=...`) and a scene+view link that keeps the room context (`?scene&room=...&view=...`).
+
 ## Important Notes
 
 1. **Windows Subsystem for Linux (WSL)**: WebRTC may have issues in WSL due to UDP traffic limitations. Run Node.js directly on Windows for best results.
@@ -125,6 +141,11 @@ node demos/socialstreamninja-listener.js roomname
    - Use `wss://wss.vdo.ninja` for general WebRTC streaming
    - Use `wss://wss.socialstream.ninja` for Social Stream Ninja chat consolidation
    - Set `salt: 'vdo.ninja'` when you want streams to be viewable on https://vdo.ninja
+
+4. **Signaling Servers & Room Exclusivity**:
+   - The official `wss://wss.vdo.ninja` backend routes like the advanced handshake server in [vdoninja_advanced.js](https://github.com/steveseguin/websocket_server); hashed room IDs restrict who can access streams without the matching room context.
+   - Simpler fan-out servers (for example `server.js` in the same repo) may deliver offers to anyone connected, even outside the intended room.
+   - You can self-host these handshake servers, but support beyond the published docs is not provided.
 
 ## Troubleshooting
 

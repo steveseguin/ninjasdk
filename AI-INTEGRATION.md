@@ -49,6 +49,8 @@ const VDONinjaSDK = require('./vdoninja-sdk-node.js');
 ```
 See [README-NODE.md](README-NODE.md) for detailed Node.js setup.
 
+> **Viewer workflow tip:** When sharing room links from Node publishers, append `?scene` so viewers land in listen-only mode. Keep room and stream identifiers alphanumeric/underscore (the SDK will auto-sanitize other characters). If you choose `password: false`, remind viewers to include `&password=0`; with the default password you can share the hashed `sdk.state.streamID` directly without extra parameters.
+
 ## Core Concepts
 
 1. **Rooms**: Virtual spaces identified by a string where peers meet

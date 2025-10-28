@@ -18,6 +18,9 @@ class WebRTCAdapter {
         this.RTCSessionDescription = null;
         this.RTCIceCandidate = null;
         this.mediaDevices = null;
+        this.MediaStream = null;
+        this.MediaStreamTrack = null;
+        this.nonstandard = {};
         
         this._detectImplementation();
     }
@@ -45,6 +48,9 @@ class WebRTCAdapter {
             this.RTCSessionDescription = wrtc.RTCSessionDescription;
             this.RTCIceCandidate = wrtc.RTCIceCandidate;
             this.mediaDevices = wrtc.mediaDevices || this._createMediaDevicesShim(wrtc);
+            this.MediaStream = wrtc.MediaStream;
+            this.MediaStreamTrack = wrtc.MediaStreamTrack;
+            this.nonstandard = wrtc.nonstandard || {};
             return;
         } catch (e) {
             // @roamhq/wrtc not available
@@ -58,6 +64,9 @@ class WebRTCAdapter {
             this.RTCSessionDescription = wrtc.RTCSessionDescription;
             this.RTCIceCandidate = wrtc.RTCIceCandidate;
             this.mediaDevices = wrtc.mediaDevices || this._createMediaDevicesShim(wrtc);
+            this.MediaStream = wrtc.MediaStream;
+            this.MediaStreamTrack = wrtc.MediaStreamTrack;
+            this.nonstandard = wrtc.nonstandard || {};
             return;
         } catch (e) {
             // wrtc not available
