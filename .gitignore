@@ -9,6 +9,7 @@ dist/
 build/
 referenceonly/
 vdoninja/
+recordings/
 
 # Misc
 .DS_Store
