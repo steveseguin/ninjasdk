@@ -128,6 +128,42 @@ VDON_ROOM=my_room VDON_STREAM_ID=my_audio node demos/node-audio-sine.js
 
 The script sanitizes identifiers to underscores, appends the random suffix automatically, keeps the default encryption password, and logs view-only URLs using `?scene` so listeners can tune in immediately (no `&password=0` required). It prints both a room view link (`?scene&room=...`) and a scene+view link that keeps the room context (`?scene&room=...&view=...`).
 
+### Room Audio Recorder (WAV)
+`demos/node-room-audio-recorder.js` joins an existing room, captures the first audio track per stream, and writes a WAV file named `streamID_timestamp.wav` to the `recordings/` folder.
+
+```bash
+npm install @roamhq/wrtc ws
+node demos/node-room-audio-recorder.js myroom
+```
+
+- If you omit the room argument, the script uses `VDON_ROOM` or falls back to a random room name.
+- Each file writes a placeholder 44-byte header, converts every incoming sample type to signed 16-bit PCM, and after shutdown rewrites the WAV header with the measured duration. The recorder snaps the derived sample rate to the nearest common value (typically 48 kHz) so playback speed is correct.
+- Press `Ctrl+C` to stop; the script waits for the WAV header rewrite before exiting. Outputs land in `recordings/` unless you set `VDON_RECORD_DIR`.
+
+### Room Media Recorder (MP4 + WAV)
+`demos/node-room-media-recorder.js` records both audio and video for one track per stream and emits `streamID_timestamp.mp4` and `streamID_timestamp.wav`.
+
+```bash
+# Install @roamhq/wrtc/ws as above, then provide ffmpeg:
+winget install ffmpeg   # Windows
+brew install ffmpeg     # macOS
+apt install ffmpeg      # Debian/Ubuntu
+
+# Run the recorder (PowerShell example on Windows)
+$env:FFMPEG_PATH="C:\Users\steve\Code\ninjasdk\ffmpeg.exe"
+$env:VDON_AUTO_STOP_SECONDS=10  # optional; default 15
+node demos\node-room-media-recorder.js myroom
+```
+
+- Set `FFMPEG_PATH` if `ffmpeg` is not already on your PATH. On Windows you can drop `ffmpeg.exe` beside the repo and point to it.
+- The recorder requests a single audio/video track per publishing stream and pipes raw I420 video frames directly into `ffmpeg` (`libx264`, `-preset veryfast`, `-crf 23` by default). Buffered frames are drained before stdin closes so the MP4 finalizes cleanly.
+- Auto-stop defaults to 15 seconds; tweak with `VDON_AUTO_STOP_SECONDS` (set `0` to disable and rely on `Ctrl+C`).
+- Useful environment overrides:
+  - `VDON_RECORD_DIR` – alternate output location.
+  - `VDON_VIDEO_FPS`, `VDON_VIDEO_CRF`, `VDON_VIDEO_PRESET`, `VDON_VIDEO_CODEC` – ffmpeg encoder tuning.
+  - `VDON_VIDEO_DEBUG=1` – noisy frame-level logging for troubleshooting.
+- Audio handling matches the WAV-only recorder: samples are normalized to signed 16-bit PCM and the finalized header snaps to the nearest standard rate (48 kHz for most WebRTC captures).
+
 ## Important Notes
 
 1. **Windows Subsystem for Linux (WSL)**: WebRTC may have issues in WSL due to UDP traffic limitations. Run Node.js directly on Windows for best results.
