@@ -68,6 +68,25 @@ function toPCM16Buffer(samples) {
     return null;
 }
 
+function normalizeSampleRate(rate) {
+    if (!Number.isFinite(rate) || rate <= 0) {
+        return null;
+    }
+    const COMMON_RATES = [48000, 44100, 32000, 24000, 22050, 16000, 12000, 11025, 8000];
+    let best = COMMON_RATES[0];
+    let bestDiff = Math.abs(rate - best);
+    for (let i = 1; i < COMMON_RATES.length; i += 1) {
+        const candidate = COMMON_RATES[i];
+        const diff = Math.abs(rate - candidate);
+        if (diff < bestDiff) {
+            best = candidate;
+            bestDiff = diff;
+        }
+    }
+    const tolerance = Math.max(200, best * 0.02);
+    return bestDiff <= tolerance ? best : Math.round(rate);
+}
+
 const SIGNAL_HOST = process.env.VDON_HOST || 'wss://wss.vdo.ninja';
 const PASSWORD = process.env.VDON_PASSWORD;
 const OUTPUT_DIR = path.resolve(process.env.VDON_RECORD_DIR || path.join(__dirname, '..', 'recordings'));
@@ -194,7 +213,7 @@ function attachAudioSink(streamID, track) {
     }
 
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const filename = `${fileSafe(streamID)}_${fileSafe(track.id)}_${timestamp}.wav`;
+    const filename = `${fileSafe(streamID)}_${timestamp}.wav`;
     const filepath = path.join(OUTPUT_DIR, filename);
     const sink = new nonstandard.RTCAudioSink(track);
 
@@ -413,15 +432,16 @@ function finalizeWavFile(state) {
 
     if (durationMs > 0 && state.totalFrames > 0) {
         const derivedSampleRate = Math.round((state.totalFrames * 1000) / durationMs);
+        const normalizedRate = normalizeSampleRate(derivedSampleRate);
         if (
-            derivedSampleRate > 0 &&
-            Math.abs(derivedSampleRate - sampleRate) > Math.max(200, sampleRate * 0.05)
+            normalizedRate &&
+            Math.abs(normalizedRate - sampleRate) > Math.max(200, sampleRate * 0.05)
         ) {
             console.log(
-                `[audio] Adjusting WAV sample rate from ${sampleRate} to ${derivedSampleRate} based on capture timing`
+                `[audio] Adjusting WAV sample rate from ${sampleRate} to ${normalizedRate} based on capture timing`
             );
-            sampleRate = derivedSampleRate;
-            state.sampleRate = derivedSampleRate;
+            sampleRate = normalizedRate;
+            state.sampleRate = normalizedRate;
         }
     }
 
