@@ -30,6 +30,44 @@ if (!nonstandard.RTCAudioSink) {
     throw new Error('RTCAudioSink unavailable. Install @roamhq/wrtc >= 0.8 for media support.');
 }
 
+function toPCM16Buffer(samples) {
+    if (Buffer.isBuffer(samples)) {
+        return Buffer.from(samples);
+    }
+    if (samples instanceof Int16Array) {
+        return Buffer.from(samples.buffer, samples.byteOffset, samples.byteLength);
+    }
+    if (samples instanceof Float32Array) {
+        const output = Buffer.allocUnsafe(samples.length * 2);
+        for (let i = 0; i < samples.length; i += 1) {
+            const value = Math.max(-1, Math.min(1, samples[i] || 0));
+            const int16 = value < 0 ? value * 0x8000 : value * 0x7fff;
+            output.writeInt16LE(Math.round(int16), i * 2);
+        }
+        return output;
+    }
+    if (samples instanceof Int32Array) {
+        const output = Buffer.allocUnsafe(samples.length * 2);
+        for (let i = 0; i < samples.length; i += 1) {
+            output.writeInt16LE(samples[i] >> 16, i * 2);
+        }
+        return output;
+    }
+    if (samples instanceof Uint8Array || samples instanceof Int8Array) {
+        const output = Buffer.allocUnsafe(samples.length * 2);
+        for (let i = 0; i < samples.length; i += 1) {
+            const value = (samples[i] - 128) / 128;
+            const int16 = value < 0 ? value * 0x8000 : value * 0x7fff;
+            output.writeInt16LE(Math.round(int16), i * 2);
+        }
+        return output;
+    }
+    if (samples?.buffer instanceof ArrayBuffer) {
+        return Buffer.from(new Uint8Array(samples.buffer));
+    }
+    return null;
+}
+
 const SIGNAL_HOST = process.env.VDON_HOST || 'wss://wss.vdo.ninja';
 const PASSWORD = process.env.VDON_PASSWORD;
 const OUTPUT_DIR = path.resolve(process.env.VDON_RECORD_DIR || path.join(__dirname, '..', 'recordings'));
@@ -169,7 +207,12 @@ function attachAudioSink(streamID, track) {
         fileStream: null,
         headerWritten: false,
         fd: null,
-        finalized: false
+        finalized: false,
+        formatLogged: false,
+        firstChunkTime: null,
+        lastChunkTime: null,
+        totalFrames: 0,
+        debuggedFirstChunk: false
     };
 
     console.log(`[audio] Writing ${streamID} (${track.id}) to ${filepath}`);
@@ -185,20 +228,55 @@ function attachAudioSink(streamID, track) {
     });
 
     sink.ondata = (data) => {
-        if (!data?.samples) {
+        const samples = data?.samples;
+        if (!samples) {
             return;
         }
-        if (!wavState.sampleRate) {
-            wavState.sampleRate = data.sampleRate || 48000;
-            wavState.bitsPerSample = data.bitsPerSample || 16;
-            wavState.channelCount = data.channelCount || 1;
+
+        const length = typeof samples.length === 'number' ? samples.length : 0;
+        if (length === 0) {
+            return;
         }
 
-        const buffer = Buffer.from(
-            data.samples.buffer,
-            data.samples.byteOffset,
-            data.samples.byteLength
-        );
+        if (!wavState.sampleRate) {
+            wavState.sampleRate = data.sampleRate || 48000;
+            wavState.channelCount = data.numberOfChannels || data.channelCount || 1;
+        }
+
+        wavState.bitsPerSample = 16;
+
+        if (!wavState.formatLogged) {
+            wavState.formatLogged = true;
+            console.log(
+                `[audio] format sampleRate=${wavState.sampleRate}Hz channels=${wavState.channelCount} (source bits=${data.bitsPerSample || 'n/a'})`
+            );
+            if (DEBUG) {
+                console.log('[audio] debug keys=', Object.keys(data));
+            }
+        }
+
+        if (DEBUG && !wavState.debuggedFirstChunk) {
+            wavState.debuggedFirstChunk = true;
+            console.log(
+                `[audio] chunk length=${length} frames=${data.numberOfFrames ?? 'n/a'} channelCount=${data.channelCount ?? 'n/a'}`
+            );
+        }
+
+        const buffer = toPCM16Buffer(samples);
+        if (!buffer || buffer.length === 0) {
+            return;
+        }
+
+        const now = Date.now();
+        if (!wavState.firstChunkTime) {
+            wavState.firstChunkTime = now;
+        }
+        wavState.lastChunkTime = now;
+
+        const channels = wavState.channelCount || 1;
+        const framesThisChunk = buffer.length / (2 * channels);
+        wavState.totalFrames += framesThisChunk;
+
         wavState.bytesWritten += buffer.length;
         fileStream.write(buffer);
     };
@@ -206,12 +284,35 @@ function attachAudioSink(streamID, track) {
     const close = (reason) => {
         const meta = activeTracks.get(key);
         if (!meta) {
-            return;
+            return Promise.resolve();
         }
-        sink.stop();
-        fileStream.end(() => finalizeWavFile(wavState));
+
         activeTracks.delete(key);
+
+        try {
+            sink.stop();
+        } catch (err) {
+            // ignore
+        }
+
+        const finalizePromise = new Promise((resolve) => {
+            const finalizeAndResolve = () => {
+                try {
+                    finalizeWavFile(wavState);
+                } finally {
+                    resolve();
+                }
+            };
+
+            if (!fileStream || fileStream.destroyed || fileStream.writableEnded || fileStream.closed) {
+                finalizeAndResolve();
+            } else {
+                fileStream.end(finalizeAndResolve);
+            }
+        });
+
         console.log(`[audio] Closed ${streamID} (${track.id}) due to ${reason}`);
+        return finalizePromise;
     };
 
     track.onended = () => close('track ended');
@@ -240,21 +341,56 @@ function cleanupStream(streamID, reason) {
 
 async function shutdown(sdk, signal) {
     console.log(`\nReceived ${signal}. Stopping recordings...`);
-    for (const [key, info] of activeTracks.entries()) {
+    const pendingClosures = [];
+    for (const [key, info] of Array.from(activeTracks.entries())) {
         try {
-            info.sink.stop();
+            if (typeof info.close === 'function') {
+                const result = info.close(`shutdown ${signal}`);
+                if (result && typeof result.then === 'function') {
+                    pendingClosures.push(result);
+                }
+            } else {
+                try {
+                    info.sink.stop();
+                } catch (err) {
+                    // ignore
+                }
+                const finalizePromise = new Promise((resolve) => {
+                    const finalizeAndResolve = () => {
+                        try {
+                            finalizeWavFile(info.wavState);
+                        } finally {
+                            resolve();
+                        }
+                    };
+                    const stream = info.fileStream;
+                    if (!stream || stream.destroyed || stream.writableEnded || stream.closed) {
+                        finalizeAndResolve();
+                    } else {
+                        stream.end(finalizeAndResolve);
+                    }
+                });
+                pendingClosures.push(finalizePromise);
+                activeTracks.delete(key);
+                console.log(`[shutdown] Closed ${info.streamID} (${info.track.id})`);
+            }
         } catch (err) {
-            // ignore
+            console.error(`[shutdown] Error closing ${info.streamID} (${info.track.id}):`, err.message);
         }
-        info.fileStream.end(() => finalizeWavFile(info.wavState));
-        activeTracks.delete(key);
-        console.log(`[shutdown] Closed ${info.streamID} (${info.track.id})`);
     }
 
     try {
         await sdk.disconnect();
     } catch (error) {
         console.error('Error during disconnect:', error.message);
+    }
+
+    if (pendingClosures.length > 0) {
+        try {
+            await Promise.allSettled(pendingClosures);
+        } catch (err) {
+            // ignore
+        }
     }
     process.exit(0);
 }
@@ -267,10 +403,28 @@ main().catch((error) => {
 function finalizeWavFile(state) {
     if (!state || state.finalized || !state.headerWritten) return;
 
-    const sampleRate = state.sampleRate || 48000;
+    let sampleRate = state.sampleRate || 48000;
     const bitsPerSample = state.bitsPerSample || 16;
     const channelCount = state.channelCount || 1;
     const dataSize = state.bytesWritten;
+    const durationMs = state.lastChunkTime && state.firstChunkTime
+        ? Math.max(1, state.lastChunkTime - state.firstChunkTime)
+        : 0;
+
+    if (durationMs > 0 && state.totalFrames > 0) {
+        const derivedSampleRate = Math.round((state.totalFrames * 1000) / durationMs);
+        if (
+            derivedSampleRate > 0 &&
+            Math.abs(derivedSampleRate - sampleRate) > Math.max(200, sampleRate * 0.05)
+        ) {
+            console.log(
+                `[audio] Adjusting WAV sample rate from ${sampleRate} to ${derivedSampleRate} based on capture timing`
+            );
+            sampleRate = derivedSampleRate;
+            state.sampleRate = derivedSampleRate;
+        }
+    }
+
     const byteRate = sampleRate * channelCount * (bitsPerSample / 8);
     const blockAlign = channelCount * (bitsPerSample / 8);
 
