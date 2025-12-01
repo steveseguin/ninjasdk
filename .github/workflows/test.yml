@@ -482,6 +482,11 @@ jobs:
         EOF
         timeout 30s node test-aliases.js
 
+    - name: Run WHIP/WHEP integration test
+      if: matrix.webrtc-lib == '@roamhq/wrtc' && matrix.node-version == 20
+      run: |
+        timeout 120s node demos/whip-whep-integration-test.js
+
   test-summary:
     needs: test-sdk
     runs-on: ubuntu-latest
