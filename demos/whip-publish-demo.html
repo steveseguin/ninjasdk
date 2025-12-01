@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<!--
+    WHIP Publish Demo
+
+    This demo code is released into the public domain (CC0 1.0 Universal).
+    You may use, modify, and distribute this demo code without any restrictions.
+
+    Note: The WHIPClient (whip-client.js) remains licensed under AGPL-3.0.
+    See: https://github.com/steveseguin/ninjasdk/blob/main/LICENSE
+-->
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WHIP Publish Demo - VDO.Ninja SDK</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #1a1a1a;
+            color: #e0e0e0;
+        }
+        h1 {
+            text-align: center;
+            color: #fff;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            text-align: center;
+            color: #888;
+            margin-bottom: 30px;
+        }
+        .card {
+            background: #2a2a2a;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border: 1px solid #3a3a3a;
+        }
+        .card h2 {
+            margin-top: 0;
+            color: #fff;
+            font-size: 18px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #666;
+        }
+        .status-dot.connecting { background: #ffc107; }
+        .status-dot.connected { background: #4caf50; }
+        .status-dot.error { background: #f44336; }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #aaa;
+            font-size: 14px;
+        }
+        input, select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #444;
+            border-radius: 5px;
+            background: #1a1a1a;
+            color: #e0e0e0;
+            font-size: 14px;
+        }
+        input:focus, select:focus {
+            outline: none;
+            border-color: #4caf50;
+        }
+        .row {
+            display: flex;
+            gap: 15px;
+        }
+        .row > * {
+            flex: 1;
+        }
+        button {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 5px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .btn-primary {
+            background: #4caf50;
+            color: white;
+        }
+        .btn-primary:hover:not(:disabled) {
+            background: #5cbf60;
+        }
+        .btn-danger {
+            background: #f44336;
+            color: white;
+        }
+        .btn-danger:hover:not(:disabled) {
+            background: #ff5252;
+        }
+        .btn-secondary {
+            background: #555;
+            color: white;
+        }
+        .btn-secondary:hover:not(:disabled) {
+            background: #666;
+        }
+        .button-row {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+        video {
+            width: 100%;
+            max-height: 400px;
+            background: #000;
+            border-radius: 5px;
+        }
+        .log {
+            background: #111;
+            border: 1px solid #333;
+            border-radius: 5px;
+            padding: 10px;
+            height: 200px;
+            overflow-y: auto;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 12px;
+        }
+        .log-entry {
+            margin-bottom: 5px;
+            line-height: 1.4;
+        }
+        .log-entry.info { color: #4caf50; }
+        .log-entry.error { color: #f44336; }
+        .log-entry.warn { color: #ffc107; }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-top: 15px;
+        }
+        .stat {
+            background: #1a1a1a;
+            padding: 10px;
+            border-radius: 5px;
+            text-align: center;
+        }
+        .stat-value {
+            font-size: 20px;
+            font-weight: bold;
+            color: #4caf50;
+        }
+        .stat-label {
+            font-size: 12px;
+            color: #888;
+        }
+        .preset-buttons {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+        .preset-btn {
+            padding: 8px 16px;
+            background: #333;
+            border: 1px solid #444;
+            color: #e0e0e0;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+        .preset-btn:hover {
+            background: #444;
+        }
+        .info-box {
+            background: #1e3a5f;
+            border: 1px solid #2a4a6f;
+            border-radius: 5px;
+            padding: 15px;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+        .info-box a {
+            color: #64b5f6;
+        }
+    </style>
+</head>
+<body>
+    <h1>WHIP Publish Demo</h1>
+    <p class="subtitle">Publish your camera/screen to WHIP-compatible services</p>
+
+    <div class="info-box">
+        <strong>Supported Services:</strong>
+        <ul style="margin: 10px 0; padding-left: 20px;">
+            <li><strong>Meshcast.io</strong> - Free WebRTC relay (use preset below)</li>
+            <li><strong>Twitch</strong> - Use your WHIP ingest URL from <a href="https://dashboard.twitch.tv/settings/stream" target="_blank">Twitch Dashboard</a></li>
+            <li><strong>Cloudflare Stream</strong> - Use your Stream WHIP endpoint</li>
+            <li>Any other WHIP-compliant media server</li>
+        </ul>
+    </div>
+
+    <!-- Configuration -->
+    <div class="card">
+        <h2>Configuration</h2>
+
+        <div class="preset-buttons">
+            <button class="preset-btn" onclick="setPreset('meshcast')">Meshcast.io</button>
+            <button class="preset-btn" onclick="setPreset('cloudflare')">Cloudflare</button>
+            <button class="preset-btn" onclick="setPreset('twitch')">Twitch</button>
+        </div>
+
+        <div class="form-group">
+            <label for="whipUrl">WHIP Endpoint URL</label>
+            <input type="text" id="whipUrl" placeholder="https://example.com/whip/your-stream-id">
+        </div>
+
+        <div class="form-group">
+            <label for="authToken">Auth Token (optional)</label>
+            <input type="text" id="authToken" placeholder="Bearer token for authentication">
+        </div>
+
+        <div class="row">
+            <div class="form-group">
+                <label for="videoCodec">Video Codec</label>
+                <select id="videoCodec">
+                    <option value="">Auto</option>
+                    <option value="h264">H.264</option>
+                    <option value="vp8">VP8</option>
+                    <option value="vp9">VP9</option>
+                    <option value="av1">AV1</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="videoBitrate">Video Bitrate (kbps)</label>
+                <input type="number" id="videoBitrate" value="2500" min="100" max="20000">
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="form-group">
+                <label for="videoSource">Video Source</label>
+                <select id="videoSource">
+                    <option value="camera">Camera</option>
+                    <option value="screen">Screen Share</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="resolution">Resolution</label>
+                <select id="resolution">
+                    <option value="1920x1080">1080p (1920x1080)</option>
+                    <option value="1280x720" selected>720p (1280x720)</option>
+                    <option value="854x480">480p (854x480)</option>
+                    <option value="640x360">360p (640x360)</option>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <!-- Preview -->
+    <div class="card">
+        <h2>
+            <span class="status-dot" id="statusDot"></span>
+            Preview & Status
+        </h2>
+        <video id="preview" autoplay muted playsinline></video>
+
+        <div class="button-row">
+            <button class="btn-secondary" id="previewBtn" onclick="startPreview()">Start Preview</button>
+            <button class="btn-primary" id="publishBtn" onclick="startPublish()" disabled>Publish</button>
+            <button class="btn-danger" id="stopBtn" onclick="stopPublish()" disabled>Stop</button>
+        </div>
+
+        <div class="stats" id="stats" style="display: none;">
+            <div class="stat">
+                <div class="stat-value" id="statBitrate">0</div>
+                <div class="stat-label">kbps (video)</div>
+            </div>
+            <div class="stat">
+                <div class="stat-value" id="statFramerate">0</div>
+                <div class="stat-label">FPS</div>
+            </div>
+            <div class="stat">
+                <div class="stat-value" id="statPackets">0</div>
+                <div class="stat-label">Packets Sent</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Log -->
+    <div class="card">
+        <h2>Log</h2>
+        <div class="log" id="log"></div>
+    </div>
+
+    <script src="../whip-client.js"></script>
+    <script>
+        let client = null;
+        let localStream = null;
+        let statsInterval = null;
+        let lastBytesSent = 0;
+        let lastTimestamp = 0;
+
+        // Generate random stream ID for Meshcast
+        const randomStreamId = 'demo' + Math.random().toString(36).substring(2, 10);
+
+        function setPreset(preset) {
+            const urlInput = document.getElementById('whipUrl');
+            const tokenInput = document.getElementById('authToken');
+            const codecSelect = document.getElementById('videoCodec');
+
+            switch (preset) {
+                case 'meshcast':
+                    urlInput.value = `https://cae1.meshcast.io/whip/${randomStreamId}`;
+                    tokenInput.value = '';
+                    codecSelect.value = '';
+                    log(`Meshcast preset loaded. View URL: https://meshcast.io/${randomStreamId}`, 'info');
+                    break;
+                case 'cloudflare':
+                    urlInput.value = 'https://customer-XXXXX.cloudflarestream.com/XXXXX/webRTC/publish';
+                    tokenInput.value = '';
+                    codecSelect.value = 'h264';
+                    log('Cloudflare preset loaded. Replace XXXXX with your stream details.', 'info');
+                    break;
+                case 'twitch':
+                    urlInput.value = 'https://g.webrtc.live-video.net:4443/v2/offer';
+                    tokenInput.value = '';
+                    codecSelect.value = 'h264';
+                    log('Twitch preset loaded. Get your stream key from Twitch Dashboard and add as auth token.', 'info');
+                    break;
+            }
+        }
+
+        function log(message, type = 'info') {
+            const logDiv = document.getElementById('log');
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logDiv.appendChild(entry);
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        function setStatus(status) {
+            const dot = document.getElementById('statusDot');
+            dot.className = 'status-dot ' + status;
+        }
+
+        async function startPreview() {
+            try {
+                const source = document.getElementById('videoSource').value;
+                const resolution = document.getElementById('resolution').value.split('x');
+
+                const constraints = {
+                    video: {
+                        width: { ideal: parseInt(resolution[0]) },
+                        height: { ideal: parseInt(resolution[1]) },
+                        frameRate: { ideal: 30 }
+                    },
+                    audio: true
+                };
+
+                if (source === 'screen') {
+                    localStream = await navigator.mediaDevices.getDisplayMedia({
+                        video: { ...constraints.video, cursor: 'always' },
+                        audio: true
+                    });
+                } else {
+                    localStream = await navigator.mediaDevices.getUserMedia(constraints);
+                }
+
+                document.getElementById('preview').srcObject = localStream;
+                document.getElementById('publishBtn').disabled = false;
+                document.getElementById('previewBtn').disabled = true;
+                log('Preview started', 'info');
+            } catch (error) {
+                log(`Failed to start preview: ${error.message}`, 'error');
+            }
+        }
+
+        async function startPublish() {
+            const endpoint = document.getElementById('whipUrl').value.trim();
+            if (!endpoint) {
+                log('Please enter a WHIP endpoint URL', 'error');
+                return;
+            }
+
+            if (!localStream) {
+                log('Please start preview first', 'error');
+                return;
+            }
+
+            setStatus('connecting');
+            log('Connecting to WHIP endpoint...', 'info');
+
+            try {
+                const options = {
+                    debug: true,
+                    trickleIce: true
+                };
+
+                const authToken = document.getElementById('authToken').value.trim();
+                if (authToken) {
+                    options.authToken = authToken;
+                }
+
+                const videoCodec = document.getElementById('videoCodec').value;
+                if (videoCodec) {
+                    options.videoCodec = videoCodec;
+                }
+
+                const videoBitrate = parseInt(document.getElementById('videoBitrate').value);
+                if (videoBitrate) {
+                    options.videoBitrate = videoBitrate;
+                }
+
+                client = new WHIPClient(endpoint, options);
+
+                client.addEventListener('connecting', () => {
+                    setStatus('connecting');
+                    log('Connecting...', 'info');
+                });
+
+                client.addEventListener('connected', (e) => {
+                    setStatus('connected');
+                    log(`Connected! Resource URL: ${e.detail.resourceUrl || 'N/A'}`, 'info');
+                    startStatsMonitoring();
+                });
+
+                client.addEventListener('icestate', (e) => {
+                    log(`ICE state: ${e.detail.state}`, 'info');
+                });
+
+                client.addEventListener('error', (e) => {
+                    setStatus('error');
+                    log(`Error: ${e.detail.error?.message || 'Unknown error'}`, 'error');
+                });
+
+                client.addEventListener('disconnected', () => {
+                    log('Disconnected', 'warn');
+                });
+
+                await client.publish(localStream);
+
+                document.getElementById('publishBtn').disabled = true;
+                document.getElementById('stopBtn').disabled = false;
+                document.getElementById('stats').style.display = 'grid';
+
+            } catch (error) {
+                setStatus('error');
+                log(`Failed to publish: ${error.message}`, 'error');
+                client = null;
+            }
+        }
+
+        async function stopPublish() {
+            if (statsInterval) {
+                clearInterval(statsInterval);
+                statsInterval = null;
+            }
+
+            if (client) {
+                await client.stop();
+                client = null;
+            }
+
+            setStatus('');
+            document.getElementById('publishBtn').disabled = false;
+            document.getElementById('stopBtn').disabled = true;
+            document.getElementById('stats').style.display = 'none';
+            log('Publishing stopped', 'info');
+        }
+
+        function startStatsMonitoring() {
+            statsInterval = setInterval(async () => {
+                if (!client) return;
+
+                try {
+                    const stats = await client.getStats();
+                    let videoBytesSent = 0;
+                    let framesPerSecond = 0;
+                    let packetsSent = 0;
+
+                    stats.forEach(report => {
+                        if (report.type === 'outbound-rtp' && report.kind === 'video') {
+                            videoBytesSent = report.bytesSent || 0;
+                            framesPerSecond = report.framesPerSecond || 0;
+                            packetsSent = report.packetsSent || 0;
+                        }
+                    });
+
+                    // Calculate bitrate
+                    const now = Date.now();
+                    if (lastTimestamp > 0) {
+                        const timeDiff = (now - lastTimestamp) / 1000;
+                        const bytesDiff = videoBytesSent - lastBytesSent;
+                        const bitrate = Math.round((bytesDiff * 8) / timeDiff / 1000);
+                        document.getElementById('statBitrate').textContent = bitrate;
+                    }
+                    lastBytesSent = videoBytesSent;
+                    lastTimestamp = now;
+
+                    document.getElementById('statFramerate').textContent = Math.round(framesPerSecond);
+                    document.getElementById('statPackets').textContent = packetsSent.toLocaleString();
+
+                } catch (error) {
+                    // Stats not available
+                }
+            }, 1000);
+        }
+
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', () => {
+            if (client) {
+                client.stop();
+            }
+            if (localStream) {
+                localStream.getTracks().forEach(track => track.stop());
+            }
+        });
+
+        // Set default Meshcast URL
+        setPreset('meshcast');
+    </script>
+</body>
+</html>

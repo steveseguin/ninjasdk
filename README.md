@@ -137,6 +137,79 @@ await vdo.publish(stream, { room: "videoroom" });
 - 🚀 **Easy**: Simple API, works everywhere
 - 📡 **Flexible**: Audio, video, and data channels
 - 🌐 **Resilient**: NAT traversal and firewall bypassing
+- 📤 **WHIP/WHEP Support**: Publish to Twitch, Meshcast, Cloudflare and more
+
+## WHIP/WHEP Support
+
+The SDK includes standalone WHIP and WHEP clients for publishing to and consuming from standard WebRTC-HTTP endpoints.
+
+### What are WHIP and WHEP?
+
+- **WHIP** (WebRTC-HTTP Ingestion Protocol): Publish media to servers like Twitch, Meshcast, Cloudflare Stream
+- **WHEP** (WebRTC-HTTP Egress Protocol): Consume media from WHEP-compatible servers
+
+### WHIP Client - Publish to Streaming Services
+
+```javascript
+// Include the WHIP client
+// Browser: <script src="whip-client.js"></script>
+// Node.js: const WHIPClient = require('./whip-client.js');
+
+// Publish to Meshcast.io
+const client = new WHIPClient('https://cae1.meshcast.io/whip/mystream', {
+    videoCodec: 'h264',
+    videoBitrate: 2500,
+    debug: true
+});
+
+// Get camera/screen
+const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+
+// Publish
+await client.publish(stream);
+console.log('Publishing! View at: https://meshcast.io/mystream');
+
+// Stop when done
+await client.stop();
+```
+
+### WHEP Client - Watch Streams
+
+```javascript
+// Include the WHEP client
+// Browser: <script src="whep-client.js"></script>
+// Node.js: const WHEPClient = require('./whep-client.js');
+
+// Connect to a WHEP endpoint
+const client = new WHEPClient('https://cae1.meshcast.io/whep/mystream', {
+    debug: true
+});
+
+// Handle incoming tracks
+client.addEventListener('track', (e) => {
+    document.getElementById('video').srcObject = e.detail.streams[0];
+});
+
+// Start viewing
+await client.view();
+
+// Stop when done
+await client.stop();
+```
+
+### Supported WHIP/WHEP Services
+
+| Service | WHIP (Publish) | WHEP (View) |
+|---------|---------------|-------------|
+| Meshcast.io | `https://cae1.meshcast.io/whip/{streamId}` | `https://cae1.meshcast.io/whep/{streamId}` |
+| Cloudflare Stream | Yes | Yes |
+| Twitch | `https://g.webrtc.live-video.net:4443/v2/offer` | N/A |
+| Dolby.io | Yes | Yes |
+
+### WHIP/WHEP Demos
+
+- [WHIP Publish Demo](demos/whip-publish-demo.html) - Publish your camera to Meshcast, Twitch, etc.
+- [WHEP View Demo](demos/whep-view-demo.html) - Watch streams from WHEP endpoints
 
 ## Constructor Options
 

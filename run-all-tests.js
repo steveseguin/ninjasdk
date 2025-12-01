@@ -507,6 +507,212 @@ test();`
     }
 ];
 
+// WHIP/WHEP Unit Tests (no network required)
+tests.push({
+    name: 'WHIP Client Instantiation',
+    file: 'test-whip-client.js',
+    code: `
+const WHIPClient = require('./whip-client.js');
+
+async function test() {
+    try {
+        // Test basic instantiation
+        const client = new WHIPClient('https://example.com/whip/test');
+        console.log('  ✓ WHIPClient instantiated');
+
+        // Test with options
+        const clientWithOptions = new WHIPClient('https://example.com/whip/test', {
+            authToken: 'test-token',
+            videoCodec: 'h264',
+            videoBitrate: 2500,
+            audioBitrate: 128,
+            trickleIce: true,
+            debug: false
+        });
+        console.log('  ✓ WHIPClient with options instantiated');
+
+        // Test state
+        if (client.state !== 'idle') {
+            throw new Error('Initial state should be idle');
+        }
+        console.log('  ✓ Initial state is idle');
+
+        // Test missing endpoint throws
+        try {
+            new WHIPClient();
+            throw new Error('Should have thrown for missing endpoint');
+        } catch (e) {
+            if (e.message.includes('endpoint URL is required')) {
+                console.log('  ✓ Missing endpoint throws error');
+            } else {
+                throw e;
+            }
+        }
+
+        // Test EventTarget inheritance
+        let eventFired = false;
+        client.addEventListener('test', () => { eventFired = true; });
+        client.dispatchEvent(new Event('test'));
+        if (!eventFired) {
+            throw new Error('EventTarget not working');
+        }
+        console.log('  ✓ EventTarget inheritance works');
+
+        process.exit(0);
+    } catch (error) {
+        console.error('  ✗ WHIP Client test failed:', error.message);
+        process.exit(1);
+    }
+}
+test();`
+});
+
+tests.push({
+    name: 'WHEP Client Instantiation',
+    file: 'test-whep-client.js',
+    code: `
+const WHEPClient = require('./whep-client.js');
+
+async function test() {
+    try {
+        // Test basic instantiation
+        const client = new WHEPClient('https://example.com/whep/test');
+        console.log('  ✓ WHEPClient instantiated');
+
+        // Test with options
+        const clientWithOptions = new WHEPClient('https://example.com/whep/test', {
+            authToken: 'test-token',
+            audio: true,
+            video: true,
+            trickleIce: true,
+            debug: false
+        });
+        console.log('  ✓ WHEPClient with options instantiated');
+
+        // Test state
+        if (client.state !== 'idle') {
+            throw new Error('Initial state should be idle');
+        }
+        console.log('  ✓ Initial state is idle');
+
+        // Test missing endpoint throws
+        try {
+            new WHEPClient();
+            throw new Error('Should have thrown for missing endpoint');
+        } catch (e) {
+            if (e.message.includes('endpoint URL is required')) {
+                console.log('  ✓ Missing endpoint throws error');
+            } else {
+                throw e;
+            }
+        }
+
+        // Test EventTarget inheritance
+        let eventFired = false;
+        client.addEventListener('test', () => { eventFired = true; });
+        client.dispatchEvent(new Event('test'));
+        if (!eventFired) {
+            throw new Error('EventTarget not working');
+        }
+        console.log('  ✓ EventTarget inheritance works');
+
+        // Test getStream returns null before connection
+        if (client.getStream() !== null) {
+            throw new Error('getStream should return null before connection');
+        }
+        console.log('  ✓ getStream returns null before connection');
+
+        process.exit(0);
+    } catch (error) {
+        console.error('  ✗ WHEP Client test failed:', error.message);
+        process.exit(1);
+    }
+}
+test();`
+});
+
+// WHIP/WHEP Integration Test (requires @roamhq/wrtc with media support)
+if (webrtcLib === '@roamhq/wrtc' && process.env.WHIP_WHEP_TEST) {
+    tests.push({
+        name: 'WHIP/WHEP Integration (Meshcast)',
+        file: 'test-whip-whep-integration.js',
+        code: `
+const WHIPClient = require('./whip-client.js');
+const WHEPClient = require('./whep-client.js');
+const wrtc = require('@roamhq/wrtc');
+
+global.RTCPeerConnection = wrtc.RTCPeerConnection;
+global.RTCIceCandidate = wrtc.RTCIceCandidate;
+global.RTCSessionDescription = wrtc.RTCSessionDescription;
+global.MediaStream = wrtc.MediaStream;
+
+const nonstandard = wrtc.nonstandard || {};
+if (!nonstandard.RTCAudioSource) {
+    console.log('  ⚠ Skipping: RTCAudioSource not available');
+    process.exit(0);
+}
+
+const streamId = 'sdk-test-' + Math.random().toString(36).substring(2, 10);
+const WHIP_URL = 'https://cae1.meshcast.io/whip/' + streamId;
+const WHEP_URL = 'https://cae1.meshcast.io/whep/' + streamId;
+
+function createAudioTrack() {
+    const source = new nonstandard.RTCAudioSource();
+    const track = source.createTrack();
+    const sampleRate = 48000;
+    let phase = 0;
+    const interval = setInterval(() => {
+        const samples = new Int16Array(480);
+        for (let i = 0; i < 480; i++) {
+            samples[i] = Math.round(Math.sin(phase) * 0.25 * 32767);
+            phase += 2 * Math.PI * 440 / sampleRate;
+        }
+        source.onData({ samples, sampleRate, bitsPerSample: 16, channelCount: 1, numberOfFrames: 480 });
+    }, 10);
+    return { track, stop: () => clearInterval(interval) };
+}
+
+async function test() {
+    let whipClient, whepClient, audioSource;
+    try {
+        audioSource = createAudioTrack();
+        const stream = new wrtc.MediaStream([audioSource.track]);
+
+        console.log('  Publishing via WHIP to ' + streamId + '...');
+        whipClient = new WHIPClient(WHIP_URL, { trickleIce: false });
+        await whipClient.publish(stream);
+        console.log('  ✓ WHIP publishing');
+
+        await new Promise(r => setTimeout(r, 8000));
+
+        console.log('  Pulling via WHEP...');
+        whepClient = new WHEPClient(WHEP_URL, { trickleIce: false, audio: true, video: false });
+
+        let gotTrack = false;
+        whepClient.addEventListener('track', () => { gotTrack = true; });
+        await whepClient.view();
+
+        await new Promise(r => setTimeout(r, 5000));
+
+        if (gotTrack) {
+            console.log('  ✓ Received track via WHEP');
+            process.exit(0);
+        } else {
+            throw new Error('No track received');
+        }
+    } catch (error) {
+        console.error('  ✗ WHIP/WHEP test failed:', error.message);
+        process.exit(1);
+    } finally {
+        if (audioSource) audioSource.stop();
+        if (whepClient) await whepClient.stop().catch(() => {});
+        if (whipClient) await whipClient.stop().catch(() => {});
+    }
+}
+test();`
+    });
+}
+
 if (webrtcLib === '@roamhq/wrtc') {
     tests.push({
         name: 'Audio Streaming (sine wave)',

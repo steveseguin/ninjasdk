@@ -89,6 +89,58 @@
       <li>State: <code>publishing</code>, <code>publishingStopped</code>, <code>viewingStopped</code>, <code>iceRestart</code>, <code>connectionFailed</code>, <code>alert</code>, <code>error</code></li>
     </ul>
 
+    <h2>WHIP/WHEP Clients</h2>
+    <p>Standalone clients for standard WebRTC-HTTP streaming protocols. Works independently of the VDO.Ninja P2P system.</p>
+
+    <h3>WHIPClient (whip-client.js)</h3>
+    <p>Publish media streams to WHIP-compatible endpoints (Twitch, Meshcast, Cloudflare, etc.)</p>
+    <pre><code>const client = new WHIPClient(endpoint, options)</code></pre>
+    <ul>
+      <li><b>endpoint</b>: WHIP endpoint URL (required)</li>
+      <li><b>authToken</b>: Bearer token for authentication</li>
+      <li><b>videoCodec</b>: Preferred codec ('h264', 'vp8', 'vp9', 'av1')</li>
+      <li><b>videoBitrate</b>: Target video bitrate in kbps</li>
+      <li><b>audioBitrate</b>: Target audio bitrate in kbps</li>
+      <li><b>trickleIce</b>: Enable trickle ICE (default: true)</li>
+    </ul>
+    <p>Methods:</p>
+    <ul>
+      <li><code>publish(stream)</code> — Publish a MediaStream</li>
+      <li><code>replaceTrack(oldTrack, newTrack)</code> — Replace a track mid-session</li>
+      <li><code>stop()</code> — Stop publishing and cleanup</li>
+      <li><code>getStats()</code> — Get RTCStatsReport</li>
+      <li><code>restartIce()</code> — Restart ICE connection</li>
+    </ul>
+    <p>Events: <code>connecting</code>, <code>connected</code>, <code>icestate</code>, <code>connectionstate</code>, <code>error</code>, <code>disconnected</code>, <code>stopped</code></p>
+
+    <h3>WHEPClient (whep-client.js)</h3>
+    <p>Consume media streams from WHEP-compatible endpoints.</p>
+    <pre><code>const client = new WHEPClient(endpoint, options)</code></pre>
+    <ul>
+      <li><b>endpoint</b>: WHEP endpoint URL (required)</li>
+      <li><b>authToken</b>: Bearer token for authentication</li>
+      <li><b>audio</b>: Request audio track (default: true)</li>
+      <li><b>video</b>: Request video track (default: true)</li>
+      <li><b>trickleIce</b>: Enable trickle ICE (default: true)</li>
+    </ul>
+    <p>Methods:</p>
+    <ul>
+      <li><code>view()</code> — Start viewing, returns MediaStream</li>
+      <li><code>getStream()</code> — Get the received MediaStream</li>
+      <li><code>muteAudio(muted)</code>, <code>muteVideo(muted)</code> — Mute locally</li>
+      <li><code>stop()</code> — Stop viewing and cleanup</li>
+      <li><code>getStats()</code> — Get RTCStatsReport</li>
+    </ul>
+    <p>Events: <code>connecting</code>, <code>connected</code>, <code>track</code>, <code>icestate</code>, <code>connectionstate</code>, <code>error</code>, <code>disconnected</code>, <code>stopped</code></p>
+
+    <h3>Supported Services</h3>
+    <ul>
+      <li><b>Meshcast.io</b>: <code>https://cae1.meshcast.io/whip/{id}</code> / <code>https://cae1.meshcast.io/whep/{id}</code></li>
+      <li><b>Twitch</b>: <code>https://g.webrtc.live-video.net:4443/v2/offer</code> (WHIP only)</li>
+      <li><b>Cloudflare Stream</b>: Your Stream WHIP/WHEP endpoint</li>
+      <li><b>Dolby.io</b>: Your Dolby WHIP/WHEP endpoint</li>
+    </ul>
+
     <p>See <a href="../README.md">README</a> and <a href="../demos/index.html">demos</a> for examples.</p>
   </body>
   </html>

@@ -1,7 +1,7 @@
 {
   "name": "@vdoninja/sdk",
   "version": "1.3.17",
-  "description": "AI-friendly P2P communication SDK for audio, video, and data",
+  "description": "AI-friendly P2P communication SDK for audio, video, and data. Includes WHIP/WHEP clients for publishing to Twitch, Meshcast, Cloudflare Stream",
   "main": "vdoninja-sdk.js",
   "browser": "vdoninja-sdk.js",
   "exports": {
@@ -11,7 +11,9 @@
       "default": "./vdoninja-sdk.js"
     },
     "./node": "./vdoninja-sdk-node.js",
-    "./browser": "./vdoninja-sdk.js"
+    "./browser": "./vdoninja-sdk.js",
+    "./whip": "./whip-client.js",
+    "./whep": "./whep-client.js"
   },
   "scripts": {
     "build": "npm run minify",
@@ -37,7 +39,13 @@
     "streaming",
     "vdo.ninja",
     "ai-friendly",
-    "data-channel"
+    "data-channel",
+    "whip",
+    "whep",
+    "twitch",
+    "meshcast",
+    "cloudflare-stream",
+    "webrtc-http"
   ],
   "author": "Steve Seguin",
   "license": "AGPL-3.0",

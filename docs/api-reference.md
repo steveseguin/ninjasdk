@@ -131,4 +131,96 @@ State & Errors
 
 ---
 
+## WHIP/WHEP Clients
+
+Standalone clients for standard WebRTC-HTTP streaming protocols. These work independently of the VDO.Ninja P2P system.
+
+### WHIPClient (whip-client.js)
+
+Publish media streams to WHIP-compatible endpoints (Twitch, Meshcast, Cloudflare, etc.)
+
+```js
+const client = new WHIPClient(endpoint, options)
+```
+
+Options:
+- endpoint: WHIP endpoint URL (required)
+- authToken: Bearer token for authentication
+- videoCodec: Preferred codec ('h264', 'vp8', 'vp9', 'av1')
+- videoBitrate: Target video bitrate in kbps
+- audioBitrate: Target audio bitrate in kbps
+- trickleIce: Enable trickle ICE (default: true)
+- iceServers: Custom ICE servers array
+- headers: Additional HTTP headers
+- debug: Enable debug logging
+
+Methods:
+- publish(stream): Promise<void> — Publish a MediaStream
+- replaceTrack(oldTrack, newTrack): Promise<void> — Replace a track mid-session
+- stop(): Promise<void> — Stop publishing and cleanup
+- getStats(): Promise<RTCStatsReport> — Get connection statistics
+- restartIce(): Promise<void> — Restart ICE connection
+
+Events: connecting, connected, icestate, connectionstate, error, disconnected, stopped
+
+### WHEPClient (whep-client.js)
+
+Consume media streams from WHEP-compatible endpoints.
+
+```js
+const client = new WHEPClient(endpoint, options)
+```
+
+Options:
+- endpoint: WHEP endpoint URL (required)
+- authToken: Bearer token for authentication
+- audio: Request audio track (default: true)
+- video: Request video track (default: true)
+- trickleIce: Enable trickle ICE (default: true)
+- iceServers: Custom ICE servers array
+- headers: Additional HTTP headers
+- debug: Enable debug logging
+
+Methods:
+- view(): Promise<MediaStream> — Start viewing
+- getStream(): MediaStream | null — Get the received MediaStream
+- muteAudio(muted): void — Mute/unmute audio locally
+- muteVideo(muted): void — Mute/unmute video locally
+- stop(): Promise<void> — Stop viewing and cleanup
+- getStats(): Promise<RTCStatsReport> — Get connection statistics
+- restartIce(): Promise<void> — Restart ICE connection
+
+Events: connecting, connected, track, icestate, connectionstate, error, disconnected, stopped
+
+### Supported WHIP/WHEP Services
+
+| Service | WHIP URL | WHEP URL |
+|---------|----------|----------|
+| Meshcast.io | `https://cae1.meshcast.io/whip/{streamId}` | `https://cae1.meshcast.io/whep/{streamId}` |
+| Twitch | `https://g.webrtc.live-video.net:4443/v2/offer` | N/A |
+| Cloudflare Stream | Your Stream endpoint | Your Stream endpoint |
+| Dolby.io | Your Dolby endpoint | Your Dolby endpoint |
+
+### WHIP/WHEP Example
+
+```js
+// Publish to Meshcast
+const whip = new WHIPClient('https://cae1.meshcast.io/whip/mystream', {
+    videoCodec: 'h264',
+    videoBitrate: 2500
+});
+const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+await whip.publish(stream);
+// View at: https://meshcast.io/mystream
+
+// Watch from Meshcast
+const whep = new WHEPClient('https://cae1.meshcast.io/whep/mystream');
+whep.addEventListener('track', (e) => {
+    document.getElementById('video').srcObject = e.detail.streams[0];
+});
+await whep.view();
+```
+
+---
+
 See README for end-to-end examples and the demos folder for runnable samples.

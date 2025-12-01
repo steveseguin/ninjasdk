@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<!--
+    WHEP View Demo
+
+    This demo code is released into the public domain (CC0 1.0 Universal).
+    You may use, modify, and distribute this demo code without any restrictions.
+
+    Note: The WHEPClient (whep-client.js) remains licensed under AGPL-3.0.
+    See: https://github.com/steveseguin/ninjasdk/blob/main/LICENSE
+-->
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WHEP View Demo - VDO.Ninja SDK</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #1a1a1a;
+            color: #e0e0e0;
+        }
+        h1 {
+            text-align: center;
+            color: #fff;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            text-align: center;
+            color: #888;
+            margin-bottom: 30px;
+        }
+        .card {
+            background: #2a2a2a;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border: 1px solid #3a3a3a;
+        }
+        .card h2 {
+            margin-top: 0;
+            color: #fff;
+            font-size: 18px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #666;
+        }
+        .status-dot.connecting { background: #ffc107; }
+        .status-dot.connected { background: #4caf50; }
+        .status-dot.error { background: #f44336; }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #aaa;
+            font-size: 14px;
+        }
+        input, select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #444;
+            border-radius: 5px;
+            background: #1a1a1a;
+            color: #e0e0e0;
+            font-size: 14px;
+        }
+        input:focus, select:focus {
+            outline: none;
+            border-color: #2196f3;
+        }
+        .row {
+            display: flex;
+            gap: 15px;
+        }
+        .row > * {
+            flex: 1;
+        }
+        button {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 5px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .btn-primary {
+            background: #2196f3;
+            color: white;
+        }
+        .btn-primary:hover:not(:disabled) {
+            background: #42a5f5;
+        }
+        .btn-danger {
+            background: #f44336;
+            color: white;
+        }
+        .btn-danger:hover:not(:disabled) {
+            background: #ff5252;
+        }
+        .btn-secondary {
+            background: #555;
+            color: white;
+        }
+        .btn-secondary:hover:not(:disabled) {
+            background: #666;
+        }
+        .button-row {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+        video {
+            width: 100%;
+            max-height: 500px;
+            background: #000;
+            border-radius: 5px;
+        }
+        .log {
+            background: #111;
+            border: 1px solid #333;
+            border-radius: 5px;
+            padding: 10px;
+            height: 200px;
+            overflow-y: auto;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 12px;
+        }
+        .log-entry {
+            margin-bottom: 5px;
+            line-height: 1.4;
+        }
+        .log-entry.info { color: #2196f3; }
+        .log-entry.error { color: #f44336; }
+        .log-entry.warn { color: #ffc107; }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+            margin-top: 15px;
+        }
+        .stat {
+            background: #1a1a1a;
+            padding: 10px;
+            border-radius: 5px;
+            text-align: center;
+        }
+        .stat-value {
+            font-size: 18px;
+            font-weight: bold;
+            color: #2196f3;
+        }
+        .stat-label {
+            font-size: 11px;
+            color: #888;
+        }
+        .preset-buttons {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+        .preset-btn {
+            padding: 8px 16px;
+            background: #333;
+            border: 1px solid #444;
+            color: #e0e0e0;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+        .preset-btn:hover {
+            background: #444;
+        }
+        .info-box {
+            background: #1e3a5f;
+            border: 1px solid #2a4a6f;
+            border-radius: 5px;
+            padding: 15px;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+        .info-box a {
+            color: #64b5f6;
+        }
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+            align-items: center;
+        }
+        .volume-control {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex: 1;
+        }
+        .volume-control input {
+            width: 100px;
+        }
+        .checkbox-group {
+            display: flex;
+            gap: 20px;
+            margin-top: 10px;
+        }
+        .checkbox-group label {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            cursor: pointer;
+        }
+        .checkbox-group input {
+            width: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>WHEP View Demo</h1>
+    <p class="subtitle">Watch streams from WHEP-compatible services</p>
+
+    <div class="info-box">
+        <strong>How to use:</strong>
+        <ol style="margin: 10px 0; padding-left: 20px;">
+            <li>First, publish a stream using the <a href="whip-publish-demo.html">WHIP Publish Demo</a> or another WHIP source</li>
+            <li>Enter the WHEP endpoint URL (same stream ID as WHIP, but with /whep/ instead of /whip/)</li>
+            <li>Click "Connect" to start viewing</li>
+        </ol>
+        <p style="margin: 0;">
+            <strong>Meshcast example:</strong> If you published to <code>https://cae1.meshcast.io/whip/MyStream</code>,
+            view with <code>https://cae1.meshcast.io/whep/MyStream</code>
+        </p>
+    </div>
+
+    <!-- Configuration -->
+    <div class="card">
+        <h2>Configuration</h2>
+
+        <div class="preset-buttons">
+            <button class="preset-btn" onclick="setPreset('meshcast')">Meshcast.io Example</button>
+            <button class="preset-btn" onclick="setPreset('cloudflare')">Cloudflare</button>
+        </div>
+
+        <div class="form-group">
+            <label for="whepUrl">WHEP Endpoint URL</label>
+            <input type="text" id="whepUrl" placeholder="https://example.com/whep/stream-id">
+        </div>
+
+        <div class="form-group">
+            <label for="authToken">Auth Token (optional)</label>
+            <input type="text" id="authToken" placeholder="Bearer token for authentication">
+        </div>
+
+        <div class="checkbox-group">
+            <label>
+                <input type="checkbox" id="requestVideo" checked>
+                Request Video
+            </label>
+            <label>
+                <input type="checkbox" id="requestAudio" checked>
+                Request Audio
+            </label>
+        </div>
+    </div>
+
+    <!-- Video Player -->
+    <div class="card">
+        <h2>
+            <span class="status-dot" id="statusDot"></span>
+            Video Player
+        </h2>
+
+        <video id="videoPlayer" controls playsinline></video>
+
+        <div class="controls">
+            <div class="volume-control">
+                <span>Volume:</span>
+                <input type="range" id="volume" min="0" max="100" value="100" oninput="setVolume(this.value)">
+                <span id="volumeValue">100%</span>
+            </div>
+            <button class="btn-secondary" onclick="toggleMute()">Mute/Unmute</button>
+            <button class="btn-secondary" onclick="toggleFullscreen()">Fullscreen</button>
+        </div>
+
+        <div class="button-row">
+            <button class="btn-primary" id="connectBtn" onclick="startViewing()">Connect</button>
+            <button class="btn-danger" id="stopBtn" onclick="stopViewing()" disabled>Disconnect</button>
+        </div>
+
+        <div class="stats" id="stats" style="display: none;">
+            <div class="stat">
+                <div class="stat-value" id="statBitrate">0</div>
+                <div class="stat-label">kbps (video)</div>
+            </div>
+            <div class="stat">
+                <div class="stat-value" id="statFramerate">0</div>
+                <div class="stat-label">FPS</div>
+            </div>
+            <div class="stat">
+                <div class="stat-value" id="statResolution">-</div>
+                <div class="stat-label">Resolution</div>
+            </div>
+            <div class="stat">
+                <div class="stat-value" id="statPackets">0</div>
+                <div class="stat-label">Packets Recv</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Log -->
+    <div class="card">
+        <h2>Log</h2>
+        <div class="log" id="log"></div>
+    </div>
+
+    <script src="../whep-client.js"></script>
+    <script>
+        let client = null;
+        let statsInterval = null;
+        let lastBytesReceived = 0;
+        let lastTimestamp = 0;
+
+        function setPreset(preset) {
+            const urlInput = document.getElementById('whepUrl');
+            const tokenInput = document.getElementById('authToken');
+
+            switch (preset) {
+                case 'meshcast':
+                    urlInput.value = 'https://cae1.meshcast.io/whep/NewHang739795';
+                    tokenInput.value = '';
+                    log('Meshcast example preset loaded. This will connect to a sample stream if available.', 'info');
+                    break;
+                case 'cloudflare':
+                    urlInput.value = 'https://customer-XXXXX.cloudflarestream.com/XXXXX/webRTC/play';
+                    tokenInput.value = '';
+                    log('Cloudflare preset loaded. Replace XXXXX with your stream details.', 'info');
+                    break;
+            }
+        }
+
+        function log(message, type = 'info') {
+            const logDiv = document.getElementById('log');
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logDiv.appendChild(entry);
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        function setStatus(status) {
+            const dot = document.getElementById('statusDot');
+            dot.className = 'status-dot ' + status;
+        }
+
+        async function startViewing() {
+            const endpoint = document.getElementById('whepUrl').value.trim();
+            if (!endpoint) {
+                log('Please enter a WHEP endpoint URL', 'error');
+                return;
+            }
+
+            setStatus('connecting');
+            log('Connecting to WHEP endpoint...', 'info');
+
+            try {
+                const options = {
+                    debug: true,
+                    trickleIce: true,
+                    video: document.getElementById('requestVideo').checked,
+                    audio: document.getElementById('requestAudio').checked
+                };
+
+                const authToken = document.getElementById('authToken').value.trim();
+                if (authToken) {
+                    options.authToken = authToken;
+                }
+
+                client = new WHEPClient(endpoint, options);
+
+                client.addEventListener('connecting', () => {
+                    setStatus('connecting');
+                    log('Connecting...', 'info');
+                });
+
+                client.addEventListener('connected', (e) => {
+                    setStatus('connected');
+                    log(`Connected! Resource URL: ${e.detail.resourceUrl || 'N/A'}`, 'info');
+                    startStatsMonitoring();
+                });
+
+                client.addEventListener('track', (e) => {
+                    const track = e.detail.track;
+                    log(`Received ${track.kind} track: ${track.id}`, 'info');
+
+                    // Attach stream to video element
+                    const videoElement = document.getElementById('videoPlayer');
+                    if (e.detail.streams && e.detail.streams[0]) {
+                        videoElement.srcObject = e.detail.streams[0];
+                    } else if (client.getStream()) {
+                        videoElement.srcObject = client.getStream();
+                    }
+
+                    // Autoplay
+                    videoElement.play().catch(err => {
+                        log('Autoplay blocked. Click play button to start.', 'warn');
+                    });
+                });
+
+                client.addEventListener('icestate', (e) => {
+                    log(`ICE state: ${e.detail.state}`, 'info');
+                });
+
+                client.addEventListener('error', (e) => {
+                    setStatus('error');
+                    log(`Error: ${e.detail.error?.message || 'Unknown error'}`, 'error');
+                });
+
+                client.addEventListener('disconnected', () => {
+                    log('Disconnected', 'warn');
+                });
+
+                await client.view();
+
+                document.getElementById('connectBtn').disabled = true;
+                document.getElementById('stopBtn').disabled = false;
+                document.getElementById('stats').style.display = 'grid';
+
+            } catch (error) {
+                setStatus('error');
+                log(`Failed to connect: ${error.message}`, 'error');
+                client = null;
+            }
+        }
+
+        async function stopViewing() {
+            if (statsInterval) {
+                clearInterval(statsInterval);
+                statsInterval = null;
+            }
+
+            if (client) {
+                await client.stop();
+                client = null;
+            }
+
+            document.getElementById('videoPlayer').srcObject = null;
+            setStatus('');
+            document.getElementById('connectBtn').disabled = false;
+            document.getElementById('stopBtn').disabled = true;
+            document.getElementById('stats').style.display = 'none';
+            log('Disconnected', 'info');
+        }
+
+        function startStatsMonitoring() {
+            statsInterval = setInterval(async () => {
+                if (!client) return;
+
+                try {
+                    const stats = await client.getStats();
+                    let videoBytesReceived = 0;
+                    let framesPerSecond = 0;
+                    let packetsReceived = 0;
+                    let frameWidth = 0;
+                    let frameHeight = 0;
+
+                    stats.forEach(report => {
+                        if (report.type === 'inbound-rtp' && report.kind === 'video') {
+                            videoBytesReceived = report.bytesReceived || 0;
+                            framesPerSecond = report.framesPerSecond || 0;
+                            packetsReceived = report.packetsReceived || 0;
+                            frameWidth = report.frameWidth || 0;
+                            frameHeight = report.frameHeight || 0;
+                        }
+                    });
+
+                    // Calculate bitrate
+                    const now = Date.now();
+                    if (lastTimestamp > 0) {
+                        const timeDiff = (now - lastTimestamp) / 1000;
+                        const bytesDiff = videoBytesReceived - lastBytesReceived;
+                        const bitrate = Math.round((bytesDiff * 8) / timeDiff / 1000);
+                        document.getElementById('statBitrate').textContent = bitrate;
+                    }
+                    lastBytesReceived = videoBytesReceived;
+                    lastTimestamp = now;
+
+                    document.getElementById('statFramerate').textContent = Math.round(framesPerSecond);
+                    document.getElementById('statPackets').textContent = packetsReceived.toLocaleString();
+
+                    if (frameWidth && frameHeight) {
+                        document.getElementById('statResolution').textContent = `${frameWidth}x${frameHeight}`;
+                    }
+
+                } catch (error) {
+                    // Stats not available
+                }
+            }, 1000);
+        }
+
+        function setVolume(value) {
+            const video = document.getElementById('videoPlayer');
+            video.volume = value / 100;
+            document.getElementById('volumeValue').textContent = value + '%';
+        }
+
+        function toggleMute() {
+            const video = document.getElementById('videoPlayer');
+            video.muted = !video.muted;
+            log(video.muted ? 'Muted' : 'Unmuted', 'info');
+        }
+
+        function toggleFullscreen() {
+            const video = document.getElementById('videoPlayer');
+            if (video.requestFullscreen) {
+                video.requestFullscreen();
+            } else if (video.webkitRequestFullscreen) {
+                video.webkitRequestFullscreen();
+            }
+        }
+
+        // Check URL params for auto-connect
+        const urlParams = new URLSearchParams(window.location.search);
+        const whepUrl = urlParams.get('url');
+        if (whepUrl) {
+            document.getElementById('whepUrl').value = whepUrl;
+            // Auto-connect after page load
+            setTimeout(() => startViewing(), 500);
+        }
+
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', () => {
+            if (client) {
+                client.stop();
+            }
+        });
+    </script>
+</body>
+</html>

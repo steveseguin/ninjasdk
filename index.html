@@ -30,7 +30,7 @@
     <meta property="twitter:image" content="https://sdk.vdo.ninja/og-image.png">
     
     <!-- Additional SEO -->
-    <meta name="keywords" content="webrtc, p2p, peer-to-peer, sdk, nodejs, npm, python, flutter, mobile, cross-platform, video streaming, audio streaming, data channels, ai friendly, no server, free, open source, vdo.ninja, social stream ninja, raspberry ninja">
+    <meta name="keywords" content="webrtc, p2p, peer-to-peer, sdk, nodejs, npm, python, flutter, mobile, cross-platform, video streaming, audio streaming, data channels, ai friendly, no server, free, open source, vdo.ninja, social stream ninja, raspberry ninja, whip, whep, twitch, meshcast, cloudflare stream, webrtc-http">
     <meta name="author" content="Steve Seguin">
     <link rel="canonical" href="https://sdk.vdo.ninja/">
     
@@ -77,7 +77,11 @@
             "Real-time communication",
             "Video streaming",
             "Audio streaming",
-            "Data channels"
+            "Data channels",
+            "WHIP",
+            "WHEP",
+            "Twitch streaming",
+            "Meshcast"
         ]
     }
     </script>
@@ -239,6 +243,7 @@
                     <a href="#features">Features ▼</a>
                     <ul class="nav-dropdown-menu">
                         <li><a href="#features">Core Features</a></li>
+                        <li><a href="#whip-whep">📤 WHIP/WHEP</a></li>
                         <li><a href="#social-stream-ninja">💬 Social Stream</a></li>
                         <li><a href="#ai-integration">🤖 AI Integration</a></li>
                         <li><a href="#examples">Live Examples</a></li>
@@ -472,6 +477,47 @@ await vdo.autoConnect('demo-room'); // streamID is auto-generated</code></pre>
                     <h3>Unlimited Bandwidth</h3>
                     <p>Stream 4K video, transfer gigabytes. You're only limited by your users' internet connections.</p>
                 </div>
+                <div class="feature-card">
+                    <div class="feature-icon">📤</div>
+                    <h3>WHIP/WHEP Support</h3>
+                    <p>Publish to Twitch, Meshcast, Cloudflare Stream and more using standard WHIP/WHEP protocols.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="whip-whep" class="section section-alt">
+        <div class="container">
+            <h2 class="section-title">📤 WHIP/WHEP - Standard WebRTC Streaming</h2>
+            <p style="text-align: center; max-width: 800px; margin: 0 auto 2rem;">
+                In addition to P2P, the SDK includes standalone WHIP and WHEP clients for publishing to and consuming from standard WebRTC streaming services.
+            </p>
+            <div class="features-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">📡</div>
+                    <h3>WHIP - Publish Anywhere</h3>
+                    <p>Publish your camera or screen to Twitch, Meshcast.io, Cloudflare Stream, Dolby.io, or any WHIP-compatible server.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">👁️</div>
+                    <h3>WHEP - View Anywhere</h3>
+                    <p>Pull streams from any WHEP endpoint with ultra-low latency. Perfect for monitoring or embedding live streams.</p>
+                </div>
+            </div>
+            <div class="code-preview" style="max-width: 800px; margin: 2rem auto;">
+                <pre><code class="language-javascript">// WHIP - Publish to Meshcast
+const whip = new WHIPClient('https://cae1.meshcast.io/whip/mystream');
+await whip.publish(mediaStream);
+// View at: https://meshcast.io/mystream
+
+// WHEP - Watch from Meshcast
+const whep = new WHEPClient('https://cae1.meshcast.io/whep/mystream');
+whep.addEventListener('track', (e) => video.srcObject = e.detail.streams[0]);
+await whep.view();</code></pre>
+            </div>
+            <div style="text-align: center; margin-top: 1.5rem;">
+                <a href="demos/whip-publish-demo.html" class="btn btn-primary">WHIP Demo</a>
+                <a href="demos/whep-view-demo.html" class="btn btn-secondary">WHEP Demo</a>
             </div>
         </div>
     </section>
