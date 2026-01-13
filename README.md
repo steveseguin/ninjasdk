@@ -839,7 +839,7 @@ try {
 
 ## Contributing
 
-Contributions are welcome! Please check our [GitHub repository](https://github.com/steveseguin/ninjasdk).
+Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 By submitting a pull request, you agree to the [Contributor License Agreement (CLA)](CLA.md), which assigns your contribution rights to the maintainer so that the SDK exception can be preserved and licensing decisions can be made consistently.
 
