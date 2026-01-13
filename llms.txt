@@ -96,6 +96,35 @@ await sdk.announce({ streamID: "mystream" });
 5. **Salt matters for vdo.ninja compatibility.**
    Set `salt: "vdo.ninja"` if you want streams viewable on https://vdo.ninja.
 
+6. **`&scene` and `&solo` are only for room-based links.**
+   These parameters are used to view all streams in a room without publishing.
+   For direct view links (`?view=streamID` without `&room=`), do NOT add `&scene` or `&solo`.
+
+---
+
+## Room-Based vs Direct View Links
+
+Two ways to view streams on vdo.ninja:
+
+### Direct View (no room)
+```
+https://vdo.ninja/?view=STREAM_ID
+```
+- Views a specific stream directly by its ID
+- No `&scene` or `&solo` needed
+- Simpler, works without room context
+
+### Room-Based View
+```
+https://vdo.ninja/?scene&room=ROOM_NAME
+https://vdo.ninja/?view=STREAM_ID&room=ROOM_NAME
+```
+- `&scene` = view all streams in room (listen-only, no publishing)
+- `&solo` = similar to scene but optimized for single stream focus
+- Only use these with `&room=` parameter
+
+**Common mistake:** Adding `&scene` to a direct view link. This is unnecessary and may cause issues.
+
 ---
 
 ## Quick Reference
