@@ -110,7 +110,7 @@ jobs:
     - name: Update SDK version in file
       run: |
         # Update header comment
-        sed -i "1s/.*/\/\/ VDO.Ninja SDK v${{ steps.version.outputs.new_version }}/" vdoninja-sdk.js
+        sed -i "1s/.*/\/\/ VDO.Ninja SDK v${{ steps.version.outputs.new_version }} — AGPL-3.0-only + SDK Exception; see LICENSE-SDK-EXCEPTION/" vdoninja-sdk.js
         
         # Update static VERSION getter
         sed -i "s/return '[0-9]\+\.[0-9]\+\.[0-9]\+';/return '${{ steps.version.outputs.new_version }}';/" vdoninja-sdk.js

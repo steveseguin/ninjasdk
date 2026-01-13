@@ -1,4 +1,4 @@
-// VDO.Ninja SDK v1.3.17
+// VDO.Ninja SDK v1.3.17 — AGPL-3.0-only + SDK Exception; see LICENSE-SDK-EXCEPTION
 
 const MEDIA_STREAM_TRACK_ENABLED_DESCRIPTOR =
     (typeof MediaStreamTrack !== 'undefined' && MediaStreamTrack?.prototype)
@@ -12,8 +12,12 @@ const OUTBOUND_VIDEO_STOP_MUTE_DELAY_MS = 500;
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * the Free Software Foundation, version 3 of the License only (AGPL-3.0-only).
+ *
+ * Additional Permission:
+ * Unmodified official builds of `vdoninja-sdk.js` and `vdoninja-sdk.min.js` may
+ * be used and distributed as part of proprietary works under the terms in
+ * `LICENSE-SDK-EXCEPTION`.
  * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -321,7 +325,7 @@ const OUTBOUND_VIDEO_STOP_MUTE_DELAY_MS = 500;
  *     sdk.sendData(data, { streamID: "user1", type: "viewer" })  // To viewers of stream
  * 
  * @author Steve Seguin
- * @license AGPLv3
+ * @license AGPL-3.0-only (with additional permission; see LICENSE-SDK-EXCEPTION)
  */
 
 (function (global) {
