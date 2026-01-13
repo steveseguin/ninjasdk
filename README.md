@@ -841,10 +841,14 @@ try {
 
 Contributions are welcome! Please check our [GitHub repository](https://github.com/steveseguin/ninjasdk).
 
+By submitting a pull request, you agree to the [Contributor License Agreement (CLA)](CLA.md), which assigns your contribution rights to the maintainer so that the SDK exception can be preserved and licensing decisions can be made consistently.
+
 ## License
 
 ### SDK Core
 `vdoninja-sdk.js` and `vdoninja-sdk.min.js` are licensed under AGPL-3.0-only with an additional permission for unmodified official builds. See [LICENSE](LICENSE) and [LICENSE-SDK-EXCEPTION](LICENSE-SDK-EXCEPTION).
+
+**Want to modify the SDK?** Contributing changes via a pull request ensures the exception allowance is maintained for everyone. A singular, unified SDK and API is a core goal of this project. If the "byte-for-byte identical" requirement is problematic for your use case, please open a PR to add an additional build variant—we're happy to include it in the official distribution.
 
 ### SDK Extras
 `vdoninja-sdk-node.js`, `webrtc-adapter.js`, `whip-client.js`, and `whep-client.js` are MIT licensed. See [LICENSE-MIT](LICENSE-MIT).
