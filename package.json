@@ -1,6 +1,6 @@
 {
   "name": "@vdoninja/sdk",
-  "version": "1.3.17",
+  "version": "1.3.18",
   "description": "AI-friendly P2P communication SDK for audio, video, and data. Includes WHIP/WHEP clients for publishing to Twitch, Meshcast, Cloudflare Stream",
   "main": "vdoninja-sdk.js",
   "browser": "vdoninja-sdk.js",
