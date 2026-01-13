@@ -1,0 +1,156 @@
+# VDO.Ninja SDK - LLM Integration Guide
+
+This file helps AI coding assistants (Claude, Codex, Gemini, etc.) understand and use the VDO.Ninja SDK correctly.
+
+## Canonical Documentation Order
+
+1. `AI-INTEGRATION.md` - Complete SDK knowledge for AI systems (read first)
+2. `docs/api-reference.md` - Method signatures and events
+3. `README.md` - Installation, quick start, and feature overview
+4. `README-NODE.md` - Node.js-specific setup and examples
+
+## Repository Structure
+
+- `vdoninja-sdk.js` - Main SDK source (browser)
+- `vdoninja-sdk.min.js` - Minified browser build
+- `vdoninja-sdk-node.js` - Node.js entry point
+- `whip-client.js` - WHIP publishing client
+- `whep-client.js` - WHEP viewing client
+- `demos/` - Working examples
+- `docs/` - API reference
+
+## How to Run / Test
+
+```bash
+npm install
+npm test          # Run all tests
+npm run test:node # Run Node.js example
+```
+
+## Hard Constraints
+
+- Do NOT access the WebSocket API directly; always use this SDK
+- Do NOT edit `vdoninja-sdk.min.js`; it is a build artifact
+- License: AGPL-3.0-only with SDK Exception (see LICENSE-SDK-EXCEPTION)
+
+---
+
+## Password Semantics (Critical - Do Not Guess)
+
+The SDK and vdo.ninja use passwords for end-to-end encryption. Misunderstanding these states causes broken links and failed connections.
+
+### SDK Password States (Truth Table)
+
+| SDK `password` value       | Effective behavior                         |
+|----------------------------|--------------------------------------------|
+| `undefined` / `null` / `""`| Uses default: `"someEncryptionKey123"`     |
+| `"mypassword"`             | Uses `"mypassword"` (encrypted)            |
+| `false`                    | Encryption **disabled** (plaintext)        |
+
+Source of truth: `vdoninja-sdk.js` functions `_sanitizePassword()` and `_getEffectivePassword()`.
+
+### Generating vdo.ninja Viewer Links
+
+When generating viewer URLs for https://vdo.ninja:
+
+| SDK password state | Viewer URL parameter        |
+|--------------------|-----------------------------|
+| default (omitted)  | No `&password=` needed      |
+| custom password    | `&password=YOURPASSWORD`    |
+| `false` (disabled) | `&password=false`           |
+
+**Important:**
+- `&password=false` explicitly disables encryption on the viewer side.
+- Omitting `&password=` does NOT disable encryption; vdo.ninja may apply its own default.
+- Do NOT use `&password=0` or `&p=0`; use `&password=false` for clarity.
+- Empty string in the SDK (`""`) means "use default password", not "disabled".
+
+### Example: Generating a View Link
+
+```javascript
+const sdk = new VDONinjaSDK({ password: false });
+await sdk.connect();
+await sdk.joinRoom({ room: "myroom" });
+await sdk.announce({ streamID: "mystream" });
+
+// Correct viewer link when password is disabled:
+// https://vdo.ninja/?view=mystream&room=myroom&password=false
+```
+
+---
+
+## Common Pitfalls for AI
+
+1. **Do not assume "no password parameter" means encryption is off.**
+   The SDK uses a default password if you omit it; vdo.ninja does the same.
+
+2. **Do not conflate empty string with disabled.**
+   `password: ""` in the SDK means "use default", not "no encryption".
+
+3. **Always include `&password=false` in viewer links when SDK uses `password: false`.**
+   Otherwise viewers will fail to connect or see encrypted garbage.
+
+4. **Stream and room IDs are sanitized.**
+   Non-alphanumeric characters (except `_`) are replaced with `_`. Hyphens become underscores.
+
+5. **Salt matters for vdo.ninja compatibility.**
+   Set `salt: "vdo.ninja"` if you want streams viewable on https://vdo.ninja.
+
+6. **`&scene` and `&solo` are only for room-based links.**
+   These parameters are used to view all streams in a room without publishing.
+   For direct view links (`?view=streamID` without `&room=`), do NOT add `&scene` or `&solo`.
+
+---
+
+## Room-Based vs Direct View Links
+
+Two ways to view streams on vdo.ninja:
+
+### Direct View (no room)
+```
+https://vdo.ninja/?view=STREAM_ID
+```
+- Views a specific stream directly by its ID
+- No `&scene` or `&solo` needed
+- Simpler, works without room context
+
+### Room-Based View
+```
+https://vdo.ninja/?scene&room=ROOM_NAME
+https://vdo.ninja/?view=STREAM_ID&room=ROOM_NAME
+```
+- `&scene` = view all streams in room (listen-only, no publishing)
+- `&solo` = similar to scene but optimized for single stream focus
+- Only use these with `&room=` parameter
+
+**Common mistake:** Adding `&scene` to a direct view link. This is unnecessary and may cause issues.
+
+---
+
+## Quick Reference
+
+```javascript
+// Data-only bot (no encryption)
+const sdk = new VDONinjaSDK({ password: false });
+await sdk.connect();
+await sdk.joinRoom({ room: "botroom" });
+await sdk.announce({ streamID: "bot1" });
+sdk.sendData({ msg: "hello" });
+// Viewer link: https://vdo.ninja/?view=bot1&room=botroom&password=false
+
+// Video stream compatible with vdo.ninja (default password)
+const sdk = new VDONinjaSDK({ salt: "vdo.ninja" });
+await sdk.connect();
+await sdk.joinRoom({ room: "videoroom" });
+await sdk.publish(mediaStream, { streamID: "cam1" });
+// Viewer link: https://vdo.ninja/?view=cam1&room=videoroom
+```
+
+---
+
+## Verification
+
+If updating documentation about passwords, verify behavior against:
+- `vdoninja-sdk.js` `_sanitizePassword()` (~line 442)
+- `vdoninja-sdk.js` `_getEffectivePassword()` (~line 477)
+- `README.md` "Password & Encryption" section
