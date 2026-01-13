@@ -1,13 +1,3 @@
-MIT License (Demo Files)
-========================
-
-This MIT license applies to files under the `demos/` folder.
-
-Note: The VDO.Ninja SDK core itself is NOT licensed under MIT. The SDK core
-files (`vdoninja-sdk.js` and `vdoninja-sdk.min.js`) are licensed under
-AGPL-3.0-only with an additional permission for unmodified official builds.
-See `LICENSE` and `LICENSE-SDK-EXCEPTION`.
-
 MIT License
 
 Copyright (c) 2026 Steve Seguin

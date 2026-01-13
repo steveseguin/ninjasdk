@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 /**
  * VDO.Ninja SDK - Node.js Version with WebRTC Adapter
  * 

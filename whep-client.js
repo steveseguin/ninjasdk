@@ -1,7 +1,8 @@
+// SPDX-License-Identifier: MIT
 // WHEP Client v1.0.0
 // WebRTC-HTTP Egress Protocol client for consuming media streams
 // Part of the VDO.Ninja SDK project - https://github.com/steveseguin/ninjasdk
-// License: AGPL-3.0
+// See LICENSE-MIT for details.
 
 // CustomEvent polyfill for Node.js (native in Node 19+, browsers have it)
 if (typeof CustomEvent === 'undefined') {

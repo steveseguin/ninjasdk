@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 /**
  * WebRTC Adapter for VDO.Ninja SDK
  * 

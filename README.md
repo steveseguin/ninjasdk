@@ -3,7 +3,7 @@
 [![SDK Tests](https://github.com/steveseguin/ninjasdk/actions/workflows/test.yml/badge.svg)](https://github.com/steveseguin/ninjasdk/actions/workflows/test.yml)
 [![npm version](https://img.shields.io/npm/v/@vdoninja/sdk.svg)](https://www.npmjs.com/package/@vdoninja/sdk)
 [![npm downloads](https://img.shields.io/npm/dm/@vdoninja/sdk.svg)](https://www.npmjs.com/package/@vdoninja/sdk)
-[![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
+[![License: AGPL-3.0-only + Exception](https://img.shields.io/badge/License-AGPL--3.0--only%20%2B%20Exception-blue.svg)](LICENSE-SDK-EXCEPTION)
 
 AI-friendly P2P communication SDK for audio, video, and data streaming. Build peer-to-peer applications without servers, user accounts, or complex infrastructure.
 
@@ -843,11 +843,16 @@ Contributions are welcome! Please check our [GitHub repository](https://github.c
 
 ## License
 
-### SDK Core (vdoninja-sdk.js)
-AGPLv3 - Free for all uses, including commercial. See [LICENSE](LICENSE) for details.
+### SDK Core
+`vdoninja-sdk.js` and `vdoninja-sdk.min.js` are licensed under AGPL-3.0-only with an additional permission for unmodified official builds. See [LICENSE](LICENSE) and [LICENSE-SDK-EXCEPTION](LICENSE-SDK-EXCEPTION).
+
+### SDK Extras
+`vdoninja-sdk-node.js`, `webrtc-adapter.js`, `whip-client.js`, and `whep-client.js` are MIT licensed. See [LICENSE-MIT](LICENSE-MIT).
 
 ### Demos and Examples
-All demo files (*.html) and code examples are released under a permissive "Do What You Want With It" license. See [LICENSE-DEMOS](LICENSE-DEMOS) for details. This means you can freely copy, modify, and use the example code in your own projects without any restrictions.
+Demo files (the `demos/` folder) are MIT licensed. See [LICENSE-DEMOS](LICENSE-DEMOS).
+
+Note: demo files are excluded from the npm package via `.npmignore`.
 
 ## Support
 

@@ -5,8 +5,8 @@
     This demo code is released into the public domain (CC0 1.0 Universal).
     You may use, modify, and distribute this demo code without any restrictions.
     
-    Note: The VDO.Ninja SDK itself (vdoninja-sdk.js) remains licensed under AGPL-3.0.
-    See: https://github.com/steveseguin/ninjasdk/blob/main/LICENSE
+    Note: The VDO.Ninja SDK core (`vdoninja-sdk.js`, `vdoninja-sdk.min.js`) is licensed under AGPL-3.0-only with an additional permission for unmodified official builds.
+    See: https://github.com/steveseguin/ninjasdk/blob/main/LICENSE and https://github.com/steveseguin/ninjasdk/blob/main/LICENSE-SDK-EXCEPTION
 -->
 <html lang="en">
 <head>
@@ -57,7 +57,7 @@
             "@type": "Person",
             "name": "Steve Seguin"
         },
-        "license": "https://www.gnu.org/licenses/agpl-3.0.html",
+        "license": "https://github.com/steveseguin/ninjasdk/blob/main/LICENSE",
         "softwareVersion": "1.1.0",
         "softwareRequirements": [
             "Chrome 80+",
@@ -1013,7 +1013,7 @@ vdo.addEventListener('error', (event) => {
                 </div>
                 <div class="faq-item">
                     <h3>Can I use this commercially?</h3>
-                    <p>Yes! The AGPLv3 license allows commercial use. You must share any modifications to the SDK itself, but your application code remains yours.</p>
+                    <p>Yes! Commercial use is allowed. Unmodified official SDK builds (<code>vdoninja-sdk.js</code> / <code>vdoninja-sdk.min.js</code>) may be used in proprietary applications under the additional permission in <code>LICENSE-SDK-EXCEPTION</code>. If you modify the SDK core, that additional permission does not apply and the SDK is governed by AGPL-3.0-only.</p>
                 </div>
                 <div class="faq-item">
                     <h3>What platforms are supported?</h3>
@@ -1141,6 +1141,7 @@ vdo.addEventListener('error', (event) => {
                         <span class="version-badge">Latest</span>
                         <span class="size-badge">~45KB minified</span>
                     </div>
+                    <p style="font-size:0.85em;color:#94a3b8;margin-top:0.5rem;">For proprietary use under the SDK exception, pin a specific version (e.g., <code>@v1.3.17</code>) to ensure your build stays byte-identical to an official release.</p>
                 </div>
                 <div class="download-option">
                     <h3>💾 Direct Download</h3>
@@ -1155,7 +1156,7 @@ vdo.addEventListener('error', (event) => {
                     </div>
                     <div class="download-meta">
                         <span class="version-badge">v1.1.0</span>
-                        <span class="license-badge">AGPLv3</span>
+                        <span class="license-badge">AGPLv3-only + Exception</span>
                     </div>
                 </div>
                 <div class="download-option">
@@ -1262,7 +1263,7 @@ const VDONinjaSDK = require('./vdoninja-sdk-node.js');</code></pre>
                 <div class="footer-section">
                     <h4>VDO.Ninja SDK</h4>
                     <p>Free, open-source P2P communication framework</p>
-                    <p class="footer-license">Licensed under AGPLv3</p>
+                    <p class="footer-license">Licensed under AGPLv3-only + Exception</p>
                 </div>
                 <div class="footer-section">
                     <h4>Links</h4>

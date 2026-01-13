@@ -568,7 +568,9 @@ await vdo.announce({ streamID: 'langchain_bot' });
 
 ## License
 
-AGPLv3 - Free for all uses including commercial. Must share modifications.
+SDK core (`vdoninja-sdk.js`, `vdoninja-sdk.min.js`) is licensed under AGPL-3.0-only with an additional permission for unmodified official builds. See `LICENSE` and `LICENSE-SDK-EXCEPTION`.
+
+SDK extras (`vdoninja-sdk-node.js`, `webrtc-adapter.js`, `whip-client.js`, `whep-client.js`) are MIT licensed. See `LICENSE-MIT`.
 
 ## Support Resources
 
