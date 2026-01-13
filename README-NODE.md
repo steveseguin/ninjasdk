@@ -126,7 +126,7 @@ By default it joins room `node_audio_demo_xxxxx` and stream `node_sine_demo_xxxx
 VDON_ROOM=my_room VDON_STREAM_ID=my_audio node demos/node-audio-sine.js
 ```
 
-The script sanitizes identifiers to underscores, appends the random suffix automatically, keeps the default encryption password, and logs view-only URLs using `?scene` so listeners can tune in immediately (no `&password=0` required). It prints both a room view link (`?scene&room=...`) and a scene+view link that keeps the room context (`?scene&room=...&view=...`).
+The script sanitizes identifiers to underscores, appends the random suffix automatically, keeps the default encryption password, and logs view-only URLs using `?scene` so listeners can tune in immediately (no extra password parameter required since it uses the default). It prints both a room view link (`?scene&room=...`) and a scene+view link that keeps the room context (`?scene&room=...&view=...`).
 
 ### Room Audio Recorder (WAV)
 `demos/node-room-audio-recorder.js` joins an existing room, captures the first audio track per stream, and writes a WAV file named `streamID_timestamp.wav` to the `recordings/` folder.

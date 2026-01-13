@@ -387,10 +387,12 @@ const vdo = new VDONinjaSDK({
 
 - Default password: if `password` is `undefined`, `null`, or `""`, the SDK uses `"someEncryptionKey123"`.
 - Disable encryption explicitly with `password: false`.
+- **Empty string (`""`) is not the same as disabled.** An empty string uses the default password.
 - When effective password is set, the SDK:
   - Encrypts SDP and ICE (WebSocket and DataChannel) with AES‑CBC and includes a `vector`.
   - Appends a 6‑char hex suffix to the streamID for hashing. Offers include this hashed streamID so viewers can match allow‑lists.
 - Set `salt: "vdo.ninja"` when you want streams to be viewable on https://vdo.ninja (affects hash compatibility).
+- **Generating vdo.ninja viewer links:** When using `password: false`, include `&password=false` in the viewer URL. Omitting the parameter does NOT disable encryption on the viewer side.
 
 ## Data Channel Signaling
 

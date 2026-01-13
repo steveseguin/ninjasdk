@@ -49,7 +49,7 @@ const VDONinjaSDK = require('./vdoninja-sdk-node.js');
 ```
 See [README-NODE.md](README-NODE.md) for detailed Node.js setup.
 
-> **Viewer workflow tip:** When sharing room links from Node publishers, append `?scene` so viewers land in listen-only mode. Keep room and stream identifiers alphanumeric/underscore (the SDK will auto-sanitize other characters). If you choose `password: false`, remind viewers to include `&password=0`; with the default password you can share the hashed `sdk.state.streamID` directly without extra parameters.
+> **Viewer workflow tip:** When sharing room links from Node publishers, append `?scene` so viewers land in listen-only mode. Keep room and stream identifiers alphanumeric/underscore (the SDK will auto-sanitize other characters). If you choose `password: false`, remind viewers to include `&password=false` in the URL; with the default password you can share the hashed `sdk.state.streamID` directly without extra parameters. Note: `password: ""` (empty string) in the SDK means "use default password", not "disabled".
 
 ## Core Concepts
 
