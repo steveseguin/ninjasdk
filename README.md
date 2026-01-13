@@ -397,7 +397,7 @@ const vdo = new VDONinjaSDK({
 - The publisher creates a data channel named `sendChannel` (matching VDO.Ninja core).
 - Before the data channel opens, signaling uses WebSocket. After it opens, ICE is sent via DataChannel only (no duplication).
 - Pings are DC‑only: use `sendPing(uuid)` manually or enable viewer auto‑ping with `autoPingViewer: true`.
-```
+
 
 ## Event Listeners
 
@@ -422,12 +422,12 @@ vdo.addEventListener('peerInfo', (event) => {
     const { uuid, streamID, info } = event.detail;
     console.log('Peer info updated:', uuid, streamID, info); // info.label available
 });
-
+```
 ## Publisher Info (Data Channel)
 
 When a publisher’s data channel (label `sendChannel`) opens, the SDK sends a publisher info payload to the viewer:
 
-```
+```javascript
 { info: {
     label: "Main Camera",   // optional string
     meta: "Desk Cam",       // optional string
@@ -447,7 +447,7 @@ Provide these in `publish()`/`announce()` options. You can either:
 - Or pass an `info` object: `{ info: { label, meta, order, ... } }`
 
 The viewer receives `peerInfo` with the merged `info` object.
-
+```javascript
 vdo.addEventListener('peerConnected', (event) => {
     const { uuid, connection } = event.detail;
     console.log('Peer connected:', uuid);
