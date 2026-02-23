@@ -1,0 +1,175 @@
+{
+  "started_at": "2026-02-22T23:40:58.484Z",
+  "finished_at": "2026-02-22T23:41:01.433Z",
+  "profiles": [
+    {
+      "name": "secure_core_turn_only",
+      "env": {
+        "MCP_TOOL_PROFILE": "core",
+        "MCP_ENFORCE_JOIN_TOKEN": "1",
+        "MCP_REQUIRE_SESSION_MAC": "1",
+        "LIVE_FORCE_TURN": "1",
+        "LIVE_TURN_TRANSPORT_HINT": "relay"
+      },
+      "fallbacks": []
+    }
+  ],
+  "settings": {
+    "retries": 1,
+    "profile_timeout_ms": 180000,
+    "profile_cooldown_ms": 1000,
+    "cycles": 1,
+    "messages_per_cycle": 1,
+    "include_secure": true,
+    "adaptive_fallback": true,
+    "allow_direct_fallback": true,
+    "strict": false
+  },
+  "results": [
+    {
+      "profile_name": "secure_core_turn_only",
+      "profile_env": {
+        "MCP_TOOL_PROFILE": "core",
+        "MCP_ENFORCE_JOIN_TOKEN": "1",
+        "MCP_REQUIRE_SESSION_MAC": "1",
+        "LIVE_FORCE_TURN": "1",
+        "LIVE_TURN_TRANSPORT_HINT": "relay"
+      },
+      "ok": true,
+      "selected_candidate": "secure_core_turn_only",
+      "selected_env": {
+        "MCP_TOOL_PROFILE": "core",
+        "MCP_ENFORCE_JOIN_TOKEN": "1",
+        "MCP_REQUIRE_SESSION_MAC": "1",
+        "LIVE_FORCE_TURN": "1",
+        "LIVE_TURN_TRANSPORT_HINT": "relay"
+      },
+      "fallback_used": false,
+      "final": {
+        "candidate_name": "secure_core_turn_only",
+        "profile_name": "secure_core_turn_only",
+        "profile_env": {
+          "MCP_TOOL_PROFILE": "core",
+          "MCP_ENFORCE_JOIN_TOKEN": "1",
+          "MCP_REQUIRE_SESSION_MAC": "1",
+          "LIVE_FORCE_TURN": "1",
+          "LIVE_TURN_TRANSPORT_HINT": "relay"
+        },
+        "candidate_env": {},
+        "merged_env": {
+          "MCP_TOOL_PROFILE": "core",
+          "MCP_ENFORCE_JOIN_TOKEN": "1",
+          "MCP_REQUIRE_SESSION_MAC": "1",
+          "LIVE_FORCE_TURN": "1",
+          "LIVE_TURN_TRANSPORT_HINT": "relay"
+        },
+        "started_at": "2026-02-22T23:40:58.487Z",
+        "finished_at": "2026-02-22T23:41:00.432Z",
+        "ok": true,
+        "run": {
+          "ok": true,
+          "attempts": [
+            {
+              "attempt": 1,
+              "ok": true,
+              "timed_out": false,
+              "exit_code": 0,
+              "signal": null,
+              "duration_ms": 1942,
+              "error": null
+            }
+          ],
+          "final": {
+            "attempt": 1,
+            "ok": true,
+            "timed_out": false,
+            "exit_code": 0,
+            "signal": null,
+            "duration_ms": 1942,
+            "error": null
+          }
+        },
+        "metrics": {
+          "total_cycles": 1,
+          "connected_cycles": 1,
+          "connect_success_rate": 1,
+          "avg_connect_attempts": 1,
+          "total_messages": 1,
+          "message_success_rate": 1,
+          "total_gate_checks": 3,
+          "gate_success_rate": 1
+        },
+        "report_pass": true,
+        "error": null,
+        "report_path": null
+      },
+      "candidate_results": [
+        {
+          "candidate_name": "secure_core_turn_only",
+          "profile_name": "secure_core_turn_only",
+          "profile_env": {
+            "MCP_TOOL_PROFILE": "core",
+            "MCP_ENFORCE_JOIN_TOKEN": "1",
+            "MCP_REQUIRE_SESSION_MAC": "1",
+            "LIVE_FORCE_TURN": "1",
+            "LIVE_TURN_TRANSPORT_HINT": "relay"
+          },
+          "candidate_env": {},
+          "merged_env": {
+            "MCP_TOOL_PROFILE": "core",
+            "MCP_ENFORCE_JOIN_TOKEN": "1",
+            "MCP_REQUIRE_SESSION_MAC": "1",
+            "LIVE_FORCE_TURN": "1",
+            "LIVE_TURN_TRANSPORT_HINT": "relay"
+          },
+          "started_at": "2026-02-22T23:40:58.487Z",
+          "finished_at": "2026-02-22T23:41:00.432Z",
+          "ok": true,
+          "run": {
+            "ok": true,
+            "attempts": [
+              {
+                "attempt": 1,
+                "ok": true,
+                "timed_out": false,
+                "exit_code": 0,
+                "signal": null,
+                "duration_ms": 1942,
+                "error": null
+              }
+            ],
+            "final": {
+              "attempt": 1,
+              "ok": true,
+              "timed_out": false,
+              "exit_code": 0,
+              "signal": null,
+              "duration_ms": 1942,
+              "error": null
+            }
+          },
+          "metrics": {
+            "total_cycles": 1,
+            "connected_cycles": 1,
+            "connect_success_rate": 1,
+            "avg_connect_attempts": 1,
+            "total_messages": 1,
+            "message_success_rate": 1,
+            "total_gate_checks": 3,
+            "gate_success_rate": 1
+          },
+          "report_pass": true,
+          "error": null,
+          "report_path": null
+        }
+      ]
+    }
+  ],
+  "aggregate": {
+    "total_profiles": 1,
+    "successful_profiles": 1,
+    "success_rate": 1,
+    "failed_profiles": [],
+    "fallback_used_profiles": []
+  }
+}

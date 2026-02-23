@@ -1,0 +1,134 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.steveseguin/vdo-ninja-mcp",
+  "title": "VDO.Ninja MCP Bridge",
+  "description": "WebRTC data-channel MCP bridge for VDO.Ninja with reliable messages, files, and room sync.",
+  "version": "0.4.0",
+  "websiteUrl": "https://github.com/steveseguin/ninjasdk/tree/main/MCP",
+  "repository": {
+    "url": "https://github.com/steveseguin/ninjasdk",
+    "source": "github",
+    "id": "1006762093",
+    "subfolder": "MCP"
+  },
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "@vdoninja/sdk",
+      "version": "1.3.18",
+      "runtimeHint": "node",
+      "runtimeArguments": [
+        {
+          "type": "positional",
+          "value": "MCP/scripts/vdo-mcp-server.js"
+        }
+      ],
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "VDON_MCP_TOOL_PROFILE",
+          "description": "Least-privilege tool set for this server process.",
+          "choices": [
+            "core",
+            "file",
+            "state",
+            "full"
+          ],
+          "default": "full",
+          "isRequired": false
+        },
+        {
+          "name": "VDON_MCP_MAX_MESSAGE_BYTES",
+          "description": "Max MCP JSON-RPC payload size in bytes.",
+          "format": "number",
+          "default": "1048576",
+          "isRequired": false
+        },
+        {
+          "name": "VDON_MCP_JOIN_TOKEN_SECRET",
+          "description": "Optional HMAC secret used to verify/generate signed join tokens.",
+          "isRequired": false,
+          "isSecret": true
+        },
+        {
+          "name": "VDON_MCP_ENFORCE_JOIN_TOKEN",
+          "description": "When true, reject peers without valid join tokens.",
+          "format": "boolean",
+          "default": "false",
+          "isRequired": false
+        },
+        {
+          "name": "VDON_MCP_ALLOW_PEER_STREAM_IDS",
+          "description": "Optional comma-separated stream_id allowlist for room and file actions.",
+          "placeholder": "agent_a,agent_b",
+          "isRequired": false
+        },
+        {
+          "name": "VDON_MCP_REQUIRE_SESSION_MAC",
+          "description": "When true, require session MAC on file/control envelopes.",
+          "format": "boolean",
+          "default": "false",
+          "isRequired": false
+        }
+      ]
+    }
+  ],
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "http://127.0.0.1:{http_port}/mcp",
+      "variables": {
+        "http_port": {
+          "description": "Port used by MCP/scripts/vdo-mcp-streamable-http.js.",
+          "format": "number",
+          "default": "8787",
+          "isRequired": false
+        }
+      }
+    }
+  ],
+  "_meta": {
+    "io.modelcontextprotocol.registry/publisher-provided": {
+      "com.vdo.ninja": {
+        "installChannels": [
+          {
+            "label": "codex-claude-auto",
+            "command": "npm run mcp:install"
+          },
+          {
+            "label": "custom-local-install",
+            "command": "node MCP/scripts/install-mcp.js --name vdo-ninja-mcp"
+          },
+          {
+            "label": "core-install",
+            "command": "npm run mcp:install:core"
+          },
+          {
+            "label": "secure-core-install",
+            "command": "node MCP/scripts/install-mcp.js --preset secure-core"
+          },
+          {
+            "label": "secure-full-install",
+            "command": "npm run mcp:install:secure-full"
+          },
+          {
+            "label": "uninstall",
+            "command": "npm run mcp:uninstall"
+          }
+        ],
+        "toolProfiles": {
+          "core": "Session + sync messaging tools only.",
+          "file": "Core plus reliable file transfer tools.",
+          "state": "Core plus shared room-state sync tools.",
+          "full": "Core + file + state tool surface."
+        },
+        "transportNotes": [
+          "WebRTC data channels are the transport (not generic TCP tunneling).",
+          "TURN improves reachability but cannot bypass every enterprise policy."
+        ]
+      }
+    }
+  }
+}

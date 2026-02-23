@@ -1,0 +1,261 @@
+{
+  "started_at": "2026-02-22T23:42:29.369Z",
+  "finished_at": "2026-02-22T23:42:42.472Z",
+  "profiles": [
+    {
+      "name": "core_forced_primary_fail",
+      "env": {
+        "MCP_TOOL_PROFILE": "core",
+        "MCP_ENFORCE_JOIN_TOKEN": "0",
+        "MCP_REQUIRE_SESSION_MAC": "0",
+        "LIVE_FORCE_TURN": "1",
+        "LIVE_TURN_TRANSPORT_HINT": "relay",
+        "LIVE_WSS_HOST": "ws://127.0.0.1:1"
+      },
+      "fallbacks": [
+        {
+          "name": "core_direct_recover",
+          "env": {
+            "LIVE_FORCE_TURN": "0",
+            "LIVE_TURN_TRANSPORT_HINT": "direct",
+            "LIVE_WSS_HOST": "wss://wss.vdo.ninja"
+          }
+        }
+      ]
+    }
+  ],
+  "settings": {
+    "retries": 1,
+    "profile_timeout_ms": 120000,
+    "profile_cooldown_ms": 1000,
+    "cycles": 1,
+    "messages_per_cycle": 1,
+    "include_secure": true,
+    "adaptive_fallback": true,
+    "allow_direct_fallback": true,
+    "strict": false
+  },
+  "results": [
+    {
+      "profile_name": "core_forced_primary_fail",
+      "profile_env": {
+        "MCP_TOOL_PROFILE": "core",
+        "MCP_ENFORCE_JOIN_TOKEN": "0",
+        "MCP_REQUIRE_SESSION_MAC": "0",
+        "LIVE_FORCE_TURN": "1",
+        "LIVE_TURN_TRANSPORT_HINT": "relay",
+        "LIVE_WSS_HOST": "ws://127.0.0.1:1"
+      },
+      "ok": true,
+      "selected_candidate": "core_direct_recover",
+      "selected_env": {
+        "MCP_TOOL_PROFILE": "core",
+        "MCP_ENFORCE_JOIN_TOKEN": "0",
+        "MCP_REQUIRE_SESSION_MAC": "0",
+        "LIVE_FORCE_TURN": "0",
+        "LIVE_TURN_TRANSPORT_HINT": "direct",
+        "LIVE_WSS_HOST": "wss://wss.vdo.ninja"
+      },
+      "fallback_used": true,
+      "final": {
+        "candidate_name": "core_direct_recover",
+        "profile_name": "core_forced_primary_fail",
+        "profile_env": {
+          "MCP_TOOL_PROFILE": "core",
+          "MCP_ENFORCE_JOIN_TOKEN": "0",
+          "MCP_REQUIRE_SESSION_MAC": "0",
+          "LIVE_FORCE_TURN": "1",
+          "LIVE_TURN_TRANSPORT_HINT": "relay",
+          "LIVE_WSS_HOST": "ws://127.0.0.1:1"
+        },
+        "candidate_env": {
+          "LIVE_FORCE_TURN": "0",
+          "LIVE_TURN_TRANSPORT_HINT": "direct",
+          "LIVE_WSS_HOST": "wss://wss.vdo.ninja"
+        },
+        "merged_env": {
+          "MCP_TOOL_PROFILE": "core",
+          "MCP_ENFORCE_JOIN_TOKEN": "0",
+          "MCP_REQUIRE_SESSION_MAC": "0",
+          "LIVE_FORCE_TURN": "0",
+          "LIVE_TURN_TRANSPORT_HINT": "direct",
+          "LIVE_WSS_HOST": "wss://wss.vdo.ninja"
+        },
+        "started_at": "2026-02-22T23:42:39.954Z",
+        "finished_at": "2026-02-22T23:42:41.470Z",
+        "ok": true,
+        "run": {
+          "ok": true,
+          "attempts": [
+            {
+              "attempt": 1,
+              "ok": true,
+              "timed_out": false,
+              "exit_code": 0,
+              "signal": null,
+              "duration_ms": 1514,
+              "error": null
+            }
+          ],
+          "final": {
+            "attempt": 1,
+            "ok": true,
+            "timed_out": false,
+            "exit_code": 0,
+            "signal": null,
+            "duration_ms": 1514,
+            "error": null
+          }
+        },
+        "metrics": {
+          "total_cycles": 1,
+          "connected_cycles": 1,
+          "connect_success_rate": 1,
+          "avg_connect_attempts": 1,
+          "total_messages": 1,
+          "message_success_rate": 1,
+          "total_gate_checks": 3,
+          "gate_success_rate": 1
+        },
+        "report_pass": true,
+        "error": null,
+        "report_path": null
+      },
+      "candidate_results": [
+        {
+          "candidate_name": "core_forced_primary_fail",
+          "profile_name": "core_forced_primary_fail",
+          "profile_env": {
+            "MCP_TOOL_PROFILE": "core",
+            "MCP_ENFORCE_JOIN_TOKEN": "0",
+            "MCP_REQUIRE_SESSION_MAC": "0",
+            "LIVE_FORCE_TURN": "1",
+            "LIVE_TURN_TRANSPORT_HINT": "relay",
+            "LIVE_WSS_HOST": "ws://127.0.0.1:1"
+          },
+          "candidate_env": {},
+          "merged_env": {
+            "MCP_TOOL_PROFILE": "core",
+            "MCP_ENFORCE_JOIN_TOKEN": "0",
+            "MCP_REQUIRE_SESSION_MAC": "0",
+            "LIVE_FORCE_TURN": "1",
+            "LIVE_TURN_TRANSPORT_HINT": "relay",
+            "LIVE_WSS_HOST": "ws://127.0.0.1:1"
+          },
+          "started_at": "2026-02-22T23:42:29.370Z",
+          "finished_at": "2026-02-22T23:42:39.954Z",
+          "ok": false,
+          "run": {
+            "ok": false,
+            "attempts": [
+              {
+                "attempt": 1,
+                "ok": false,
+                "timed_out": false,
+                "exit_code": 1,
+                "signal": null,
+                "duration_ms": 10581,
+                "error": "child exited with code=1 signal=none"
+              }
+            ],
+            "final": {
+              "attempt": 1,
+              "ok": false,
+              "timed_out": false,
+              "exit_code": 1,
+              "signal": null,
+              "duration_ms": 10581,
+              "error": "child exited with code=1 signal=none"
+            }
+          },
+          "metrics": {
+            "total_cycles": 1,
+            "connected_cycles": 0,
+            "connect_success_rate": 0,
+            "avg_connect_attempts": 0,
+            "total_messages": 0,
+            "message_success_rate": 0,
+            "total_gate_checks": 0,
+            "gate_success_rate": 0
+          },
+          "report_pass": false,
+          "error": "child exited with code=1 signal=none",
+          "report_path": null
+        },
+        {
+          "candidate_name": "core_direct_recover",
+          "profile_name": "core_forced_primary_fail",
+          "profile_env": {
+            "MCP_TOOL_PROFILE": "core",
+            "MCP_ENFORCE_JOIN_TOKEN": "0",
+            "MCP_REQUIRE_SESSION_MAC": "0",
+            "LIVE_FORCE_TURN": "1",
+            "LIVE_TURN_TRANSPORT_HINT": "relay",
+            "LIVE_WSS_HOST": "ws://127.0.0.1:1"
+          },
+          "candidate_env": {
+            "LIVE_FORCE_TURN": "0",
+            "LIVE_TURN_TRANSPORT_HINT": "direct",
+            "LIVE_WSS_HOST": "wss://wss.vdo.ninja"
+          },
+          "merged_env": {
+            "MCP_TOOL_PROFILE": "core",
+            "MCP_ENFORCE_JOIN_TOKEN": "0",
+            "MCP_REQUIRE_SESSION_MAC": "0",
+            "LIVE_FORCE_TURN": "0",
+            "LIVE_TURN_TRANSPORT_HINT": "direct",
+            "LIVE_WSS_HOST": "wss://wss.vdo.ninja"
+          },
+          "started_at": "2026-02-22T23:42:39.954Z",
+          "finished_at": "2026-02-22T23:42:41.470Z",
+          "ok": true,
+          "run": {
+            "ok": true,
+            "attempts": [
+              {
+                "attempt": 1,
+                "ok": true,
+                "timed_out": false,
+                "exit_code": 0,
+                "signal": null,
+                "duration_ms": 1514,
+                "error": null
+              }
+            ],
+            "final": {
+              "attempt": 1,
+              "ok": true,
+              "timed_out": false,
+              "exit_code": 0,
+              "signal": null,
+              "duration_ms": 1514,
+              "error": null
+            }
+          },
+          "metrics": {
+            "total_cycles": 1,
+            "connected_cycles": 1,
+            "connect_success_rate": 1,
+            "avg_connect_attempts": 1,
+            "total_messages": 1,
+            "message_success_rate": 1,
+            "total_gate_checks": 3,
+            "gate_success_rate": 1
+          },
+          "report_pass": true,
+          "error": null,
+          "report_path": null
+        }
+      ]
+    }
+  ],
+  "aggregate": {
+    "total_profiles": 1,
+    "successful_profiles": 1,
+    "success_rate": 1,
+    "failed_profiles": [],
+    "fallback_used_profiles": [
+      "core_forced_primary_fail"
+    ]
+  }
+}

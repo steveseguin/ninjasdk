@@ -1,0 +1,6 @@
+Preset Matrix Timestamp: 2026-02-22T23:40:35.895Z
+Profiles: 1/1 success (100.0%)
+Failed Profiles: none
+Fallback Used: none
+Profile Results:
+- core_turn_only: ok=true candidate=core_turn_only fallback=false connect_rate=1.000 message_rate=1.000 gate_rate=1.000

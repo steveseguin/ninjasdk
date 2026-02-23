@@ -1,0 +1,1579 @@
+{
+  "started_at": "2026-02-22T05:27:36.833Z",
+  "total_runs": 3,
+  "successful_runs": 3,
+  "success_rate": 1,
+  "min_success_rate": 0.8,
+  "failed_runs": [],
+  "profile_aggregate": {
+    "direct": {
+      "runs": 3,
+      "success_runs": 3,
+      "success_rate": 1,
+      "fallback_runs": 0,
+      "avg_connect_success_rate": 1,
+      "avg_message_success_rate": 1
+    },
+    "relay": {
+      "runs": 3,
+      "success_runs": 3,
+      "success_rate": 1,
+      "fallback_runs": 2,
+      "avg_connect_success_rate": 1,
+      "avg_message_success_rate": 1
+    }
+  },
+  "runs": [
+    {
+      "run": 1,
+      "ok": true,
+      "exit_code": 0,
+      "report_path": null,
+      "report": {
+        "started_at": "2026-02-22T05:25:30.057Z",
+        "finished_at": "2026-02-22T05:26:28.153Z",
+        "profiles": [
+          {
+            "name": "direct",
+            "env": {
+              "LIVE_FORCE_TURN": "0",
+              "LIVE_TURN_TRANSPORT_HINT": "direct"
+            },
+            "fallbacks": []
+          },
+          {
+            "name": "relay",
+            "env": {
+              "LIVE_FORCE_TURN": "1",
+              "LIVE_TURN_TRANSPORT_HINT": "relay"
+            },
+            "fallbacks": [
+              {
+                "name": "relay_udp_hint",
+                "env": {
+                  "LIVE_FORCE_TURN": "1",
+                  "LIVE_TURN_TRANSPORT_HINT": "udp"
+                }
+              },
+              {
+                "name": "relay_tcp_hint",
+                "env": {
+                  "LIVE_FORCE_TURN": "1",
+                  "LIVE_TURN_TRANSPORT_HINT": "tcp"
+                }
+              },
+              {
+                "name": "relay_tls_hint",
+                "env": {
+                  "LIVE_FORCE_TURN": "1",
+                  "LIVE_TURN_TRANSPORT_HINT": "tls"
+                }
+              },
+              {
+                "name": "direct_fallback",
+                "env": {
+                  "LIVE_FORCE_TURN": "0",
+                  "LIVE_TURN_TRANSPORT_HINT": "direct"
+                }
+              }
+            ]
+          }
+        ],
+        "settings": {
+          "retries": 1,
+          "profile_timeout_ms": 300000,
+          "adaptive_fallback": true
+        },
+        "results": [
+          {
+            "profile_name": "direct",
+            "ok": true,
+            "selected_candidate": "direct",
+            "selected_env": {
+              "LIVE_FORCE_TURN": "0",
+              "LIVE_TURN_TRANSPORT_HINT": "direct"
+            },
+            "fallback_used": false,
+            "final": {
+              "attempt": 1,
+              "candidate_name": "direct",
+              "candidate_env": {
+                "LIVE_FORCE_TURN": "0",
+                "LIVE_TURN_TRANSPORT_HINT": "direct"
+              },
+              "started_at": "2026-02-22T05:25:30.059Z",
+              "finished_at": "2026-02-22T05:25:34.562Z",
+              "ok": true,
+              "exit_code": 0,
+              "error": null,
+              "report_path": null,
+              "metrics": {
+                "total_cycles": 1,
+                "connected_cycles": 1,
+                "connect_success_rate": 1,
+                "reconnect_success_rate": 1,
+                "total_messages": 1,
+                "message_success_rate": 1,
+                "avg_connect_ms": 1081,
+                "avg_reconnect_ms": 2756,
+                "avg_one_way_latency_ms": 1,
+                "avg_round_trip_latency_ms": 2
+              },
+              "report": {
+                "started_at": "2026-02-22T05:25:30.678Z",
+                "config": {
+                  "host": "wss://wss.vdo.ninja",
+                  "forceTURN": false,
+                  "profileName": "direct",
+                  "turnTransportHint": "direct",
+                  "cycles": 1,
+                  "messagesPerCycle": 1,
+                  "connectTimeoutMs": 30000,
+                  "channelReadyTimeoutMs": 15000,
+                  "messageTimeoutMs": 15000,
+                  "reconnectTimeoutMs": 20000,
+                  "reconnectMs": 2000,
+                  "maxReconnectMs": 12000,
+                  "heartbeatMs": 5000,
+                  "triggerReconnect": true,
+                  "minSuccessRate": 1,
+                  "roomPrefix": "mcp_soak",
+                  "reportPath": "/tmp/vdo-mcp-soak-direct-1771737930059-878644.json"
+                },
+                "cycles": [
+                  {
+                    "cycle": 1,
+                    "room": "mcp_soak_1_1771737930679",
+                    "profile_name": "direct",
+                    "turn_transport_hint": "direct",
+                    "force_turn": false,
+                    "started_at": "2026-02-22T05:25:30.679Z",
+                    "connected": true,
+                    "messages_ok": 1,
+                    "messages_fail": 0,
+                    "reconnect_ok": true,
+                    "connect_ms": 1081,
+                    "reconnect_ms": 2756,
+                    "one_way_latency_ms": [
+                      1
+                    ],
+                    "round_trip_latency_ms": [
+                      2
+                    ],
+                    "error": null,
+                    "finished_at": "2026-02-22T05:25:34.524Z"
+                  }
+                ],
+                "metrics": {
+                  "total_cycles": 1,
+                  "connected_cycles": 1,
+                  "connect_success_rate": 1,
+                  "reconnect_success_rate": 1,
+                  "total_messages": 1,
+                  "message_success_rate": 1,
+                  "avg_connect_ms": 1081,
+                  "avg_reconnect_ms": 2756,
+                  "avg_one_way_latency_ms": 1,
+                  "avg_round_trip_latency_ms": 2
+                },
+                "finished_at": "2026-02-22T05:25:34.533Z"
+              }
+            },
+            "candidate_results": [
+              {
+                "candidate_name": "direct",
+                "candidate_env": {
+                  "LIVE_FORCE_TURN": "0",
+                  "LIVE_TURN_TRANSPORT_HINT": "direct"
+                },
+                "ok": true,
+                "attempts": [
+                  {
+                    "attempt": 1,
+                    "candidate_name": "direct",
+                    "candidate_env": {
+                      "LIVE_FORCE_TURN": "0",
+                      "LIVE_TURN_TRANSPORT_HINT": "direct"
+                    },
+                    "started_at": "2026-02-22T05:25:30.059Z",
+                    "finished_at": "2026-02-22T05:25:34.562Z",
+                    "ok": true,
+                    "exit_code": 0,
+                    "error": null,
+                    "report_path": null,
+                    "metrics": {
+                      "total_cycles": 1,
+                      "connected_cycles": 1,
+                      "connect_success_rate": 1,
+                      "reconnect_success_rate": 1,
+                      "total_messages": 1,
+                      "message_success_rate": 1,
+                      "avg_connect_ms": 1081,
+                      "avg_reconnect_ms": 2756,
+                      "avg_one_way_latency_ms": 1,
+                      "avg_round_trip_latency_ms": 2
+                    },
+                    "report": {
+                      "started_at": "2026-02-22T05:25:30.678Z",
+                      "config": {
+                        "host": "wss://wss.vdo.ninja",
+                        "forceTURN": false,
+                        "profileName": "direct",
+                        "turnTransportHint": "direct",
+                        "cycles": 1,
+                        "messagesPerCycle": 1,
+                        "connectTimeoutMs": 30000,
+                        "channelReadyTimeoutMs": 15000,
+                        "messageTimeoutMs": 15000,
+                        "reconnectTimeoutMs": 20000,
+                        "reconnectMs": 2000,
+                        "maxReconnectMs": 12000,
+                        "heartbeatMs": 5000,
+                        "triggerReconnect": true,
+                        "minSuccessRate": 1,
+                        "roomPrefix": "mcp_soak",
+                        "reportPath": "/tmp/vdo-mcp-soak-direct-1771737930059-878644.json"
+                      },
+                      "cycles": [
+                        {
+                          "cycle": 1,
+                          "room": "mcp_soak_1_1771737930679",
+                          "profile_name": "direct",
+                          "turn_transport_hint": "direct",
+                          "force_turn": false,
+                          "started_at": "2026-02-22T05:25:30.679Z",
+                          "connected": true,
+                          "messages_ok": 1,
+                          "messages_fail": 0,
+                          "reconnect_ok": true,
+                          "connect_ms": 1081,
+                          "reconnect_ms": 2756,
+                          "one_way_latency_ms": [
+                            1
+                          ],
+                          "round_trip_latency_ms": [
+                            2
+                          ],
+                          "error": null,
+                          "finished_at": "2026-02-22T05:25:34.524Z"
+                        }
+                      ],
+                      "metrics": {
+                        "total_cycles": 1,
+                        "connected_cycles": 1,
+                        "connect_success_rate": 1,
+                        "reconnect_success_rate": 1,
+                        "total_messages": 1,
+                        "message_success_rate": 1,
+                        "avg_connect_ms": 1081,
+                        "avg_reconnect_ms": 2756,
+                        "avg_one_way_latency_ms": 1,
+                        "avg_round_trip_latency_ms": 2
+                      },
+                      "finished_at": "2026-02-22T05:25:34.533Z"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "profile_name": "relay",
+            "ok": true,
+            "selected_candidate": "relay_udp_hint",
+            "selected_env": {
+              "LIVE_FORCE_TURN": "1",
+              "LIVE_TURN_TRANSPORT_HINT": "udp"
+            },
+            "fallback_used": true,
+            "final": {
+              "attempt": 1,
+              "candidate_name": "relay_udp_hint",
+              "candidate_env": {
+                "LIVE_FORCE_TURN": "1",
+                "LIVE_TURN_TRANSPORT_HINT": "udp"
+              },
+              "started_at": "2026-02-22T05:26:06.076Z",
+              "finished_at": "2026-02-22T05:26:28.153Z",
+              "ok": true,
+              "exit_code": 0,
+              "error": null,
+              "report_path": null,
+              "metrics": {
+                "total_cycles": 1,
+                "connected_cycles": 1,
+                "connect_success_rate": 1,
+                "reconnect_success_rate": 0,
+                "total_messages": 1,
+                "message_success_rate": 1,
+                "avg_connect_ms": 1294,
+                "avg_reconnect_ms": 0,
+                "avg_one_way_latency_ms": 24,
+                "avg_round_trip_latency_ms": 44
+              },
+              "report": {
+                "started_at": "2026-02-22T05:26:06.735Z",
+                "config": {
+                  "host": "wss://wss.vdo.ninja",
+                  "forceTURN": true,
+                  "profileName": "relay_udp_hint",
+                  "turnTransportHint": "udp",
+                  "cycles": 1,
+                  "messagesPerCycle": 1,
+                  "connectTimeoutMs": 30000,
+                  "channelReadyTimeoutMs": 30000,
+                  "messageTimeoutMs": 15000,
+                  "reconnectTimeoutMs": 20000,
+                  "reconnectMs": 2000,
+                  "maxReconnectMs": 12000,
+                  "heartbeatMs": 5000,
+                  "triggerReconnect": true,
+                  "minSuccessRate": 1,
+                  "roomPrefix": "mcp_soak",
+                  "reportPath": "/tmp/vdo-mcp-soak-relay_udp_hint-1771737966076-545055.json"
+                },
+                "cycles": [
+                  {
+                    "cycle": 1,
+                    "room": "mcp_soak_1_1771737966736",
+                    "profile_name": "relay_udp_hint",
+                    "turn_transport_hint": "udp",
+                    "force_turn": true,
+                    "started_at": "2026-02-22T05:26:06.736Z",
+                    "connected": true,
+                    "messages_ok": 1,
+                    "messages_fail": 0,
+                    "reconnect_ok": false,
+                    "connect_ms": 1294,
+                    "reconnect_ms": null,
+                    "one_way_latency_ms": [
+                      24
+                    ],
+                    "round_trip_latency_ms": [
+                      44
+                    ],
+                    "error": null,
+                    "finished_at": "2026-02-22T05:26:28.115Z"
+                  }
+                ],
+                "metrics": {
+                  "total_cycles": 1,
+                  "connected_cycles": 1,
+                  "connect_success_rate": 1,
+                  "reconnect_success_rate": 0,
+                  "total_messages": 1,
+                  "message_success_rate": 1,
+                  "avg_connect_ms": 1294,
+                  "avg_reconnect_ms": 0,
+                  "avg_one_way_latency_ms": 24,
+                  "avg_round_trip_latency_ms": 44
+                },
+                "finished_at": "2026-02-22T05:26:28.123Z"
+              }
+            },
+            "candidate_results": [
+              {
+                "candidate_name": "relay",
+                "candidate_env": {
+                  "LIVE_FORCE_TURN": "1",
+                  "LIVE_TURN_TRANSPORT_HINT": "relay"
+                },
+                "ok": false,
+                "attempts": [
+                  {
+                    "attempt": 1,
+                    "candidate_name": "relay",
+                    "candidate_env": {
+                      "LIVE_FORCE_TURN": "1",
+                      "LIVE_TURN_TRANSPORT_HINT": "relay"
+                    },
+                    "started_at": "2026-02-22T05:25:34.563Z",
+                    "finished_at": "2026-02-22T05:26:06.076Z",
+                    "ok": false,
+                    "exit_code": 1,
+                    "error": "candidate exited with code 1",
+                    "report_path": null,
+                    "metrics": {
+                      "total_cycles": 1,
+                      "connected_cycles": 0,
+                      "connect_success_rate": 0,
+                      "reconnect_success_rate": 0,
+                      "total_messages": 0,
+                      "message_success_rate": 0,
+                      "avg_connect_ms": 0,
+                      "avg_reconnect_ms": 0,
+                      "avg_one_way_latency_ms": 0,
+                      "avg_round_trip_latency_ms": 0
+                    },
+                    "report": {
+                      "started_at": "2026-02-22T05:25:35.169Z",
+                      "config": {
+                        "host": "wss://wss.vdo.ninja",
+                        "forceTURN": true,
+                        "profileName": "relay",
+                        "turnTransportHint": "relay",
+                        "cycles": 1,
+                        "messagesPerCycle": 1,
+                        "connectTimeoutMs": 30000,
+                        "channelReadyTimeoutMs": 30000,
+                        "messageTimeoutMs": 15000,
+                        "reconnectTimeoutMs": 20000,
+                        "reconnectMs": 2000,
+                        "maxReconnectMs": 12000,
+                        "heartbeatMs": 5000,
+                        "triggerReconnect": true,
+                        "minSuccessRate": 1,
+                        "roomPrefix": "mcp_soak",
+                        "reportPath": "/tmp/vdo-mcp-soak-relay-1771737934563-565592.json"
+                      },
+                      "cycles": [
+                        {
+                          "cycle": 1,
+                          "room": "mcp_soak_1_1771737935170",
+                          "profile_name": "relay",
+                          "turn_transport_hint": "relay",
+                          "force_turn": true,
+                          "started_at": "2026-02-22T05:25:35.170Z",
+                          "connected": false,
+                          "messages_ok": 0,
+                          "messages_fail": 0,
+                          "reconnect_ok": false,
+                          "connect_ms": null,
+                          "reconnect_ms": null,
+                          "one_way_latency_ms": [],
+                          "round_trip_latency_ms": [],
+                          "error": "connect timeout",
+                          "finished_at": "2026-02-22T05:26:06.037Z"
+                        }
+                      ],
+                      "metrics": {
+                        "total_cycles": 1,
+                        "connected_cycles": 0,
+                        "connect_success_rate": 0,
+                        "reconnect_success_rate": 0,
+                        "total_messages": 0,
+                        "message_success_rate": 0,
+                        "avg_connect_ms": 0,
+                        "avg_reconnect_ms": 0,
+                        "avg_one_way_latency_ms": 0,
+                        "avg_round_trip_latency_ms": 0
+                      },
+                      "finished_at": "2026-02-22T05:26:06.045Z"
+                    }
+                  }
+                ]
+              },
+              {
+                "candidate_name": "relay_udp_hint",
+                "candidate_env": {
+                  "LIVE_FORCE_TURN": "1",
+                  "LIVE_TURN_TRANSPORT_HINT": "udp"
+                },
+                "ok": true,
+                "attempts": [
+                  {
+                    "attempt": 1,
+                    "candidate_name": "relay_udp_hint",
+                    "candidate_env": {
+                      "LIVE_FORCE_TURN": "1",
+                      "LIVE_TURN_TRANSPORT_HINT": "udp"
+                    },
+                    "started_at": "2026-02-22T05:26:06.076Z",
+                    "finished_at": "2026-02-22T05:26:28.153Z",
+                    "ok": true,
+                    "exit_code": 0,
+                    "error": null,
+                    "report_path": null,
+                    "metrics": {
+                      "total_cycles": 1,
+                      "connected_cycles": 1,
+                      "connect_success_rate": 1,
+                      "reconnect_success_rate": 0,
+                      "total_messages": 1,
+                      "message_success_rate": 1,
+                      "avg_connect_ms": 1294,
+                      "avg_reconnect_ms": 0,
+                      "avg_one_way_latency_ms": 24,
+                      "avg_round_trip_latency_ms": 44
+                    },
+                    "report": {
+                      "started_at": "2026-02-22T05:26:06.735Z",
+                      "config": {
+                        "host": "wss://wss.vdo.ninja",
+                        "forceTURN": true,
+                        "profileName": "relay_udp_hint",
+                        "turnTransportHint": "udp",
+                        "cycles": 1,
+                        "messagesPerCycle": 1,
+                        "connectTimeoutMs": 30000,
+                        "channelReadyTimeoutMs": 30000,
+                        "messageTimeoutMs": 15000,
+                        "reconnectTimeoutMs": 20000,
+                        "reconnectMs": 2000,
+                        "maxReconnectMs": 12000,
+                        "heartbeatMs": 5000,
+                        "triggerReconnect": true,
+                        "minSuccessRate": 1,
+                        "roomPrefix": "mcp_soak",
+                        "reportPath": "/tmp/vdo-mcp-soak-relay_udp_hint-1771737966076-545055.json"
+                      },
+                      "cycles": [
+                        {
+                          "cycle": 1,
+                          "room": "mcp_soak_1_1771737966736",
+                          "profile_name": "relay_udp_hint",
+                          "turn_transport_hint": "udp",
+                          "force_turn": true,
+                          "started_at": "2026-02-22T05:26:06.736Z",
+                          "connected": true,
+                          "messages_ok": 1,
+                          "messages_fail": 0,
+                          "reconnect_ok": false,
+                          "connect_ms": 1294,
+                          "reconnect_ms": null,
+                          "one_way_latency_ms": [
+                            24
+                          ],
+                          "round_trip_latency_ms": [
+                            44
+                          ],
+                          "error": null,
+                          "finished_at": "2026-02-22T05:26:28.115Z"
+                        }
+                      ],
+                      "metrics": {
+                        "total_cycles": 1,
+                        "connected_cycles": 1,
+                        "connect_success_rate": 1,
+                        "reconnect_success_rate": 0,
+                        "total_messages": 1,
+                        "message_success_rate": 1,
+                        "avg_connect_ms": 1294,
+                        "avg_reconnect_ms": 0,
+                        "avg_one_way_latency_ms": 24,
+                        "avg_round_trip_latency_ms": 44
+                      },
+                      "finished_at": "2026-02-22T05:26:28.123Z"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "aggregate": {
+          "total_profiles": 2,
+          "successful_profiles": 2,
+          "success_rate": 1,
+          "failed_profiles": [],
+          "fallback_used_profiles": [
+            "relay"
+          ]
+        }
+      }
+    },
+    {
+      "run": 2,
+      "ok": true,
+      "exit_code": 0,
+      "report_path": null,
+      "report": {
+        "started_at": "2026-02-22T05:26:28.230Z",
+        "finished_at": "2026-02-22T05:26:54.903Z",
+        "profiles": [
+          {
+            "name": "direct",
+            "env": {
+              "LIVE_FORCE_TURN": "0",
+              "LIVE_TURN_TRANSPORT_HINT": "direct"
+            },
+            "fallbacks": []
+          },
+          {
+            "name": "relay",
+            "env": {
+              "LIVE_FORCE_TURN": "1",
+              "LIVE_TURN_TRANSPORT_HINT": "relay"
+            },
+            "fallbacks": [
+              {
+                "name": "relay_udp_hint",
+                "env": {
+                  "LIVE_FORCE_TURN": "1",
+                  "LIVE_TURN_TRANSPORT_HINT": "udp"
+                }
+              },
+              {
+                "name": "relay_tcp_hint",
+                "env": {
+                  "LIVE_FORCE_TURN": "1",
+                  "LIVE_TURN_TRANSPORT_HINT": "tcp"
+                }
+              },
+              {
+                "name": "relay_tls_hint",
+                "env": {
+                  "LIVE_FORCE_TURN": "1",
+                  "LIVE_TURN_TRANSPORT_HINT": "tls"
+                }
+              },
+              {
+                "name": "direct_fallback",
+                "env": {
+                  "LIVE_FORCE_TURN": "0",
+                  "LIVE_TURN_TRANSPORT_HINT": "direct"
+                }
+              }
+            ]
+          }
+        ],
+        "settings": {
+          "retries": 1,
+          "profile_timeout_ms": 300000,
+          "adaptive_fallback": true
+        },
+        "results": [
+          {
+            "profile_name": "direct",
+            "ok": true,
+            "selected_candidate": "direct",
+            "selected_env": {
+              "LIVE_FORCE_TURN": "0",
+              "LIVE_TURN_TRANSPORT_HINT": "direct"
+            },
+            "fallback_used": false,
+            "final": {
+              "attempt": 1,
+              "candidate_name": "direct",
+              "candidate_env": {
+                "LIVE_FORCE_TURN": "0",
+                "LIVE_TURN_TRANSPORT_HINT": "direct"
+              },
+              "started_at": "2026-02-22T05:26:28.232Z",
+              "finished_at": "2026-02-22T05:26:32.787Z",
+              "ok": true,
+              "exit_code": 0,
+              "error": null,
+              "report_path": null,
+              "metrics": {
+                "total_cycles": 1,
+                "connected_cycles": 1,
+                "connect_success_rate": 1,
+                "reconnect_success_rate": 1,
+                "total_messages": 1,
+                "message_success_rate": 1,
+                "avg_connect_ms": 1078,
+                "avg_reconnect_ms": 2756,
+                "avg_one_way_latency_ms": 1,
+                "avg_round_trip_latency_ms": 2
+              },
+              "report": {
+                "started_at": "2026-02-22T05:26:28.896Z",
+                "config": {
+                  "host": "wss://wss.vdo.ninja",
+                  "forceTURN": false,
+                  "profileName": "direct",
+                  "turnTransportHint": "direct",
+                  "cycles": 1,
+                  "messagesPerCycle": 1,
+                  "connectTimeoutMs": 30000,
+                  "channelReadyTimeoutMs": 15000,
+                  "messageTimeoutMs": 15000,
+                  "reconnectTimeoutMs": 20000,
+                  "reconnectMs": 2000,
+                  "maxReconnectMs": 12000,
+                  "heartbeatMs": 5000,
+                  "triggerReconnect": true,
+                  "minSuccessRate": 1,
+                  "roomPrefix": "mcp_soak",
+                  "reportPath": "/tmp/vdo-mcp-soak-direct-1771737988232-151212.json"
+                },
+                "cycles": [
+                  {
+                    "cycle": 1,
+                    "room": "mcp_soak_1_1771737988898",
+                    "profile_name": "direct",
+                    "turn_transport_hint": "direct",
+                    "force_turn": false,
+                    "started_at": "2026-02-22T05:26:28.898Z",
+                    "connected": true,
+                    "messages_ok": 1,
+                    "messages_fail": 0,
+                    "reconnect_ok": true,
+                    "connect_ms": 1078,
+                    "reconnect_ms": 2756,
+                    "one_way_latency_ms": [
+                      1
+                    ],
+                    "round_trip_latency_ms": [
+                      2
+                    ],
+                    "error": null,
+                    "finished_at": "2026-02-22T05:26:32.742Z"
+                  }
+                ],
+                "metrics": {
+                  "total_cycles": 1,
+                  "connected_cycles": 1,
+                  "connect_success_rate": 1,
+                  "reconnect_success_rate": 1,
+                  "total_messages": 1,
+                  "message_success_rate": 1,
+                  "avg_connect_ms": 1078,
+                  "avg_reconnect_ms": 2756,
+                  "avg_one_way_latency_ms": 1,
+                  "avg_round_trip_latency_ms": 2
+                },
+                "finished_at": "2026-02-22T05:26:32.755Z"
+              }
+            },
+            "candidate_results": [
+              {
+                "candidate_name": "direct",
+                "candidate_env": {
+                  "LIVE_FORCE_TURN": "0",
+                  "LIVE_TURN_TRANSPORT_HINT": "direct"
+                },
+                "ok": true,
+                "attempts": [
+                  {
+                    "attempt": 1,
+                    "candidate_name": "direct",
+                    "candidate_env": {
+                      "LIVE_FORCE_TURN": "0",
+                      "LIVE_TURN_TRANSPORT_HINT": "direct"
+                    },
+                    "started_at": "2026-02-22T05:26:28.232Z",
+                    "finished_at": "2026-02-22T05:26:32.787Z",
+                    "ok": true,
+                    "exit_code": 0,
+                    "error": null,
+                    "report_path": null,
+                    "metrics": {
+                      "total_cycles": 1,
+                      "connected_cycles": 1,
+                      "connect_success_rate": 1,
+                      "reconnect_success_rate": 1,
+                      "total_messages": 1,
+                      "message_success_rate": 1,
+                      "avg_connect_ms": 1078,
+                      "avg_reconnect_ms": 2756,
+                      "avg_one_way_latency_ms": 1,
+                      "avg_round_trip_latency_ms": 2
+                    },
+                    "report": {
+                      "started_at": "2026-02-22T05:26:28.896Z",
+                      "config": {
+                        "host": "wss://wss.vdo.ninja",
+                        "forceTURN": false,
+                        "profileName": "direct",
+                        "turnTransportHint": "direct",
+                        "cycles": 1,
+                        "messagesPerCycle": 1,
+                        "connectTimeoutMs": 30000,
+                        "channelReadyTimeoutMs": 15000,
+                        "messageTimeoutMs": 15000,
+                        "reconnectTimeoutMs": 20000,
+                        "reconnectMs": 2000,
+                        "maxReconnectMs": 12000,
+                        "heartbeatMs": 5000,
+                        "triggerReconnect": true,
+                        "minSuccessRate": 1,
+                        "roomPrefix": "mcp_soak",
+                        "reportPath": "/tmp/vdo-mcp-soak-direct-1771737988232-151212.json"
+                      },
+                      "cycles": [
+                        {
+                          "cycle": 1,
+                          "room": "mcp_soak_1_1771737988898",
+                          "profile_name": "direct",
+                          "turn_transport_hint": "direct",
+                          "force_turn": false,
+                          "started_at": "2026-02-22T05:26:28.898Z",
+                          "connected": true,
+                          "messages_ok": 1,
+                          "messages_fail": 0,
+                          "reconnect_ok": true,
+                          "connect_ms": 1078,
+                          "reconnect_ms": 2756,
+                          "one_way_latency_ms": [
+                            1
+                          ],
+                          "round_trip_latency_ms": [
+                            2
+                          ],
+                          "error": null,
+                          "finished_at": "2026-02-22T05:26:32.742Z"
+                        }
+                      ],
+                      "metrics": {
+                        "total_cycles": 1,
+                        "connected_cycles": 1,
+                        "connect_success_rate": 1,
+                        "reconnect_success_rate": 1,
+                        "total_messages": 1,
+                        "message_success_rate": 1,
+                        "avg_connect_ms": 1078,
+                        "avg_reconnect_ms": 2756,
+                        "avg_one_way_latency_ms": 1,
+                        "avg_round_trip_latency_ms": 2
+                      },
+                      "finished_at": "2026-02-22T05:26:32.755Z"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "profile_name": "relay",
+            "ok": true,
+            "selected_candidate": "relay",
+            "selected_env": {
+              "LIVE_FORCE_TURN": "1",
+              "LIVE_TURN_TRANSPORT_HINT": "relay"
+            },
+            "fallback_used": false,
+            "final": {
+              "attempt": 1,
+              "candidate_name": "relay",
+              "candidate_env": {
+                "LIVE_FORCE_TURN": "1",
+                "LIVE_TURN_TRANSPORT_HINT": "relay"
+              },
+              "started_at": "2026-02-22T05:26:32.787Z",
+              "finished_at": "2026-02-22T05:26:54.902Z",
+              "ok": true,
+              "exit_code": 0,
+              "error": null,
+              "report_path": null,
+              "metrics": {
+                "total_cycles": 1,
+                "connected_cycles": 1,
+                "connect_success_rate": 1,
+                "reconnect_success_rate": 0,
+                "total_messages": 1,
+                "message_success_rate": 1,
+                "avg_connect_ms": 1340,
+                "avg_reconnect_ms": 0,
+                "avg_one_way_latency_ms": 25,
+                "avg_round_trip_latency_ms": 46
+              },
+              "report": {
+                "started_at": "2026-02-22T05:26:33.433Z",
+                "config": {
+                  "host": "wss://wss.vdo.ninja",
+                  "forceTURN": true,
+                  "profileName": "relay",
+                  "turnTransportHint": "relay",
+                  "cycles": 1,
+                  "messagesPerCycle": 1,
+                  "connectTimeoutMs": 30000,
+                  "channelReadyTimeoutMs": 30000,
+                  "messageTimeoutMs": 15000,
+                  "reconnectTimeoutMs": 20000,
+                  "reconnectMs": 2000,
+                  "maxReconnectMs": 12000,
+                  "heartbeatMs": 5000,
+                  "triggerReconnect": true,
+                  "minSuccessRate": 1,
+                  "roomPrefix": "mcp_soak",
+                  "reportPath": "/tmp/vdo-mcp-soak-relay-1771737992787-175378.json"
+                },
+                "cycles": [
+                  {
+                    "cycle": 1,
+                    "room": "mcp_soak_1_1771737993435",
+                    "profile_name": "relay",
+                    "turn_transport_hint": "relay",
+                    "force_turn": true,
+                    "started_at": "2026-02-22T05:26:33.435Z",
+                    "connected": true,
+                    "messages_ok": 1,
+                    "messages_fail": 0,
+                    "reconnect_ok": false,
+                    "connect_ms": 1340,
+                    "reconnect_ms": null,
+                    "one_way_latency_ms": [
+                      25
+                    ],
+                    "round_trip_latency_ms": [
+                      46
+                    ],
+                    "error": null,
+                    "finished_at": "2026-02-22T05:26:54.868Z"
+                  }
+                ],
+                "metrics": {
+                  "total_cycles": 1,
+                  "connected_cycles": 1,
+                  "connect_success_rate": 1,
+                  "reconnect_success_rate": 0,
+                  "total_messages": 1,
+                  "message_success_rate": 1,
+                  "avg_connect_ms": 1340,
+                  "avg_reconnect_ms": 0,
+                  "avg_one_way_latency_ms": 25,
+                  "avg_round_trip_latency_ms": 46
+                },
+                "finished_at": "2026-02-22T05:26:54.872Z"
+              }
+            },
+            "candidate_results": [
+              {
+                "candidate_name": "relay",
+                "candidate_env": {
+                  "LIVE_FORCE_TURN": "1",
+                  "LIVE_TURN_TRANSPORT_HINT": "relay"
+                },
+                "ok": true,
+                "attempts": [
+                  {
+                    "attempt": 1,
+                    "candidate_name": "relay",
+                    "candidate_env": {
+                      "LIVE_FORCE_TURN": "1",
+                      "LIVE_TURN_TRANSPORT_HINT": "relay"
+                    },
+                    "started_at": "2026-02-22T05:26:32.787Z",
+                    "finished_at": "2026-02-22T05:26:54.902Z",
+                    "ok": true,
+                    "exit_code": 0,
+                    "error": null,
+                    "report_path": null,
+                    "metrics": {
+                      "total_cycles": 1,
+                      "connected_cycles": 1,
+                      "connect_success_rate": 1,
+                      "reconnect_success_rate": 0,
+                      "total_messages": 1,
+                      "message_success_rate": 1,
+                      "avg_connect_ms": 1340,
+                      "avg_reconnect_ms": 0,
+                      "avg_one_way_latency_ms": 25,
+                      "avg_round_trip_latency_ms": 46
+                    },
+                    "report": {
+                      "started_at": "2026-02-22T05:26:33.433Z",
+                      "config": {
+                        "host": "wss://wss.vdo.ninja",
+                        "forceTURN": true,
+                        "profileName": "relay",
+                        "turnTransportHint": "relay",
+                        "cycles": 1,
+                        "messagesPerCycle": 1,
+                        "connectTimeoutMs": 30000,
+                        "channelReadyTimeoutMs": 30000,
+                        "messageTimeoutMs": 15000,
+                        "reconnectTimeoutMs": 20000,
+                        "reconnectMs": 2000,
+                        "maxReconnectMs": 12000,
+                        "heartbeatMs": 5000,
+                        "triggerReconnect": true,
+                        "minSuccessRate": 1,
+                        "roomPrefix": "mcp_soak",
+                        "reportPath": "/tmp/vdo-mcp-soak-relay-1771737992787-175378.json"
+                      },
+                      "cycles": [
+                        {
+                          "cycle": 1,
+                          "room": "mcp_soak_1_1771737993435",
+                          "profile_name": "relay",
+                          "turn_transport_hint": "relay",
+                          "force_turn": true,
+                          "started_at": "2026-02-22T05:26:33.435Z",
+                          "connected": true,
+                          "messages_ok": 1,
+                          "messages_fail": 0,
+                          "reconnect_ok": false,
+                          "connect_ms": 1340,
+                          "reconnect_ms": null,
+                          "one_way_latency_ms": [
+                            25
+                          ],
+                          "round_trip_latency_ms": [
+                            46
+                          ],
+                          "error": null,
+                          "finished_at": "2026-02-22T05:26:54.868Z"
+                        }
+                      ],
+                      "metrics": {
+                        "total_cycles": 1,
+                        "connected_cycles": 1,
+                        "connect_success_rate": 1,
+                        "reconnect_success_rate": 0,
+                        "total_messages": 1,
+                        "message_success_rate": 1,
+                        "avg_connect_ms": 1340,
+                        "avg_reconnect_ms": 0,
+                        "avg_one_way_latency_ms": 25,
+                        "avg_round_trip_latency_ms": 46
+                      },
+                      "finished_at": "2026-02-22T05:26:54.872Z"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "aggregate": {
+          "total_profiles": 2,
+          "successful_profiles": 2,
+          "success_rate": 1,
+          "failed_profiles": [],
+          "fallback_used_profiles": []
+        }
+      }
+    },
+    {
+      "run": 3,
+      "ok": true,
+      "exit_code": 0,
+      "report_path": null,
+      "report": {
+        "started_at": "2026-02-22T05:26:54.976Z",
+        "finished_at": "2026-02-22T05:27:36.803Z",
+        "profiles": [
+          {
+            "name": "direct",
+            "env": {
+              "LIVE_FORCE_TURN": "0",
+              "LIVE_TURN_TRANSPORT_HINT": "direct"
+            },
+            "fallbacks": []
+          },
+          {
+            "name": "relay",
+            "env": {
+              "LIVE_FORCE_TURN": "1",
+              "LIVE_TURN_TRANSPORT_HINT": "relay"
+            },
+            "fallbacks": [
+              {
+                "name": "relay_udp_hint",
+                "env": {
+                  "LIVE_FORCE_TURN": "1",
+                  "LIVE_TURN_TRANSPORT_HINT": "udp"
+                }
+              },
+              {
+                "name": "relay_tcp_hint",
+                "env": {
+                  "LIVE_FORCE_TURN": "1",
+                  "LIVE_TURN_TRANSPORT_HINT": "tcp"
+                }
+              },
+              {
+                "name": "relay_tls_hint",
+                "env": {
+                  "LIVE_FORCE_TURN": "1",
+                  "LIVE_TURN_TRANSPORT_HINT": "tls"
+                }
+              },
+              {
+                "name": "direct_fallback",
+                "env": {
+                  "LIVE_FORCE_TURN": "0",
+                  "LIVE_TURN_TRANSPORT_HINT": "direct"
+                }
+              }
+            ]
+          }
+        ],
+        "settings": {
+          "retries": 1,
+          "profile_timeout_ms": 300000,
+          "adaptive_fallback": true
+        },
+        "results": [
+          {
+            "profile_name": "direct",
+            "ok": true,
+            "selected_candidate": "direct",
+            "selected_env": {
+              "LIVE_FORCE_TURN": "0",
+              "LIVE_TURN_TRANSPORT_HINT": "direct"
+            },
+            "fallback_used": false,
+            "final": {
+              "attempt": 1,
+              "candidate_name": "direct",
+              "candidate_env": {
+                "LIVE_FORCE_TURN": "0",
+                "LIVE_TURN_TRANSPORT_HINT": "direct"
+              },
+              "started_at": "2026-02-22T05:26:54.978Z",
+              "finished_at": "2026-02-22T05:26:59.456Z",
+              "ok": true,
+              "exit_code": 0,
+              "error": null,
+              "report_path": null,
+              "metrics": {
+                "total_cycles": 1,
+                "connected_cycles": 1,
+                "connect_success_rate": 1,
+                "reconnect_success_rate": 1,
+                "total_messages": 1,
+                "message_success_rate": 1,
+                "avg_connect_ms": 1034,
+                "avg_reconnect_ms": 2756,
+                "avg_one_way_latency_ms": 2,
+                "avg_round_trip_latency_ms": 3
+              },
+              "report": {
+                "started_at": "2026-02-22T05:26:55.617Z",
+                "config": {
+                  "host": "wss://wss.vdo.ninja",
+                  "forceTURN": false,
+                  "profileName": "direct",
+                  "turnTransportHint": "direct",
+                  "cycles": 1,
+                  "messagesPerCycle": 1,
+                  "connectTimeoutMs": 30000,
+                  "channelReadyTimeoutMs": 15000,
+                  "messageTimeoutMs": 15000,
+                  "reconnectTimeoutMs": 20000,
+                  "reconnectMs": 2000,
+                  "maxReconnectMs": 12000,
+                  "heartbeatMs": 5000,
+                  "triggerReconnect": true,
+                  "minSuccessRate": 1,
+                  "roomPrefix": "mcp_soak",
+                  "reportPath": "/tmp/vdo-mcp-soak-direct-1771738014977-619734.json"
+                },
+                "cycles": [
+                  {
+                    "cycle": 1,
+                    "room": "mcp_soak_1_1771738015618",
+                    "profile_name": "direct",
+                    "turn_transport_hint": "direct",
+                    "force_turn": false,
+                    "started_at": "2026-02-22T05:26:55.618Z",
+                    "connected": true,
+                    "messages_ok": 1,
+                    "messages_fail": 0,
+                    "reconnect_ok": true,
+                    "connect_ms": 1034,
+                    "reconnect_ms": 2756,
+                    "one_way_latency_ms": [
+                      2
+                    ],
+                    "round_trip_latency_ms": [
+                      3
+                    ],
+                    "error": null,
+                    "finished_at": "2026-02-22T05:26:59.417Z"
+                  }
+                ],
+                "metrics": {
+                  "total_cycles": 1,
+                  "connected_cycles": 1,
+                  "connect_success_rate": 1,
+                  "reconnect_success_rate": 1,
+                  "total_messages": 1,
+                  "message_success_rate": 1,
+                  "avg_connect_ms": 1034,
+                  "avg_reconnect_ms": 2756,
+                  "avg_one_way_latency_ms": 2,
+                  "avg_round_trip_latency_ms": 3
+                },
+                "finished_at": "2026-02-22T05:26:59.426Z"
+              }
+            },
+            "candidate_results": [
+              {
+                "candidate_name": "direct",
+                "candidate_env": {
+                  "LIVE_FORCE_TURN": "0",
+                  "LIVE_TURN_TRANSPORT_HINT": "direct"
+                },
+                "ok": true,
+                "attempts": [
+                  {
+                    "attempt": 1,
+                    "candidate_name": "direct",
+                    "candidate_env": {
+                      "LIVE_FORCE_TURN": "0",
+                      "LIVE_TURN_TRANSPORT_HINT": "direct"
+                    },
+                    "started_at": "2026-02-22T05:26:54.978Z",
+                    "finished_at": "2026-02-22T05:26:59.456Z",
+                    "ok": true,
+                    "exit_code": 0,
+                    "error": null,
+                    "report_path": null,
+                    "metrics": {
+                      "total_cycles": 1,
+                      "connected_cycles": 1,
+                      "connect_success_rate": 1,
+                      "reconnect_success_rate": 1,
+                      "total_messages": 1,
+                      "message_success_rate": 1,
+                      "avg_connect_ms": 1034,
+                      "avg_reconnect_ms": 2756,
+                      "avg_one_way_latency_ms": 2,
+                      "avg_round_trip_latency_ms": 3
+                    },
+                    "report": {
+                      "started_at": "2026-02-22T05:26:55.617Z",
+                      "config": {
+                        "host": "wss://wss.vdo.ninja",
+                        "forceTURN": false,
+                        "profileName": "direct",
+                        "turnTransportHint": "direct",
+                        "cycles": 1,
+                        "messagesPerCycle": 1,
+                        "connectTimeoutMs": 30000,
+                        "channelReadyTimeoutMs": 15000,
+                        "messageTimeoutMs": 15000,
+                        "reconnectTimeoutMs": 20000,
+                        "reconnectMs": 2000,
+                        "maxReconnectMs": 12000,
+                        "heartbeatMs": 5000,
+                        "triggerReconnect": true,
+                        "minSuccessRate": 1,
+                        "roomPrefix": "mcp_soak",
+                        "reportPath": "/tmp/vdo-mcp-soak-direct-1771738014977-619734.json"
+                      },
+                      "cycles": [
+                        {
+                          "cycle": 1,
+                          "room": "mcp_soak_1_1771738015618",
+                          "profile_name": "direct",
+                          "turn_transport_hint": "direct",
+                          "force_turn": false,
+                          "started_at": "2026-02-22T05:26:55.618Z",
+                          "connected": true,
+                          "messages_ok": 1,
+                          "messages_fail": 0,
+                          "reconnect_ok": true,
+                          "connect_ms": 1034,
+                          "reconnect_ms": 2756,
+                          "one_way_latency_ms": [
+                            2
+                          ],
+                          "round_trip_latency_ms": [
+                            3
+                          ],
+                          "error": null,
+                          "finished_at": "2026-02-22T05:26:59.417Z"
+                        }
+                      ],
+                      "metrics": {
+                        "total_cycles": 1,
+                        "connected_cycles": 1,
+                        "connect_success_rate": 1,
+                        "reconnect_success_rate": 1,
+                        "total_messages": 1,
+                        "message_success_rate": 1,
+                        "avg_connect_ms": 1034,
+                        "avg_reconnect_ms": 2756,
+                        "avg_one_way_latency_ms": 2,
+                        "avg_round_trip_latency_ms": 3
+                      },
+                      "finished_at": "2026-02-22T05:26:59.426Z"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "profile_name": "relay",
+            "ok": true,
+            "selected_candidate": "relay_udp_hint",
+            "selected_env": {
+              "LIVE_FORCE_TURN": "1",
+              "LIVE_TURN_TRANSPORT_HINT": "udp"
+            },
+            "fallback_used": true,
+            "final": {
+              "attempt": 1,
+              "candidate_name": "relay_udp_hint",
+              "candidate_env": {
+                "LIVE_FORCE_TURN": "1",
+                "LIVE_TURN_TRANSPORT_HINT": "udp"
+              },
+              "started_at": "2026-02-22T05:27:30.999Z",
+              "finished_at": "2026-02-22T05:27:36.802Z",
+              "ok": true,
+              "exit_code": 0,
+              "error": null,
+              "report_path": null,
+              "metrics": {
+                "total_cycles": 1,
+                "connected_cycles": 1,
+                "connect_success_rate": 1,
+                "reconnect_success_rate": 1,
+                "total_messages": 1,
+                "message_success_rate": 1,
+                "avg_connect_ms": 1305,
+                "avg_reconnect_ms": 3762,
+                "avg_one_way_latency_ms": 23,
+                "avg_round_trip_latency_ms": 50
+              },
+              "report": {
+                "started_at": "2026-02-22T05:27:31.644Z",
+                "config": {
+                  "host": "wss://wss.vdo.ninja",
+                  "forceTURN": true,
+                  "profileName": "relay_udp_hint",
+                  "turnTransportHint": "udp",
+                  "cycles": 1,
+                  "messagesPerCycle": 1,
+                  "connectTimeoutMs": 30000,
+                  "channelReadyTimeoutMs": 30000,
+                  "messageTimeoutMs": 15000,
+                  "reconnectTimeoutMs": 20000,
+                  "reconnectMs": 2000,
+                  "maxReconnectMs": 12000,
+                  "heartbeatMs": 5000,
+                  "triggerReconnect": true,
+                  "minSuccessRate": 1,
+                  "roomPrefix": "mcp_soak",
+                  "reportPath": "/tmp/vdo-mcp-soak-relay_udp_hint-1771738050998-79644.json"
+                },
+                "cycles": [
+                  {
+                    "cycle": 1,
+                    "room": "mcp_soak_1_1771738051645",
+                    "profile_name": "relay_udp_hint",
+                    "turn_transport_hint": "udp",
+                    "force_turn": true,
+                    "started_at": "2026-02-22T05:27:31.645Z",
+                    "connected": true,
+                    "messages_ok": 1,
+                    "messages_fail": 0,
+                    "reconnect_ok": true,
+                    "connect_ms": 1305,
+                    "reconnect_ms": 3762,
+                    "one_way_latency_ms": [
+                      23
+                    ],
+                    "round_trip_latency_ms": [
+                      50
+                    ],
+                    "error": null,
+                    "finished_at": "2026-02-22T05:27:36.769Z"
+                  }
+                ],
+                "metrics": {
+                  "total_cycles": 1,
+                  "connected_cycles": 1,
+                  "connect_success_rate": 1,
+                  "reconnect_success_rate": 1,
+                  "total_messages": 1,
+                  "message_success_rate": 1,
+                  "avg_connect_ms": 1305,
+                  "avg_reconnect_ms": 3762,
+                  "avg_one_way_latency_ms": 23,
+                  "avg_round_trip_latency_ms": 50
+                },
+                "finished_at": "2026-02-22T05:27:36.775Z"
+              }
+            },
+            "candidate_results": [
+              {
+                "candidate_name": "relay",
+                "candidate_env": {
+                  "LIVE_FORCE_TURN": "1",
+                  "LIVE_TURN_TRANSPORT_HINT": "relay"
+                },
+                "ok": false,
+                "attempts": [
+                  {
+                    "attempt": 1,
+                    "candidate_name": "relay",
+                    "candidate_env": {
+                      "LIVE_FORCE_TURN": "1",
+                      "LIVE_TURN_TRANSPORT_HINT": "relay"
+                    },
+                    "started_at": "2026-02-22T05:26:59.457Z",
+                    "finished_at": "2026-02-22T05:27:30.998Z",
+                    "ok": false,
+                    "exit_code": 1,
+                    "error": "candidate exited with code 1",
+                    "report_path": null,
+                    "metrics": {
+                      "total_cycles": 1,
+                      "connected_cycles": 0,
+                      "connect_success_rate": 0,
+                      "reconnect_success_rate": 0,
+                      "total_messages": 0,
+                      "message_success_rate": 0,
+                      "avg_connect_ms": 0,
+                      "avg_reconnect_ms": 0,
+                      "avg_one_way_latency_ms": 0,
+                      "avg_round_trip_latency_ms": 0
+                    },
+                    "report": {
+                      "started_at": "2026-02-22T05:27:00.110Z",
+                      "config": {
+                        "host": "wss://wss.vdo.ninja",
+                        "forceTURN": true,
+                        "profileName": "relay",
+                        "turnTransportHint": "relay",
+                        "cycles": 1,
+                        "messagesPerCycle": 1,
+                        "connectTimeoutMs": 30000,
+                        "channelReadyTimeoutMs": 30000,
+                        "messageTimeoutMs": 15000,
+                        "reconnectTimeoutMs": 20000,
+                        "reconnectMs": 2000,
+                        "maxReconnectMs": 12000,
+                        "heartbeatMs": 5000,
+                        "triggerReconnect": true,
+                        "minSuccessRate": 1,
+                        "roomPrefix": "mcp_soak",
+                        "reportPath": "/tmp/vdo-mcp-soak-relay-1771738019456-908792.json"
+                      },
+                      "cycles": [
+                        {
+                          "cycle": 1,
+                          "room": "mcp_soak_1_1771738020111",
+                          "profile_name": "relay",
+                          "turn_transport_hint": "relay",
+                          "force_turn": true,
+                          "started_at": "2026-02-22T05:27:00.111Z",
+                          "connected": false,
+                          "messages_ok": 0,
+                          "messages_fail": 0,
+                          "reconnect_ok": false,
+                          "connect_ms": null,
+                          "reconnect_ms": null,
+                          "one_way_latency_ms": [],
+                          "round_trip_latency_ms": [],
+                          "error": "connect timeout",
+                          "finished_at": "2026-02-22T05:27:30.959Z"
+                        }
+                      ],
+                      "metrics": {
+                        "total_cycles": 1,
+                        "connected_cycles": 0,
+                        "connect_success_rate": 0,
+                        "reconnect_success_rate": 0,
+                        "total_messages": 0,
+                        "message_success_rate": 0,
+                        "avg_connect_ms": 0,
+                        "avg_reconnect_ms": 0,
+                        "avg_one_way_latency_ms": 0,
+                        "avg_round_trip_latency_ms": 0
+                      },
+                      "finished_at": "2026-02-22T05:27:30.968Z"
+                    }
+                  }
+                ]
+              },
+              {
+                "candidate_name": "relay_udp_hint",
+                "candidate_env": {
+                  "LIVE_FORCE_TURN": "1",
+                  "LIVE_TURN_TRANSPORT_HINT": "udp"
+                },
+                "ok": true,
+                "attempts": [
+                  {
+                    "attempt": 1,
+                    "candidate_name": "relay_udp_hint",
+                    "candidate_env": {
+                      "LIVE_FORCE_TURN": "1",
+                      "LIVE_TURN_TRANSPORT_HINT": "udp"
+                    },
+                    "started_at": "2026-02-22T05:27:30.999Z",
+                    "finished_at": "2026-02-22T05:27:36.802Z",
+                    "ok": true,
+                    "exit_code": 0,
+                    "error": null,
+                    "report_path": null,
+                    "metrics": {
+                      "total_cycles": 1,
+                      "connected_cycles": 1,
+                      "connect_success_rate": 1,
+                      "reconnect_success_rate": 1,
+                      "total_messages": 1,
+                      "message_success_rate": 1,
+                      "avg_connect_ms": 1305,
+                      "avg_reconnect_ms": 3762,
+                      "avg_one_way_latency_ms": 23,
+                      "avg_round_trip_latency_ms": 50
+                    },
+                    "report": {
+                      "started_at": "2026-02-22T05:27:31.644Z",
+                      "config": {
+                        "host": "wss://wss.vdo.ninja",
+                        "forceTURN": true,
+                        "profileName": "relay_udp_hint",
+                        "turnTransportHint": "udp",
+                        "cycles": 1,
+                        "messagesPerCycle": 1,
+                        "connectTimeoutMs": 30000,
+                        "channelReadyTimeoutMs": 30000,
+                        "messageTimeoutMs": 15000,
+                        "reconnectTimeoutMs": 20000,
+                        "reconnectMs": 2000,
+                        "maxReconnectMs": 12000,
+                        "heartbeatMs": 5000,
+                        "triggerReconnect": true,
+                        "minSuccessRate": 1,
+                        "roomPrefix": "mcp_soak",
+                        "reportPath": "/tmp/vdo-mcp-soak-relay_udp_hint-1771738050998-79644.json"
+                      },
+                      "cycles": [
+                        {
+                          "cycle": 1,
+                          "room": "mcp_soak_1_1771738051645",
+                          "profile_name": "relay_udp_hint",
+                          "turn_transport_hint": "udp",
+                          "force_turn": true,
+                          "started_at": "2026-02-22T05:27:31.645Z",
+                          "connected": true,
+                          "messages_ok": 1,
+                          "messages_fail": 0,
+                          "reconnect_ok": true,
+                          "connect_ms": 1305,
+                          "reconnect_ms": 3762,
+                          "one_way_latency_ms": [
+                            23
+                          ],
+                          "round_trip_latency_ms": [
+                            50
+                          ],
+                          "error": null,
+                          "finished_at": "2026-02-22T05:27:36.769Z"
+                        }
+                      ],
+                      "metrics": {
+                        "total_cycles": 1,
+                        "connected_cycles": 1,
+                        "connect_success_rate": 1,
+                        "reconnect_success_rate": 1,
+                        "total_messages": 1,
+                        "message_success_rate": 1,
+                        "avg_connect_ms": 1305,
+                        "avg_reconnect_ms": 3762,
+                        "avg_one_way_latency_ms": 23,
+                        "avg_round_trip_latency_ms": 50
+                      },
+                      "finished_at": "2026-02-22T05:27:36.775Z"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "aggregate": {
+          "total_profiles": 2,
+          "successful_profiles": 2,
+          "success_rate": 1,
+          "failed_profiles": [],
+          "fallback_used_profiles": [
+            "relay"
+          ]
+        }
+      }
+    }
+  ]
+}
