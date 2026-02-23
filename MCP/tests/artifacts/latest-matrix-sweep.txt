@@ -1,0 +1,6 @@
+Sweep Timestamp: 2026-02-22T05:27:36.833Z
+Runs: 3/3 success (100.0%)
+Failed Runs: none
+Profiles:
+- direct: success_rate=100.0% fallback_runs=0/3 connect_avg=1.000 message_avg=1.000
+- relay: success_rate=100.0% fallback_runs=2/3 connect_avg=1.000 message_avg=1.000

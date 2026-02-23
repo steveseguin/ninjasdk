@@ -1,0 +1,10 @@
+name = "vdo-ninja-mcp-proxy"
+main = "worker-proxy.js"
+compatibility_date = "2026-02-22"
+
+[vars]
+MCP_ALLOW_ORIGIN = "*"
+
+# Set these as secrets:
+# wrangler secret put MCP_UPSTREAM_URL
+# wrangler secret put MCP_UPSTREAM_TOKEN

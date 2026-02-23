@@ -1,0 +1,7 @@
+Preset Matrix Timestamp: 2026-02-22T23:40:45.665Z
+Profiles: 2/2 success (100.0%)
+Failed Profiles: none
+Fallback Used: none
+Profile Results:
+- core_relay_then_direct: ok=true candidate=core_relay_then_direct fallback=false connect_rate=1.000 message_rate=1.000 gate_rate=1.000
+- full_relay_then_direct: ok=true candidate=full_relay_then_direct fallback=false connect_rate=1.000 message_rate=1.000 gate_rate=1.000

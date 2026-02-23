@@ -1,0 +1,7 @@
+Matrix Timestamp: 2026-02-22T05:09:13.509Z
+Profiles: 2/2 success (100.0%)
+Failed Profiles: none
+Fallback Used: relay
+Profile Results:
+- direct: ok=true candidate=direct fallback=false connect_rate=1.000 message_rate=1.000
+- relay: ok=true candidate=direct_fallback fallback=true connect_rate=1.000 message_rate=1.000
