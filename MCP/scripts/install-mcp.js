@@ -38,12 +38,12 @@ function usage() {
     .join('\n');
   const text = `
 Usage:
-  node MCP/scripts/install-mcp.js [options]
+  vdon-mcp-install [options]
 
 Options:
   --uninstall                  Remove MCP server entries instead of installing.
   --name <name>                Server name. Default: vdo-ninja-mcp
-  --server-script <path>       Path to MCP server script. Default: MCP/scripts/vdo-mcp-server.js
+  --server-script <path>       Path to MCP server script. Default: bundled scripts/vdo-mcp-server.js
   --node-cmd <path_or_name>    Node executable used in registered command. Default: current node
   --preset <name>              Registration preset. Default: full
   --server-arg <value>         Extra server argument (repeatable).

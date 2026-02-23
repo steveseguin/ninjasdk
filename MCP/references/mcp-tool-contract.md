@@ -140,23 +140,24 @@ Tools return `isError: true` with:
 Automated registration:
 
 ```bash
-npm run mcp:install
+npm i @vdoninja/mcp @roamhq/wrtc
+npx vdon-mcp-install
 ```
 
 Preset registrations:
 
 ```bash
-npm run mcp:install:core
-npm run mcp:install:file
-npm run mcp:install:state
-npm run mcp:install:secure-core
-npm run mcp:install:secure-full
+npx vdon-mcp-install --preset core
+npx vdon-mcp-install --preset file
+npx vdon-mcp-install --preset state
+npx vdon-mcp-install --preset secure-core
+npx vdon-mcp-install --preset secure-full
 ```
 
 Removal:
 
 ```bash
-npm run mcp:uninstall
+npx vdon-mcp-install --uninstall
 ```
 
 Codex-style:
@@ -165,7 +166,7 @@ Codex-style:
 {
   "name": "vdo-ninja-mcp",
   "command": "node",
-  "args": ["MCP/scripts/vdo-mcp-server.js"]
+  "args": ["node_modules/@vdoninja/mcp/scripts/vdo-mcp-server.js"]
 }
 ```
 
@@ -176,7 +177,7 @@ Claude Code-style:
   "mcpServers": {
     "vdo-ninja-mcp": {
       "command": "node",
-      "args": ["MCP/scripts/vdo-mcp-server.js"]
+      "args": ["node_modules/@vdoninja/mcp/scripts/vdo-mcp-server.js"]
     }
   }
 }

@@ -14,13 +14,13 @@
   "packages": [
     {
       "registryType": "npm",
-      "identifier": "@vdoninja/sdk",
-      "version": "1.3.18",
+      "identifier": "@vdoninja/mcp",
+      "version": "0.4.0",
       "runtimeHint": "node",
       "runtimeArguments": [
         {
           "type": "positional",
-          "value": "MCP/scripts/vdo-mcp-server.js"
+          "value": "scripts/vdo-mcp-server.js"
         }
       ],
       "transport": {
@@ -95,27 +95,27 @@
         "installChannels": [
           {
             "label": "codex-claude-auto",
-            "command": "npm run mcp:install"
+            "command": "npm i @vdoninja/mcp @roamhq/wrtc && npx vdon-mcp-install"
           },
           {
             "label": "custom-local-install",
-            "command": "node MCP/scripts/install-mcp.js --name vdo-ninja-mcp"
+            "command": "npm i @vdoninja/mcp @roamhq/wrtc && npx vdon-mcp-install --name vdo-ninja-mcp"
           },
           {
             "label": "core-install",
-            "command": "npm run mcp:install:core"
+            "command": "npm i @vdoninja/mcp @roamhq/wrtc && npx vdon-mcp-install --preset core"
           },
           {
             "label": "secure-core-install",
-            "command": "node MCP/scripts/install-mcp.js --preset secure-core"
+            "command": "npm i @vdoninja/mcp @roamhq/wrtc && npx vdon-mcp-install --preset secure-core"
           },
           {
             "label": "secure-full-install",
-            "command": "npm run mcp:install:secure-full"
+            "command": "npm i @vdoninja/mcp @roamhq/wrtc && npx vdon-mcp-install --preset secure-full"
           },
           {
             "label": "uninstall",
-            "command": "npm run mcp:uninstall"
+            "command": "npm i @vdoninja/mcp && npx vdon-mcp-install --uninstall"
           }
         ],
         "toolProfiles": {

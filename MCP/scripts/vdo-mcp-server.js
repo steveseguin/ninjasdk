@@ -487,7 +487,7 @@ function parseCliArgs(argv) {
 function cliUsage() {
   return `
 Usage:
-  node MCP/scripts/vdo-mcp-server.js [options]
+  vdon-mcp-server [options]
 
 Options:
   --tool-profile <core|file|state|full>   Default tool profile for this process.
