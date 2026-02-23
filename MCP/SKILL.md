@@ -27,15 +27,18 @@ Use this skill to run VDO.Ninja as an MCP data bridge in Codex, Claude Code, and
 ## Fast Path
 
 1. Install MCP registration:
-`npm run mcp:install`
+`npm i @vdoninja/mcp @roamhq/wrtc`
 
-2. Start server:
-`node MCP/scripts/vdo-mcp-server.js`
+2. Register for Codex/Claude:
+`npx vdon-mcp-install`
 
-3. Optional least-privilege tool profile:
-`VDON_MCP_TOOL_PROFILE=core|file|state|full node MCP/scripts/vdo-mcp-server.js`
+3. Start server:
+`npx vdon-mcp-server`
 
-4. First tool call:
+4. Optional least-privilege tool profile:
+`VDON_MCP_TOOL_PROFILE=core|file|state|full npx vdon-mcp-server`
+
+5. First tool call:
 `{ "name": "vdo_capabilities", "arguments": {} }`
 
 ## Two Primary Workflows
@@ -63,6 +66,7 @@ Use this skill to run VDO.Ninja as an MCP data bridge in Codex, Claude Code, and
 - `require_session_mac`
 
 For secure presets, set `VDON_MCP_JOIN_TOKEN_SECRET` before install/runtime.
+`@vdoninja/mcp` depends on `@vdoninja/sdk`, so SDK installs transitively.
 
 ## AI Agent Contract
 

@@ -1,0 +1,66 @@
+{
+  "name": "@vdoninja/mcp",
+  "version": "0.4.0",
+  "description": "VDO.Ninja MCP bridge for WebRTC data-channel messaging, file transfer, and room sync.",
+  "license": "AGPL-3.0-only",
+  "homepage": "https://github.com/steveseguin/ninjasdk/tree/main/MCP",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/steveseguin/ninjasdk.git",
+    "directory": "MCP"
+  },
+  "bugs": {
+    "url": "https://github.com/steveseguin/ninjasdk/issues"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "vdo.ninja",
+    "webrtc",
+    "data-channel",
+    "p2p",
+    "ai"
+  ],
+  "bin": {
+    "vdon-mcp-install": "scripts/install-mcp.js",
+    "vdon-mcp-server": "scripts/vdo-mcp-server.js",
+    "vdon-mcp-http": "scripts/vdo-mcp-streamable-http.js",
+    "vdon-mcp-demo-message": "scripts/demo-message-workflow.js",
+    "vdon-mcp-demo-file": "scripts/demo-file-workflow.js"
+  },
+  "scripts": {
+    "mcp:install": "node scripts/install-mcp.js",
+    "mcp:server": "node scripts/vdo-mcp-server.js",
+    "mcp:http": "node scripts/vdo-mcp-streamable-http.js",
+    "demo:message": "node scripts/demo-message-workflow.js",
+    "demo:file": "node scripts/demo-file-workflow.js"
+  },
+  "files": [
+    "SKILL.md",
+    "server.json",
+    "assets/cloudflare/worker-proxy.js",
+    "assets/cloudflare/wrangler.toml.example",
+    "references/advanced-diagnostics.md",
+    "references/mcp-tool-contract.md",
+    "references/quickstart-and-compat.md",
+    "references/vdo-ninja-p2p-data-notes.md",
+    "scripts/demo-file-workflow.js",
+    "scripts/demo-message-workflow.js",
+    "scripts/install-mcp.js",
+    "scripts/vdo-data-bridge.js",
+    "scripts/vdo-mcp-server.js",
+    "scripts/vdo-mcp-streamable-http.js",
+    "scripts/lib/bridge-session.js",
+    "scripts/lib/bridge-utils.js",
+    "scripts/lib/fake-network-sdk.js",
+    "scripts/lib/load-vdo-sdk.js",
+    "scripts/lib/mcp-stdio-parser.js",
+    "scripts/lib/tool-profiles.js"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@vdoninja/sdk": "^1.3.18"
+  }
+}

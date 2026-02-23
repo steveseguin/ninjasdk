@@ -29,7 +29,8 @@ function average(values) {
 }
 
 function hasWebRTCSupport() {
-  const VDONinjaSDK = require('../../vdoninja-sdk-node.js');
+  const { loadVDONinjaSDK } = require('../scripts/lib/load-vdo-sdk');
+  const VDONinjaSDK = loadVDONinjaSDK();
   const support = typeof VDONinjaSDK.checkWebRTCSupport === 'function'
     ? VDONinjaSDK.checkWebRTCSupport()
     : [];

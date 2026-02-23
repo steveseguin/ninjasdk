@@ -5,7 +5,7 @@ const fs = require('node:fs');
 const EventEmitter = require('node:events');
 const os = require('node:os');
 const path = require('node:path');
-const VDONinjaSDK = require('../../../vdoninja-sdk-node.js');
+const { loadVDONinjaSDK } = require('./load-vdo-sdk');
 const {
   intFromValue,
   nonNegativeIntFromValue,
@@ -19,6 +19,8 @@ const {
   safeJsonParse,
   generateShortId
 } = require('./bridge-utils');
+
+const VDONinjaSDK = loadVDONinjaSDK();
 
 const PROTOCOL_MAGIC = 'vdo_mcp_bridge_v1';
 const MAX_PROTOCOL_EVENTS = 4000;

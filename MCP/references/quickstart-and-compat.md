@@ -10,22 +10,35 @@ This is the fast path for users and AI agents.
 
 ## 60-Second Setup
 
-Install MCP registration for Codex and Claude:
+Install locally (no clone), including a Node WebRTC implementation:
 
 ```bash
-npm run mcp:install
+npm i @vdoninja/mcp @roamhq/wrtc
+```
+
+Register MCP for Codex/Claude:
+
+```bash
+npx vdon-mcp-install
 ```
 
 Start the local MCP server:
 
 ```bash
-node MCP/scripts/vdo-mcp-server.js
+npx vdon-mcp-server
 ```
 
 Optional least-privilege profile:
 
 ```bash
-VDON_MCP_TOOL_PROFILE=core node MCP/scripts/vdo-mcp-server.js
+VDON_MCP_TOOL_PROFILE=core npx vdon-mcp-server
+```
+
+Repo-local equivalents still work when developing in this repo:
+
+```bash
+npm run mcp:install
+node MCP/scripts/vdo-mcp-server.js
 ```
 
 AI-first sanity check (recommended first call):
@@ -76,13 +89,13 @@ AI-first sanity check (recommended first call):
 Runnable demo script:
 
 ```bash
-npm run mcp:demo:message
+npx vdon-mcp-demo-message
 ```
 
 For live network mode instead of fake/local demo mode:
 
 ```bash
-MCP_DEMO_FAKE=0 MCP_DEMO_FORCE_TURN=1 npm run mcp:demo:message
+MCP_DEMO_FAKE=0 MCP_DEMO_FORCE_TURN=1 npx vdon-mcp-demo-message
 ```
 
 ## Workflow B: File Send/Receive
@@ -131,13 +144,13 @@ MCP_DEMO_FAKE=0 MCP_DEMO_FORCE_TURN=1 npm run mcp:demo:message
 Runnable demo script:
 
 ```bash
-npm run mcp:demo:file
+npx vdon-mcp-demo-file
 ```
 
 For live network mode:
 
 ```bash
-MCP_DEMO_FAKE=0 MCP_DEMO_FORCE_TURN=1 npm run mcp:demo:file
+MCP_DEMO_FAKE=0 MCP_DEMO_FORCE_TURN=1 npx vdon-mcp-demo-file
 ```
 
 ## Security Baseline
@@ -176,6 +189,7 @@ npm run test:mcp:all
 - Codex and Claude Code both work via command-based local MCP registration.
 - Registry metadata is in `MCP/server.json`.
 - Tool contracts are in `MCP/references/mcp-tool-contract.md`.
+- `@vdoninja/mcp` depends on `@vdoninja/sdk`, so SDK is installed transitively.
 
 ## Optional Advanced Diagnostics
 

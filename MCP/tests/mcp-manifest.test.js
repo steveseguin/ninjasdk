@@ -29,7 +29,7 @@ function run() {
   const stdioPackage = manifest.packages.find((pkg) => pkg.transport && pkg.transport.type === 'stdio');
   assert.ok(stdioPackage, 'expected at least one stdio package');
   assert.equal(stdioPackage.registryType, 'npm');
-  assert.equal(stdioPackage.identifier, '@vdoninja/sdk');
+  assert.equal(stdioPackage.identifier, '@vdoninja/mcp');
 
   const envVars = new Set((stdioPackage.environmentVariables || []).map((item) => item.name));
   assert.ok(envVars.has('VDON_MCP_TOOL_PROFILE'));
