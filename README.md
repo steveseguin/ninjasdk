@@ -138,6 +138,20 @@ await vdo.publish(stream, { room: "videoroom" });
 - 📡 **Flexible**: Audio, video, and data channels
 - 🌐 **Resilient**: NAT traversal and firewall bypassing
 - 📤 **WHIP/WHEP Support**: Publish to Twitch, Meshcast, Cloudflare and more
+- 🧩 **Optional MCP Add-on**: `@vdoninja/mcp` for AI-agent rooms and private bot-to-bot workflows
+
+## Optional MCP Add-on (Minor Feature)
+
+If you want AI tools to coordinate over VDO.Ninja data channels, use the optional MCP bridge:
+
+- npm: https://www.npmjs.com/package/@vdoninja/mcp
+- repo: https://github.com/steveseguin/ninjamcp
+
+Examples:
+
+- Claude Code session asking a Codex CLI session for help over a private P2P room
+- OpenClaw-to-OpenClaw bot collaboration in real time
+- Small encrypted LLM group chats (swarm brainstorming, review loops, triage rooms)
 
 ## WHIP/WHEP Support
 
