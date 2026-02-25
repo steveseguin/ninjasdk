@@ -564,7 +564,7 @@ await vdo.announce({ streamID: 'langchain_bot' });
 - **VDO.Ninja**: Full video production suite using this SDK
 - **Social Stream Ninja**: Social media aggregator migrating to SDK
 - **Raspberry Ninja**: Python implementation for IoT devices
-- **Vibe Coding MCP**: Model Context Protocol for AI systems (coming soon)
+- **VDO.Ninja MCP**: Model Context Protocol bridge for AI systems (`@vdoninja/mcp`) - https://github.com/steveseguin/ninjamcp
 
 ## License
 

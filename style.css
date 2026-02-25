@@ -741,6 +741,39 @@ pre code {
     margin-bottom: 1rem;
 }
 
+.ai-mcp-mini {
+    background: rgba(99, 102, 241, 0.08);
+    border: 1px solid rgba(99, 102, 241, 0.28);
+    border-radius: 0.75rem;
+    padding: 1.25rem;
+    margin-bottom: 2rem;
+}
+
+.ai-mcp-mini h4 {
+    color: var(--primary-color);
+    margin-bottom: 0.5rem;
+}
+
+.ai-mcp-mini p {
+    color: var(--text-secondary);
+    margin-bottom: 0.75rem;
+}
+
+.ai-mcp-list {
+    margin: 0 0 1rem 1.25rem;
+    color: var(--text-secondary);
+}
+
+.ai-mcp-list li {
+    margin-bottom: 0.4rem;
+}
+
+.ai-mcp-actions {
+    margin-bottom: 0;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+}
+
 .nav-ai {
     background: rgba(99, 102, 241, 0.1);
     padding: 0.25rem 0.75rem;
