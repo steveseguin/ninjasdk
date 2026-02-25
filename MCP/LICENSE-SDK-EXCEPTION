@@ -1,0 +1,54 @@
+VDO.Ninja MCP Unmodified Distribution Exception
+==============================================
+
+This document grants an additional permission under Section 7 of the GNU Affero
+General Public License version 3 (AGPL-3.0-only) for the VDO.Ninja MCP package.
+
+1. Covered MCP Files
+--------------------
+This exception applies only to files distributed as part of an official
+`@vdoninja/mcp` package release (the "Covered MCP Files"), including files
+listed in the package's published `files` allowlist.
+
+2. Official Distributions
+-------------------------
+An "Official Distribution" of Covered MCP Files means a copy distributed by
+Steve Seguin as part of:
+
+- the npm package `@vdoninja/mcp@X.Y.Z` (a specific published version), and/or
+- a tagged release `vX.Y.Z` of:
+  - https://github.com/steveseguin/ninjasdk (directory `MCP/`), or
+  - https://github.com/steveseguin/ninjamcp
+
+and any byte-for-byte identical mirror of that exact Official Distribution.
+
+3. Unmodified
+-------------
+"Unmodified" means byte-for-byte identical to an Official Distribution of the
+same Covered MCP File, including preservation of any license notices.
+
+4. Additional Permission
+------------------------
+Notwithstanding the other terms of the AGPL-3.0-only, you are granted permission
+to use, copy, combine, bundle, link, and convey the Covered MCP Files in
+Unmodified form as part of a larger work (a "Larger Work"), and to convey that
+Larger Work under terms of your choice (including proprietary terms), without
+requiring that the Larger Work as a whole be licensed under the AGPL.
+
+5. Conditions
+-------------
+This additional permission applies only if:
+
+- the Covered MCP Files are Unmodified; and
+- you comply with the AGPL-3.0-only requirements applicable to conveying verbatim
+  copies of the Covered MCP Files (including preserving notices and providing
+  recipients a copy of the AGPL license).
+
+6. Modified Versions
+--------------------
+If you modify any Covered MCP File, this additional permission does not apply to
+that modified file or to any Larger Work that includes that modified file.
+
+7. No Other Permissions
+-----------------------
+This exception grants no rights beyond those stated above.
