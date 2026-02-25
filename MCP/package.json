@@ -36,6 +36,8 @@
     "demo:file": "node scripts/demo-file-workflow.js"
   },
   "files": [
+    "LICENSE",
+    "LICENSE-SDK-EXCEPTION",
     "SKILL.md",
     "server.json",
     "assets/cloudflare/worker-proxy.js",

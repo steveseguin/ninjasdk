@@ -90,10 +90,22 @@ async function main() {
         serverA.callTool('vdo_status', { session_id: sessionA }),
         serverB.callTool('vdo_status', { session_id: sessionB })
       ]);
-      return statusA.connected && statusB.connected;
+      return (
+        statusA.connected &&
+        statusB.connected &&
+        statusA.peer_count > 0 &&
+        statusB.peer_count > 0
+      );
     }, connectTimeoutMs, 200);
     if (!connected) {
-      throw new Error('demo-file connect timeout');
+      const [statusA, statusB] = await Promise.all([
+        serverA.callTool('vdo_status', { session_id: sessionA }),
+        serverB.callTool('vdo_status', { session_id: sessionB })
+      ]);
+      throw new Error(
+        `demo-file connect timeout (peer_count a=${statusA.peer_count} b=${statusB.peer_count} ` +
+        `connected a=${statusA.connected} b=${statusB.connected})`
+      );
     }
 
     const payload = Buffer.from(fileText, 'utf8').toString('base64');
