@@ -407,6 +407,69 @@ test('publisher accepts the existing WSS iceRestartRequest relay shape', async (
   assert.equal(connection.dataChannel.sent[0].description.type, 'offer');
 });
 
+test('viewer restart fallback completes a round trip through Gemini generic routing', async () => {
+  const viewer = makeSDK();
+  const publisher = makeSDK();
+  const publisherConnection = await publisher._createConnection('viewer-client', 'publisher');
+  publisherConnection.streamID = 'camera';
+  publisherConnection.session = 'session-gemini';
+
+  const clients = new Map([
+    ['viewer-client', viewer],
+    ['publisher-client', publisher]
+  ]);
+  const routeLikeGemini = async (senderUUID, message) => {
+    // Mirrors hss/gemini.js: messages without request are routed by UUID,
+    // and UUID is replaced with the sender before delivery.
+    if (message.request || !message.UUID) return false;
+    const destination = clients.get(message.UUID);
+    if (!destination) return false;
+    await destination._handleSignalingMessage({ ...message, UUID: senderUUID });
+    return true;
+  };
+
+  viewer.signaling = {
+    readyState: global.WebSocket.OPEN,
+    send(value) {
+      const message = JSON.parse(value);
+      void routeLikeGemini('viewer-client', message);
+    }
+  };
+  const viewerConnection = await viewer._createConnection('publisher-client', 'viewer');
+  viewerConnection.dataChannel = null;
+
+  assert.equal(await viewer._requestConnectionICERestart(viewerConnection, 'test'), true);
+  await wait(0);
+  assert.deepEqual(publisherConnection.pc.lastOfferOptions, { iceRestart: true });
+  assert.equal(publisherConnection.dataChannel.sent.length, 1);
+  assert.equal(publisherConnection.dataChannel.sent[0].description.type, 'offer');
+});
+
+test('official Gemini source retains the signaling contracts used by the SDK', (t) => {
+  const candidates = [
+    process.env.VDONINJA_ROOT,
+    path.resolve(__dirname, '../../vdoninja')
+  ].filter(Boolean);
+  const geminiPath = candidates
+    .map(root => path.join(root, 'hss', 'gemini.js'))
+    .find(candidate => fs.existsSync(candidate));
+
+  if (!geminiPath) {
+    t.skip('Set VDONINJA_ROOT or place vdoninja beside ninjasdk for source compatibility checks');
+    return;
+  }
+
+  const source = fs.readFileSync(geminiPath, 'utf8');
+  assert.match(source, /if\s*\(\s*!data\.request\s*\)/, 'generic relay branch missing');
+  assert.match(source, /const\s+dst_uuid\s*=\s*data\.UUID/, 'generic relay no longer routes by UUID');
+  assert.match(source, /data\.UUID\s*=\s*uuid/, 'generic relay no longer rewrites UUID to the sender');
+  assert.match(source, /safeSend\(dst_ws,\s*JSON\.stringify\(data\)\)/, 'generic relay delivery changed');
+
+  for (const request of ['joinroom', 'seed', 'play']) {
+    assert.match(source, new RegExp(`case ["']${request}["']`), `Gemini no longer accepts ${request}`);
+  }
+});
+
 test('relay escalation is local configuration only and remains reversible', async () => {
   const sdk = makeSDK();
   const connection = await sdk._createConnection('peer-c', 'publisher');
@@ -447,6 +510,45 @@ test('stopViewing cancels only that view and does not disable global reconnects'
   assert.equal(sdk._intentionalDisconnect, false);
   assert.equal(sdk._connectionIntent.views.has('one'), false);
   assert.equal(sdk._connectionIntent.views.has('two'), true);
+});
+
+test('stopViewing follows VDO.Ninja by sending bye on the established peer path only', async () => {
+  const sdk = makeSDK();
+  const signalingMessages = [];
+  sdk.signaling = {
+    readyState: global.WebSocket.OPEN,
+    send(value) { signalingMessages.push(JSON.parse(value)); }
+  };
+  const connection = await sdk._createConnection('publisher-bye', 'viewer');
+  connection.streamID = 'camera';
+  connection.dataChannel = new MockDataChannel();
+  const dataChannel = connection.dataChannel;
+
+  sdk.stopViewing('camera');
+  await wait(0);
+
+  assert.deepEqual(dataChannel.sent, [{ bye: true }]);
+  assert.deepEqual(signalingMessages, []);
+  assert.equal(connection.pc.closed, true);
+});
+
+test('disconnect sends peer-path bye before closing signaling and peer connections', async () => {
+  const sdk = makeSDK();
+  const connection = await sdk._createConnection('peer-disconnect', 'publisher');
+  let signalingClosed = false;
+  sdk.signaling = {
+    readyState: global.WebSocket.OPEN,
+    close() { signalingClosed = true; }
+  };
+
+  sdk.disconnect();
+  await wait(0);
+
+  assert.deepEqual(connection.dataChannel.sent, [{ bye: true }]);
+  assert.equal(connection.pc.closed, true);
+  assert.equal(signalingClosed, true);
+  assert.equal(sdk.connections.size, 0);
+  assert.equal(sdk.state.connected, false);
 });
 
 test('iframe-style room listing is an additive local event', async () => {

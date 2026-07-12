@@ -46,6 +46,18 @@ jobs:
     
     steps:
     - uses: actions/checkout@v4
+
+    - name: Check out VDO.Ninja signaling reference
+      uses: actions/checkout@v4
+      with:
+        repository: steveseguin/vdoninja
+        path: ecosystem/vdoninja
+
+    - name: Check out Social Stream compatibility consumer
+      uses: actions/checkout@v4
+      with:
+        repository: steveseguin/social_stream
+        path: ecosystem/social_stream
     
     - name: Setup Node.js
       uses: actions/setup-node@v4
@@ -58,9 +70,13 @@ jobs:
         npm install ${{ matrix.webrtc-lib }}
     
     - name: Run tests
+      env:
+        VDONINJA_ROOT: ${{ github.workspace }}/ecosystem/vdoninja
+        SOCIAL_STREAM_ROOT: ${{ github.workspace }}/ecosystem/social_stream
       run: |
         npm test
         npm run test:reliability
+        node --test tests/social-stream-compatibility.test.js
       
   version:
     needs: test  # Only run if tests pass
