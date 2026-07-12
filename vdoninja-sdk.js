@@ -510,6 +510,12 @@ const OUTBOUND_VIDEO_STOP_MUTE_DELAY_MS = 500;
          * @param {number} options.reconnectDelay - Initial reconnection delay in ms (default: 1000)
          * @param {boolean} options.autoPingViewer - Enable viewer-side auto ping (default: false)
          * @param {number} options.autoPingInterval - Auto ping interval in ms (default: 10000)
+         * @param {boolean} options.autoRecover - Recover failed peer directions automatically (default: true)
+         * @param {boolean} options.autoRelay - Temporarily escalate failed direct paths to TURN (default: true)
+         * @param {number} options.disconnectGracePeriod - ICE disconnected grace period in ms (default: 5000)
+         * @param {number} options.connectionTimeout - Initial peer connection timeout in ms (default: 20000)
+         * @param {number} options.recoveryTimeout - Wait between recovery phases in ms (default: 12000)
+         * @param {number} options.relayRestoreDelay - Delay before restoring direct-first ICE policy (default: 45000)
          */
         constructor(options = {}) {
             super();
@@ -631,6 +637,29 @@ const OUTBOUND_VIDEO_STOP_MUTE_DELAY_MS = 500;
             this._maxReconnectAttempts = options.maxReconnectAttempts || 5;
             this._reconnectDelay = options.reconnectDelay || 1000;
             this._reconnectTimer = null;
+
+            // Desired application state is kept separately from transient transport
+            // state.  A WebSocket reconnect gets a new HSS UUID, so room, seed, and
+            // play intent must be replayed using the existing VDO.Ninja protocol.
+            this._connectionIntent = {
+                room: null,
+                publishing: null,
+                views: new Map()
+            };
+            this._stoppedViews = new Set();
+            this._restoringIntent = false;
+
+            // Peer recovery is local-only and uses the existing SDP/ICE messages.
+            this.autoRecover = options.autoRecover !== false;
+            this.autoRelay = options.autoRelay !== false;
+            this.disconnectGracePeriod = Number.isFinite(options.disconnectGracePeriod) ?
+                Math.max(0, options.disconnectGracePeriod) : 5000;
+            this.recoveryTimeout = Number.isFinite(options.recoveryTimeout) ?
+                Math.max(1000, options.recoveryTimeout) : 12000;
+            this.connectionTimeout = Number.isFinite(options.connectionTimeout) ?
+                Math.max(1000, options.connectionTimeout) : 20000;
+            this.relayRestoreDelay = Number.isFinite(options.relayRestoreDelay) ?
+                Math.max(0, options.relayRestoreDelay) : 45000;
             
             // Internal flags
             this._isReconnecting = false;
@@ -745,7 +774,7 @@ const OUTBOUND_VIDEO_STOP_MUTE_DELAY_MS = 500;
             this._intentionalDisconnect = false;
             
             // Merge options
-            if (options.host) this.host = options.host;
+            if (options.host || options.wss) this.host = options.host || options.wss;
             if (options.room) this.room = this._sanitizeRoomName(options.room);
             else if (this._pendingRoomID) this.room = this._sanitizeRoomName(this._pendingRoomID);
             // Sanitize and apply password only if explicitly provided
@@ -772,9 +801,12 @@ const OUTBOUND_VIDEO_STOP_MUTE_DELAY_MS = 500;
                     this.signaling.onopen = () => {
                         this._log('WebSocket connected');
                         this.state.connected = true;
-                        this._reconnectAttempts = 0;
+                        if (!this._isReconnecting) {
+                            this._reconnectAttempts = 0;
+                        }
                         
                         this._emit('connected');
+                        this._emitIframeCompatible('hss-connection', 'connected');
                         
                         resolve();
                     };
@@ -798,11 +830,13 @@ const OUTBOUND_VIDEO_STOP_MUTE_DELAY_MS = 500;
                     this.signaling.onclose = () => {
                         this._log('WebSocket closed');
                         this.state.connected = false;
-                        // Reset per-connection states
+                        // These describe the current socket generation. Desired room,
+                        // publishing, and viewing state remains in _connectionIntent.
                         this.state.roomJoined = false;
                         this.state.publishing = false;
                         
                         this._emit('disconnected');
+                        this._emitIframeCompatible('hss-connection', 'closed');
                         
                         if (!this._intentionalDisconnect && this._reconnectAttempts < this._maxReconnectAttempts) {
                             this._attemptReconnect();
@@ -822,6 +856,21 @@ const OUTBOUND_VIDEO_STOP_MUTE_DELAY_MS = 500;
         disconnect() {
             this._log('Disconnecting...');
             this._intentionalDisconnect = true;
+
+            // disconnect() has always represented a full local teardown. Do not
+            // restore room/publish/view intent after a later explicit connect().
+            if (this._connectionIntent) {
+                this._connectionIntent.room = null;
+                this._connectionIntent.publishing = null;
+                if (this._connectionIntent.views) this._connectionIntent.views.clear();
+            }
+            if (this._stoppedViews) this._stoppedViews.clear();
+            if (this._failedViewerConnections) {
+                for (const failed of this._failedViewerConnections.values()) {
+                    if (failed && failed.timer) clearTimeout(failed.timer);
+                }
+                this._failedViewerConnections.clear();
+            }
             
             // Clear reconnect timer
             if (this._reconnectTimer) {
@@ -880,6 +929,8 @@ const OUTBOUND_VIDEO_STOP_MUTE_DELAY_MS = 500;
                         if (connection) {
                             // Stop ping monitoring
                             this._stopPingMonitoring(connection);
+                            this._clearConnectionRecoveryTimers(connection);
+                            connection._finalized = true;
                             // Close peer connection
                             if (connection.pc) {
                                 connection.pc.close();
@@ -938,23 +989,11 @@ const OUTBOUND_VIDEO_STOP_MUTE_DELAY_MS = 500;
             this._reconnectTimer = setTimeout(async () => {
                 try {
                     await this.connect();
-                    
-                    // Rejoin room if we were in one
-                    if (this.state.room) {
-                        await this.joinRoom({ 
-                            room: this.state.room, 
-                            password: this.password 
-                        });
-                    }
-                    
-                    // Re-publish if we were publishing
-                    if (this.state.publishing && this.localStream) {
-                        await this.publish(this.localStream, { 
-                            streamID: this.state.streamID 
-                        });
-                    }
+
+                    await this._restoreConnectionIntent();
                     
                     this._emit('reconnected');
+                    this._reconnectAttempts = 0;
                     this._isReconnecting = false;
                     
                 } catch (error) {
@@ -968,6 +1007,55 @@ const OUTBOUND_VIDEO_STOP_MUTE_DELAY_MS = 500;
                     }
                 }
             }, delay);
+        }
+
+        /**
+         * Replay desired state after an HSS socket reconnect. This deliberately
+         * uses only joinroom, seed, and play messages already used by VDO.Ninja.
+         * @private
+         */
+        async _restoreConnectionIntent() {
+            if (this._restoringIntent) return;
+            this._restoringIntent = true;
+
+            try {
+                const intent = this._connectionIntent || {};
+
+                if (intent.room && intent.room.room) {
+                    await this.joinRoom({
+                        ...intent.room.options,
+                        room: intent.room.room,
+                        password: intent.room.password
+                    });
+                }
+
+                if (intent.publishing && intent.publishing.active) {
+                    const publishing = intent.publishing;
+                    const options = {
+                        ...publishing.options,
+                        streamID: publishing.streamID
+                    };
+                    if (publishing.dataOnly) {
+                        await this.announce(options);
+                    } else if (publishing.stream) {
+                        await this.publish(publishing.stream, options);
+                    }
+                }
+
+                if (intent.views && typeof intent.views.entries === 'function') {
+                    for (const [streamID, viewOptions] of intent.views.entries()) {
+                        if (this._stoppedViews && this._stoppedViews.has(streamID)) continue;
+                        // Start each play restoration without serially waiting up to
+                        // the view timeout for unavailable peers.
+                        this.view(streamID, { ...viewOptions, _intentReplay: true }).catch(error => {
+                            this._log('Failed to restore view intent for', streamID, error.message || error);
+                            this._setupViewRetry(streamID, viewOptions, 2000);
+                        });
+                    }
+                }
+            } finally {
+                this._restoringIntent = false;
+            }
         }
 
 
@@ -1052,6 +1140,12 @@ const OUTBOUND_VIDEO_STOP_MUTE_DELAY_MS = 500;
                 throw new Error('Room name is required');
             }
 
+            this._connectionIntent.room = {
+                room,
+                password,
+                options: { claim: !!options.claim }
+            };
+
             // Store password for later use, converting empty string to default
             if (password === '') {
                 this.password = this._sanitizePassword("someEncryptionKey123");
@@ -1123,6 +1217,7 @@ const OUTBOUND_VIDEO_STOP_MUTE_DELAY_MS = 500;
             const previousRoom = this.state.room;
             this.state.room = null;
             this.state.roomJoined = false;
+            if (this._connectionIntent) this._connectionIntent.room = null;
 
             this._emit('roomLeft', { room: previousRoom });
         }
@@ -1232,6 +1327,14 @@ const OUTBOUND_VIDEO_STOP_MUTE_DELAY_MS = 500;
             this._log('Sending seed message for streamID:', hashedStreamID);
             this._sendMessageWS(seedMessage);
 
+            this._connectionIntent.publishing = {
+                active: true,
+                dataOnly: false,
+                stream: this.localStream,
+                streamID,
+                options: { ...options, streamID }
+            };
+
             this._emit('publishing', { streamID, hashedStreamID });
             
             // Add our own stream to tracking
@@ -1333,6 +1436,14 @@ const OUTBOUND_VIDEO_STOP_MUTE_DELAY_MS = 500;
 
             this._sendMessageWS(seedMessage);
 
+            this._connectionIntent.publishing = {
+                active: true,
+                dataOnly: true,
+                stream: null,
+                streamID,
+                options: { ...options, streamID }
+            };
+
             this._emit('publishing', { streamID, hashedStreamID, dataOnly: true });
 
             return streamID;
@@ -1342,7 +1453,10 @@ const OUTBOUND_VIDEO_STOP_MUTE_DELAY_MS = 500;
          * Stop publishing
          */
         stopPublishing() {
-            if (!this.state.publishing) {
+            const hadPublishingIntent = !!(this._connectionIntent && this._connectionIntent.publishing);
+            if (this._connectionIntent) this._connectionIntent.publishing = null;
+
+            if (!this.state.publishing && !hadPublishingIntent) {
                 this._log('Not currently publishing');
                 return;
             }
@@ -1397,6 +1511,8 @@ const OUTBOUND_VIDEO_STOP_MUTE_DELAY_MS = 500;
                     if (connection) {
                         // Stop ping monitoring
                         this._stopPingMonitoring(connection);
+                        this._clearConnectionRecoveryTimers(connection);
+                        connection._finalized = true;
                         
                         if (connection.pc) {
                             connection.pc.close();
@@ -1479,6 +1595,11 @@ const OUTBOUND_VIDEO_STOP_MUTE_DELAY_MS = 500;
                     return options || {};
                 })();
 
+                const rememberedOptions = { ...normalizedOptions };
+                delete rememberedOptions._intentReplay;
+                this._connectionIntent.views.set(streamID, rememberedOptions);
+                this._stoppedViews.delete(streamID);
+
                 // Track pending view so we know we initiated this
                 this._pendingViews.set(streamID, {
                     options: normalizedOptions,
@@ -1544,7 +1665,7 @@ const OUTBOUND_VIDEO_STOP_MUTE_DELAY_MS = 500;
          * @param {string} streamID - The stream ID to retry
          * @param {Object} options - View options
          */
-        _setupViewRetry(streamID, options) {
+        _setupViewRetry(streamID, options, delay = this._viewRetryInterval) {
             // Clear any existing retry timer for this stream
             if (this._viewRetryTimers.has(streamID)) {
                 clearTimeout(this._viewRetryTimers.get(streamID));
@@ -1561,7 +1682,7 @@ const OUTBOUND_VIDEO_STOP_MUTE_DELAY_MS = 500;
                         this._log('Retry view error:', err.message);
                     });
                 }
-            }, this._viewRetryInterval);
+            }, delay);
             
             this._viewRetryTimers.set(streamID, retryTimer);
         }
@@ -1571,8 +1692,11 @@ const OUTBOUND_VIDEO_STOP_MUTE_DELAY_MS = 500;
          * @param {string} streamID - The stream ID to stop viewing
          */
         stopViewing(streamID) {
-            // Mark as intentional disconnect
-            this._intentionalDisconnect = true;
+            streamID = this._sanitizeStreamID(streamID);
+            if (this._connectionIntent && this._connectionIntent.views) {
+                this._connectionIntent.views.delete(streamID);
+            }
+            if (this._stoppedViews) this._stoppedViews.add(streamID);
             
             // Cancel any retry timer for this stream
             if (this._viewRetryTimers.has(streamID)) {
@@ -1585,6 +1709,8 @@ const OUTBOUND_VIDEO_STOP_MUTE_DELAY_MS = 500;
             
             // Remove from failed connections if present
             if (this._failedViewerConnections) {
+                const failed = this._failedViewerConnections.get(streamID);
+                if (failed && failed.timer) clearTimeout(failed.timer);
                 this._failedViewerConnections.delete(streamID);
             }
             
@@ -1630,6 +1756,8 @@ const OUTBOUND_VIDEO_STOP_MUTE_DELAY_MS = 500;
                 for (const [uuid, connections] of this.connections) {
                     const viewerConnection = connections.viewer;
                     if (viewerConnection && viewerConnection.streamID === streamID) {
+                        this._clearConnectionRecoveryTimers(viewerConnection);
+                        viewerConnection._finalized = true;
                         if (viewerConnection.pc) {
                             viewerConnection.pc.close();
                         }
@@ -1643,9 +1771,6 @@ const OUTBOUND_VIDEO_STOP_MUTE_DELAY_MS = 500;
                 }
 
                 this._emit('viewingStopped', { streamID });
-                
-                // Reset the intentional disconnect flag
-                this._intentionalDisconnect = false;
             });
         }
 
@@ -1703,6 +1828,18 @@ const OUTBOUND_VIDEO_STOP_MUTE_DELAY_MS = 500;
                 pendingPing: null
             };
 
+            connection.healthState = 'connecting';
+            connection.recoveryStage = 0;
+            connection.recovering = false;
+            connection.disconnectTimer = null;
+            connection.recoveryTimer = null;
+            connection.connectTimer = null;
+            connection.relayRestoreTimer = null;
+            connection.relayEscalated = false;
+            connection.originalConfiguration = null;
+            connection._peerConnectedEmitted = false;
+            connection._finalized = false;
+
             // Add any additional properties from options
             if (options) {
                 if (options.streamID) connection.streamID = options.streamID;
@@ -1720,27 +1857,13 @@ const OUTBOUND_VIDEO_STOP_MUTE_DELAY_MS = 500;
             };
 
             connection.pc.oniceconnectionstatechange = () => {
-                this._log(`ICE state for ${uuid}:`, connection.pc.iceConnectionState);
-                
-                if (connection.pc.iceConnectionState === 'connected') {
-                    // Update stream state to connected
-                    if (connection.streamID && this.streams.has(connection.streamID)) {
-                        const stream = this.streams.get(connection.streamID);
-                        stream.state = 'connected';
-                        stream.lastSeen = Date.now();
-                        if (connection.uuid) stream.uuid = connection.uuid;
-                    }
-                    this._emit('peerConnected', { uuid, connection });
-                } else if (connection.pc.iceConnectionState === 'failed' || 
-                           connection.pc.iceConnectionState === 'disconnected') {
-                    // Update stream state to disconnected/failed
-                    if (connection.streamID && this.streams.has(connection.streamID)) {
-                        const stream = this.streams.get(connection.streamID);
-                        stream.state = connection.pc.iceConnectionState === 'failed' ? 'failed' : 'disconnected';
-                        stream.lastSeen = Date.now();
-                    }
-                    this._handleConnectionFailed(connection);
-                }
+                this._handlePeerConnectionState(connection, 'ice');
+            };
+
+            // connectionState catches DTLS failures that do not always produce a
+            // distinct ICE transition. Both handlers feed one idempotent state path.
+            connection.pc.onconnectionstatechange = () => {
+                this._handlePeerConnectionState(connection, 'peer');
             };
 
             connection.pc.ontrack = (event) => {
@@ -1776,6 +1899,19 @@ const OUTBOUND_VIDEO_STOP_MUTE_DELAY_MS = 500;
             
             const connections = this.connections.get(uuid);
             connections[type] = connection;
+
+            connection.connectTimer = setTimeout(() => {
+                connection.connectTimer = null;
+                if (!this._isCurrentConnection(connection) || !connection.pc) return;
+                const peerState = connection.pc.connectionState;
+                const iceState = connection.pc.iceConnectionState;
+                if (peerState !== 'connected' && iceState !== 'connected' && iceState !== 'completed') {
+                    this._recoverConnection(connection, 'connect-timeout');
+                }
+            }, this.connectionTimeout);
+            if (connection.connectTimer && typeof connection.connectTimer.unref === 'function') {
+                connection.connectTimer.unref();
+            }
             
             return connection;
         }
@@ -2490,44 +2626,14 @@ const OUTBOUND_VIDEO_STOP_MUTE_DELAY_MS = 500;
                         }
                     } else if (msg.iceRestartRequest) {
                         this._log('Received ICE restart request via data channel');
-                        // Handle ICE restart
-                        if (connection.pc && connection.pc.restartIce) {
-                            connection.pc.restartIce();
-                        } else {
-                            // Create new offer with ICE restart
-                            const offer = await connection.pc.createOffer({ iceRestart: true });
-                            await connection.pc.setLocalDescription(offer);
-                            
-                            const offerMsg = {
-                                UUID: connection.uuid,
-                                session: connection.session,
-                                streamID: connection.streamID
-                            };
-                            
-                            // Encrypt and send via data channel
-                            if (this._getEffectivePassword() !== null) {
-                                try {
-                                    const [encrypted, vector] = await this._encryptMessage(JSON.stringify(offer));
-                            const restartMsg = { 
-                                UUID: connection.uuid,
-                                description: encrypted,
-                                vector: vector,
-                                session: connection.session
-                            };
-                                    this._logMessage('OUT', restartMsg, 'DataChannel');
-                                    channel.send(JSON.stringify(restartMsg));
-                                } catch (error) {
-                                    this._log('Failed to encrypt offer for ICE restart:', error);
-                                }
-                            } else {
-                            const restartMsg = { 
-                                UUID: connection.uuid,
-                                description: offer,
-                                session: connection.session
-                            };
-                                this._logMessage('OUT', restartMsg, 'DataChannel');
-                                channel.send(JSON.stringify(restartMsg));
-                            }
+                        // The publisher owns the offer in VDO.Ninja. Ignore a
+                        // misdirected request rather than letting a viewer create a
+                        // competing offer.
+                        if (connection.type === 'publisher') {
+                            await this._initiateICERestart(connection, 'remote_request', {
+                                skipRemoteRequest: true,
+                                preferDataChannel: true
+                            });
                         }
                     }
                 } catch (error) {
@@ -3323,15 +3429,259 @@ const OUTBOUND_VIDEO_STOP_MUTE_DELAY_MS = 500;
             }, connection.iceBundleDelay);
         }
 
+        _isCurrentConnection(connection) {
+            if (!connection || !this.connections) return false;
+            const pair = this.connections.get(connection.uuid);
+            return !!(pair && pair[connection.type] === connection);
+        }
+
+        _clearConnectionRecoveryTimers(connection) {
+            if (!connection) return;
+            for (const key of ['disconnectTimer', 'recoveryTimer', 'connectTimer', 'relayRestoreTimer']) {
+                if (connection[key]) clearTimeout(connection[key]);
+                connection[key] = null;
+            }
+        }
+
+        _setTrackedStreamState(connection, state) {
+            if (!connection || !connection.streamID || !this.streams.has(connection.streamID)) return;
+            const stream = this.streams.get(connection.streamID);
+            stream.state = state;
+            stream.lastSeen = Date.now();
+            if (connection.uuid) stream.uuid = connection.uuid;
+        }
+
         /**
-         * Handle connection failure
+         * Normalize RTCPeerConnection and ICE state changes into one directional
+         * health path. A transient disconnected state is not a terminal failure.
          * @private
-         * @param {Object} connection - Connection object
          */
-        _handleConnectionFailed(connection) {
+        _handlePeerConnectionState(connection, source = 'ice') {
+            if (!this._isCurrentConnection(connection) || connection._finalized || !connection.pc) return;
+
+            const peerState = connection.pc.connectionState;
+            const iceState = connection.pc.iceConnectionState;
+            let state;
+            if (peerState === 'failed' || iceState === 'failed') {
+                state = 'failed';
+            } else if (peerState === 'disconnected' || iceState === 'disconnected') {
+                state = 'disconnected';
+            } else if (peerState === 'connected' || iceState === 'connected' || iceState === 'completed') {
+                state = 'connected';
+            } else {
+                state = (peerState && peerState !== 'new') ? peerState : iceState;
+            }
+
+            this._log(`${source === 'peer' ? 'Peer' : 'ICE'} state for ${connection.uuid}:`, state);
+
+            if (state === 'connected') {
+                const recovered = connection.recoveryStage > 0 || connection.healthState === 'recovering';
+                this._clearConnectionRecoveryTimers(connection);
+                connection.healthState = 'connected';
+                connection.recovering = false;
+                connection.recoveryStage = 0;
+                this._setTrackedStreamState(connection, 'connected');
+
+                if (!connection._peerConnectedEmitted) {
+                    connection._peerConnectedEmitted = true;
+                    this._emit('peerConnected', { uuid: connection.uuid, connection });
+                    this._emitIframeCompatible(
+                        connection.type === 'publisher' ? 'push-connection' : 'view-connection',
+                        true,
+                        connection.uuid,
+                        connection.streamID
+                    );
+                }
+                if (recovered) {
+                    this._emit('connectionRecovered', {
+                        uuid: connection.uuid,
+                        type: connection.type,
+                        streamID: connection.streamID
+                    });
+                }
+                if (connection.relayEscalated) this._scheduleRelayPolicyRestore(connection);
+                if (connection.type === 'viewer' && connection.streamID && this._failedViewerConnections) {
+                    const failed = this._failedViewerConnections.get(connection.streamID);
+                    if (failed && failed.timer) clearTimeout(failed.timer);
+                    this._failedViewerConnections.delete(connection.streamID);
+                }
+                return;
+            }
+
+            if (state === 'disconnected') {
+                connection.healthState = 'degraded';
+                this._setTrackedStreamState(connection, 'disconnected');
+                if (!connection.disconnectTimer) {
+                    connection.disconnectTimer = setTimeout(() => {
+                        connection.disconnectTimer = null;
+                        if (!this._isCurrentConnection(connection) || !connection.pc) return;
+                        const peerConnected = connection.pc.connectionState === 'connected';
+                        const iceConnected = connection.pc.iceConnectionState === 'connected' ||
+                            connection.pc.iceConnectionState === 'completed';
+                        if (!peerConnected && !iceConnected) {
+                            this._recoverConnection(connection, 'disconnected');
+                        }
+                    }, this.disconnectGracePeriod);
+                    if (connection.disconnectTimer && typeof connection.disconnectTimer.unref === 'function') {
+                        connection.disconnectTimer.unref();
+                    }
+                }
+                return;
+            }
+
+            if (state === 'failed') {
+                if (connection.disconnectTimer) clearTimeout(connection.disconnectTimer);
+                connection.disconnectTimer = null;
+                this._setTrackedStreamState(connection, 'failed');
+                this._recoverConnection(connection, 'failed');
+            }
+        }
+
+        _hasTurnServer(configuration) {
+            const servers = configuration && Array.isArray(configuration.iceServers) ? configuration.iceServers : [];
+            return servers.some(server => {
+                const urls = Array.isArray(server.urls) ? server.urls : [server.urls || server.url];
+                return urls.some(url => typeof url === 'string' && /^turns?:/i.test(url));
+            });
+        }
+
+        _escalateConnectionToRelay(connection) {
+            if (!connection.pc || typeof connection.pc.setConfiguration !== 'function') return false;
+            const current = (typeof connection.pc.getConfiguration === 'function') ?
+                connection.pc.getConfiguration() : this.configuration;
+            if (!this._hasTurnServer(current)) return false;
+            if (current.iceTransportPolicy === 'relay') return true;
+
+            const next = { ...current };
+            if (Array.isArray(current.iceServers) && current.iceServers.length > 1) {
+                next.iceServers = current.iceServers.slice(1).concat(current.iceServers[0]);
+            }
+            next.iceTransportPolicy = 'relay';
+
+            try {
+                connection.pc.setConfiguration(next);
+                connection.originalConfiguration = current;
+                connection.relayEscalated = true;
+                this._emit('relayEscalated', {
+                    uuid: connection.uuid,
+                    type: connection.type,
+                    streamID: connection.streamID
+                });
+                return true;
+            } catch (error) {
+                this._log('Unable to escalate connection to TURN relay:', error.message || error);
+                return false;
+            }
+        }
+
+        _scheduleRelayPolicyRestore(connection) {
+            if (this.forceTURN || !connection.relayEscalated || connection.relayRestoreTimer) return;
+            connection.relayRestoreTimer = setTimeout(() => {
+                connection.relayRestoreTimer = null;
+                if (!this._isCurrentConnection(connection) || !connection.pc || !connection.originalConfiguration) return;
+                try {
+                    connection.pc.setConfiguration(connection.originalConfiguration);
+                    connection.relayEscalated = false;
+                    connection.originalConfiguration = null;
+                    this._emit('relayRestored', {
+                        uuid: connection.uuid,
+                        type: connection.type,
+                        streamID: connection.streamID
+                    });
+                } catch (error) {
+                    this._log('Unable to restore direct ICE policy:', error.message || error);
+                }
+            }, this.relayRestoreDelay);
+        }
+
+        async _requestConnectionICERestart(connection, reason) {
+            if (!connection || !connection.pc) return false;
+
+            // VDO.Ninja's publisher owns the offer. A viewer asks over the existing
+            // sendChannel; it never invents a new WebSocket request type.
+            if (connection.type === 'viewer') {
+                if (!connection.dataChannel || connection.dataChannel.readyState !== 'open') return false;
+                connection.dataChannel.send(JSON.stringify({ iceRestartRequest: true }));
+                this._emit('iceRestart', {
+                    uuid: connection.uuid,
+                    streamID: connection.streamID,
+                    reason
+                });
+                return true;
+            }
+
+            return this._initiateICERestart(connection, reason, { skipRemoteRequest: true });
+        }
+
+        async _recoverConnection(connection, reason) {
+            if (!this._isCurrentConnection(connection) || connection._finalized || connection.recovering) return;
+            if (!this.autoRecover || this._intentionalDisconnect) {
+                this._handleConnectionFailed(connection, reason);
+                return;
+            }
+
+            connection.recovering = true;
+            connection.healthState = 'recovering';
+            if (connection.recoveryTimer) clearTimeout(connection.recoveryTimer);
+            connection.recoveryTimer = null;
+
+            let phase = 'direct';
+            let started = false;
+
+            if (connection.recoveryStage === 0) {
+                connection.recoveryStage = 1;
+                started = await this._requestConnectionICERestart(connection, reason);
+            } else if (connection.recoveryStage === 1 && this.autoRelay) {
+                phase = 'relay';
+                connection.recoveryStage = 2;
+                if (this._escalateConnectionToRelay(connection)) {
+                    started = await this._requestConnectionICERestart(connection, `${reason}-relay`);
+                }
+            }
+
+            if (!started) {
+                connection.recovering = false;
+                this._handleConnectionFailed(connection, reason);
+                return;
+            }
+
+            this._emit('connectionRecovering', {
+                uuid: connection.uuid,
+                type: connection.type,
+                streamID: connection.streamID,
+                reason,
+                phase,
+                attempt: connection.recoveryStage
+            });
+
+            connection.recoveryTimer = setTimeout(() => {
+                connection.recoveryTimer = null;
+                connection.recovering = false;
+                if (!this._isCurrentConnection(connection) || !connection.pc) return;
+                const peerConnected = connection.pc.connectionState === 'connected';
+                const iceConnected = connection.pc.iceConnectionState === 'connected' ||
+                    connection.pc.iceConnectionState === 'completed';
+                if (peerConnected || iceConnected) {
+                    this._handlePeerConnectionState(connection, 'recovery');
+                } else {
+                    this._recoverConnection(connection, `${reason}-timeout`);
+                }
+            }, this.recoveryTimeout);
+            if (connection.recoveryTimer && typeof connection.recoveryTimer.unref === 'function') {
+                connection.recoveryTimer.unref();
+            }
+        }
+
+        /**
+         * Finalize a connection after bounded recovery is exhausted.
+         * @private
+         */
+        _handleConnectionFailed(connection, reason = 'failed') {
+            if (!connection || connection._finalized) return;
+            connection._finalized = true;
             this._log('Connection failed:', connection.uuid, 'type:', connection.type);
 
-            // Stop ping monitoring
+            this._clearConnectionRecoveryTimers(connection);
             this._stopPingMonitoring(connection);
 
             if (connection.pc) {
@@ -3345,10 +3695,18 @@ const OUTBOUND_VIDEO_STOP_MUTE_DELAY_MS = 500;
                     type: connection.type,
                     streamID: connection.streamID
                 });
+                this._emitIframeCompatible(
+                    connection.type === 'publisher' ? 'push-connection' : 'view-connection',
+                    false,
+                    connection.uuid,
+                    connection.streamID
+                );
             } catch (e) {}
 
             // For viewer connections, check if we should retry
-            if (connection.type === 'viewer' && connection.streamID && !this._intentionalDisconnect) {
+            const viewIntent = connection.streamID && this._connectionIntent && this._connectionIntent.views ?
+                this._connectionIntent.views.get(connection.streamID) : null;
+            if (connection.type === 'viewer' && connection.streamID && viewIntent && !this._intentionalDisconnect) {
                 this._log('Viewer connection failed for stream:', connection.streamID);
                 
                 // Store the stream we were viewing for retry
@@ -3357,17 +3715,21 @@ const OUTBOUND_VIDEO_STOP_MUTE_DELAY_MS = 500;
                 }
                 
                 // Track the failed connection with retry info
-                this._failedViewerConnections.set(connection.streamID, {
+                const previous = this._failedViewerConnections.get(connection.streamID);
+                if (previous && previous.timer) clearTimeout(previous.timer);
+                const failed = {
                     uuid: connection.uuid,
-                    viewOptions: connection.viewOptions || {},
-                    retryCount: 0,
-                    lastRetry: Date.now()
-                });
+                    viewOptions: viewIntent || connection.viewOptions || {},
+                    retryCount: previous ? previous.retryCount : 0,
+                    lastRetry: Date.now(),
+                    timer: null
+                };
+                this._failedViewerConnections.set(connection.streamID, failed);
                 
-                // Schedule a retry after a short delay
-                setTimeout(() => {
+                failed.timer = setTimeout(() => {
+                    failed.timer = null;
                     this._retryFailedViewerConnection(connection.streamID);
-                }, 2000); // Wait 2 seconds before retry
+                }, 2000);
             }
 
             // Remove the specific connection type
@@ -3384,7 +3746,8 @@ const OUTBOUND_VIDEO_STOP_MUTE_DELAY_MS = 500;
             this._emit('connectionFailed', {
                 uuid: connection.uuid,
                 type: connection.type,
-                streamID: connection.streamID
+                streamID: connection.streamID,
+                reason
             });
         }
 
@@ -3398,7 +3761,9 @@ const OUTBOUND_VIDEO_STOP_MUTE_DELAY_MS = 500;
             if (!failedConnection) return;
 
             // Check if we should still retry
-            if (this._intentionalDisconnect) {
+            const viewIntent = this._connectionIntent && this._connectionIntent.views ?
+                this._connectionIntent.views.get(streamID) : null;
+            if (this._intentionalDisconnect || !viewIntent || (this._stoppedViews && this._stoppedViews.has(streamID))) {
                 this._failedViewerConnections.delete(streamID);
                 return;
             }
@@ -3408,18 +3773,20 @@ const OUTBOUND_VIDEO_STOP_MUTE_DELAY_MS = 500;
 
             try {
                 // Re-request the stream
-                await this.view(streamID, failedConnection.viewOptions);
-                
-                // Success - remove from failed connections
-                this._failedViewerConnections.delete(streamID);
-                this._log('Successfully reconnected to stream:', streamID);
+                if (!this.state.connected) throw new Error('Signaling server is not connected');
+                const pc = await this.view(streamID, failedConnection.viewOptions);
+                if (!pc) throw new Error('Stream is not available yet');
+                // Keep the retry record until the replacement direction actually
+                // reaches connected; creating a PeerConnection is not recovery.
+                this._log('Replacement connection created for stream:', streamID);
             } catch (error) {
                 this._log('Retry failed for stream:', streamID, error.message);
                 
                 // Schedule another retry with exponential backoff
                 const nextDelay = Math.min(30000, 2000 * Math.pow(2, Math.min(failedConnection.retryCount - 1, 5)));
                 
-                setTimeout(() => {
+                failedConnection.timer = setTimeout(() => {
+                    failedConnection.timer = null;
                     this._retryFailedViewerConnection(streamID);
                 }, nextDelay);
             }
@@ -3552,6 +3919,8 @@ const OUTBOUND_VIDEO_STOP_MUTE_DELAY_MS = 500;
                 // Session mismatch: close and drop, then recreate
                 this._log('Found existing connection with different session:', connection.session, 'vs', msg.session);
                 this._log('Closing old connection due to session mismatch');
+                this._clearConnectionRecoveryTimers(connection);
+                connection._finalized = true;
                 try { connection.pc && connection.pc.close(); } catch (e) {}
                 if (existingConnections) delete existingConnections.viewer;
                 connection = null;
@@ -4141,6 +4510,12 @@ const OUTBOUND_VIDEO_STOP_MUTE_DELAY_MS = 500;
                 
                 // Emit for the whole list
                 this._emit('listing', { list: cleanList, raw: msg });
+                this._emitIframeCompatible('room-peer-listing', {
+                    list: cleanList,
+                    director: msg.director || false,
+                    claim: Object.prototype.hasOwnProperty.call(msg, 'claim') ? msg.claim : null,
+                    source: 'listing'
+                });
 
                 // Also emit for each item
                 cleanList.forEach((item, index) => {
@@ -4161,6 +4536,15 @@ const OUTBOUND_VIDEO_STOP_MUTE_DELAY_MS = 500;
                     uuid: msg.UUID,
                     label: msg.label,
                     raw: msg
+                });
+                this._emitIframeCompatible('room-peer-listing', {
+                    list: msg.streamID ? [{
+                        streamID: this._stripHashFromStreamID(msg.streamID),
+                        UUID: msg.UUID
+                    }] : [],
+                    director: msg.director || false,
+                    claim: Object.prototype.hasOwnProperty.call(msg, 'claim') ? msg.claim : null,
+                    source: 'listing'
                 });
             }
 
@@ -4303,6 +4687,7 @@ const OUTBOUND_VIDEO_STOP_MUTE_DELAY_MS = 500;
                 // Publishing failed - reset state
                 this.state.publishing = false;
                 this.state.streamID = null;
+                if (this._connectionIntent) this._connectionIntent.publishing = null;
                 this._log('Publishing failed due to stream ID conflict');
             }
             
@@ -4450,6 +4835,8 @@ const OUTBOUND_VIDEO_STOP_MUTE_DELAY_MS = 500;
                     if (connection) {
                         // Stop ping monitoring
                         this._stopPingMonitoring(connection);
+                        this._clearConnectionRecoveryTimers(connection);
+                        connection._finalized = true;
                         // Close peer connection
                         if (connection.pc) {
                             connection.pc.close();
@@ -4505,6 +4892,8 @@ const OUTBOUND_VIDEO_STOP_MUTE_DELAY_MS = 500;
                     if (connection) {
                         // Stop ping monitoring
                         this._stopPingMonitoring(connection);
+                        this._clearConnectionRecoveryTimers(connection);
+                        connection._finalized = true;
                         // Close peer connection
                         if (connection.pc) {
                             connection.pc.close();
@@ -4593,6 +4982,21 @@ const OUTBOUND_VIDEO_STOP_MUTE_DELAY_MS = 500;
          */
         _emit(eventName, detail = {}) {
             this.dispatchEvent(new CustomEvent(eventName, { detail }));
+        }
+
+        /**
+         * Additive EventTarget form of VDO.Ninja's iframe action/value shape.
+         * This is local API sugar; it does not send anything over WebSocket.
+         * @private
+         */
+        _emitIframeCompatible(action, value = null, uuid = null, streamID = null) {
+            this._emit(action, {
+                action,
+                value,
+                UUID: uuid,
+                uuid,
+                streamID
+            });
         }
 
         /**
@@ -6207,15 +6611,28 @@ const OUTBOUND_VIDEO_STOP_MUTE_DELAY_MS = 500;
          * @private
          * @param {Object} connection - Connection to restart
          */
-        async _initiateICERestart(connection) {
+        async _initiateICERestart(connection, reason = 'missed_pings', options = {}) {
             if (!connection.pc) {
                 this._log('Cannot restart ICE - no peer connection');
-                return;
+                return false;
+            }
+
+            if (connection.type === 'viewer' && !options.allowViewerOffer) {
+                if (!options.skipRemoteRequest && connection.dataChannel && connection.dataChannel.readyState === 'open') {
+                    connection.dataChannel.send(JSON.stringify({ iceRestartRequest: true }));
+                    this._emit('iceRestart', {
+                        uuid: connection.uuid,
+                        streamID: connection.streamID,
+                        reason
+                    });
+                    return true;
+                }
+                return false;
             }
             
             try {
                 // Request ICE restart via data channel if available
-                if (connection.dataChannel && connection.dataChannel.readyState === 'open') {
+                if (!options.skipRemoteRequest && connection.dataChannel && connection.dataChannel.readyState === 'open') {
                     connection.dataChannel.send(JSON.stringify({ iceRestartRequest: true }));
                     this._log('Sent ICE restart request via data channel');
                 }
@@ -6256,18 +6673,31 @@ const OUTBOUND_VIDEO_STOP_MUTE_DELAY_MS = 500;
                     offerMsg.description = offer;
                 }
                 
-                this._sendMessageWS(offerMsg);
-                this._log('Sent ICE restart offer');
+                if (options.preferDataChannel && connection.dataChannel && connection.dataChannel.readyState === 'open') {
+                    const dcMsg = {
+                        description: offerMsg.description,
+                        session: connection.session
+                    };
+                    if (offerMsg.vector) dcMsg.vector = offerMsg.vector;
+                    this._logMessage('OUT', dcMsg, 'DataChannel');
+                    connection.dataChannel.send(JSON.stringify(dcMsg));
+                    this._log('Sent ICE restart offer via data channel');
+                } else {
+                    this._sendMessageWS(offerMsg);
+                    this._log('Sent ICE restart offer via WebSocket');
+                }
                 
                 // Emit event
                 this._emit('iceRestart', {
                     uuid: connection.uuid,
                     streamID: connection.streamID,
-                    reason: 'missed_pings'
+                    reason
                 });
+                return true;
                 
             } catch (error) {
                 this._log('Error initiating ICE restart:', error);
+                return false;
             }
         }
 

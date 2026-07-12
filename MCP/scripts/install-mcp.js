@@ -69,6 +69,7 @@ function parseArgs(argv) {
     serverArgs: [],
     codex: true,
     claude: true,
+    targetSelectionExplicit: false,
     claudeScope: 'local',
     dryRun: false
   };
@@ -106,11 +107,13 @@ function parseArgs(argv) {
     if (arg === '--codex-only') {
       out.claude = false;
       out.codex = true;
+      out.targetSelectionExplicit = true;
       continue;
     }
     if (arg === '--claude-only') {
       out.codex = false;
       out.claude = true;
+      out.targetSelectionExplicit = true;
       continue;
     }
     if (arg === '--claude-scope') {
@@ -179,6 +182,16 @@ function assertBinaryExists(name, options) {
   if (!check.ok) {
     throw new Error(`Required command not found or not working: ${name}`);
   }
+}
+
+function binaryExists(name, options) {
+  const check = runCommand(name, ['--version'], {
+    dryRun: options.dryRun,
+    quiet: true,
+    env: options.env,
+    cwd: options.cwd
+  });
+  return check.ok;
 }
 
 function codexServerExists(name, options) {
@@ -278,8 +291,33 @@ function main() {
     process.stdout.write('Warning: secure preset selected but VDON_MCP_JOIN_TOKEN_SECRET is not set in this shell.\n');
   }
 
-  if (config.codex) assertBinaryExists('codex', options);
-  if (config.claude) assertBinaryExists('claude', options);
+  if (config.codex && !binaryExists('codex', options)) {
+    if (config.targetSelectionExplicit && !config.claude) {
+      assertBinaryExists('codex', options);
+    }
+    process.stdout.write('Warning: Codex CLI not found in PATH. Skipping Codex install target.\n');
+    process.stdout.write('Tip: install Codex CLI, or rerun with --claude-only.\n');
+    config.codex = false;
+  }
+  if (config.claude && !binaryExists('claude', options)) {
+    if (config.targetSelectionExplicit && !config.codex) {
+      assertBinaryExists('claude', options);
+    }
+    process.stdout.write('Warning: Claude Code CLI not found in PATH. Skipping Claude install target.\n');
+    process.stdout.write('Tip: install Claude Code CLI, or rerun with --codex-only.\n');
+    config.claude = false;
+  }
+
+  if (!config.codex && !config.claude) {
+    if (config.action === 'uninstall') {
+      process.stdout.write('No supported CLI targets found in PATH; nothing to uninstall.\n\nDone.\n');
+      return;
+    }
+    throw new Error(
+      'No supported CLI targets found in PATH. Install Codex CLI or Claude Code CLI, ' +
+      'or configure GUI clients manually (e.g. Cursor via mcp.json).'
+    );
+  }
 
   if (config.action === 'install') {
     if (config.codex) installCodex(config, options);
@@ -290,6 +328,16 @@ function main() {
   }
 
   process.stdout.write('\nDone.\n');
+  if (config.action === 'install') {
+    process.stdout.write('\nUsage quickstart:\n');
+    process.stdout.write('  1) Start server: npx vdon-mcp-server\n');
+    process.stdout.write('  2) In your MCP client, call: {"name":"vdo_capabilities","arguments":{}}\n');
+    process.stdout.write('  3) Generic stdio MCP config:\n');
+    process.stdout.write(`     command: ${config.nodeCmd}\n`);
+    process.stdout.write(`     args: [${JSON.stringify(config.serverScript)}${config.serverArgs.map((arg) => `, ${JSON.stringify(arg)}`).join('')}]\n`);
+    process.stdout.write('  4) Client-specific examples (Cursor/Gemini/OpenCode):\n');
+    process.stdout.write('     https://github.com/steveseguin/ninjasdk/tree/main/MCP/references/client-config-examples.md\n');
+  }
 }
 
 if (require.main === module) {

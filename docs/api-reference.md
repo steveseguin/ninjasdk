@@ -18,6 +18,12 @@ const vdo = new VDONinjaSDK(options)
 - turnServers: null=auto-fetch, false=disable, or custom ICE servers
 - forceTURN: Force relay mode (boolean)
 - stunServers, configuration, salt, plus advanced info flags (see README for details)
+- autoRecover: Recover failed peer directions automatically (default: true)
+- autoRelay: Temporarily escalate failed direct paths to TURN (default: true)
+- disconnectGracePeriod: Grace period for temporary ICE disconnects (default: 5000 ms)
+- connectionTimeout: Initial peer connection timeout (default: 20000 ms)
+- recoveryTimeout: Wait between bounded recovery phases (default: 12000 ms)
+- relayRestoreDelay: Restore direct-first ICE policy after recovery (default: 45000 ms)
 
 ## Connection
 
@@ -95,6 +101,8 @@ Note: The viewing alias `unsubscribe(streamID)` that conflicted with pub/sub has
 Connection & Room
 - connected, disconnected
 - reconnecting, reconnected, reconnectFailed
+- connectionRecovering, connectionRecovered, connectionFailed, relayEscalated, relayRestored
+- iframe-friendly aliases: hss-connection, room-peer-listing, push-connection, view-connection
 - roomJoined { room }, roomLeft { room }
 - listing { list, raw }, peerListing (raw VDO.Ninja listings)
 

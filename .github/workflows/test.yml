@@ -32,6 +32,9 @@ jobs:
       run: |
         npm install
         npm install ${{ matrix.webrtc-lib }}
+
+    - name: Run deterministic reliability tests
+      run: npm run test:reliability
     
     - name: Run basic connectivity test
       run: |

@@ -32,6 +32,12 @@
       <li><b>debug</b>: Enable verbose logs</li>
       <li><b>turnServers</b>: null=auto, false=disable, or custom ICE servers</li>
       <li><b>forceTURN</b>: Force relay mode (boolean)</li>
+      <li><b>autoRecover</b>: Recover failed peer directions automatically (default: true)</li>
+      <li><b>autoRelay</b>: Temporarily try TURN after direct recovery fails (default: true)</li>
+      <li><b>disconnectGracePeriod</b>: Temporary ICE disconnect grace period (default: 5000 ms)</li>
+      <li><b>connectionTimeout</b>: Initial peer connection timeout (default: 20000 ms)</li>
+      <li><b>recoveryTimeout</b>: Wait between bounded recovery phases (default: 12000 ms)</li>
+      <li><b>relayRestoreDelay</b>: Restore direct-first ICE policy after recovery (default: 45000 ms)</li>
     </ul>
 
     <h2>Connection</h2>
@@ -86,6 +92,8 @@
     <h2>Events (Selected)</h2>
     <ul>
       <li>Connection: <code>connected</code>, <code>disconnected</code>, <code>reconnecting</code>, <code>reconnected</code>, <code>reconnectFailed</code></li>
+      <li>Recovery: <code>connectionRecovering</code>, <code>connectionRecovered</code>, <code>connectionFailed</code>, <code>relayEscalated</code>, <code>relayRestored</code></li>
+      <li>Iframe-friendly aliases: <code>hss-connection</code>, <code>room-peer-listing</code>, <code>push-connection</code>, <code>view-connection</code></li>
       <li>Room: <code>roomJoined</code>, <code>roomLeft</code>, <code>listing</code>, <code>peerListing</code></li>
       <li>Peer/DC: <code>peerConnected</code>, <code>peerDisconnected</code>, <code>dataChannelOpen</code>, <code>dataChannelClose</code>, <code>peerInfo</code>, <code>peerLatency</code></li>
       <li>Data: <code>dataReceived</code> (<code>dataRecieved</code> alias), <code>data</code></li>
@@ -148,4 +156,3 @@
     <p>See <a href="../README.md">README</a> and <a href="../demos/index.html">demos</a> for examples.</p>
   </body>
   </html>
-

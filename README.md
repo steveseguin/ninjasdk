@@ -7,6 +7,19 @@
 
 AI-friendly P2P communication SDK for audio, video, and data streaming. Build peer-to-peer applications without servers, user accounts, or complex infrastructure.
 
+## Choose Your Starting Point
+
+| What you want to build | Start here |
+| --- | --- |
+| Publish or view VDO.Ninja audio/video | [Audio/video quick start](#audiovideo-example) and [API reference](docs/api-reference.md) |
+| Record incoming media | [Recording guide](docs/recording.md) |
+| Add P2P messaging to an application | [Basic data channel example](#basic-data-channel-example) |
+| Let AI agents communicate in rooms | [Agent network guide](docs/agent-network.md) |
+| Understand reconnect and ICE recovery | [Reliability and recovery](docs/reliability-and-recovery.md) |
+| Upgrade without breaking an integration | [Compatibility contract](docs/compatibility.md) |
+
+The SDK deliberately supports several layers. Media publishing/viewing and generic data use the same VDO.Ninja-compatible WebRTC transport. The optional MCP package presents that data transport as practical tools for agent messaging, file transfer, and shared state. Recording is performed by browser or Node recording APIs after the SDK delivers media.
+
 ## ⚠️ IMPORTANT: Usage Guidelines
 
 **Direct WebSocket API access is NOT APPROVED.** You must use this SDK to interact with VDO.Ninja services.
@@ -146,6 +159,8 @@ If you want AI tools to coordinate over VDO.Ninja data channels, use the optiona
 
 - npm: https://www.npmjs.com/package/@vdoninja/mcp
 - repo: https://github.com/steveseguin/ninjamcp
+- Works with local `stdio` MCP clients (Codex CLI, Claude Code, Cursor, and other MCP-compatible CLIs).
+- First call after connecting: `{"name":"vdo_capabilities","arguments":{}}`
 
 Examples:
 
@@ -246,7 +261,13 @@ const vdo = new VDONinjaSDK({
     reconnectDelay: 1000,             // Initial reconnection delay in ms
     videoElement: null,               // DOM element to auto-attach streams (optional)
     autoPingViewer: false,            // Optional: auto ping from viewer side only
-    autoPingInterval: 10000           // Optional: viewer auto-ping interval (ms)
+    autoPingInterval: 10000,          // Optional: viewer auto-ping interval (ms)
+    autoRecover: true,                // Recover failed peer directions automatically
+    autoRelay: true,                  // Temporarily try TURN after direct recovery fails
+    disconnectGracePeriod: 5000,      // Grace period for temporary ICE disconnects
+    connectionTimeout: 20000,         // Initial peer connection timeout
+    recoveryTimeout: 12000,           // Wait between bounded recovery phases
+    relayRestoreDelay: 45000          // Restore direct-first ICE policy after recovery
 });
 ```
 

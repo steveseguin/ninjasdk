@@ -52,7 +52,9 @@ jobs:
         npm install ${{ matrix.webrtc-lib }}
     
     - name: Run tests
-      run: npm test
+      run: |
+        npm test
+        npm run test:reliability
       
   version:
     needs: test  # Only run if tests pass

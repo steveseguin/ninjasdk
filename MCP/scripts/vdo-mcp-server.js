@@ -500,6 +500,38 @@ Options:
 `.trim();
 }
 
+function isInteractiveTerminal(stream) {
+  return !!(stream && stream.isTTY);
+}
+
+function buildStartupBanner(server) {
+  const profile = server && server.toolProfile && server.toolProfile.name
+    ? server.toolProfile.name
+    : DEFAULT_TOOL_PROFILE;
+  return [
+    '[vdon-mcp] Server running (stdio) and waiting for MCP client input.',
+    `[vdon-mcp] Active tool profile: ${profile}`,
+    '[vdon-mcp] First tool call: {"name":"vdo_capabilities","arguments":{}}',
+    '[vdon-mcp] Stop with Ctrl+C'
+  ];
+}
+
+function maybeWriteStartupBanner(options, server) {
+  const env = options.env || process.env;
+  const disabled = toBool(env.VDON_MCP_NO_STARTUP_BANNER, false);
+  if (disabled) return false;
+
+  const input = options.input || process.stdin;
+  const output = options.output || process.stdout;
+  const errorOutput = options.errorOutput || process.stderr;
+
+  const interactive = isInteractiveTerminal(input) && isInteractiveTerminal(output) && isInteractiveTerminal(errorOutput);
+  if (!interactive) return false;
+
+  errorOutput.write(`${buildStartupBanner(server).join('\n')}\n`);
+  return true;
+}
+
 class VdoMcpServer {
   constructor(options = {}) {
     this.protocolVersion = SUPPORTED_PROTOCOL_VERSIONS[0];
@@ -1328,6 +1360,8 @@ async function runMcpStdioLoop(options = {}) {
     onExit
   });
 
+  maybeWriteStartupBanner(options, server);
+
   const parser = new McpStdioParser({ maxMessageBytes });
   let chain = Promise.resolve();
   let closed = false;
@@ -1421,5 +1455,7 @@ module.exports = {
   buildTools,
   makeToolResult,
   classifyToolError,
-  parseCliArgs
+  parseCliArgs,
+  buildStartupBanner,
+  maybeWriteStartupBanner
 };

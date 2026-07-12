@@ -43,6 +43,7 @@
     "assets/cloudflare/worker-proxy.js",
     "assets/cloudflare/wrangler.toml.example",
     "references/advanced-diagnostics.md",
+    "references/client-config-examples.md",
     "references/mcp-tool-contract.md",
     "references/quickstart-and-compat.md",
     "references/vdo-ninja-p2p-data-notes.md",

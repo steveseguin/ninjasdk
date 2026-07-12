@@ -28,6 +28,9 @@ Start the local MCP server:
 npx vdon-mcp-server
 ```
 
+If started directly in a terminal, it prints a short `Server running (stdio)` banner and a first-call hint.
+If started by an MCP client, no interactive banner may appear, which is normal.
+
 Optional least-privilege profile:
 
 ```bash
@@ -186,7 +189,12 @@ npm run test:mcp:all
 
 ## Compatibility Notes
 
-- Codex and Claude Code both work via command-based local MCP registration.
+- Works with any MCP client that supports local `stdio` transport (Codex CLI, Claude Code, Cursor, and other MCP-compatible CLIs).
+- Codex and Claude can be auto-registered via `npx vdon-mcp-install`.
+- Cursor and other GUI tools typically need manual MCP JSON config using:
+  - `command`: your Node executable
+  - `args`: path to `.../node_modules/@vdoninja/mcp/scripts/vdo-mcp-server.js` plus optional flags
+- Ready-to-paste per-client examples are in `MCP/references/client-config-examples.md`.
 - Registry metadata is in `MCP/server.json`.
 - Tool contracts are in `MCP/references/mcp-tool-contract.md`.
 - `@vdoninja/mcp` depends on `@vdoninja/sdk`, so SDK is installed transitively.

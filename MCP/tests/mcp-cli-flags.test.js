@@ -1,7 +1,12 @@
 'use strict';
 
 const assert = require('node:assert/strict');
-const { VdoMcpServer, parseCliArgs } = require('../scripts/vdo-mcp-server');
+const {
+  VdoMcpServer,
+  parseCliArgs,
+  buildStartupBanner,
+  maybeWriteStartupBanner
+} = require('../scripts/vdo-mcp-server');
 const { createFakeSDKFactory } = require('../scripts/lib/fake-network-sdk');
 
 function run() {
@@ -37,6 +42,54 @@ function run() {
   assert.equal(config.joinTokenSecret, 'secret_123');
   assert.deepEqual(config.allowPeerStreamIDs, ['agent_a', 'agent_b']);
   assert.equal(config.requireSessionMac, true);
+
+  const banner = buildStartupBanner(server);
+  assert.equal(Array.isArray(banner), true);
+  assert.equal(banner.length >= 3, true);
+  assert.ok(banner[0].includes('Server running'));
+
+  const writes = [];
+  const didWrite = maybeWriteStartupBanner(
+    {
+      input: { isTTY: true },
+      output: { isTTY: true },
+      errorOutput: {
+        isTTY: true,
+        write: (text) => {
+          writes.push(String(text));
+        }
+      }
+    },
+    server
+  );
+  assert.equal(didWrite, true);
+  assert.ok(writes.join('').includes('vdo_capabilities'));
+
+  const suppressed = maybeWriteStartupBanner(
+    {
+      env: { VDON_MCP_NO_STARTUP_BANNER: '1' },
+      input: { isTTY: true },
+      output: { isTTY: true },
+      errorOutput: {
+        isTTY: true,
+        write: () => {
+          throw new Error('unexpected write when startup banner disabled');
+        }
+      }
+    },
+    server
+  );
+  assert.equal(suppressed, false);
+
+  const nonInteractive = maybeWriteStartupBanner(
+    {
+      input: { isTTY: false },
+      output: { isTTY: true },
+      errorOutput: { isTTY: true, write: () => {} }
+    },
+    server
+  );
+  assert.equal(nonInteractive, false);
 
   assert.equal(parseCliArgs(['--help']).showHelp, true);
 

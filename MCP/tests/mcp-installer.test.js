@@ -25,6 +25,7 @@ function runInstaller(args, env, cwd) {
   if (result.status !== 0) {
     throw new Error(`installer failed\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`);
   }
+  return result;
 }
 
 function runInstallerExpectFailure(args, env, cwd) {
@@ -258,6 +259,32 @@ process.exit(1);
     assert.equal(codexRemoveCalls.length >= 1, true);
     assert.equal(claudeRemoveCalls.length >= 1, true);
 
+    const claudeOnlyBinDir = path.join(baseDir, 'bin-claude-only');
+    fs.mkdirSync(claudeOnlyBinDir, { recursive: true });
+    fs.copyFileSync(path.join(binDir, 'claude'), path.join(claudeOnlyBinDir, 'claude'));
+    fs.chmodSync(path.join(claudeOnlyBinDir, 'claude'), 0o755);
+    writeExecutable(path.join(claudeOnlyBinDir, 'codex'), `#!/usr/bin/env node
+'use strict';
+process.exit(1);
+`);
+
+    const envClaudeOnly = {
+      ...process.env,
+      MCP_INSTALLER_TEST_STATE_DIR: stateDir,
+      PATH: `${claudeOnlyBinDir}:${process.env.PATH || ''}`
+    };
+    const claudeOnlyResult = runInstaller([
+      '--name', 'vdo-claude-only',
+      '--server-script', fakeServer,
+      '--node-cmd', 'node'
+    ], envClaudeOnly, path.resolve(__dirname, '..'));
+    assert.match(claudeOnlyResult.stdout, /Warning: Codex CLI not found in PATH/);
+
+    codexState = readJson(codexStatePath);
+    claudeState = readJson(claudeStatePath);
+    assert.equal(!!codexState.servers['vdo-claude-only'], false);
+    assert.equal(!!claudeState.servers['vdo-claude-only'], true);
+
     runInstaller([
       '--uninstall',
       '--name', 'vdo-test',
@@ -278,6 +305,28 @@ process.exit(1);
     ], env, path.resolve(__dirname, '..'));
     assert.equal(badPreset.status, 1);
     assert.match(badPreset.stderr, /Invalid --preset/);
+
+    const noCliBinDir = path.join(baseDir, 'bin-empty');
+    fs.mkdirSync(noCliBinDir, { recursive: true });
+    writeExecutable(path.join(noCliBinDir, 'codex'), `#!/usr/bin/env node
+'use strict';
+process.exit(1);
+`);
+    writeExecutable(path.join(noCliBinDir, 'claude'), `#!/usr/bin/env node
+'use strict';
+process.exit(1);
+`);
+    const noCliResult = runInstallerExpectFailure([
+      '--name', 'vdo-no-cli',
+      '--server-script', fakeServer,
+      '--node-cmd', 'node'
+    ], {
+      ...process.env,
+      MCP_INSTALLER_TEST_STATE_DIR: stateDir,
+      PATH: `${noCliBinDir}:${process.env.PATH || ''}`
+    }, path.resolve(__dirname, '..'));
+    assert.equal(noCliResult.status, 1);
+    assert.match(noCliResult.stderr, /No supported CLI targets found in PATH/);
 
     console.log('mcp-installer.test.js passed');
   } finally {

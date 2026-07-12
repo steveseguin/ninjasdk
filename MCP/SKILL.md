@@ -34,6 +34,7 @@ Use this skill to run VDO.Ninja as an MCP data bridge in Codex, Claude Code, and
 
 3. Start server:
 `npx vdon-mcp-server`
+If run directly in a terminal, it prints a short running banner and a first-call hint.
 
 4. Optional least-privilege tool profile:
 `VDON_MCP_TOOL_PROFILE=core|file|state|full npx vdon-mcp-server`
@@ -85,6 +86,7 @@ For secure presets, set `VDON_MCP_JOIN_TOKEN_SECRET` before install/runtime.
 ## References
 
 - Operator quickstart: `MCP/references/quickstart-and-compat.md`
+- Client config examples: `MCP/references/client-config-examples.md`
 - Tool contract: `MCP/references/mcp-tool-contract.md`
 - Transport notes: `MCP/references/vdo-ninja-p2p-data-notes.md`
 - Registry manifest: `MCP/server.json`

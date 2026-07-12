@@ -20,6 +20,7 @@
     "minify": "terser vdoninja-sdk.js -o vdoninja-sdk.min.js --compress --mangle --comments \"/VDO.Ninja SDK v/\"",
     "watch": "npm-watch",
     "test": "node run-all-tests.js",
+    "test:reliability": "node --test tests/sdk-reliability.test.js",
     "test:mcp": "node MCP/tests/run-mcp-tests-minimal.js",
     "test:mcp:all": "node MCP/tests/run-mcp-tests.js",
     "test:mcp:live": "node MCP/tests/live-turn-smoke.js",
