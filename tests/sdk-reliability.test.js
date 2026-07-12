@@ -32,6 +32,8 @@ class MockPeerConnection {
     this.connectionState = 'new';
     this.iceConnectionState = 'new';
     this.localDescription = null;
+    this.remoteDescription = null;
+    this.addedIceCandidates = [];
     this.closed = false;
     this.dataChannel = null;
   }
@@ -48,6 +50,19 @@ class MockPeerConnection {
 
   async setLocalDescription(description) {
     this.localDescription = description;
+  }
+
+  async setRemoteDescription(description) {
+    this.remoteDescription = description;
+  }
+
+  async createAnswer() {
+    return { type: 'answer', sdp: 'answer' };
+  }
+
+  async addIceCandidate(candidate) {
+    if (!this.remoteDescription) throw new Error('remote description not set');
+    this.addedIceCandidates.push({ ...candidate });
   }
 
   getConfiguration() {
@@ -209,6 +224,95 @@ test('signaling reconnect restores intent after opening a new socket', async () 
   }
 });
 
+test('signaling queue is bounded and flushes original HSS messages in order', () => {
+  const sdk = makeSDK({ signalingQueueLimit: 3 });
+  const sent = [];
+  sdk.signaling = {
+    readyState: 0,
+    send(value) { sent.push(JSON.parse(value)); }
+  };
+
+  for (let i = 0; i < 5; i++) {
+    assert.equal(sdk._sendMessageWS({ request: 'play', streamID: `stream-${i}` }), true);
+  }
+  assert.deepEqual(sdk._signalingQueue.map(message => message.streamID), [
+    'stream-2', 'stream-3', 'stream-4'
+  ]);
+
+  sdk.signaling.readyState = global.WebSocket.OPEN;
+  assert.equal(sdk._flushSignalingQueue(), 3);
+  assert.deepEqual(sent.map(message => message.streamID), [
+    'stream-2', 'stream-3', 'stream-4'
+  ]);
+  assert.equal(sdk._signalingQueue.length, 0);
+  assert.equal(sent.some(message => Object.keys(message).some(key => key.startsWith('__sdk'))), false);
+});
+
+test('ICE arriving before its peer is queued and drained after the offer', async () => {
+  const sdk = makeSDK();
+  sdk._sendMessageWS = () => true;
+  const candidate = {
+    candidate: 'candidate:1 1 udp 1 192.0.2.1 5000 typ host',
+    sdpMid: '0',
+    sdpMLineIndex: 0
+  };
+
+  await sdk._handleRemoteICECandidate({
+    UUID: 'publisher-early',
+    type: 'local',
+    session: 'session-early',
+    candidate
+  });
+  assert.equal(sdk._pendingIceCandidates.size, 1);
+
+  await sdk._handleOfferSDP({
+    UUID: 'publisher-early',
+    streamID: 'camera',
+    session: 'session-early',
+    description: { type: 'offer', sdp: 'offer' }
+  });
+
+  const connection = sdk._getConnection('publisher-early', 'viewer');
+  assert.equal(connection.pc.addedIceCandidates.length, 1);
+  assert.equal(connection.pc.addedIceCandidates[0].candidate, candidate.candidate);
+  assert.equal(sdk._pendingIceCandidates.size, 0);
+});
+
+test('queued ICE from a stale peer session is not applied', async () => {
+  const sdk = makeSDK();
+  await sdk._handleRemoteICECandidate({
+    UUID: 'publisher-stale',
+    type: 'local',
+    session: 'old-session',
+    candidate: { candidate: 'candidate:old' }
+  });
+
+  const connection = await sdk._createConnection('publisher-stale', 'viewer');
+  connection.session = 'new-session';
+  await connection.pc.setRemoteDescription({ type: 'offer', sdp: 'offer' });
+  assert.equal(await sdk._drainPendingICE('publisher-stale', 'local', connection), 0);
+  assert.equal(connection.pc.addedIceCandidates.length, 0);
+});
+
+test('pending ICE queues enforce per-direction and global bounds', () => {
+  const sdk = makeSDK({ pendingIceMaxPerPeer: 2, pendingIceMaxKeys: 2 });
+  for (let i = 0; i < 3; i++) {
+    sdk._queuePendingICE(
+      { UUID: 'peer-a', type: 'local', session: 'a' },
+      { candidate: `candidate:a${i}` }
+    );
+  }
+  assert.deepEqual(
+    sdk._pendingIceCandidates.get('local:peer-a').map(item => item.candidate.candidate),
+    ['candidate:a1', 'candidate:a2']
+  );
+
+  sdk._queuePendingICE({ UUID: 'peer-b', type: 'local' }, { candidate: 'candidate:b' });
+  sdk._queuePendingICE({ UUID: 'peer-c', type: 'remote' }, { candidate: 'candidate:c' });
+  assert.equal(sdk._pendingIceCandidates.size, 2);
+  assert.equal(sdk._pendingIceCandidates.has('local:peer-a'), false);
+});
+
 test('a transient disconnected state does not immediately close a peer', async () => {
   const sdk = makeSDK({ autoRecover: false, disconnectGracePeriod: 25 });
   const connection = await sdk._createConnection('peer-a', 'viewer');
@@ -274,6 +378,35 @@ test('viewer recovery requests the existing publisher-owned restart over the dat
   assert.equal(connection.pc.localDescription, null);
 });
 
+test('viewer recovery uses VDO.Ninja generic WSS relay when the data channel is unavailable', async () => {
+  const sdk = makeSDK();
+  const sent = [];
+  sdk.signaling = {
+    readyState: global.WebSocket.OPEN,
+    send(value) { sent.push(JSON.parse(value)); }
+  };
+  const connection = await sdk._createConnection('publisher-wss', 'viewer');
+  connection.dataChannel = null;
+
+  assert.equal(await sdk._requestConnectionICERestart(connection, 'test'), true);
+  assert.deepEqual(sent, [{ UUID: 'publisher-wss', iceRestartRequest: true }]);
+  assert.equal('request' in sent[0], false);
+  assert.equal(connection.pc.localDescription, null);
+});
+
+test('publisher accepts the existing WSS iceRestartRequest relay shape', async () => {
+  const sdk = makeSDK();
+  const connection = await sdk._createConnection('viewer-wss', 'publisher');
+  connection.streamID = 'camera';
+  connection.session = 'session-wss';
+
+  await sdk._handleSignalingMessage({ UUID: 'viewer-wss', iceRestartRequest: true });
+
+  assert.deepEqual(connection.pc.lastOfferOptions, { iceRestart: true });
+  assert.equal(connection.dataChannel.sent.length, 1);
+  assert.equal(connection.dataChannel.sent[0].description.type, 'offer');
+});
+
 test('relay escalation is local configuration only and remains reversible', async () => {
   const sdk = makeSDK();
   const connection = await sdk._createConnection('peer-c', 'publisher');
@@ -281,12 +414,20 @@ test('relay escalation is local configuration only and remains reversible', asyn
     iceTransportPolicy: 'all',
     iceServers: [
       { urls: 'stun:example.test' },
-      { urls: 'turn:example.test', username: 'u', credential: 'p' }
-    ]
+      { urls: 'turn:first.example.test', username: 'u1', credential: 'p1' },
+      { urls: 'turn:second.example.test', username: 'u2', credential: 'p2' }
+    ],
+    bundlePolicy: 'max-bundle'
   };
 
   assert.equal(sdk._escalateConnectionToRelay(connection), true);
   assert.equal(connection.pc.configuration.iceTransportPolicy, 'relay');
+  assert.equal(connection.pc.configuration.bundlePolicy, 'max-bundle');
+  assert.deepEqual(connection.pc.configuration.iceServers.map(server => server.urls), [
+    'stun:example.test',
+    'turn:second.example.test',
+    'turn:first.example.test'
+  ]);
   assert.equal(connection.relayEscalated, true);
 
   sdk._scheduleRelayPolicyRestore(connection);

@@ -516,6 +516,10 @@ const OUTBOUND_VIDEO_STOP_MUTE_DELAY_MS = 500;
          * @param {number} options.connectionTimeout - Initial peer connection timeout in ms (default: 20000)
          * @param {number} options.recoveryTimeout - Wait between recovery phases in ms (default: 12000)
          * @param {number} options.relayRestoreDelay - Delay before restoring direct-first ICE policy (default: 45000)
+         * @param {number} options.signalingQueueLimit - Newest HSS messages retained while offline (default: 30)
+         * @param {number} options.pendingIceTTL - Maximum pre-PC ICE age in ms (default: 15000)
+         * @param {number} options.pendingIceMaxPerPeer - Candidate cap per UUID/direction (default: 100)
+         * @param {number} options.pendingIceMaxKeys - Global UUID/direction queue cap (default: 500)
          */
         constructor(options = {}) {
             super();
@@ -637,6 +641,21 @@ const OUTBOUND_VIDEO_STOP_MUTE_DELAY_MS = 500;
             this._maxReconnectAttempts = options.maxReconnectAttempts || 5;
             this._reconnectDelay = options.reconnectDelay || 1000;
             this._reconnectTimer = null;
+            this._signalingQueue = [];
+            this._signalingQueueLimit = Number.isFinite(options.signalingQueueLimit) ?
+                Math.max(1, Math.floor(options.signalingQueueLimit)) : 30;
+
+            // Match VDO.Ninja's bounded pre-PC ICE handling. Candidates can beat
+            // their SDP over either WSS or an established data channel.
+            this._pendingIceCandidates = new Map();
+            this._pendingIceLastSweep = 0;
+            this._pendingIceSweepMinMs = 2000;
+            this._pendingIceTTL = Number.isFinite(options.pendingIceTTL) ?
+                Math.max(1000, options.pendingIceTTL) : 15000;
+            this._pendingIceMaxPerPeer = Number.isFinite(options.pendingIceMaxPerPeer) ?
+                Math.max(1, Math.floor(options.pendingIceMaxPerPeer)) : 100;
+            this._pendingIceMaxKeys = Number.isFinite(options.pendingIceMaxKeys) ?
+                Math.max(1, Math.floor(options.pendingIceMaxKeys)) : 500;
 
             // Desired application state is kept separately from transient transport
             // state.  A WebSocket reconnect gets a new HSS UUID, so room, seed, and
@@ -765,6 +784,8 @@ const OUTBOUND_VIDEO_STOP_MUTE_DELAY_MS = 500;
             if (!this.messageHandlers) this.messageHandlers = new Map();
             if (!this.streams) this.streams = new Map();
             if (!this._viewRetryTimers) this._viewRetryTimers = new Map();
+            if (!this._signalingQueue) this._signalingQueue = [];
+            if (!this._pendingIceCandidates) this._pendingIceCandidates = new Map();
             
             if (this.state.connected) {
                 this._log('Already connected');
@@ -804,6 +825,10 @@ const OUTBOUND_VIDEO_STOP_MUTE_DELAY_MS = 500;
                         if (!this._isReconnecting) {
                             this._reconnectAttempts = 0;
                         }
+
+                        // VDO.Ninja flushes its bounded signaling queue before
+                        // reconnect-specific room/seed/play restoration.
+                        this._flushSignalingQueue();
                         
                         this._emit('connected');
                         this._emitIframeCompatible('hss-connection', 'connected');
@@ -865,6 +890,8 @@ const OUTBOUND_VIDEO_STOP_MUTE_DELAY_MS = 500;
                 if (this._connectionIntent.views) this._connectionIntent.views.clear();
             }
             if (this._stoppedViews) this._stoppedViews.clear();
+            if (this._signalingQueue) this._signalingQueue.length = 0;
+            if (this._pendingIceCandidates) this._pendingIceCandidates.clear();
             if (this._failedViewerConnections) {
                 for (const failed of this._failedViewerConnections.values()) {
                     if (failed && failed.timer) clearTimeout(failed.timer);
@@ -2469,17 +2496,6 @@ const OUTBOUND_VIDEO_STOP_MUTE_DELAY_MS = 500;
                 });
             };
             
-            channel.onerror = (error) => {
-                this._log(`Data channel error for ${connection.uuid}:`, error);
-            };
-            
-            channel.onclose = () => {
-                this._log(`Data channel closed for ${connection.uuid}, was in state: ${channel.readyState}`);
-                
-                // Stop ping monitoring
-                this._stopPingMonitoring(connection);
-            };
-
             channel.onmessage = async (event) => {
                 // Update last message time for ping monitoring
                 connection.lastMessageTime = Date.now();
@@ -2647,11 +2663,12 @@ const OUTBOUND_VIDEO_STOP_MUTE_DELAY_MS = 500;
             };
 
             channel.onerror = (error) => {
-                this._log('Data channel error:', error);
+                this._log(`Data channel error for ${connection.uuid}:`, error);
             };
 
             channel.onclose = () => {
-                this._log('Data channel closed');
+                this._log(`Data channel closed for ${connection.uuid}, was in state: ${channel.readyState}`);
+                this._stopPingMonitoring(connection);
                 try {
                     this._emit('dataChannelClose', {
                         uuid: connection.uuid,
@@ -3553,8 +3570,16 @@ const OUTBOUND_VIDEO_STOP_MUTE_DELAY_MS = 500;
             if (current.iceTransportPolicy === 'relay') return true;
 
             const next = { ...current };
-            if (Array.isArray(current.iceServers) && current.iceServers.length > 1) {
-                next.iceServers = current.iceServers.slice(1).concat(current.iceServers[0]);
+            if (Array.isArray(current.iceServers)) {
+                const stuns = [];
+                const turns = [];
+                for (const server of current.iceServers) {
+                    const urls = Array.isArray(server.urls) ? server.urls : [server.urls || server.url];
+                    if (urls.some(url => typeof url === 'string' && /^turns?:/i.test(url))) turns.push(server);
+                    else stuns.push(server);
+                }
+                if (turns.length > 1) turns.push(turns.shift());
+                next.iceServers = stuns.concat(turns);
             }
             next.iceTransportPolicy = 'relay';
 
@@ -3597,11 +3622,17 @@ const OUTBOUND_VIDEO_STOP_MUTE_DELAY_MS = 500;
         async _requestConnectionICERestart(connection, reason) {
             if (!connection || !connection.pc) return false;
 
-            // VDO.Ninja's publisher owns the offer. A viewer asks over the existing
-            // sendChannel; it never invents a new WebSocket request type.
+            // VDO.Ninja's publisher owns the offer. Prefer sendChannel and use
+            // VDO.Ninja's existing generic relay shape only when it is unavailable.
             if (connection.type === 'viewer') {
-                if (!connection.dataChannel || connection.dataChannel.readyState !== 'open') return false;
-                connection.dataChannel.send(JSON.stringify({ iceRestartRequest: true }));
+                if (connection.dataChannel && connection.dataChannel.readyState === 'open') {
+                    connection.dataChannel.send(JSON.stringify({ iceRestartRequest: true }));
+                } else if (!this._sendMessageWS({
+                    UUID: connection.uuid,
+                    iceRestartRequest: true
+                })) {
+                    return false;
+                }
                 this._emit('iceRestart', {
                     uuid: connection.uuid,
                     streamID: connection.streamID,
@@ -3839,6 +3870,16 @@ const OUTBOUND_VIDEO_STOP_MUTE_DELAY_MS = 500;
                 await this._handleRemoteICECandidate(msg);
             } else if (msg.candidates) {
                 await this._handleRemoteICECandidates(msg);
+            } else if (msg.iceRestartRequest && msg.UUID) {
+                // Existing VDO.Ninja generic relay shape; HSS only rewrites the
+                // sender UUID and does not need a new request command.
+                const connection = this._getConnection(msg.UUID, 'publisher');
+                if (connection) {
+                    await this._initiateICERestart(connection, 'remote_request', {
+                        skipRemoteRequest: true,
+                        preferDataChannel: true
+                    });
+                }
             } else if (msg.request === "joinroom") {
                 await this._handleJoinRoom(msg);
             } else if (msg.request === "play") {
@@ -3962,6 +4003,7 @@ const OUTBOUND_VIDEO_STOP_MUTE_DELAY_MS = 500;
             try {
                 // Set remote description
                 await connection.pc.setRemoteDescription(new RTCSessionDescription(msg.description));
+                await this._drainPendingICE(msg.UUID, 'local', connection);
 
                 // Create and send answer
                 const answer = await this._createAnswer(connection);
@@ -4044,6 +4086,7 @@ const OUTBOUND_VIDEO_STOP_MUTE_DELAY_MS = 500;
 
             try {
                 await connection.pc.setRemoteDescription(new RTCSessionDescription(msg.description));
+                await this._drainPendingICE(msg.UUID, 'remote', connection);
                 this._log('Remote description set successfully');
             } catch (error) {
                 this._log('Error handling answer:', error);
@@ -4052,6 +4095,87 @@ const OUTBOUND_VIDEO_STOP_MUTE_DELAY_MS = 500;
                     details: error.message 
                 });
             }
+        }
+
+        _pendingICEKey(uuid, type) {
+            return `${type || 'unknown'}:${uuid}`;
+        }
+
+        _prunePendingICE(force = false) {
+            if (!this._pendingIceCandidates) this._pendingIceCandidates = new Map();
+            const now = Date.now();
+            const ttl = this._pendingIceTTL || 15000;
+            const sweepMinMs = this._pendingIceSweepMinMs || 2000;
+
+            if (force || now - this._pendingIceLastSweep >= sweepMinMs) {
+                this._pendingIceLastSweep = now;
+                for (const [key, queue] of this._pendingIceCandidates) {
+                    const fresh = Array.isArray(queue) ? queue.filter(item => item && now - item.ts <= ttl) : [];
+                    if (fresh.length) this._pendingIceCandidates.set(key, fresh);
+                    else this._pendingIceCandidates.delete(key);
+                }
+            }
+
+            const maxKeys = Math.max(1, this._pendingIceMaxKeys || 500);
+            if (this._pendingIceCandidates.size > maxKeys) {
+                const entries = [...this._pendingIceCandidates.entries()].sort((a, b) => {
+                    const aTime = a[1] && a[1].length ? a[1][a[1].length - 1].ts : 0;
+                    const bTime = b[1] && b[1].length ? b[1][b[1].length - 1].ts : 0;
+                    return aTime - bTime;
+                });
+                for (let i = 0; i < entries.length - maxKeys; i++) {
+                    this._pendingIceCandidates.delete(entries[i][0]);
+                }
+            }
+        }
+
+        _queuePendingICE(msg, candidate) {
+            if (!msg || !msg.UUID || !candidate || (msg.type !== 'local' && msg.type !== 'remote')) return false;
+            this._prunePendingICE();
+            const key = this._pendingICEKey(msg.UUID, msg.type);
+            const queue = this._pendingIceCandidates.get(key) || [];
+            const maxEntries = Math.max(1, this._pendingIceMaxPerPeer || 100);
+            if (queue.length >= maxEntries) queue.splice(0, queue.length - maxEntries + 1);
+            queue.push({
+                candidate,
+                session: Object.prototype.hasOwnProperty.call(msg, 'session') ? msg.session : undefined,
+                ts: Date.now()
+            });
+            this._pendingIceCandidates.set(key, queue);
+            this._prunePendingICE();
+            this._log(`Queued ICE before peer connection ready: ${msg.UUID} (${msg.type})`);
+            return true;
+        }
+
+        async _drainPendingICE(uuid, type, connection) {
+            if (!uuid || !connection || !connection.pc || !connection.pc.remoteDescription) return 0;
+            this._prunePendingICE(true);
+            const keys = [this._pendingICEKey(uuid, type)];
+            let drained = 0;
+
+            for (const key of keys) {
+                const queue = this._pendingIceCandidates.get(key) || [];
+                this._pendingIceCandidates.delete(key);
+                for (const item of queue) {
+                    if (item.session !== undefined && item.session !== null &&
+                        connection.session && item.session !== connection.session) {
+                        continue;
+                    }
+                    try {
+                        await connection.pc.addIceCandidate(new RTCIceCandidate(item.candidate));
+                        drained += 1;
+                    } catch (error) {
+                        this._log('Error adding queued ICE candidate:', error.message || error);
+                    }
+                }
+            }
+            return drained;
+        }
+
+        _clearPendingICE(uuid) {
+            if (!uuid || !this._pendingIceCandidates) return;
+            this._pendingIceCandidates.delete(this._pendingICEKey(uuid, 'remote'));
+            this._pendingIceCandidates.delete(this._pendingICEKey(uuid, 'local'));
         }
 
         /**
@@ -4105,6 +4229,7 @@ const OUTBOUND_VIDEO_STOP_MUTE_DELAY_MS = 500;
                 this._log('Available connections:', Array.from(this.connections.entries()).map(([k, v]) => 
                     `UUID: ${v.uuid}, type: ${v.type}, streamID: ${v.streamID}`
                 ));
+                this._queuePendingICE(msg, msg.candidate);
                 return;
             }
 
@@ -4115,6 +4240,10 @@ const OUTBOUND_VIDEO_STOP_MUTE_DELAY_MS = 500;
             }
 
             try {
+                if (!connection.pc.remoteDescription) {
+                    this._queuePendingICE(msg, msg.candidate);
+                    return;
+                }
                 // Add type field if missing
                 if (msg.candidate && !msg.candidate.type) {
                     msg.candidate.type = 'host';
@@ -4181,6 +4310,9 @@ const OUTBOUND_VIDEO_STOP_MUTE_DELAY_MS = 500;
                 this._log('Available connections:', Array.from(this.connections.entries()).map(([k, v]) => 
                     `UUID: ${v.uuid}, type: ${v.type}, streamID: ${v.streamID}`
                 ));
+                for (const candidate of (msg.candidates || [])) {
+                    this._queuePendingICE(msg, candidate);
+                }
                 return;
             }
 
@@ -4190,7 +4322,14 @@ const OUTBOUND_VIDEO_STOP_MUTE_DELAY_MS = 500;
                 return;
             }
 
-            for (const candidate of msg.candidates) {
+            if (!connection.pc.remoteDescription) {
+                for (const candidate of (msg.candidates || [])) {
+                    this._queuePendingICE(msg, candidate);
+                }
+                return;
+            }
+
+            for (const candidate of (msg.candidates || [])) {
                 try {
                     if (candidate.candidate) {
                         await connection.pc.addIceCandidate(new RTCIceCandidate(candidate));
@@ -4813,6 +4952,7 @@ const OUTBOUND_VIDEO_STOP_MUTE_DELAY_MS = 500;
          */
         _handleBye(msg) {
             this._log('Received bye from:', msg.UUID);
+            this._clearPendingICE(msg.UUID);
 
             // Close all connections for this UUID
             const connections = this.connections.get(msg.UUID);
@@ -4883,6 +5023,7 @@ const OUTBOUND_VIDEO_STOP_MUTE_DELAY_MS = 500;
          */
         _handleHangup(msg) {
             this._log('Received hangup from:', msg.UUID);
+            this._clearPendingICE(msg.UUID);
 
             // Close all connections for this UUID
             const connections = this.connections.get(msg.UUID);
@@ -4966,12 +5107,54 @@ const OUTBOUND_VIDEO_STOP_MUTE_DELAY_MS = 500;
          */
         _sendMessageWS(msg) {
             if (this.signaling && this.signaling.readyState === WebSocket.OPEN) {
-                this._logMessage('OUT', msg, 'WebSocket');
-                this.signaling.send(JSON.stringify(msg));
-            } else {
-                this._log('WebSocket not ready, queuing message');
-                // TODO: Implement message queue
+                try {
+                    this._logMessage('OUT', msg, 'WebSocket');
+                    this.signaling.send(JSON.stringify(msg));
+                    return true;
+                } catch (error) {
+                    this._log('WebSocket send failed, queuing message:', error.message || error);
+                }
             }
+
+            if (this._intentionalDisconnect) return false;
+
+            this._log('WebSocket not ready, queuing message');
+            if (!this._signalingQueue) this._signalingQueue = [];
+            const limit = Math.max(1, this._signalingQueueLimit || 30);
+            this._signalingQueue.push({ ...msg });
+            if (this._signalingQueue.length > limit) {
+                this._signalingQueue.splice(0, this._signalingQueue.length - limit);
+            }
+            return true;
+        }
+
+        /**
+         * Replay the bounded signaling queue on the current HSS socket.
+         * Uses only the original messages; no SDK-specific command is added.
+         * @private
+         */
+        _flushSignalingQueue() {
+            if (!this.signaling || this.signaling.readyState !== WebSocket.OPEN) return 0;
+            if (!this._signalingQueue || !this._signalingQueue.length) return 0;
+
+            const queued = this._signalingQueue.splice(0, this._signalingQueue.length);
+            let sent = 0;
+            for (let i = 0; i < queued.length; i++) {
+                try {
+                    this._logMessage('OUT', queued[i], 'WebSocket');
+                    this.signaling.send(JSON.stringify(queued[i]));
+                    sent += 1;
+                } catch (error) {
+                    const unsent = queued.slice(i);
+                    this._signalingQueue = unsent.concat(this._signalingQueue || []);
+                    const limit = Math.max(1, this._signalingQueueLimit || 30);
+                    if (this._signalingQueue.length > limit) {
+                        this._signalingQueue = this._signalingQueue.slice(-limit);
+                    }
+                    break;
+                }
+            }
+            return sent;
         }
 
         /**

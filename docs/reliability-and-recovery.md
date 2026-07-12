@@ -12,6 +12,10 @@ Room membership, publishing, and requested views are stored separately from the 
 
 An explicit `disconnect()`, `leaveRoom()`, `stopPublishing()`, or `stopViewing()` removes the corresponding intent and prevents automatic restoration.
 
+Like VDO.Ninja, the SDK retains only the newest 30 signaling messages while the socket is unavailable and replays them when it opens. This queue carries the original `joinroom`, `seed`, `play`, SDP, ICE, and generic relay shapes; the SDK does not add private handshake-server commands.
+
+ICE candidates that arrive before their directional peer or remote description are held for up to 15 seconds. Queues are bounded to 100 candidates per UUID/direction and 500 keys, session-checked, and drained after the matching remote description is accepted.
+
 ## Directional peer recovery
 
 Publishing to a peer and viewing that peer are separate `RTCPeerConnection` directions. Recovery affects only the failed direction.
@@ -25,7 +29,7 @@ The default sequence is:
 5. Close the failed direction after the bounded recovery sequence.
 6. For an active viewer intent, issue a fresh `play` request and wait for a genuinely connected replacement.
 
-The publisher remains the SDP offer owner. A viewer requests a restart through the existing data channel; it does not send an SDK-specific WebSocket request.
+The publisher remains the SDP offer owner. A viewer requests a restart through the existing data channel first. If that channel is unavailable, it uses VDO.Ninja's existing generic `{ UUID, iceRestartRequest: true }` WebSocket relay shape; this is not a new handshake-server command.
 
 ## Options
 
@@ -36,7 +40,11 @@ const sdk = new VDONinjaSDK({
   disconnectGracePeriod: 5000, // Delay before recovering a transient disconnect
   connectionTimeout: 20000,    // Maximum initial peer-connection wait
   recoveryTimeout: 12000,      // Wait between bounded recovery phases
-  relayRestoreDelay: 45000     // Restore the original direct-first ICE policy
+  relayRestoreDelay: 45000,    // Restore the original direct-first ICE policy
+  signalingQueueLimit: 30,     // Newest HSS messages retained while offline
+  pendingIceTTL: 15000,        // Maximum age of pre-PC ICE candidates
+  pendingIceMaxPerPeer: 100,   // Candidate cap per UUID and direction
+  pendingIceMaxKeys: 500       // Global UUID/direction queue cap
 });
 ```
 
@@ -69,4 +77,3 @@ npm run test:reliability
 ```
 
 Production testing should additionally cover WebSocket loss, one-way ICE failure, TURN-only networks, stale signaling after peer replacement, data-channel closure, and media that connects but stops advancing.
-
