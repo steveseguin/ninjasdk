@@ -26,6 +26,7 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  id-token: write
 
 jobs:
   # First, run all tests
@@ -154,11 +155,12 @@ jobs:
         
     - name: Install dependencies
       run: npm install
+
+    - name: Update npm for trusted publishing
+      run: npm install --global npm@latest
       
     - name: Publish to NPM
       run: npm publish --access public
-      env:
-        NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         
   create-release:
     needs: [version, publish-npm]
