@@ -22,6 +22,11 @@ on:
         required: true
         default: true
         type: boolean
+      existing_version:
+        description: 'Publish an existing tag without another version bump (for example, 1.4.0)'
+        required: false
+        default: ''
+        type: string
 
 permissions:
   contents: write
@@ -63,7 +68,8 @@ jobs:
     # Skip if the commit message contains [skip ci] or was made by the bot
     if: |
       !contains(github.event.head_commit.message, '[skip ci]') &&
-      !contains(github.event.head_commit.message, 'chore: bump version')
+      !contains(github.event.head_commit.message, 'chore: bump version') &&
+      (github.event_name != 'workflow_dispatch' || inputs.existing_version == '')
     
     outputs:
       new_version: ${{ steps.version.outputs.new_version }}
@@ -150,7 +156,7 @@ jobs:
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '20'
+        node-version: '24'
         registry-url: 'https://registry.npmjs.org'
         
     - name: Install dependencies
@@ -160,6 +166,34 @@ jobs:
       run: npm install --global npm@latest
       
     - name: Publish to NPM
+      run: npm publish --access public
+
+  publish-existing-npm:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' && inputs.existing_version != ''
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        ref: v${{ inputs.existing_version }}
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '24'
+        registry-url: 'https://registry.npmjs.org'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Update npm for trusted publishing
+      run: npm install --global npm@latest
+
+    - name: Verify requested version
+      run: test "$(node -p "require('./package.json').version")" = "${{ inputs.existing_version }}"
+
+    - name: Publish existing version to NPM
       run: npm publish --access public
         
   create-release:
