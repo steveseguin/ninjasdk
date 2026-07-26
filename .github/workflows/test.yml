@@ -35,6 +35,9 @@ jobs:
 
     - name: Run deterministic reliability tests
       run: npm run test:reliability
+
+    - name: Verify TypeScript entry points
+      run: npm run test:types
     
     - name: Run basic connectivity test
       run: |

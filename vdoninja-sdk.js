@@ -6,6 +6,54 @@ const MEDIA_STREAM_TRACK_ENABLED_DESCRIPTOR =
         : null;
 
 const OUTBOUND_VIDEO_STOP_MUTE_DELAY_MS = 500;
+
+/**
+ * VDO.Ninja data-channel labels.
+ *
+ * VDO.Ninja opens up to four kinds of data channel per peer and routes incoming
+ * channels by label (see webrtc.js `ondatachannel`). Only CONTROL carries the JSON
+ * signaling/control protocol; the rest are binary side-channels. Any label that is
+ * not CONTROL, CHUNKED or RESOURCES is treated as a file transfer, where the label
+ * is the file ID.
+ */
+const VDON_CHANNEL_CONTROL = 'sendChannel';
+const VDON_CHANNEL_CHUNKED = 'chunked';
+const VDON_CHANNEL_RESOURCES = 'resources';
+
+/**
+ * Labels beginning with this prefix are reserved for third-party SDK channels.
+ *
+ * VDO.Ninja ignores them in both `ondatachannel` handlers rather than feeding them to
+ * its file-transfer receiver (webrtc.js `isReservedChannelLabel`, since 2026-07-25).
+ * The prefix is collision-proof because every label either side opens is alphanumeric —
+ * `generateStreamID` here and there both exclude punctuation — or a known literal.
+ *
+ * The SDK must honour the same reservation: an `x-` channel is never a file transfer,
+ * and a hosted file ID must never start with it.
+ */
+const VDON_RESERVED_CHANNEL_PREFIX = 'x-';
+
+/**
+ * Default lane for sendBinary().
+ *
+ * Binary must never go on the control channel: VDO.Ninja treats any object payload there
+ * as a WebP image frame and renders it into an <img> (webrtc.js:21219), so raw bytes would
+ * visibly corrupt a viewer. A reserved label is ignored by VDO.Ninja instead.
+ */
+const VDON_CHANNEL_BINARY = 'x-bin';
+
+/** Below this many bytes buffered, a channel is considered drained. */
+const VDON_DEFAULT_BUFFER_LOW = 262144;   // 256KB
+/** Above this many bytes buffered, senders should wait. */
+const VDON_DEFAULT_BUFFER_HIGH = 1048576; // 1MB
+
+// VDO.Ninja's file transfer framing (lib.js `sendFile` / webrtc.js `recieveFile`).
+const VDON_FILE_CHUNK_SIZE = 16384;
+const VDON_FILE_EOF_COMPLETE = 'EOF1';
+const VDON_FILE_EOF_CANCELLED = 'EOF2';
+
+// VDO.Ninja's resource framing (lib.js `processResourceQueue`).
+const VDON_RESOURCE_CHUNK_SIZE = 16384;
 /**
  * VDO.Ninja SDK - OFFICIAL SDK FOR VDO.NINJA WEBSOCKET API
  * Copyright (C) 2025 Steve Seguin and contributors
@@ -417,6 +465,47 @@ const OUTBOUND_VIDEO_STOP_MUTE_DELAY_MS = 500;
          * @param {string} label - Label to sanitize
          * @returns {string} Sanitized label
          */
+        /**
+         * Sanitize a publisher `meta` payload while preserving its shape.
+         *
+         * `meta` is not just a label. VDO.Ninja accepts it only when it is an **object**
+         * (webrtc.js:22099) and stores it as `session.rpcs[UUID].meta`, keyed by template
+         * name. The resources channel then fills in each entry's `value` with an object
+         * URL. Passing meta through the string sanitizer collapsed objects to "", so
+         * VDO.Ninja set `meta = false` and silently dropped every resource.
+         *
+         * Strings still sanitize exactly as before, so existing callers are unaffected.
+         *
+         * @private
+         * @param {string|Object} meta
+         * @param {number} [depth=0]
+         * @returns {string|Object|null}
+         */
+        _sanitizeMeta(meta, depth = 0) {
+            if (typeof meta === 'string') return this._sanitizeLabel(meta);
+            if (!meta || typeof meta !== 'object' || Array.isArray(meta)) return null;
+            if (depth > 1) return null;
+
+            const out = {};
+            let fields = 0;
+            for (const key of Object.keys(meta)) {
+                if (fields++ >= 32) break;
+                const safeKey = this._sanitizeLabel(key);
+                if (!safeKey) continue;
+
+                const value = meta[key];
+                if (typeof value === 'string') {
+                    out[safeKey] = this._sanitizeLabel(value);
+                } else if (typeof value === 'number' || typeof value === 'boolean') {
+                    out[safeKey] = value;
+                } else if (value && typeof value === 'object' && !Array.isArray(value)) {
+                    const nested = this._sanitizeMeta(value, depth + 1);
+                    if (nested && typeof nested === 'object') out[safeKey] = nested;
+                }
+            }
+            return out;
+        }
+
         _sanitizeLabel(label) {
             if (!label || typeof label !== 'string') {
                 return "";
@@ -546,7 +635,7 @@ const OUTBOUND_VIDEO_STOP_MUTE_DELAY_MS = 500;
             // Optional publisher info fields to send on DC open
             this._pendingInfo = {};
             if (options.label) this._pendingInfo.label = this._sanitizeLabel(options.label);
-            if (options.meta) this._pendingInfo.meta = this._sanitizeLabel(options.meta);
+            if (options.meta) this._pendingInfo.meta = this._sanitizeMeta(options.meta);
             if (options.order) this._pendingInfo.order = this._sanitizeLabel(options.order);
             if (typeof options.broadcast === 'boolean') this._pendingInfo.broadcast = !!options.broadcast;
             if (typeof options.allowdrawing === 'boolean') this._pendingInfo.allowdrawing = !!options.allowdrawing;
@@ -559,7 +648,7 @@ const OUTBOUND_VIDEO_STOP_MUTE_DELAY_MS = 500;
             if (options.info && typeof options.info === 'object') {
                 const inf = options.info;
                 if (inf.label) { this._pendingInfo.label = this._sanitizeLabel(inf.label); this._pendingLabel = this._pendingInfo.label; }
-                if (inf.meta) this._pendingInfo.meta = this._sanitizeLabel(inf.meta);
+                if (inf.meta) this._pendingInfo.meta = this._sanitizeMeta(inf.meta);
                 if (inf.order) this._pendingInfo.order = this._sanitizeLabel(inf.order);
                 if (typeof inf.broadcast === 'boolean') this._pendingInfo.broadcast = !!inf.broadcast;
                 if (typeof inf.allowdrawing === 'boolean') this._pendingInfo.allowdrawing = !!inf.allowdrawing;
@@ -602,6 +691,7 @@ const OUTBOUND_VIDEO_STOP_MUTE_DELAY_MS = 500;
             this._pendingViews = new Map();
             this._failedViewerConnections = new Map(); // Track failed connections for retry
             this._intentionalDisconnect = false; // Flag for intentional disconnections
+            this._teardownPromise = null; // In-flight or most recently completed explicit teardown
             this._passwordHash = null;  // Cached hash for streamID
             this._passwordHashPromise = null; // Tracks in-flight hash computation
             this._passwordHashKey = null; // Password+salt signature for cached hash
@@ -773,6 +863,17 @@ const OUTBOUND_VIDEO_STOP_MUTE_DELAY_MS = 500;
          * @returns {Promise} Resolves when connected
          */
         async connect(options = {}) {
+            // An explicit disconnect owns the current socket and peer generation until
+            // its close event has fired. Waiting here prevents a late close from the old
+            // socket from marking a newly connected generation as disconnected.
+            if (this._teardownPromise) {
+                const pendingTeardown = this._teardownPromise;
+                await pendingTeardown;
+                if (this._teardownPromise === pendingTeardown) {
+                    this._teardownPromise = null;
+                }
+            }
+
             // Initialize required properties if missing
             if (!this.connections) this.connections = new Map();
             if (!this.state) this.state = {};
@@ -817,9 +918,11 @@ const OUTBOUND_VIDEO_STOP_MUTE_DELAY_MS = 500;
             
             return new Promise((resolve, reject) => {
                 try {
-                    this.signaling = new WebSocket(this.host);
+                    const signaling = new WebSocket(this.host);
+                    this.signaling = signaling;
                     
-                    this.signaling.onopen = () => {
+                    signaling.onopen = () => {
+                        if (this.signaling !== signaling) return;
                         this._log('WebSocket connected');
                         this.state.connected = true;
                         if (!this._isReconnecting) {
@@ -836,7 +939,8 @@ const OUTBOUND_VIDEO_STOP_MUTE_DELAY_MS = 500;
                         resolve();
                     };
                     
-                    this.signaling.onmessage = async (event) => {
+                    signaling.onmessage = async (event) => {
+                        if (this.signaling !== signaling) return;
                         try {
                             const msg = JSON.parse(event.data);
                             this._logMessage('IN', msg, 'WebSocket');
@@ -846,13 +950,18 @@ const OUTBOUND_VIDEO_STOP_MUTE_DELAY_MS = 500;
                         }
                     };
                     
-                    this.signaling.onerror = (error) => {
+                    signaling.onerror = (error) => {
+                        if (this.signaling !== signaling) return;
                         this._log('WebSocket error:', error);
                         this._emit('error', { error: 'WebSocket error', details: error });
                         reject(error);
                     };
                     
-                    this.signaling.onclose = () => {
+                    signaling.onclose = () => {
+                        // A superseded socket must never mutate the state of the current
+                        // connection generation. This also makes a forced-close fallback
+                        // harmless if its close event arrives unusually late.
+                        if (this.signaling !== signaling) return;
                         this._log('WebSocket closed');
                         this.state.connected = false;
                         // These describe the current socket generation. Desired room,
@@ -860,10 +969,22 @@ const OUTBOUND_VIDEO_STOP_MUTE_DELAY_MS = 500;
                         this.state.roomJoined = false;
                         this.state.publishing = false;
                         
-                        this._emit('disconnected');
+                        const intentional = !!this._intentionalDisconnect;
+                        const willReconnect = !intentional &&
+                            this._reconnectAttempts < this._maxReconnectAttempts;
+
+                        // This fires when the socket closes, which is not the same thing
+                        // as teardown being finished. Listeners that need "cleanup is
+                        // done" should use 'teardownComplete' instead.
+                        this._emit('disconnected', {
+                            intentional: intentional,
+                            reason: intentional ? 'local-disconnect' : 'socket-closed',
+                            willReconnect: willReconnect,
+                            phase: 'socket'
+                        });
                         this._emitIframeCompatible('hss-connection', 'closed');
-                        
-                        if (!this._intentionalDisconnect && this._reconnectAttempts < this._maxReconnectAttempts) {
+
+                        if (willReconnect) {
                             this._attemptReconnect();
                         }
                     };
@@ -876,10 +997,25 @@ const OUTBOUND_VIDEO_STOP_MUTE_DELAY_MS = 500;
         }
 
         /**
-         * Disconnect from the signaling server
+         * Disconnect from the signaling server and tear down all peers.
+         *
+         * Returns a promise that resolves when cleanup has genuinely finished: bye
+         * messages flushed, peer connections closed, timers cleared, socket closed. Exiting
+         * the process before that resolves can crash the native WebRTC module mid-teardown.
+         *
+         * The returned promise is new in v1.5. Callers that ignore it behave exactly as
+         * before. The `disconnected` event is not a completion signal — it also fires when
+         * the socket closes, which happens partway through. Use the resolved promise or
+         * the `teardownComplete` event.
+         *
+         * @returns {Promise<void>} Resolves once teardown is complete
          */
         disconnect() {
             this._log('Disconnecting...');
+
+            // Calling disconnect() twice should not run teardown twice.
+            if (this._teardownPromise) return this._teardownPromise;
+
             this._intentionalDisconnect = true;
 
             // disconnect() has always represented a full local teardown. Do not
@@ -904,6 +1040,8 @@ const OUTBOUND_VIDEO_STOP_MUTE_DELAY_MS = 500;
                 clearTimeout(this._reconnectTimer);
                 this._reconnectTimer = null;
             }
+            this._isReconnecting = false;
+            this._restoringIntent = false;
             
             // Send bye message to all connected peers via data channels
             this._log('Connections count:', this.connections.size);
@@ -947,8 +1085,10 @@ const OUTBOUND_VIDEO_STOP_MUTE_DELAY_MS = 500;
                 }
             }
             
+            const signalingToClose = this.signaling;
+
             // Wait for all bye messages to be sent or timeout
-            Promise.all(byePromises).then(() => {
+            this._teardownPromise = Promise.all(byePromises).then(async () => {
                 // Close all peer connections
                 for (const [uuid, connections] of this.connections) {
                     for (const type of ['viewer', 'publisher']) {
@@ -975,9 +1115,10 @@ const OUTBOUND_VIDEO_STOP_MUTE_DELAY_MS = 500;
                 }
                 this._viewRetryTimers.clear();
 
-                // Close WebSocket
-                if (this.signaling) {
-                    this.signaling.close();
+                // WebSocket.close() is asynchronous. Keep this generation current until
+                // its close handler has run so the socket-phase event precedes teardown.
+                await this._closeSignalingSocket(signalingToClose);
+                if (this.signaling === signalingToClose) {
                     this.signaling = null;
                 }
 
@@ -991,7 +1132,120 @@ const OUTBOUND_VIDEO_STOP_MUTE_DELAY_MS = 500;
                     publishing: false
                 };
 
-                this._emit('disconnected');
+                this._emit('disconnected', {
+                    intentional: true,
+                    reason: 'teardown-complete',
+                    willReconnect: false,
+                    phase: 'teardown'
+                });
+                // The unambiguous "cleanup is finished" signal. Unlike 'disconnected',
+                // this is emitted exactly once and only from here.
+                this._emit('teardownComplete', { reason: 'local-disconnect' });
+            });
+
+            return this._teardownPromise;
+        }
+
+        /**
+         * Close one signaling socket and resolve after its close event has actually run.
+         *
+         * Browser WebSocket.close() and ws.close() are asynchronous. Treating the method
+         * return as completion lets the old onclose handler race a subsequent connect().
+         * Native sockets expose an observable close event; minimal test doubles that do
+         * not expose one retain their historical synchronous-close behavior.
+         *
+         * @private
+         * @param {WebSocket|null} signaling
+         * @returns {Promise<void>}
+         */
+        _closeSignalingSocket(signaling) {
+            if (!signaling) return Promise.resolve();
+
+            const closedState = (typeof WebSocket !== 'undefined' &&
+                typeof WebSocket.CLOSED === 'number') ? WebSocket.CLOSED : 3;
+            if (signaling.readyState === closedState) return Promise.resolve();
+
+            return new Promise((resolve) => {
+                let settled = false;
+                let removeCloseListener = null;
+                let forceTimer = null;
+
+                const done = () => {
+                    if (settled) return;
+                    settled = true;
+                    if (forceTimer) clearTimeout(forceTimer);
+                    if (removeCloseListener) {
+                        try { removeCloseListener(); } catch (e) { /* non-fatal */ }
+                    }
+                    resolve();
+                };
+
+                let observesClose = false;
+                if (typeof signaling.addEventListener === 'function') {
+                    const onClose = () => done();
+                    try {
+                        signaling.addEventListener('close', onClose);
+                        removeCloseListener = () => signaling.removeEventListener('close', onClose);
+                        observesClose = true;
+                    } catch (e) { /* fall through to other event styles */ }
+                }
+
+                if (!observesClose && typeof signaling.once === 'function') {
+                    try {
+                        signaling.once('close', done);
+                        removeCloseListener = () => {
+                            if (typeof signaling.removeListener === 'function') {
+                                signaling.removeListener('close', done);
+                            }
+                        };
+                        observesClose = true;
+                    } catch (e) { /* fall through to onclose */ }
+                }
+
+                if (!observesClose && 'onclose' in signaling) {
+                    const previousOnClose = signaling.onclose;
+                    const wrappedOnClose = (event) => {
+                        try {
+                            if (typeof previousOnClose === 'function') {
+                                previousOnClose.call(signaling, event);
+                            }
+                        } finally {
+                            done();
+                        }
+                    };
+                    try {
+                        signaling.onclose = wrappedOnClose;
+                        removeCloseListener = () => {
+                            if (signaling.onclose === wrappedOnClose) {
+                                signaling.onclose = previousOnClose;
+                            }
+                        };
+                        observesClose = true;
+                    } catch (e) { /* unobservable close; preserve legacy behavior */ }
+                }
+
+                try {
+                    signaling.close();
+                } catch (error) {
+                    this._log('Error closing signaling socket:', error);
+                    done();
+                    return;
+                }
+
+                if (!observesClose) {
+                    done();
+                    return;
+                }
+
+                // ws can wait on the close handshake for a long time. Its terminate()
+                // method is a safe local fallback and still emits the close event that
+                // this promise waits for. Browsers have no terminate(), so they follow
+                // their native close lifecycle.
+                if (typeof signaling.terminate === 'function') {
+                    forceTimer = setTimeout(() => {
+                        try { signaling.terminate(); } catch (e) { done(); }
+                    }, 1000);
+                }
             });
         }
 
@@ -1292,7 +1546,7 @@ const OUTBOUND_VIDEO_STOP_MUTE_DELAY_MS = 500;
             // Capture optional info fields for publisher
             this._pendingInfo = this._pendingInfo || {};
             if (options.label) this._pendingInfo.label = this._sanitizeLabel(options.label);
-            if (options.meta) this._pendingInfo.meta = this._sanitizeLabel(options.meta);
+            if (options.meta) this._pendingInfo.meta = this._sanitizeMeta(options.meta);
             if (options.order) this._pendingInfo.order = this._sanitizeLabel(options.order);
             if (typeof options.broadcast === 'boolean') this._pendingInfo.broadcast = !!options.broadcast;
             if (typeof options.allowdrawing === 'boolean') this._pendingInfo.allowdrawing = !!options.allowdrawing;
@@ -1304,7 +1558,7 @@ const OUTBOUND_VIDEO_STOP_MUTE_DELAY_MS = 500;
             if (options.info && typeof options.info === 'object') {
                 const inf = options.info;
                 if (inf.label) { this._pendingInfo.label = this._sanitizeLabel(inf.label); this._pendingLabel = this._pendingInfo.label; }
-                if (inf.meta) this._pendingInfo.meta = this._sanitizeLabel(inf.meta);
+                if (inf.meta) this._pendingInfo.meta = this._sanitizeMeta(inf.meta);
                 if (inf.order) this._pendingInfo.order = this._sanitizeLabel(inf.order);
                 if (typeof inf.broadcast === 'boolean') this._pendingInfo.broadcast = !!inf.broadcast;
                 if (typeof inf.allowdrawing === 'boolean') this._pendingInfo.allowdrawing = !!inf.allowdrawing;
@@ -1402,7 +1656,7 @@ const OUTBOUND_VIDEO_STOP_MUTE_DELAY_MS = 500;
             if (options.label) this._pendingLabel = this._sanitizeLabel(options.label);
             this._pendingInfo = this._pendingInfo || {};
             if (options.label) this._pendingInfo.label = this._sanitizeLabel(options.label);
-            if (options.meta) this._pendingInfo.meta = this._sanitizeLabel(options.meta);
+            if (options.meta) this._pendingInfo.meta = this._sanitizeMeta(options.meta);
             if (options.order) this._pendingInfo.order = this._sanitizeLabel(options.order);
             if (typeof options.broadcast === 'boolean') this._pendingInfo.broadcast = !!options.broadcast;
             if (typeof options.allowdrawing === 'boolean') this._pendingInfo.allowdrawing = !!options.allowdrawing;
@@ -1414,7 +1668,7 @@ const OUTBOUND_VIDEO_STOP_MUTE_DELAY_MS = 500;
             if (options.info && typeof options.info === 'object') {
                 const inf = options.info;
                 if (inf.label) { this._pendingInfo.label = this._sanitizeLabel(inf.label); this._pendingLabel = this._pendingInfo.label; }
-                if (inf.meta) this._pendingInfo.meta = this._sanitizeLabel(inf.meta);
+                if (inf.meta) this._pendingInfo.meta = this._sanitizeMeta(inf.meta);
                 if (inf.order) this._pendingInfo.order = this._sanitizeLabel(inf.order);
                 if (typeof inf.broadcast === 'boolean') this._pendingInfo.broadcast = !!inf.broadcast;
                 if (typeof inf.allowdrawing === 'boolean') this._pendingInfo.allowdrawing = !!inf.allowdrawing;
@@ -1576,6 +1830,14 @@ const OUTBOUND_VIDEO_STOP_MUTE_DELAY_MS = 500;
          * View a stream
          * @param {string} streamID - The stream ID to view
          * @param {Object} options - Viewing options
+         * @param {boolean} [options.downloads=true] - Advertise willingness to receive
+         *        file offers. VDO.Ninja publishers only call provideFileList() for a
+         *        viewer that sent `downloads: true`, so leaving this off means no
+         *        `fileList` arrives at connect time.
+         * @param {boolean} [options.allowresources=false] - Advertise willingness to
+         *        receive the 'resources' channel. VDO.Ninja publishers only open it for a
+         *        viewer that sent `allowresources: true`. Off by default, matching
+         *        VDO.Ninja, where it requires the &resources URL flag.
          * @returns {Promise<RTCPeerConnection>} The peer connection
          */
         async view(streamID, options = {}) {
@@ -1835,7 +2097,8 @@ const OUTBOUND_VIDEO_STOP_MUTE_DELAY_MS = 500;
                 uuid: uuid,
                 type: type,
                 pc: new RTCPeerConnection(iceConfig),
-                dataChannel: null,
+                dataChannel: null,   // control channel ('sendChannel') only
+                channels: new Map(), // label -> RTCDataChannel, including the control channel
                 streamID: null,
                 session: null,  // Session ID for this WebRTC connection
                 info: {label: options?.label || null},
@@ -1905,18 +2168,20 @@ const OUTBOUND_VIDEO_STOP_MUTE_DELAY_MS = 500;
 
             // Setup data channel for publishers
             if (type === 'publisher') {
-                const dc = connection.pc.createDataChannel('sendChannel', { 
-                    ordered: true 
+                const dc = connection.pc.createDataChannel(VDON_CHANNEL_CONTROL, {
+                    ordered: true
                 });
                 connection.dataChannel = dc;
+                connection.channels.set(VDON_CHANNEL_CONTROL, dc);
                 this._setupDataChannel(connection, dc);
             }
 
-            // Handle data channel for viewers (and publishers receiving from other publishers)
+            // Handle data channel for viewers (and publishers receiving from other publishers).
+            // Route by label the way VDO.Ninja does: only 'sendChannel' is the control
+            // channel. Auxiliary channels must never replace connection.dataChannel or run
+            // control-channel setup, or the control protocol breaks for this peer.
             connection.pc.ondatachannel = (event) => {
-                this._log('Data channel received from:', uuid);
-                connection.dataChannel = event.channel;
-                this._setupDataChannel(connection, event.channel);
+                this._handleIncomingDataChannel(connection, event.channel);
             };
 
             // Store connection in nested structure
@@ -2394,11 +2659,11 @@ const OUTBOUND_VIDEO_STOP_MUTE_DELAY_MS = 500;
         _getConnection(uuid, type = null) {
             const connections = this.connections.get(uuid);
             if (!connections) return null;
-            
+
             if (type) {
                 return connections[type] || null;
             }
-            
+
             // Return any available connection if no type specified
             return connections.viewer || connections.publisher || null;
         }
@@ -2414,26 +2679,26 @@ const OUTBOUND_VIDEO_STOP_MUTE_DELAY_MS = 500;
          */
         _getConnections(filters = {}) {
             const results = [];
-            
+
             for (const [uuid, connections] of this.connections) {
                 // Apply UUID filter
                 if (filters.uuid && uuid !== filters.uuid) continue;
-                
+
                 // Check each connection type
                 for (const type of ['viewer', 'publisher']) {
                     const connection = connections[type];
                     if (!connection) continue;
-                    
+
                     // Apply type filter
                     if (filters.type && type !== filters.type) continue;
-                    
+
                     // Apply streamID filter
                     if (filters.streamID && connection.streamID !== filters.streamID) continue;
-                    
+
                     results.push(connection);
                 }
             }
-            
+
             return results;
         }
 
@@ -2443,8 +2708,1334 @@ const OUTBOUND_VIDEO_STOP_MUTE_DELAY_MS = 500;
          * @param {Object} connection - Connection object
          * @param {RTCDataChannel} channel - Data channel
          */
+        /**
+         * Add the viewer-side capability flags to an outgoing preferences message.
+         *
+         * VDO.Ninja gates both of these on the *publisher* side (webrtc.js:12889-12894):
+         * a viewer that does not advertise `downloads` never receives provideFileList(),
+         * and one that does not advertise `allowresources === true` never gets a
+         * resources channel. Publishers ignore keys they do not know, so this is safe to
+         * send to older peers.
+         *
+         * @private
+         * @param {Object} preferences - Outgoing viewer preferences message
+         * @param {Object} options - The caller's view() options
+         */
+        _applyViewerCapabilities(preferences, options) {
+            // Matches VDO.Ninja's viewer default (msg.downloads = true unless &nodownloads).
+            preferences.downloads = options.downloads !== false;
+
+            // Off unless asked for, matching VDO.Ninja's &resources flag. Only advertise
+            // it when we can actually act on it, or the peer opens a channel we ignore.
+            if (options.allowresources === true) {
+                preferences.allowresources = true;
+            }
+        }
+
+        /**
+         * Route an incoming data channel by label.
+         *
+         * Mirrors VDO.Ninja's `ondatachannel` dispatch: a falsy label or 'sendChannel' is
+         * the control channel; 'chunked' and 'resources' have dedicated handlers; every
+         * other label is a file transfer whose label is the file ID.
+         *
+         * Auxiliary channels must not touch connection.dataChannel or run control-channel
+         * setup — doing so re-sends publisher info, starts a second ping monitor, emits a
+         * spurious dataChannelOpen, and JSON.parses binary frames.
+         *
+         * @private
+         * @param {Object} connection - Connection object
+         * @param {RTCDataChannel} channel - The newly received channel
+         */
+        _handleIncomingDataChannel(connection, channel) {
+            if (!channel) return;
+            const label = (typeof channel.label === 'string') ? channel.label : '';
+            this._log(`Data channel received from ${connection.uuid}: "${label}"`);
+
+            this._trackChannel(connection, channel);
+
+            // VDO.Ninja treats a falsy label as the control channel; match that.
+            if (!label || label === VDON_CHANNEL_CONTROL) {
+                connection.dataChannel = channel;
+                this._setupDataChannel(connection, channel);
+                return;
+            }
+
+            this._setupAuxiliaryChannel(connection, channel, label);
+        }
+
+        /**
+         * Record a channel in the per-connection registry, keyed by label.
+         * Uses addEventListener so it does not compete with the `onclose` assignments
+         * made by the control and transfer handlers.
+         * @private
+         */
+        _trackChannel(connection, channel) {
+            if (!connection || !channel) return;
+            if (!connection.channels) connection.channels = new Map();
+            const label = (typeof channel.label === 'string' && channel.label)
+                ? channel.label
+                : VDON_CHANNEL_CONTROL;
+
+            connection.channels.set(label, channel);
+
+            const untrack = () => {
+                if (connection.channels && connection.channels.get(label) === channel) {
+                    connection.channels.delete(label);
+                }
+            };
+            if (typeof channel.addEventListener === 'function') {
+                try { channel.addEventListener('close', untrack); } catch (e) { /* non-fatal */ }
+            }
+        }
+
+        /**
+         * Whether a label belongs to the reserved third-party namespace.
+         * Mirrors VDO.Ninja's `session.isReservedChannelLabel`.
+         * @private
+         */
+        _isReservedChannelLabel(label) {
+            return typeof label === 'string' && label.startsWith(VDON_RESERVED_CHANNEL_PREFIX);
+        }
+
+        /**
+         * List both peer-connection directions for one UUID in the SDK's historical
+         * publisher-first order.
+         * @private
+         */
+        _connectionsFor(uuid) {
+            const connections = this.connections.get(uuid);
+            if (!connections) return [];
+            return [connections.publisher, connections.viewer].filter(Boolean);
+        }
+
+        /**
+         * Resolve a peer's connection, preferring whichever direction is usable.
+         * @private
+         */
+        _connectionFor(uuid) {
+            const connections = this._connectionsFor(uuid);
+            return connections.find(connection =>
+                connection.pc && connection.pc.connectionState !== 'closed'
+            ) || connections[0] || null;
+        }
+
+        /**
+         * Open an additional data channel to a peer.
+         *
+         * The label is forced into the reserved `x-` namespace, which VDO.Ninja ignores by
+         * contract — so a channel opened here is safe even when the peer turns out to be a
+         * browser tab rather than another SDK. Bulk traffic on its own channel stops a
+         * large chunk from head-of-line blocking control messages queued behind it.
+         *
+         * @param {string} uuid - Peer UUID
+         * @param {string} label - Channel name; `x-` is prepended if absent
+         * @param {Object} [options]
+         * @param {boolean} [options.ordered=true] - false allows out-of-order delivery
+         * @param {number} [options.maxRetransmits] - Partial reliability by retry count
+         * @param {number} [options.maxPacketLifeTime] - Partial reliability by time, ms
+         * @param {string} [options.protocol] - Subprotocol string
+         * @param {number} [options.timeout=15000] - Ms to wait for the channel to open
+         * @returns {Promise<RTCDataChannel>} Resolves once the channel is open
+         */
+        async openChannel(uuid, label, options = {}) {
+            if (typeof label !== 'string' || !label) {
+                throw new Error('openChannel requires a label');
+            }
+            // maxRetransmits and maxPacketLifeTime are mutually exclusive per spec, and
+            // supplying both makes createDataChannel throw.
+            if (typeof options.maxRetransmits === 'number' &&
+                typeof options.maxPacketLifeTime === 'number') {
+                throw new Error('maxRetransmits and maxPacketLifeTime are mutually exclusive');
+            }
+
+            const fullLabel = this._isReservedChannelLabel(label)
+                ? label
+                : VDON_RESERVED_CHANNEL_PREFIX + label;
+
+            const connections = this._connectionsFor(uuid);
+            for (const candidate of connections) {
+                const existing = candidate.channels && candidate.channels.get(fullLabel);
+                if (existing && existing.readyState !== 'closed' && existing.readyState !== 'closing') {
+                    if (existing.readyState === 'open') return existing;
+                    return this._awaitChannelOpen(existing, options.timeout);
+                }
+            }
+
+            const connection = connections.find(candidate =>
+                candidate.pc && candidate.pc.connectionState !== 'closed'
+            ) || null;
+            if (!connection) throw new Error(`No connection to ${uuid}`);
+
+            const init = { ordered: options.ordered !== false };
+            if (typeof options.maxRetransmits === 'number') init.maxRetransmits = options.maxRetransmits;
+            if (typeof options.maxPacketLifeTime === 'number') init.maxPacketLifeTime = options.maxPacketLifeTime;
+            if (typeof options.protocol === 'string') init.protocol = options.protocol;
+
+            const channel = connection.pc.createDataChannel(fullLabel, init);
+            channel.binaryType = 'arraybuffer';
+            this._trackChannel(connection, channel);
+            this._attachBufferedAmountLow(connection, channel, fullLabel);
+
+            this._log(`Opened channel "${fullLabel}" to ${uuid} (ordered=${init.ordered}` +
+                      `${init.maxRetransmits !== undefined ? ', maxRetransmits=' + init.maxRetransmits : ''}` +
+                      `${init.maxPacketLifeTime !== undefined ? ', maxPacketLifeTime=' + init.maxPacketLifeTime : ''})`);
+
+            return this._awaitChannelOpen(channel, options.timeout);
+        }
+
+        /**
+         * Resolve once a channel is open. A channel created over an established SCTP
+         * association can already be open before a handler could be attached.
+         * @private
+         */
+        _awaitChannelOpen(channel, timeoutMs = 15000) {
+            if (channel.readyState === 'open') return Promise.resolve(channel);
+            return new Promise((resolve, reject) => {
+                const timer = setTimeout(() => {
+                    cleanup();
+                    reject(new Error(`Channel "${channel.label}" did not open within ${timeoutMs}ms`));
+                }, timeoutMs);
+                if (timer && typeof timer.unref === 'function') timer.unref();
+
+                const cleanup = () => {
+                    clearTimeout(timer);
+                    if (typeof channel.removeEventListener === 'function') {
+                        try {
+                            channel.removeEventListener('open', onOpen);
+                            channel.removeEventListener('close', onClose);
+                            channel.removeEventListener('error', onClose);
+                        } catch (e) { /* non-fatal */ }
+                    }
+                };
+                const onOpen = () => { cleanup(); resolve(channel); };
+                const onClose = () => { cleanup(); reject(new Error(`Channel "${channel.label}" closed before opening`)); };
+
+                if (typeof channel.addEventListener === 'function') {
+                    channel.addEventListener('open', onOpen);
+                    channel.addEventListener('close', onClose);
+                    channel.addEventListener('error', onClose);
+                } else {
+                    channel.onopen = onOpen;
+                }
+                // Guard against opening between the readyState check and listener attach.
+                if (channel.readyState === 'open') onOpen();
+            });
+        }
+
+        /**
+         * Retrieve an already-open channel to a peer, if any.
+         * @param {string} uuid - Peer UUID
+         * @param {string} label - Channel name; `x-` is prepended if absent
+         * @returns {RTCDataChannel|null}
+         */
+        getChannel(uuid, label) {
+            const fullLabel = this._isReservedChannelLabel(label)
+                ? label
+                : VDON_RESERVED_CHANNEL_PREFIX + label;
+
+            let inactive = null;
+            for (const connection of this._connectionsFor(uuid)) {
+                if (!connection.channels) continue;
+                const channel = connection.channels.get(fullLabel);
+                if (!channel) continue;
+                if (channel.readyState !== 'closed' && channel.readyState !== 'closing') {
+                    return channel;
+                }
+                if (!inactive) inactive = channel;
+            }
+            // Preserve the previous behavior of returning a tracked closed channel until
+            // its close listener has removed it, while preferring a usable direction.
+            return inactive;
+        }
+
+        /**
+         * Wire a channel's drain notification and surface it as a `bufferedAmountLow` event.
+         * @private
+         */
+        _attachBufferedAmountLow(connection, channel, label) {
+            try {
+                channel.bufferedAmountLowThreshold = VDON_DEFAULT_BUFFER_LOW;
+            } catch (e) { /* not all implementations expose this */ }
+
+            if (typeof channel.addEventListener !== 'function') return;
+            try {
+                channel.addEventListener('bufferedamountlow', () => {
+                    this._emit('bufferedAmountLow', {
+                        uuid: connection.uuid,
+                        streamID: connection.streamID,
+                        label: label,
+                        bufferedAmount: channel.bufferedAmount
+                    });
+                });
+            } catch (e) { /* non-fatal */ }
+        }
+
+        /**
+         * Bytes still queued on a peer's channel.
+         *
+         * Without this, callers have to guess a fixed in-flight cap: too low wastes
+         * throughput, too high risks overrunning the SCTP buffer, and the right number
+         * differs per link.
+         *
+         * @param {string} uuid - Peer UUID
+         * @param {string} [label] - Channel name; omit for the control channel
+         * @returns {number|null} Null if the peer or channel is unknown
+         */
+        getBufferedAmount(uuid, label = null) {
+            const connection = this._connectionFor(uuid);
+            if (!connection) return null;
+
+            const channel = label
+                ? this.getChannel(uuid, label)
+                : connection.dataChannel;
+            if (!channel || typeof channel.bufferedAmount !== 'number') return null;
+            return channel.bufferedAmount;
+        }
+
+        /**
+         * Largest single message the negotiated SCTP association will carry.
+         *
+         * Returns null when the transport has not reported one — some implementations only
+         * expose it after connecting, and @roamhq/wrtc does not expose `pc.sctp` at all. On
+         * null, 65536 is the conventional safe assumption; VDO.Ninja's own file transfer
+         * uses 16384.
+         *
+         * @param {string} uuid - Peer UUID
+         * @returns {number|null}
+         */
+        getMaxMessageSize(uuid) {
+            const connection = this._connectionFor(uuid);
+            if (!connection || !connection.pc) return null;
+            const sctp = connection.pc.sctp;
+            if (!sctp || typeof sctp.maxMessageSize !== 'number') return null;
+            // Some implementations report Infinity or 0 for "no limit".
+            if (!isFinite(sctp.maxMessageSize) || sctp.maxMessageSize <= 0) return null;
+            return sctp.maxMessageSize;
+        }
+
+        /**
+         * Send raw bytes to a peer.
+         *
+         * Bytes go out untouched — no JSON, no base64. They travel on a dedicated reserved
+         * channel rather than the control channel, because VDO.Ninja renders any binary
+         * payload on the control channel as a WebP image (webrtc.js:21219). A VDO.Ninja
+         * peer ignores this channel entirely, so nothing is corrupted; it simply will not
+         * receive the bytes, since it has no generic binary sink.
+         *
+         * @param {ArrayBuffer|ArrayBufferView} data - Bytes to send
+         * @param {string} uuid - Target peer UUID
+         * @param {Object} [options]
+         * @param {boolean} [options.ordered=true]
+         * @param {number} [options.maxRetransmits]
+         * @param {number} [options.maxPacketLifeTime]
+         * @param {boolean} [options.waitForDrain=true] - Apply backpressure before sending
+         * @returns {Promise<boolean>} Whether the bytes were handed to the transport
+         */
+        async sendBinary(data, uuid, options = {}) {
+            const bytes = this._toUint8Array(data);
+            if (!bytes) throw new Error('sendBinary requires an ArrayBuffer or typed array');
+            if (!uuid) throw new Error('sendBinary requires a target uuid');
+
+            const channel = await this.openChannel(uuid, VDON_CHANNEL_BINARY, {
+                ordered: options.ordered,
+                maxRetransmits: options.maxRetransmits,
+                maxPacketLifeTime: options.maxPacketLifeTime
+            });
+
+            if (channel.readyState !== 'open') return false;
+
+            if (options.waitForDrain !== false) {
+                await this._waitForChannelDrain(channel, VDON_DEFAULT_BUFFER_HIGH);
+                if (channel.readyState !== 'open') return false;
+            }
+
+            channel.send(bytes);
+            return true;
+        }
+
+        /**
+         * Deliver bytes arriving on the SDK's binary lane.
+         * @private
+         */
+        _setupBinaryChannel(connection, channel) {
+            this._log(`Binary channel open from ${connection.uuid}`);
+
+            channel.onmessage = (event) => {
+                const bytes = this._toUint8Array(event.data);
+                if (!bytes) {
+                    // A peer put a string on the binary lane; surface it rather than drop it.
+                    this._emit('binaryReceived', {
+                        uuid: connection.uuid,
+                        streamID: connection.streamID,
+                        data: event.data,
+                        bytes: null
+                    });
+                    return;
+                }
+                this._emit('binaryReceived', {
+                    uuid: connection.uuid,
+                    streamID: connection.streamID,
+                    bytes: bytes,
+                    data: bytes
+                });
+            };
+
+            channel.onerror = (error) => {
+                this._log(`Binary channel error from ${connection.uuid}:`, error);
+            };
+        }
+
+        /**
+         * Set up a non-control channel received from a peer.
+         * @private
+         */
+        _setupAuxiliaryChannel(connection, channel, label) {
+            try { channel.binaryType = 'arraybuffer'; } catch (e) { /* not all impls expose this */ }
+
+            // Reserved namespace: never a file transfer.
+            if (this._isReservedChannelLabel(label)) {
+                this._attachBufferedAmountLow(connection, channel, label);
+
+                // The SDK owns one lane inside the namespace for sendBinary().
+                if (label === VDON_CHANNEL_BINARY) {
+                    this._setupBinaryChannel(connection, channel);
+                    return;
+                }
+
+                // Everything else belongs to the application.
+                this._log(`Reserved channel "${label}" from ${connection.uuid}`);
+                this._emit('channelOpen', {
+                    uuid: connection.uuid,
+                    streamID: connection.streamID,
+                    label: label,
+                    channel: channel
+                });
+                return;
+            }
+
+            if (label === VDON_CHANNEL_CHUNKED) {
+                // Chunked media transport is a separate protocol (indexed-v1 / positional-v1)
+                // and is not implemented yet. Accept and ignore rather than mis-routing it.
+                this._log(`Chunked media channel from ${connection.uuid} is not supported yet; ignoring`);
+                this._emit('unsupportedChannel', {
+                    uuid: connection.uuid,
+                    streamID: connection.streamID,
+                    label: label
+                });
+                return;
+            }
+
+            if (label === VDON_CHANNEL_RESOURCES) {
+                this._setupResourceReceiveChannel(connection, channel);
+                return;
+            }
+
+            this._setupFileReceiveChannel(connection, channel, label);
+        }
+
+        // ---------------------------------------------------------------------
+        // VDO.Ninja native file transfer
+        //
+        // Wire protocol (lib.js `sendFile`, webrtc.js `recieveFile`):
+        //   1. host advertises  { fileList: [{ id, name, size }] }   on the control channel
+        //   2. peer requests    { requestFile: <id> }                on the control channel
+        //   3. host opens a data channel labelled <id>
+        //   4. host sends       { type: 'filetransfer', size, filename, id }
+        //   5. host sends       16384-byte ArrayBuffer chunks
+        //   6. host sends       'EOF1' (complete) or 'EOF2' (cancelled)
+        // ---------------------------------------------------------------------
+
+        /**
+         * Normalise a hostable source into { size, read(start, end) }.
+         * Accepts Blob/File, ArrayBuffer, or any ArrayBufferView.
+         * @private
+         */
+        _normalizeFileSource(source) {
+            if (typeof Blob !== 'undefined' && source instanceof Blob) {
+                return {
+                    size: source.size,
+                    read: async (start, end) => {
+                        const slice = source.slice(start, end);
+                        if (typeof slice.arrayBuffer === 'function') return await slice.arrayBuffer();
+                        // Older environments without Blob.arrayBuffer()
+                        return await new Promise((resolve, reject) => {
+                            const fr = new FileReader();
+                            fr.onload = () => resolve(fr.result);
+                            fr.onerror = () => reject(fr.error);
+                            fr.readAsArrayBuffer(slice);
+                        });
+                    }
+                };
+            }
+            if (this._isArrayBuffer(source)) {
+                return {
+                    size: source.byteLength,
+                    read: async (start, end) => source.slice(start, end)
+                };
+            }
+            if (ArrayBuffer.isView(source)) {
+                const view = new Uint8Array(source.buffer, source.byteOffset, source.byteLength);
+                return {
+                    size: view.byteLength,
+                    read: async (start, end) => view.slice(start, end)
+                };
+            }
+            throw new Error('hostFile requires a Blob, File, ArrayBuffer, or typed array');
+        }
+
+        /**
+         * Offer a file to peers, VDO.Ninja style.
+         *
+         * @param {Blob|File|ArrayBuffer|ArrayBufferView} source - File contents
+         * @param {Object} [options]
+         * @param {string} [options.name] - Filename; required unless source is a File
+         * @param {string} [options.id] - Explicit file ID; generated when omitted
+         * @param {string|false} [options.restricted=false] - Restrict to a single peer UUID
+         * @returns {{id: string, name: string, size: number}}
+         */
+        hostFile(source, options = {}) {
+            const descriptor = this._normalizeFileSource(source);
+            const name = options.name || (source && typeof source.name === 'string' ? source.name : null);
+            if (!name) {
+                throw new Error('hostFile requires a name when the source is not a File');
+            }
+
+            if (!this._hostedFiles) this._hostedFiles = new Map();
+
+            // The label doubles as the file ID, so it must not collide with a channel name
+            // either side treats specially. VDO.Ninja renames a colliding channel; we avoid
+            // minting the id at all. An `x-` id would be ignored outright by both ends.
+            if (this._isReservedChannelLabel(options.id)) {
+                throw new Error(
+                    `File ID "${options.id}" uses the reserved "${VDON_RESERVED_CHANNEL_PREFIX}" prefix`
+                );
+            }
+            let id = options.id || this._generateStreamID();
+            while (id === VDON_CHANNEL_CONTROL || id === VDON_CHANNEL_CHUNKED ||
+                   id === VDON_CHANNEL_RESOURCES || this._isReservedChannelLabel(id) ||
+                   this._hostedFiles.has(id)) {
+                id = this._generateStreamID();
+            }
+
+            const entry = {
+                id: id,
+                name: name,
+                size: descriptor.size,
+                read: descriptor.read,
+                restricted: (typeof options.restricted === 'string') ? options.restricted : false
+            };
+            this._hostedFiles.set(id, entry);
+            this._log(`Hosting file "${name}" (${descriptor.size} bytes) as ${id}`);
+
+            // Advertise only the new file. VDO.Ninja's addDownloadLink() appends whatever
+            // it receives without de-duplicating, so re-sending the full list on every
+            // hostFile() would stack duplicate download offers in its chat.
+            this._advertiseFiles([entry]);
+            return { id: id, name: name, size: descriptor.size };
+        }
+
+        /**
+         * Stop offering a hosted file. In-flight transfers of that file are cancelled.
+         *
+         * There is no un-advertise message in VDO.Ninja's protocol — its `fileList`
+         * handler only ever appends — so a peer that already saw the offer keeps showing
+         * it. Requesting it afterwards is simply refused, which is how VDO.Ninja's own
+         * removed-file path behaves.
+         *
+         * @param {string} id - File ID returned by hostFile()
+         * @returns {boolean} Whether a hosted file was removed
+         */
+        unhostFile(id) {
+            if (!this._hostedFiles || !this._hostedFiles.has(id)) return false;
+            this._hostedFiles.delete(id);
+
+            if (this._outboundTransfers) {
+                for (const transfer of this._outboundTransfers.values()) {
+                    if (transfer.fileId === id) transfer.cancelled = true;
+                }
+            }
+
+            return true;
+        }
+
+        /**
+         * List the files this peer is currently offering.
+         * @returns {Array<{id: string, name: string, size: number, restricted: string|false}>}
+         */
+        getHostedFiles() {
+            if (!this._hostedFiles) return [];
+            return Array.from(this._hostedFiles.values()).map(f => ({
+                id: f.id,
+                name: f.name,
+                size: f.size,
+                restricted: f.restricted
+            }));
+        }
+
+        /**
+         * Build the file list visible to one peer, honouring per-file restrictions.
+         * @private
+         */
+        _fileListFor(uuid) {
+            if (!this._hostedFiles || !this._hostedFiles.size) return [];
+            const list = [];
+            for (const file of this._hostedFiles.values()) {
+                if (file.restricted === false || file.restricted === uuid) {
+                    list.push({ id: file.id, name: file.name, size: file.size });
+                }
+            }
+            return list;
+        }
+
+        /**
+         * Send file advertisements over the exact publisher connection on which the
+         * viewer opted in. VDO.Ninja treats `downloads` as a viewer-to-publisher
+         * capability, so a viewer connection must never be used as a fallback here.
+         * @private
+         */
+        _sendFileEntries(connection, fileList) {
+            if (!connection || connection.allowDownloads !== true ||
+                !connection.dataChannel || connection.dataChannel.readyState !== 'open') {
+                return false;
+            }
+            if (!fileList || !fileList.length) return false;
+
+            if (!connection._advertisedFileIds) {
+                connection._advertisedFileIds = new Set();
+            }
+            const unsent = fileList.filter(file => !connection._advertisedFileIds.has(file.id));
+            if (!unsent.length) return false;
+
+            try {
+                connection.dataChannel.send(JSON.stringify({ fileList: unsent }));
+                for (const file of unsent) connection._advertisedFileIds.add(file.id);
+                this._log(`Sent file list (${unsent.length}) to ${connection.uuid}`);
+                return true;
+            } catch (e) {
+                this._log('Failed to send file list:', e.message || e);
+                return false;
+            }
+        }
+
+        /**
+         * Send the current file list to one opted-in viewer.
+         * @private
+         */
+        _sendFileList(uuid, connection = null) {
+            const fileList = this._fileListFor(uuid);
+            if (!fileList.length) return false;
+            const target = connection ||
+                (this.connections.get(uuid) && this.connections.get(uuid).publisher) ||
+                null;
+            return this._sendFileEntries(target, fileList);
+        }
+
+        /**
+         * Advertise a specific set of files to every connected peer, honouring
+         * per-file restrictions.
+         * @private
+         */
+        _advertiseFiles(entries) {
+            if (!this.connections || !entries || !entries.length) return;
+            for (const [uuid, connections] of this.connections) {
+                const connection = connections && connections.publisher;
+                if (!connection || connection.allowDownloads !== true) continue;
+                const visible = entries
+                    .filter(f => f.restricted === false || f.restricted === uuid)
+                    .map(f => ({ id: f.id, name: f.name, size: f.size }));
+                if (!visible.length) continue;
+                this._sendFileEntries(connection, visible);
+            }
+        }
+
+        /**
+         * Request a file a peer has advertised.
+         *
+         * Resolves when the transfer completes. Progress arrives as `fileTransferProgress`
+         * events; set `stream` to receive chunks via `fileChunk` without buffering the
+         * whole file in memory.
+         *
+         * @param {string} uuid - Peer UUID hosting the file
+         * @param {string} fileId - File ID from the peer's advertised list
+         * @param {Object} [options]
+         * @param {boolean} [options.stream=false] - Emit chunks instead of accumulating
+         * @param {number} [options.timeout=30000] - Ms to wait for the transfer to start
+         * @returns {Promise<{id, name, size, bytes?: Uint8Array, blob?: Blob}>}
+         */
+        requestFile(uuid, fileId, options = {}) {
+            if (!uuid || !fileId) {
+                return Promise.reject(new Error('requestFile requires a uuid and a fileId'));
+            }
+            if (!this._inboundTransfers) this._inboundTransfers = new Map();
+
+            const key = `${uuid}:${fileId}`;
+            const existing = this._inboundTransfers.get(key);
+            if (existing) return existing.promise;
+
+            const stream = options.stream === true;
+            const startTimeout = (typeof options.timeout === 'number') ? options.timeout : 30000;
+
+            const transfer = {
+                uuid: uuid,
+                fileId: fileId,
+                stream: stream,
+                chunks: [],
+                received: 0,
+                details: null,
+                started: false
+            };
+
+            transfer.promise = new Promise((resolve, reject) => {
+                transfer.resolve = resolve;
+                transfer.reject = reject;
+            });
+
+            transfer.startTimer = setTimeout(() => {
+                if (!transfer.started) {
+                    this._inboundTransfers.delete(key);
+                    transfer.reject(new Error(`Peer ${uuid} did not start transfer of ${fileId}`));
+                }
+            }, startTimeout);
+            if (transfer.startTimer && typeof transfer.startTimer.unref === 'function') {
+                transfer.startTimer.unref();
+            }
+
+            this._inboundTransfers.set(key, transfer);
+
+            try {
+                this._sendDataInternal({ requestFile: fileId }, uuid, null, 'any');
+                this._log(`Requested file ${fileId} from ${uuid}`);
+            } catch (e) {
+                clearTimeout(transfer.startTimer);
+                this._inboundTransfers.delete(key);
+                transfer.reject(e);
+            }
+
+            return transfer.promise;
+        }
+
+        /**
+         * Handle a peer's {requestFile} by opening a labelled channel and streaming it.
+         * @private
+         */
+        async _handleFileRequest(connection, fileId) {
+            const file = this._hostedFiles && this._hostedFiles.get(fileId);
+            if (!file) {
+                this._log(`Peer ${connection.uuid} requested unknown file ${fileId}`);
+                return;
+            }
+            if (file.restricted !== false && file.restricted !== connection.uuid) {
+                this._log(`Peer ${connection.uuid} is not permitted to read ${fileId}`);
+                return;
+            }
+            if (!connection.pc) return;
+
+            if (!this._outboundTransfers) this._outboundTransfers = new Map();
+            const key = `${connection.uuid}:${fileId}`;
+            if (this._outboundTransfers.has(key)) {
+                this._log(`Transfer of ${fileId} to ${connection.uuid} is already running`);
+                return;
+            }
+
+            let channel;
+            try {
+                channel = connection.pc.createDataChannel(fileId, { ordered: true });
+                this._log(`Opened file transfer channel "${fileId}" to ${connection.uuid}, state: ${channel.readyState}`);
+            } catch (e) {
+                this._log('Failed to open file transfer channel:', e.message || e);
+                return;
+            }
+            channel.binaryType = 'arraybuffer';
+            this._trackChannel(connection, channel);
+
+            const transfer = { fileId: fileId, uuid: connection.uuid, cancelled: false, channel: channel };
+            this._outboundTransfers.set(key, transfer);
+
+            const finish = () => {
+                this._outboundTransfers.delete(key);
+            };
+
+            channel.onclose = finish;
+            channel.onerror = (err) => {
+                this._log(`File transfer channel error for ${fileId}:`, err);
+                finish();
+            };
+
+            const begin = async () => {
+                try {
+                    channel.send(JSON.stringify({
+                        type: 'filetransfer',
+                        size: file.size,
+                        filename: file.name,
+                        id: file.id
+                    }));
+                    await this._streamFileChunks(channel, file, transfer, connection);
+                } catch (e) {
+                    this._log(`File transfer of ${fileId} failed:`, e.message || e);
+                    this._emit('fileTransferError', {
+                        uuid: connection.uuid,
+                        streamID: connection.streamID,
+                        id: fileId,
+                        direction: 'outbound',
+                        error: e
+                    });
+                    try { channel.close(); } catch (e2) { /* already closing */ }
+                    finish();
+                }
+            };
+
+            // When the SCTP association is already up, a new channel can be open before
+            // we attach the handler, so onopen would never fire.
+            if (channel.readyState === 'open') {
+                begin();
+            } else {
+                channel.onopen = begin;
+            }
+        }
+
+        /**
+         * Send a hosted file's bytes in VDO.Ninja-sized chunks.
+         *
+         * Deviation from VDO.Ninja: its sender (lib.js `sendFile`) is a FileReader loop
+         * with no bufferedAmount check, which overruns SCTP on fast links. We wait for the
+         * buffer to drain between chunks. This is invisible to the receiver — the framing
+         * and chunk size are unchanged — so it stays wire-compatible.
+         * @private
+         */
+        async _streamFileChunks(channel, file, transfer, connection) {
+            let offset = 0;
+
+            while (offset < file.size) {
+                if (transfer.cancelled) {
+                    try { channel.send(VDON_FILE_EOF_CANCELLED); } catch (e) { /* peer gone */ }
+                    try { channel.close(); } catch (e) { /* already closing */ }
+                    this._emit('fileTransferCancelled', {
+                        uuid: transfer.uuid,
+                        id: file.id,
+                        direction: 'outbound',
+                        bytesSent: offset
+                    });
+                    return;
+                }
+                if (channel.readyState !== 'open') {
+                    this._log(`File transfer channel for ${file.id} closed mid-transfer`);
+                    return;
+                }
+
+                await this._waitForChannelDrain(channel);
+                if (channel.readyState !== 'open') return;
+
+                const end = Math.min(offset + VDON_FILE_CHUNK_SIZE, file.size);
+                const chunk = await file.read(offset, end);
+                channel.send(chunk);
+                offset = end;
+
+                this._emit('fileTransferProgress', {
+                    uuid: transfer.uuid,
+                    streamID: connection ? connection.streamID : null,
+                    id: file.id,
+                    name: file.name,
+                    direction: 'outbound',
+                    bytes: offset,
+                    size: file.size,
+                    progress: file.size ? (offset / file.size) : 1
+                });
+            }
+
+            channel.send(VDON_FILE_EOF_COMPLETE);
+
+            // Let the buffer empty before closing. Small transfers otherwise finish
+            // inside a single millisecond and close() lands while hundreds of KB are
+            // still queued — the peer sees the close and drops the transfer. VDO.Ninja's
+            // own sender never hits this because its FileReader loop is slow enough to
+            // hide it.
+            await this._waitForChannelFlush(channel);
+
+            this._emit('fileTransferComplete', {
+                uuid: transfer.uuid,
+                streamID: connection ? connection.streamID : null,
+                id: file.id,
+                name: file.name,
+                size: file.size,
+                direction: 'outbound'
+            });
+            try { channel.close(); } catch (e) { /* already closing */ }
+        }
+
+        /**
+         * Resolve once a channel's send buffer is empty, or the channel closes, or we
+         * give up. Mirrors the bye-flush pattern used elsewhere in the SDK.
+         * @private
+         */
+        _waitForChannelFlush(channel, timeoutMs = 15000) {
+            if (typeof channel.bufferedAmount !== 'number' || channel.bufferedAmount === 0) {
+                return Promise.resolve();
+            }
+            return new Promise((resolve) => {
+                const deadline = Date.now() + timeoutMs;
+                const poll = setInterval(() => {
+                    if (channel.readyState !== 'open' ||
+                        channel.bufferedAmount === 0 ||
+                        Date.now() > deadline) {
+                        clearInterval(poll);
+                        resolve();
+                    }
+                }, 25);
+                if (poll && typeof poll.unref === 'function') poll.unref();
+            });
+        }
+
+        /**
+         * Resolve once a channel's send buffer has drained below the high-water mark.
+         * Prefers the 'bufferedamountlow' event and falls back to polling for
+         * implementations that do not fire it.
+         * @private
+         */
+        _waitForChannelDrain(channel, highWaterMark = 1048576) {
+            if (typeof channel.bufferedAmount !== 'number' || channel.bufferedAmount < highWaterMark) {
+                return Promise.resolve();
+            }
+
+            return new Promise((resolve) => {
+                let settled = false;
+                let pollTimer = null;
+                const lowMark = Math.floor(highWaterMark / 2);
+                const priorThreshold = channel.bufferedAmountLowThreshold;
+
+                const done = () => {
+                    if (settled) return;
+                    settled = true;
+                    if (pollTimer) clearInterval(pollTimer);
+                    if (typeof channel.removeEventListener === 'function') {
+                        try { channel.removeEventListener('bufferedamountlow', done); } catch (e) { /* non-fatal */ }
+                    }
+                    try { channel.bufferedAmountLowThreshold = priorThreshold; } catch (e) { /* non-fatal */ }
+                    resolve();
+                };
+
+                try { channel.bufferedAmountLowThreshold = lowMark; } catch (e) { /* non-fatal */ }
+                if (typeof channel.addEventListener === 'function') {
+                    try { channel.addEventListener('bufferedamountlow', done); } catch (e) { /* non-fatal */ }
+                }
+
+                // Fallback for implementations without bufferedamountlow, and a safety net
+                // if the channel closes while we are waiting.
+                pollTimer = setInterval(() => {
+                    if (channel.readyState !== 'open' || channel.bufferedAmount <= lowMark) done();
+                }, 50);
+                if (pollTimer && typeof pollTimer.unref === 'function') pollTimer.unref();
+            });
+        }
+
+        /**
+         * Receive a file transfer on a labelled channel.
+         * @private
+         */
+        _setupFileReceiveChannel(connection, channel, label) {
+            if (!this._inboundTransfers) this._inboundTransfers = new Map();
+
+            // The channel label is the file ID, unless the host had to rename it to avoid
+            // colliding with 'sendChannel'. The header's id is authoritative.
+            let transfer = this._inboundTransfers.get(`${connection.uuid}:${label}`) || null;
+            let key = transfer ? `${connection.uuid}:${label}` : null;
+            let details = null;
+
+            const fail = (error) => {
+                this._emit('fileTransferError', {
+                    uuid: connection.uuid,
+                    streamID: connection.streamID,
+                    id: details ? details.id : label,
+                    direction: 'inbound',
+                    error: error
+                });
+                if (transfer) {
+                    clearTimeout(transfer.startTimer);
+                    if (key) this._inboundTransfers.delete(key);
+                    transfer.reject(error);
+                    transfer = null;
+                }
+            };
+
+            channel.onmessage = (event) => {
+                // Header first: a JSON frame announcing the transfer.
+                if (!details) {
+                    if (typeof event.data !== 'string') {
+                        this._log(`Ignoring binary frame before header on channel "${label}"`);
+                        return;
+                    }
+                    let parsed;
+                    try {
+                        parsed = JSON.parse(event.data);
+                    } catch (e) {
+                        this._log(`Unparseable header on channel "${label}"`);
+                        return;
+                    }
+                    if (!parsed || parsed.type !== 'filetransfer') {
+                        this._log(`Unsupported header on channel "${label}"; expected 'filetransfer'`);
+                        return;
+                    }
+
+                    details = parsed;
+
+                    // Re-key against the authoritative id if the label was renamed.
+                    if (!transfer) {
+                        const byId = `${connection.uuid}:${details.id}`;
+                        transfer = this._inboundTransfers.get(byId) || null;
+                        if (transfer) key = byId;
+                    }
+                    if (transfer) {
+                        transfer.started = true;
+                        transfer.details = details;
+                        clearTimeout(transfer.startTimer);
+                    }
+
+                    this._emit('fileTransferStart', {
+                        uuid: connection.uuid,
+                        streamID: connection.streamID,
+                        id: details.id,
+                        name: details.filename,
+                        size: details.size,
+                        direction: 'inbound',
+                        requested: !!transfer
+                    });
+                    return;
+                }
+
+                // Terminators
+                if (event.data === VDON_FILE_EOF_COMPLETE) {
+                    this._completeInboundTransfer(connection, transfer, details, key);
+                    transfer = null;
+                    try { channel.close(); } catch (e) { /* already closing */ }
+                    return;
+                }
+                if (event.data === VDON_FILE_EOF_CANCELLED) {
+                    this._emit('fileTransferCancelled', {
+                        uuid: connection.uuid,
+                        streamID: connection.streamID,
+                        id: details.id,
+                        name: details.filename,
+                        direction: 'inbound',
+                        bytesReceived: transfer ? transfer.received : 0
+                    });
+                    fail(new Error('Transfer cancelled by remote peer'));
+                    try { channel.close(); } catch (e) { /* already closing */ }
+                    return;
+                }
+
+                // Body
+                const bytes = this._toUint8Array(event.data);
+                if (!bytes) {
+                    this._log(`Dropping unrecognised frame on file channel "${label}" (${typeof event.data}/${event.data && event.data.constructor && event.data.constructor.name})`);
+                    return;
+                }
+
+                if (transfer) {
+                    transfer.received += bytes.byteLength;
+                    if (!transfer.stream) transfer.chunks.push(bytes);
+                }
+
+                const received = transfer ? transfer.received : bytes.byteLength;
+                this._emit('fileTransferProgress', {
+                    uuid: connection.uuid,
+                    streamID: connection.streamID,
+                    id: details.id,
+                    name: details.filename,
+                    direction: 'inbound',
+                    bytes: received,
+                    size: details.size,
+                    progress: details.size ? (received / details.size) : 0
+                });
+
+                if (transfer && transfer.stream) {
+                    this._emit('fileChunk', {
+                        uuid: connection.uuid,
+                        streamID: connection.streamID,
+                        id: details.id,
+                        name: details.filename,
+                        chunk: bytes,
+                        bytes: received,
+                        size: details.size
+                    });
+                }
+            };
+
+            channel.onerror = (error) => {
+                this._log(`File receive channel error on "${label}":`, error);
+            };
+
+            channel.onclose = () => {
+                if (transfer) {
+                    fail(new Error('Transfer channel closed before completion'));
+                }
+            };
+        }
+
+        /**
+         * Settle a completed inbound transfer.
+         * @private
+         */
+        _completeInboundTransfer(connection, transfer, details, key) {
+            // Trust EOF1 for framing, not for completeness. If the byte count does not
+            // match the announced size, fail loudly rather than handing back a file that
+            // is quietly short.
+            if (transfer && typeof details.size === 'number' && transfer.received !== details.size) {
+                const error = new Error(
+                    `Incomplete transfer of "${details.filename}": received ${transfer.received} of ${details.size} bytes`
+                );
+                this._log(error.message);
+                this._emit('fileTransferError', {
+                    uuid: connection.uuid,
+                    streamID: connection.streamID,
+                    id: details.id,
+                    name: details.filename,
+                    direction: 'inbound',
+                    received: transfer.received,
+                    size: details.size,
+                    error: error
+                });
+                clearTimeout(transfer.startTimer);
+                if (key && this._inboundTransfers) this._inboundTransfers.delete(key);
+                transfer.chunks = [];
+                transfer.reject(error);
+                return;
+            }
+
+            const result = {
+                id: details.id,
+                name: details.filename,
+                size: details.size,
+                uuid: connection.uuid,
+                streamID: connection.streamID
+            };
+
+            if (transfer && !transfer.stream) {
+                const total = transfer.chunks.reduce((sum, c) => sum + c.byteLength, 0);
+                const merged = new Uint8Array(total);
+                let offset = 0;
+                for (const chunk of transfer.chunks) {
+                    merged.set(chunk, offset);
+                    offset += chunk.byteLength;
+                }
+                result.bytes = merged;
+                if (typeof Blob !== 'undefined') {
+                    try { result.blob = new Blob([merged]); } catch (e) { /* Node without Blob */ }
+                }
+                transfer.chunks = [];
+            }
+
+            this._emit('fileTransferComplete', Object.assign({ direction: 'inbound' }, result));
+
+            if (transfer) {
+                clearTimeout(transfer.startTimer);
+                if (key && this._inboundTransfers) this._inboundTransfers.delete(key);
+                transfer.resolve(result);
+            }
+        }
+
+        /**
+         * Test for an ArrayBuffer without relying on instanceof.
+         *
+         * Native WebRTC addons (@roamhq/wrtc) hand back buffers created in another V8
+         * context, where `x instanceof ArrayBuffer` is false even though the object is a
+         * genuine ArrayBuffer. The brand check via Object.prototype.toString is realm-safe.
+         * @private
+         */
+        _isArrayBuffer(value) {
+            if (!value || typeof value !== 'object') return false;
+            if (value instanceof ArrayBuffer) return true;
+            const tag = Object.prototype.toString.call(value);
+            return tag === '[object ArrayBuffer]' || tag === '[object SharedArrayBuffer]';
+        }
+
+        /**
+         * Coerce a data-channel payload into a Uint8Array.
+         * @private
+         */
+        _toUint8Array(data) {
+            if (!data) return null;
+            // Checked before ArrayBuffer: views carry their own offset and length.
+            if (ArrayBuffer.isView(data)) return new Uint8Array(data.buffer, data.byteOffset, data.byteLength);
+            if (this._isArrayBuffer(data)) return new Uint8Array(data);
+            return null;
+        }
+
+        // ---------------------------------------------------------------------
+        // VDO.Ninja native resource channel
+        //
+        // Wire protocol (lib.js `processResourceQueue` / `recieveResourcesChannel`):
+        //   channel 'resources', { ordered: true, maxRetransmits: 30 }
+        //   1. JSON metadata frame carrying at least { templateName, size }
+        //   2. 16384-byte binary chunks until `size` bytes have arrived
+        // ---------------------------------------------------------------------
+
+        /**
+         * Send a resource to a peer over the VDO.Ninja 'resources' channel.
+         *
+         * Resources are keyed images: the receiver turns the bytes into an object URL
+         * with `metadata.type` as the MIME type (defaulting to image/png) and stores it
+         * under `metadata.templateName`. Sending the same templateName again replaces it.
+         *
+         * The peer must have advertised `allowresources`. VDO.Ninja applies the same gate
+         * before opening this channel, and its receiver discards an unsolicited one.
+         *
+         * @param {string} uuid - Target peer UUID
+         * @param {Object} metadata - Must include templateName; `type` sets the MIME type;
+         *        size is filled in for you
+         * @param {ArrayBuffer|ArrayBufferView} data - Resource bytes
+         * @returns {Promise<void>}
+         */
+        async sendResource(uuid, metadata, data) {
+            const connections = this._connectionsFor(uuid);
+            if (!connections.length) {
+                throw new Error(`No connection to ${uuid}`);
+            }
+            if (!metadata || typeof metadata.templateName !== 'string') {
+                throw new Error('sendResource requires metadata with a templateName');
+            }
+
+            // Capabilities belong to a specific peer-connection direction. In a full
+            // mesh, the publisher-first connection may not be the one whose viewer
+            // advertised resource support.
+            const usableConnections = connections.filter(candidate =>
+                candidate.pc && candidate.pc.connectionState !== 'closed'
+            );
+            if (!usableConnections.length) {
+                throw new Error(`No connection to ${uuid}`);
+            }
+            const connection = usableConnections.find(candidate =>
+                candidate.pc && candidate.pc.connectionState !== 'closed' &&
+                candidate.allowResources === true
+            ) || null;
+            if (!connection || connection.allowResources !== true) {
+                throw new Error(
+                    `Peer ${uuid} has not advertised allowresources; it would discard the channel`
+                );
+            }
+
+            const bytes = this._toUint8Array(data);
+            if (!bytes) throw new Error('sendResource requires an ArrayBuffer or typed array');
+            const header = Object.assign({}, metadata, { size: bytes.byteLength });
+
+            // VDO.Ninja's receiver has one metadata/chunk accumulator per channel.
+            // Serialize complete resources so concurrent callers cannot produce
+            // header-A, header-B, chunk-A, chunk-B and corrupt both resources.
+            const previous = connection._resourceSendQueue || Promise.resolve();
+            const operation = previous.catch(() => {}).then(async () => {
+                let channel = connection.channels && connection.channels.get(VDON_CHANNEL_RESOURCES);
+                if (!channel || channel.readyState === 'closed' || channel.readyState === 'closing') {
+                    channel = connection.pc.createDataChannel(VDON_CHANNEL_RESOURCES, {
+                        ordered: true,
+                        maxRetransmits: 30
+                    });
+                    channel.binaryType = 'arraybuffer';
+                    this._trackChannel(connection, channel);
+                }
+
+                await this._awaitChannelOpen(channel, 15000);
+                channel.send(JSON.stringify(header));
+
+                let offset = 0;
+                while (offset < bytes.byteLength) {
+                    await this._waitForChannelDrain(channel);
+                    if (channel.readyState !== 'open') {
+                        throw new Error('Resource channel closed mid-transfer');
+                    }
+                    const end = Math.min(offset + VDON_RESOURCE_CHUNK_SIZE, bytes.byteLength);
+                    channel.send(bytes.slice(offset, end));
+                    offset = end;
+                }
+
+                this._log(`Sent resource "${metadata.templateName}" (${bytes.byteLength} bytes) to ${uuid}`);
+            });
+
+            connection._resourceSendQueue = operation;
+            try {
+                await operation;
+            } finally {
+                if (connection._resourceSendQueue === operation) {
+                    connection._resourceSendQueue = null;
+                }
+            }
+        }
+
+        /**
+         * Receive resources on the 'resources' channel.
+         * Honours the same opt-in VDO.Ninja does: a peer that never advertised
+         * allowresources should not be sent them, and refuses them if it is.
+         * @private
+         */
+        _setupResourceReceiveChannel(connection, channel) {
+            // Gate on what *this viewer connection* advertised. The publisher-side
+            // _pendingInfo is a different direction entirely and is not what a peer
+            // acts on when deciding to open this channel.
+            const advertised = !!(connection.viewPreferences && connection.viewPreferences.allowresources);
+            if (!advertised) {
+                this._log(`Peer ${connection.uuid} opened a resources channel without it being requested; ignoring`);
+                try { channel.close(); } catch (e) { /* already closing */ }
+                return;
+            }
+
+            let metadata = null;
+            let chunks = [];
+            let received = 0;
+
+            channel.onmessage = (event) => {
+                if (typeof event.data === 'string') {
+                    try {
+                        const parsed = JSON.parse(event.data);
+                        if (parsed && parsed.templateName) {
+                            metadata = parsed;
+                            chunks = [];
+                            received = 0;
+                        }
+                    } catch (e) {
+                        this._log('Unparseable resource metadata frame');
+                    }
+                    return;
+                }
+
+                if (!metadata) return;
+
+                const bytes = this._toUint8Array(event.data);
+                if (!bytes) return;
+
+                chunks.push(bytes);
+                received += bytes.byteLength;
+
+                if (received >= metadata.size) {
+                    const merged = new Uint8Array(received);
+                    let offset = 0;
+                    for (const chunk of chunks) {
+                        merged.set(chunk, offset);
+                        offset += chunk.byteLength;
+                    }
+                    this._emit('resourceReceived', {
+                        uuid: connection.uuid,
+                        streamID: connection.streamID,
+                        metadata: metadata,
+                        bytes: merged
+                    });
+                    metadata = null;
+                    chunks = [];
+                    received = 0;
+                }
+            };
+
+            channel.onerror = (error) => {
+                this._log(`Resource channel error from ${connection.uuid}:`, error);
+            };
+        }
+
         _setupDataChannel(connection, channel) {
             this._log(`Setting up data channel for ${connection.uuid}, initial state: ${channel.readyState}`);
+
+            // File offers are scoped to one control-channel generation. A replacement
+            // channel represents a fresh remote UI, so its de-duplication set starts over.
+            if (connection._fileListControlChannel !== channel) {
+                connection._fileListControlChannel = channel;
+                connection._advertisedFileIds = new Set();
+            }
             
             channel.onopen = () => {
                 this._log(`Data channel opened for ${connection.uuid}`);
@@ -2467,7 +4058,17 @@ const OUTBOUND_VIDEO_STOP_MUTE_DELAY_MS = 500;
                         const infoCombined = Object.assign({}, this._pendingInfo || {}, connection.info || {});
                         // Sanitize string fields
                         if (infoCombined.label) infoCombined.label = this._sanitizeLabel(infoCombined.label);
-                        if (infoCombined.meta) infoCombined.meta = this._sanitizeLabel(infoCombined.meta);
+                        // _sanitizeMeta returns null for anything it cannot represent (an
+                        // array, a number). Drop the key rather than putting meta:null on
+                        // the wire: typeof null === "object", so a receiver type-checking
+                        // for an object accepts it and then trips over it downstream.
+                        if (infoCombined.meta) {
+                            const safeMeta = this._sanitizeMeta(infoCombined.meta);
+                            if (safeMeta === null || safeMeta === '') delete infoCombined.meta;
+                            else infoCombined.meta = safeMeta;
+                        } else if ('meta' in infoCombined) {
+                            delete infoCombined.meta;
+                        }
                         if (infoCombined.order) infoCombined.order = this._sanitizeLabel(infoCombined.order);
 
                         if (Object.keys(infoCombined).length > 0) {
@@ -2486,7 +4087,7 @@ const OUTBOUND_VIDEO_STOP_MUTE_DELAY_MS = 500;
                 
                 // Start ping monitoring based on role/flags
                 this._startPingMonitoring(connection);
-                
+
                 this._emit('dataChannelOpen', {
                     uuid: connection.uuid,
                     type: connection.type,
@@ -2538,6 +4139,33 @@ const OUTBOUND_VIDEO_STOP_MUTE_DELAY_MS = 500;
                             this._log('Failed to decrypt ICE candidate from data channel:', error);
                             return;
                         }
+                    }
+
+                    // File transfer keys are handled independently of the chain below,
+                    // matching VDO.Ninja's `if ("key" in msg)` style — a peer may combine
+                    // them with other fields.
+                    if (Array.isArray(msg.fileList)) {
+                        connection.availableFiles = msg.fileList;
+                        this._emit('fileList', {
+                            uuid: connection.uuid,
+                            streamID: connection.streamID,
+                            files: msg.fileList
+                        });
+                    }
+                    if (typeof msg.requestFile === 'string' || typeof msg.requestFile === 'number') {
+                        this._handleFileRequest(connection, String(msg.requestFile));
+                    }
+                    // Record what a viewer says it will accept, so this peer can gate the
+                    // same way VDO.Ninja does before opening an auxiliary channel.
+                    if ('downloads' in msg) {
+                        connection.allowDownloads = msg.downloads === true;
+                        if (connection.type === 'publisher' && connection.allowDownloads &&
+                            this._hostedFiles && this._hostedFiles.size) {
+                            this._sendFileList(connection.uuid, connection);
+                        }
+                    }
+                    if ('allowresources' in msg) {
+                        connection.allowResources = msg.allowresources === true;
                     }
 
                     // Handle different message types
@@ -3984,11 +5612,13 @@ const OUTBOUND_VIDEO_STOP_MUTE_DELAY_MS = 500;
                     if (pendingView.options.label) {
                         connection.viewPreferences.info = { label: pendingView.options.label };
                     }
+                    this._applyViewerCapabilities(connection.viewPreferences, pendingView.options);
                     connection.viewOptions = pendingView.options;
                     this._log('Attached view preferences to connection:', connection.viewPreferences);
                 } else {
                     // Default to requesting both audio and video if no preferences specified
                     connection.viewPreferences = { audio: true, video: true };
+                    this._applyViewerCapabilities(connection.viewPreferences, {});
                     connection.viewOptions = { audio: true, video: true };
                     this._log('No pending view found, using default preferences:', connection.viewPreferences);
                 }
@@ -6154,6 +7784,94 @@ const OUTBOUND_VIDEO_STOP_MUTE_DELAY_MS = 500;
         }
 
         /**
+         * Digested per-peer connection quality.
+         *
+         * getStats() returns the raw WebRTC report, which is a lot of work to interpret
+         * before you can rank a peer. This pulls out the values needed to decide whether a
+         * link is good: round-trip time, loss, and whether the path is direct or relayed.
+         * The numbers come from the active candidate pair, so they are available as soon as
+         * ICE settles rather than after the application has measured RTT itself.
+         *
+         * @param {string} uuid - Peer UUID
+         * @returns {Promise<{rttMs: number|null, lossRate: number|null,
+         *   candidatePairType: string|null, relayed: boolean|null,
+         *   availableOutgoingBitrate: number|null, bytesSent: number, bytesReceived: number}|null>}
+         *   Null if the peer is unknown or has no usable statistics.
+         */
+        async getPeerQuality(uuid) {
+            const connections = uuid ? this.connections.get(uuid) : null;
+            const connection = connections && (connections.publisher || connections.viewer);
+            if (!connection || !connection.pc) return null;
+
+            let report;
+            try {
+                report = await connection.pc.getStats();
+            } catch (error) {
+                this._log('Error getting peer quality:', error);
+                return null;
+            }
+
+            const entries = Array.from(report.values());
+            const byId = new Map(entries.map(s => [s.id, s]));
+
+            // Prefer the pair ICE actually settled on. Implementations disagree about
+            // which flag is authoritative, so accept either and fall back to any pair.
+            const pairs = entries.filter(s => s.type === 'candidate-pair');
+            const active =
+                pairs.find(p => p.nominated && p.state === 'succeeded') ||
+                pairs.find(p => p.state === 'succeeded') ||
+                pairs.find(p => p.selected) ||
+                null;
+
+            let candidatePairType = null;
+            let relayed = null;
+            if (active) {
+                const local = byId.get(active.localCandidateId);
+                const remote = byId.get(active.remoteCandidateId);
+                const localType = local ? local.candidateType : null;
+                const remoteType = remote ? remote.candidateType : null;
+                if (localType || remoteType) {
+                    candidatePairType = `${localType || 'unknown'}/${remoteType || 'unknown'}`;
+                    relayed = localType === 'relay' || remoteType === 'relay';
+                }
+            }
+
+            // currentRoundTripTime is in seconds; expose milliseconds.
+            let rttMs = null;
+            if (active && typeof active.currentRoundTripTime === 'number') {
+                rttMs = active.currentRoundTripTime * 1000;
+            } else if (active && typeof active.totalRoundTripTime === 'number' &&
+                       active.responsesReceived > 0) {
+                rttMs = (active.totalRoundTripTime / active.responsesReceived) * 1000;
+            }
+
+            // Loss across inbound streams. Data channels do not report loss, so this stays
+            // null on a data-only peer rather than pretending to be zero.
+            let lost = 0;
+            let received = 0;
+            let sawInbound = false;
+            for (const s of entries) {
+                if (s.type !== 'inbound-rtp') continue;
+                if (typeof s.packetsLost === 'number') { lost += s.packetsLost; sawInbound = true; }
+                if (typeof s.packetsReceived === 'number') { received += s.packetsReceived; sawInbound = true; }
+            }
+            const total = lost + received;
+            const lossRate = (sawInbound && total > 0) ? (lost / total) : null;
+
+            return {
+                rttMs: rttMs,
+                lossRate: lossRate,
+                candidatePairType: candidatePairType,
+                relayed: relayed,
+                availableOutgoingBitrate:
+                    (active && typeof active.availableOutgoingBitrate === 'number')
+                        ? active.availableOutgoingBitrate : null,
+                bytesSent: (active && typeof active.bytesSent === 'number') ? active.bytesSent : 0,
+                bytesReceived: (active && typeof active.bytesReceived === 'number') ? active.bytesReceived : 0
+            };
+        }
+
+        /**
          * Internal method to send raw data via data channel with WebSocket fallback
          * @private
          * @param {*} data - Data to send
@@ -7167,7 +8885,11 @@ const OUTBOUND_VIDEO_STOP_MUTE_DELAY_MS = 500;
     // Export for different environments
     if (typeof module !== 'undefined' && module.exports) {
         module.exports = VDONinjaSDK;
-        module.exports.VDONinja = VDONinjaSDK; // Also expose as VDONinja
+        // Keep CommonJS, transpiled default imports, and the named aliases described by
+        // vdoninja-sdk.d.ts on the same constructor.
+        module.exports.default = VDONinjaSDK;
+        module.exports.VDONinja = VDONinjaSDK;
+        module.exports.VDONinjaSDK = VDONinjaSDK;
     } else if (typeof define === 'function' && define.amd) {
         define([], function() {
             return VDONinjaSDK;

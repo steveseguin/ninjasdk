@@ -28,7 +28,15 @@ const vdo = new VDONinjaSDK(options)
 ## Connection
 
 - connect(): Promise<void>
-- disconnect(): void
+- disconnect(): Promise<void>
+  - Resolves once teardown genuinely completes: bye messages flushed, peers closed, timers
+    cleared, socket shut. Exiting the process before it resolves can crash the native
+    WebRTC module mid-teardown.
+  - Safe to call more than once; repeat calls return the same promise and do not tear down
+    twice.
+  - The returned promise is new in v1.5. Callers that ignore it behave exactly as before.
+  - `disconnected` is **not** a completion signal — it also fires when the socket closes,
+    partway through. Await the promise, or listen for `teardownComplete`.
 - joinRoom({ room, password }): Promise<void>
 - leaveRoom(): void
 - autoConnect(roomOrOptions, filter?): Promise<{ stop: Function, streamID: string }>
@@ -47,7 +55,12 @@ const vdo = new VDONinjaSDK(options)
 
 ## Viewing (Receiver)
 
-- view(streamID, { audio=true, video=true, label? }): Promise<RTCPeerConnection>
+- view(streamID, { audio=true, video=true, label?, downloads=true, allowresources=false }): Promise<RTCPeerConnection>
+  - downloads: advertise willingness to receive file offers. A VDO.Ninja publisher only
+    sends its file list to a viewer that asked for it, so turning this off means no
+    `fileList` event arrives at connect time.
+  - allowresources: advertise willingness to receive the `resources` channel. Off by
+    default, matching VDO.Ninja, where it requires the `&resources` URL flag.
 - stopViewing(streamID): void
 
 ## Quick Helpers
@@ -67,6 +80,139 @@ const vdo = new VDONinjaSDK(options)
 - respond(requestId, data, targetUUID): boolean
 - onRequest(requestType, handler): void
 
+## Binary and Additional Channels
+
+Turns the SDK from a messaging transport into a bulk transport: raw bytes, a second
+channel so bulk traffic stops head-of-line blocking control messages, partial reliability,
+and a real backpressure signal.
+
+Everything here lives in the reserved `x-` namespace, which VDO.Ninja ignores by contract.
+A reserved channel is therefore safe to open toward any peer — verified with 4MB flooded
+at a live VDO.Ninja tab, which saw zero errors and kept its control channel.
+
+- sendBinary(data, uuid, { ordered?, maxRetransmits?, maxPacketLifeTime?, waitForDrain?, timeout? }): Promise&lt;boolean&gt;
+  - Bytes go out untouched — no JSON, no base64.
+  - **Never uses the control channel.** VDO.Ninja renders any binary payload there as a
+    WebP image, so raw bytes would visibly corrupt a viewer. `sendBinary` uses a dedicated
+    `x-bin` lane instead. A VDO.Ninja peer ignores that lane, so nothing breaks; it simply
+    will not receive the bytes, having no generic binary sink.
+  - `waitForDrain` defaults true, applying backpressure before each send.
+- openChannel(uuid, label, { ordered?, maxRetransmits?, maxPacketLifeTime?, protocol?, timeout? }): Promise&lt;RTCDataChannel&gt;
+  - The label is forced into the `x-` namespace; `'bulk'` becomes `'x-bulk'`.
+  - Resolves once the channel is open. Idempotent — reopening returns the existing channel.
+  - `ordered: false` plus `maxRetransmits` or `maxPacketLifeTime` gives partially-reliable
+    delivery, which suits chunked transfer that already indexes and hashes its own chunks.
+  - `maxRetransmits` and `maxPacketLifeTime` are mutually exclusive; supplying both throws.
+- getChannel(uuid, label): RTCDataChannel | null
+- getBufferedAmount(uuid, label?): number | null
+  - Omit `label` for the control channel. Null if the peer or channel is unknown.
+- getMaxMessageSize(uuid): number | null
+  - The negotiated SCTP limit. Null when the transport has not reported one — see the
+    implementation note below. On null, 65536 is the conventional safe assumption;
+    VDO.Ninja's own file transfer uses 16384.
+
+Events:
+
+- binaryReceived: { uuid, streamID, bytes: Uint8Array, data }
+- channelOpen: { uuid, streamID, label, channel } — a peer opened a reserved channel other
+  than the SDK's own `x-bin` lane; the raw channel is handed over
+- bufferedAmountLow: { uuid, streamID, label, bufferedAmount }
+
+```js
+// Bulk on its own channel, unreliable and unordered, with backpressure
+const bulk = await vdo.openChannel(uuid, 'bulk', { ordered: false, maxRetransmits: 0 });
+for (const chunk of chunks) {
+    while (vdo.getBufferedAmount(uuid, 'bulk') > 1_000_000) {
+        await new Promise(r => vdo.once('bufferedAmountLow', r));
+    }
+    bulk.send(chunk);
+}
+```
+
+### Implementation note: backpressure needs a transport that reports it
+
+`@roamhq/wrtc` reports `bufferedAmount: 0` no matter how much is queued — 2.4MB in
+testing. So under that adapter `getBufferedAmount` always returns 0, `bufferedAmountLow`
+never fires, and `waitForDrain` is a no-op. Browsers report it correctly.
+
+This is a limitation of the WebRTC implementation, not the SDK. If you need flow control
+in Node today, keep an application-level cap on outstanding sends rather than relying on
+the drain signal.
+
+## File Transfer
+
+Implements VDO.Ninja's native file transfer, so an SDK peer and a VDO.Ninja browser tab
+can exchange files in either direction. Files move over their own data channel, never the
+control channel. See `docs/compatibility.md` for the wire format.
+
+Hosting:
+
+- hostFile(source, { name?, id?, restricted=false }): { id, name, size }
+  - source: Blob, File, ArrayBuffer, or any typed array. `name` is required unless the
+    source is a File.
+  - restricted: a peer UUID to offer the file to only that peer; `false` offers it to all.
+  - Advertises the new file immediately to eligible publisher-side peers that sent
+    `downloads: true`.
+- unhostFile(id): boolean
+  - Stops serving the file and cancels transfers in flight. Note that VDO.Ninja's protocol
+    has no un-advertise message, so a peer that already saw the offer keeps displaying it;
+    requesting it afterwards is refused.
+- getHostedFiles(): Array<{ id, name, size, restricted }>
+
+Receiving:
+
+- requestFile(uuid, fileId, { stream=false, timeout=30000 }): Promise<Result>
+  - Result: `{ id, name, size, uuid, streamID, bytes: Uint8Array, blob?: Blob }`
+  - stream: true emits `fileChunk` events instead of buffering the whole file in memory;
+    `bytes` is then omitted.
+  - Rejects if the peer never starts the transfer, if the channel closes early, or if the
+    delivered byte count does not match the announced size.
+
+Events:
+
+- fileList: { uuid, streamID, files: [{ id, name, size }] } — a peer advertised files
+- fileTransferStart: { uuid, id, name, size, direction, requested }
+- fileTransferProgress: { uuid, id, name, direction, bytes, size, progress }
+- fileChunk: { uuid, id, name, chunk: Uint8Array, bytes, size } — streaming mode only
+- fileTransferComplete: { uuid, id, name, size, direction }
+- fileTransferCancelled: { uuid, id, name, direction }
+- fileTransferError: { uuid, id, name, direction, error }
+
+`direction` is `'inbound'` or `'outbound'` on every transfer event.
+
+```js
+// Host a file and let a VDO.Ninja viewer download it from its chat feed
+const vdo = new VDONinjaSDK();
+await vdo.connect();
+await vdo.joinRoom({ room: 'myroom' });
+await vdo.announce({ streamID: 'mystream' });
+const offered = vdo.hostFile(bytes, { name: 'report.pdf' });
+
+// Or download what a peer is offering
+vdo.addEventListener('fileList', async (e) => {
+    const file = e.detail.files[0];
+    const { bytes } = await vdo.requestFile(e.detail.uuid, file.id);
+});
+```
+
+## Resources
+
+VDO.Ninja's `resources` channel carries images keyed by meta template name. The receiver
+turns each into an object URL and stores it under `meta[templateName].value`.
+
+- sendResource(uuid, metadata, data): Promise<void>
+  - metadata: must include `templateName`; `type` sets the MIME type (default image/png);
+    `size` is filled in for you.
+  - data: ArrayBuffer or typed array.
+  - Throws unless the peer advertised `allowresources`, which VDO.Ninja viewers do via the
+    `&resources` URL flag and SDK viewers via `view(id, { allowresources: true })`.
+  - The publisher's `meta` must be an **object** keyed by template name for a VDO.Ninja
+    receiver to store anything; it rejects a string.
+
+Event:
+
+- resourceReceived: { uuid, streamID, metadata, bytes: Uint8Array }
+
 ## Pub/Sub
 
 - subscribe(channels: string | string[]): void
@@ -83,7 +229,28 @@ Events:
 ## Utilities
 
 - getStats(uuid?): Promise<RTCStatsReport | any>
+- getPeerQuality(uuid): Promise<PeerQuality | null>
+  - Digested per-peer link quality, so a peer can be ranked as soon as ICE settles instead
+    of after the application has measured RTT itself.
+  - `{ rttMs, lossRate, candidatePairType, relayed, availableOutgoingBitrate, bytesSent, bytesReceived }`
+  - `rttMs` is milliseconds (the underlying stat is in seconds). `candidatePairType` looks
+    like `"host/srflx"` or `"relay/host"`.
+  - `lossRate` is `null` on a data-only peer rather than a misleading zero — data channels
+    carry no RTP, so there is nothing to measure loss against.
+  - Returns `null` for an unknown peer or when no statistics are available.
 - on/off/once(eventName, handler): chaining shorthands for add/removeEventListener
+
+## TypeScript
+
+Type definitions ship with the package (`vdoninja-sdk.d.ts`); no `@types` install needed.
+
+```ts
+import VDONinja, { PeerQuality, FileTransferResult } from '@vdoninja/sdk';
+```
+
+`on`/`off`/`once` are typed against the event map, so `e.detail` is inferred per event
+name. `npm run test:types` typechecks a consumer against the shipped declarations under
+`--strict`, so the definitions cannot silently drift from the implementation.
 
 ## Aliases (Common Names)
 
@@ -99,7 +266,13 @@ Note: The viewing alias `unsubscribe(streamID)` that conflicted with pub/sub has
 ## Events (Selected)
 
 Connection & Room
-- connected, disconnected
+- connected
+- disconnected { intentional, reason, willReconnect, phase }
+  - Fires twice on a deliberate disconnect: once with `phase: 'socket'` when the socket
+    closes, once with `phase: 'teardown'` when cleanup finishes. `intentional`
+    distinguishes a local `disconnect()` from a dropped connection, so callers no longer
+    have to keep their own flag to avoid announcing a reconnect that will not happen.
+- teardownComplete { reason } — emitted exactly once, only when cleanup genuinely finishes
 - reconnecting, reconnected, reconnectFailed
 - connectionRecovering, connectionRecovered, connectionFailed, relayEscalated, relayRestored
 - iframe-friendly aliases: hss-connection, room-peer-listing, push-connection, view-connection
@@ -117,6 +290,17 @@ Data
 - dataReceived { data, uuid, streamID?, fallback? }
 - data (legacy, original WS/DC format)
 - Typo alias also emitted: dataRecieved
+
+File Transfer & Resources (see the sections above for payloads)
+- fileList, fileTransferStart, fileTransferProgress, fileChunk
+- fileTransferComplete, fileTransferCancelled, fileTransferError
+- resourceReceived
+- channelOpen { uuid, streamID, label, channel } — a peer opened a reserved `x-*` channel.
+  The raw `RTCDataChannel` is handed over; the application owns whatever protocol runs on
+  it. VDO.Ninja ignores these labels by contract, so they are safe to open toward any peer.
+- unsupportedChannel { uuid, streamID, label } — a peer opened an auxiliary channel this
+  SDK build does not speak (currently `chunked`); it is accepted and ignored rather than
+  mis-routed
 
 Media
 - track { track, streams?, uuid, streamID }

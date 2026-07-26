@@ -115,6 +115,23 @@ const sdkContext = {
     },
     TextEncoder: TextEncoder,
     TextDecoder: TextDecoder,
+    // Share the host realm's binary types. Without these, the vm context builds typed
+    // arrays with its own constructors, so anything the SDK hands back — file transfer
+    // bytes, sendBinary payloads, received resources — fails `instanceof Uint8Array` in
+    // the caller's code even though the data is correct. Injecting them makes the SDK
+    // construct host-realm objects, so instanceof behaves the way a caller expects.
+    ArrayBuffer: ArrayBuffer,
+    SharedArrayBuffer: typeof SharedArrayBuffer !== 'undefined' ? SharedArrayBuffer : undefined,
+    Uint8Array: Uint8Array,
+    Uint16Array: Uint16Array,
+    Uint32Array: Uint32Array,
+    Int8Array: Int8Array,
+    Int16Array: Int16Array,
+    Int32Array: Int32Array,
+    Float32Array: Float32Array,
+    Float64Array: Float64Array,
+    DataView: DataView,
+    Blob: typeof Blob !== 'undefined' ? Blob : undefined,
     CustomEvent: CustomEventPolyfill,
     AbortController: AbortControllerPolyfill,
     RTCPeerConnection: webrtcAdapter.RTCPeerConnection,
@@ -291,3 +308,6 @@ class VDONinjaSDKNode extends OriginalVDONinjaSDK {
 
 // Export the Node.js SDK
 module.exports = VDONinjaSDKNode;
+module.exports.default = VDONinjaSDKNode;
+module.exports.VDONinja = VDONinjaSDKNode;
+module.exports.VDONinjaSDK = VDONinjaSDKNode;

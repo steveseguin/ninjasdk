@@ -4,6 +4,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const { pathToFileURL } = require('node:url');
 
 if (typeof global.CustomEvent === 'undefined') {
   global.CustomEvent = class CustomEvent extends Event {
@@ -138,6 +139,38 @@ test('legacy public methods and event emissions remain available', () => {
   ];
   for (const event of legacyEvents) {
     assert.match(source, new RegExp(`_emit\\(['\"]${event}['\"]`), `missing legacy event ${event}`);
+  }
+});
+
+test('runtime module aliases match the published type declarations', async () => {
+  const browserEntry = require('../vdoninja-sdk.js');
+  assert.equal(browserEntry.default, browserEntry);
+  assert.equal(browserEntry.VDONinja, browserEntry);
+  assert.equal(browserEntry.VDONinjaSDK, browserEntry);
+
+  const nodePath = path.resolve(__dirname, '../vdoninja-sdk-node.js');
+  const nodeEntry = require(nodePath);
+  assert.equal(nodeEntry.default, nodeEntry);
+  assert.equal(nodeEntry.VDONinja, nodeEntry);
+  assert.equal(nodeEntry.VDONinjaSDK, nodeEntry);
+  assert.equal(require('@vdoninja/sdk'), nodeEntry);
+  assert.equal(require('@vdoninja/sdk/node'), nodeEntry);
+
+  const namespace = await import(`${pathToFileURL(nodePath).href}?exports`);
+  assert.equal(namespace.default, nodeEntry);
+  assert.equal(namespace.VDONinja, nodeEntry);
+  assert.equal(namespace.VDONinjaSDK, nodeEntry);
+
+  const packageNamespace = await import('@vdoninja/sdk');
+  assert.equal(packageNamespace.default, nodeEntry);
+  assert.equal(packageNamespace.VDONinja, nodeEntry);
+  assert.equal(packageNamespace.VDONinjaSDK, nodeEntry);
+});
+
+test('tracked minified bundle includes the current public transport surface', () => {
+  const minified = fs.readFileSync(path.resolve(__dirname, '../vdoninja-sdk.min.js'), 'utf8');
+  for (const marker of ['sendBinary', 'hostFile', 'teardownComplete']) {
+    assert.match(minified, new RegExp(marker), `minified SDK is missing ${marker}`);
   }
 });
 
@@ -549,6 +582,201 @@ test('disconnect sends peer-path bye before closing signaling and peer connectio
   assert.equal(signalingClosed, true);
   assert.equal(sdk.connections.size, 0);
   assert.equal(sdk.state.connected, false);
+});
+
+test('disconnect waits for the signaling close event before teardown completes', async () => {
+  const OriginalWebSocket = global.WebSocket;
+
+  class DelayedCloseWebSocket {
+    static CONNECTING = 0;
+    static OPEN = 1;
+    static CLOSING = 2;
+    static CLOSED = 3;
+
+    constructor() {
+      this.readyState = DelayedCloseWebSocket.CONNECTING;
+      this.listeners = new Map();
+      this.closeEventFired = false;
+      setTimeout(() => {
+        this.readyState = DelayedCloseWebSocket.OPEN;
+        this._dispatch('open');
+      }, 0);
+    }
+
+    addEventListener(type, listener) {
+      if (!this.listeners.has(type)) this.listeners.set(type, new Set());
+      this.listeners.get(type).add(listener);
+    }
+
+    removeEventListener(type, listener) {
+      const listeners = this.listeners.get(type);
+      if (listeners) listeners.delete(listener);
+    }
+
+    _dispatch(type) {
+      const event = { type, target: this };
+      const handler = this[`on${type}`];
+      if (typeof handler === 'function') handler.call(this, event);
+      const listeners = this.listeners.get(type);
+      if (listeners) {
+        for (const listener of Array.from(listeners)) listener.call(this, event);
+      }
+    }
+
+    send() {}
+
+    close() {
+      if (this.readyState >= DelayedCloseWebSocket.CLOSING) return;
+      this.readyState = DelayedCloseWebSocket.CLOSING;
+      setTimeout(() => {
+        this.readyState = DelayedCloseWebSocket.CLOSED;
+        this.closeEventFired = true;
+        this._dispatch('close');
+      }, 20);
+    }
+  }
+
+  global.WebSocket = DelayedCloseWebSocket;
+  try {
+    const sdk = makeSDK();
+    const phases = [];
+    sdk.addEventListener('disconnected', event => phases.push(event.detail.phase));
+    sdk.addEventListener('teardownComplete', () => phases.push('complete'));
+
+    await sdk.connect();
+    const socket = sdk.signaling;
+    let resolved = false;
+    const teardown = sdk.disconnect().then(() => { resolved = true; });
+
+    await wait(5);
+    assert.equal(resolved, false);
+    assert.equal(socket.closeEventFired, false);
+    assert.equal(sdk.signaling, socket);
+
+    await teardown;
+    assert.equal(socket.closeEventFired, true);
+    assert.equal(sdk.signaling, null);
+    assert.deepEqual(phases, ['socket', 'teardown', 'complete']);
+
+    // A fresh generation remains connected; no late close from the prior socket can
+    // overwrite its state.
+    await sdk.connect();
+    assert.equal(sdk.state.connected, true);
+    await wait(25);
+    assert.equal(sdk.state.connected, true);
+    await sdk.disconnect();
+  } finally {
+    global.WebSocket = OriginalWebSocket;
+  }
+});
+
+test('file advertisements wait for downloads capability and remain de-duplicated', async () => {
+  const sdk = makeSDK();
+  const channel = new MockDataChannel();
+  const connection = {
+    uuid: 'viewer-files',
+    type: 'publisher',
+    pc: new MockPeerConnection(),
+    dataChannel: channel,
+    channels: new Map([['sendChannel', channel]]),
+    info: {}
+  };
+  sdk.connections.set(connection.uuid, { publisher: connection });
+  sdk._setupDataChannel(connection, channel);
+
+  const first = {
+    id: 'file-one',
+    name: 'one.bin',
+    size: 1,
+    restricted: false,
+    read: async () => new Uint8Array([1])
+  };
+  sdk._hostedFiles = new Map([[first.id, first]]);
+
+  await channel.onmessage({ data: JSON.stringify({ downloads: false }) });
+  sdk._advertiseFiles([first]);
+  assert.equal(channel.sent.some(message => message.fileList), false);
+
+  await channel.onmessage({ data: JSON.stringify({ downloads: true }) });
+  assert.deepEqual(
+    channel.sent.filter(message => message.fileList).map(message => message.fileList.map(file => file.id)),
+    [['file-one']]
+  );
+
+  // Repeated preferences must not stack duplicate offers in VDO.Ninja's chat.
+  await channel.onmessage({ data: JSON.stringify({ downloads: true }) });
+  assert.equal(channel.sent.filter(message => message.fileList).length, 1);
+
+  const second = { ...first, id: 'file-two', name: 'two.bin' };
+  sdk._hostedFiles.set(second.id, second);
+  sdk._advertiseFiles([second]);
+  assert.deepEqual(
+    channel.sent.filter(message => message.fileList).map(message => message.fileList.map(file => file.id)),
+    [['file-one'], ['file-two']]
+  );
+});
+
+test('resource sends are serialized as complete metadata/chunk sequences', async () => {
+  const sdk = makeSDK();
+  const frames = [];
+  const channel = {
+    label: 'resources',
+    readyState: 'open',
+    bufferedAmount: 0,
+    binaryType: 'arraybuffer',
+    addEventListener() {},
+    removeEventListener() {},
+    send(value) { frames.push(value); }
+  };
+  const connection = {
+    uuid: 'resource-peer',
+    type: 'publisher',
+    pc: { connectionState: 'connected', createDataChannel() { throw new Error('unexpected channel'); } },
+    dataChannel: null,
+    channels: new Map([['resources', channel]]),
+    allowResources: true
+  };
+  sdk.connections.set(connection.uuid, { publisher: connection });
+
+  const first = new Uint8Array(32768).fill(1);
+  const second = new Uint8Array(32768).fill(2);
+  await Promise.all([
+    sdk.sendResource(connection.uuid, { templateName: 'first' }, first),
+    sdk.sendResource(connection.uuid, { templateName: 'second' }, second)
+  ]);
+
+  const sequence = frames.map(frame => {
+    if (typeof frame === 'string') return JSON.parse(frame).templateName;
+    return frame[0];
+  });
+  assert.deepEqual(sequence, ['first', 1, 1, 'second', 2, 2]);
+  assert.equal(connection._resourceSendQueue, null);
+});
+
+test('auxiliary channel lookup spans both directions without opening duplicates', async () => {
+  const sdk = makeSDK();
+  const remoteChannel = { label: 'x-bulk', readyState: 'open' };
+  let created = 0;
+  const publisher = {
+    uuid: 'dual-peer',
+    type: 'publisher',
+    pc: {
+      connectionState: 'connected',
+      createDataChannel() { created++; throw new Error('duplicate channel'); }
+    },
+    channels: new Map()
+  };
+  const viewer = {
+    uuid: 'dual-peer',
+    type: 'viewer',
+    pc: { connectionState: 'connected' },
+    channels: new Map([['x-bulk', remoteChannel]])
+  };
+  sdk.connections.set('dual-peer', { publisher, viewer });
+
+  assert.equal(sdk.getChannel('dual-peer', 'bulk'), remoteChannel);
+  assert.equal(await sdk.openChannel('dual-peer', 'bulk'), remoteChannel);
+  assert.equal(created, 0);
 });
 
 test('iframe-style room listing is an additive local event', async () => {

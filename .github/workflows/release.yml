@@ -76,6 +76,7 @@ jobs:
       run: |
         npm test
         npm run test:reliability
+        npm run test:types
         node --test tests/social-stream-compatibility.test.js
       
   version:

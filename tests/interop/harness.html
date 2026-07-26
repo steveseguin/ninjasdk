@@ -1,0 +1,295 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SDK &harr; VDO.Ninja interop harness</title>
+
+<style>
+    :root {
+        color-scheme: light dark;
+        --bg: #ffffff;
+        --fg: #16181d;
+        --muted: #5c6370;
+        --border: #d8dbe0;
+        --panel: #f7f8fa;
+        --ok: #1a7f47;
+        --bad: #b3261e;
+    }
+    @media (prefers-color-scheme: dark) {
+        :root {
+            --bg: #16181d;
+            --fg: #e6e8ec;
+            --muted: #9aa1ad;
+            --border: #333844;
+            --panel: #1d2027;
+            --ok: #4ade80;
+            --bad: #f87171;
+        }
+    }
+    * { box-sizing: border-box; }
+    body {
+        margin: 0;
+        padding: 24px;
+        background: var(--bg);
+        color: var(--fg);
+        font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+    }
+    h1 { font-size: 18px; margin: 0 0 4px; }
+    .sub { color: var(--muted); margin-bottom: 20px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+    fieldset {
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 14px 16px;
+        margin: 0;
+        background: var(--panel);
+    }
+    legend { padding: 0 6px; font-weight: 600; }
+    label { display: block; margin: 8px 0 2px; color: var(--muted); font-size: 12px; }
+    input, select, button {
+        font: inherit;
+        padding: 6px 8px;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        background: var(--bg);
+        color: var(--fg);
+        width: 100%;
+    }
+    button { cursor: pointer; margin-top: 10px; }
+    button:hover:not(:disabled) { border-color: var(--muted); }
+    button:disabled { opacity: .5; cursor: default; }
+    #log {
+        margin-top: 20px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: var(--panel);
+        padding: 12px;
+        height: 340px;
+        overflow: auto;
+        font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+        font-size: 12px;
+        white-space: pre-wrap;
+    }
+    .ok { color: var(--ok); }
+    .bad { color: var(--bad); }
+    .dim { color: var(--muted); }
+    code { background: var(--panel); padding: 1px 4px; border-radius: 4px; }
+    .hint { margin-top: 14px; color: var(--muted); font-size: 13px; }
+</style>
+
+<h1>SDK &harr; VDO.Ninja interop harness</h1>
+<div class="sub">Drives the SDK against a real VDO.Ninja page on the same origin. Progress is logged below and mirrored to the console.</div>
+
+<div class="grid">
+    <fieldset>
+        <legend>Session</legend>
+        <label for="room">Room</label>
+        <input id="room" value="interop_test">
+        <label for="streamid">Stream ID (SDK publishes this)</label>
+        <input id="streamid" value="sdkhost">
+        <label for="password">Password</label>
+        <input id="password" value="" placeholder="blank uses the VDO.Ninja default">
+        <label for="host">Signaling host</label>
+        <input id="host" value="wss://apibackup.vdo.ninja">
+        <button id="start">Connect and announce</button>
+    </fieldset>
+
+    <fieldset>
+        <legend>Host a file</legend>
+        <label for="size">Generated payload size (KB)</label>
+        <input id="size" type="number" value="300" min="1" max="20000">
+        <label for="file">…or pick a real file</label>
+        <input id="file" type="file">
+        <button id="hostbtn" disabled>Host file</button>
+        <div class="hint">VDO.Ninja renders a download button when it receives the list.</div>
+    </fieldset>
+
+    <fieldset>
+        <legend>View a VDO.Ninja stream</legend>
+        <label for="viewid">Stream ID published by VDO.Ninja</label>
+        <input id="viewid" placeholder="e.g. abc123">
+        <label><input type="checkbox" id="wantresources" style="width:auto"> advertise allowresources</label>
+        <button id="viewbtn" disabled>View it</button>
+        <div class="hint">Exercises the inbound paths: file offers from a VDO.Ninja host, and the resources channel.</div>
+    </fieldset>
+
+    <fieldset>
+        <legend>Binary / reserved channels</legend>
+        <div class="hint">Opens an <code>x-</code> channel and floods it. VDO.Ninja must ignore it entirely — no errors, control channel intact.</div>
+        <label for="floodmb">Flood size (MB)</label>
+        <input id="floodmb" type="number" value="4" min="1" max="64">
+        <button id="floodbtn" disabled>Flood a reserved channel</button>
+    </fieldset>
+
+    <fieldset>
+        <legend>Open VDO.Ninja</legend>
+        <div class="hint">Opens a real VDO.Ninja viewer for the stream above. Its download button exercises the SDK's send path.</div>
+        <button id="openvdo" disabled>Open VDO.Ninja viewer</button>
+        <label for="vdourl">URL</label>
+        <input id="vdourl" readonly>
+    </fieldset>
+</div>
+
+<div id="log"></div>
+
+<script src="/vdoninja-sdk.js"></script>
+<script>
+    const $ = (id) => document.getElementById(id);
+    const logEl = $('log');
+    let sdk = null;
+    let hosted = null;
+
+    function log(msg, cls) {
+        const time = new Date().toISOString().slice(11, 23);
+        const line = document.createElement('div');
+        if (cls) line.className = cls;
+        line.textContent = `${time}  ${msg}`;
+        logEl.appendChild(line);
+        logEl.scrollTop = logEl.scrollHeight;
+        console.log('[harness]', msg);
+    }
+
+    // Verified-working viewer configuration. Three details matter:
+    //   room + &scene  - a roomless "&view=<id>" never reaches a room-scoped SDK
+    //                    publisher; the signaling request does not arrive at all.
+    //   &wss2=          - not &wss=, which also sets session.customWSS and changes
+    //                    unrelated behavior. Both point VDO.Ninja at the SDK's host.
+    //   password        - omit the parameter entirely when the SDK uses its default.
+    //   &cb             - shows the chat button; the download offer lives in the chat
+    //                    feed, and scene mode renders nothing without it.
+    function viewerUrl() {
+        const params = new URLSearchParams();
+        params.set('room', $('room').value);
+        params.set('scene', '');
+        params.set('wss2', $('host').value.replace(/^wss:\/\//, ''));
+        params.set('cb', '');
+        const pw = $('password').value;
+        if (pw !== '') params.set('password', pw);
+        return `/vdoninja/?${params.toString().replace('scene=', 'scene').replace('cb=', 'cb')}`;
+    }
+
+    function refreshUrl() { $('vdourl').value = new URL(viewerUrl(), location.origin).href; }
+    ['room', 'streamid', 'password'].forEach(id => $(id).addEventListener('input', refreshUrl));
+    refreshUrl();
+
+    $('start').addEventListener('click', async () => {
+        $('start').disabled = true;
+        try {
+            const passwordRaw = $('password').value;
+            const password = (passwordRaw === 'false') ? false : passwordRaw;
+
+            sdk = new VDONinjaSDK({ host: $('host').value, password, salt: 'vdo.ninja', debug: true });
+            window.sdk = sdk;   // exposed for console-driven assertions
+
+            sdk.addEventListener('peerConnected', e => log(`peerConnected  ${e.detail.uuid}`, 'ok'));
+            sdk.addEventListener('dataChannelOpen', e => log(`dataChannelOpen  ${e.detail.uuid}`, 'ok'));
+            sdk.addEventListener('unsupportedChannel', e => log(`unsupportedChannel  "${e.detail.label}" from ${e.detail.uuid}  (accepted and ignored)`, 'dim'));
+            sdk.addEventListener('fileList', e => log(`fileList from ${e.detail.uuid}: ${JSON.stringify(e.detail.files)}`));
+            sdk.addEventListener('resourceReceived', e => log(`resourceReceived  "${e.detail.metadata.templateName}"  ${e.detail.bytes.length} bytes  type=${e.detail.metadata.type || 'n/a'}`, 'ok'));
+            sdk.addEventListener('fileTransferStart', e => log(`transfer start  ${e.detail.direction}  ${e.detail.name} (${e.detail.size} bytes)`, 'ok'));
+            sdk.addEventListener('fileTransferComplete', e => log(`transfer complete  ${e.detail.direction}  ${e.detail.name}`, 'ok'));
+            sdk.addEventListener('fileTransferCancelled', e => log(`transfer cancelled  ${e.detail.direction}  ${e.detail.name}`, 'bad'));
+            sdk.addEventListener('fileTransferError', e => log(`transfer error  ${e.detail.direction}  ${e.detail.error && e.detail.error.message}`, 'bad'));
+
+            let lastPct = -1;
+            sdk.addEventListener('fileTransferProgress', e => {
+                const pct = Math.floor(e.detail.progress * 100);
+                if (pct !== lastPct && pct % 10 === 0) {
+                    lastPct = pct;
+                    log(`  ${e.detail.direction} ${e.detail.name}  ${pct}%  (${e.detail.bytes}/${e.detail.size})`, 'dim');
+                }
+            });
+
+            await sdk.connect();
+            log(`connected to ${$('host').value}`, 'ok');
+            await sdk.joinRoom({ room: $('room').value });
+            log(`joined room "${$('room').value}"`, 'ok');
+            await sdk.announce({ streamID: $('streamid').value });
+            log(`announced "${$('streamid').value}" — waiting for a viewer`, 'ok');
+
+            $('hostbtn').disabled = false;
+            $('openvdo').disabled = false;
+            $('viewbtn').disabled = false;
+            $('floodbtn').disabled = false;
+        } catch (err) {
+            log(`failed: ${err.message}`, 'bad');
+            $('start').disabled = false;
+        }
+    });
+
+    $('hostbtn').addEventListener('click', async () => {
+        if (!sdk) return;
+        try {
+            const picked = $('file').files[0];
+            if (picked) {
+                hosted = sdk.hostFile(picked);
+            } else {
+                const bytes = new Uint8Array(parseInt($('size').value, 10) * 1024);
+                // getRandomValues refuses more than 65536 bytes per call.
+                for (let off = 0; off < bytes.length; off += 65536) {
+                    crypto.getRandomValues(bytes.subarray(off, Math.min(off + 65536, bytes.length)));
+                }
+                hosted = sdk.hostFile(bytes, { name: 'payload.bin' });
+            }
+            log(`hosting "${hosted.name}"  id=${hosted.id}  ${hosted.size} bytes`, 'ok');
+            log('open the VDO.Ninja viewer and click its download button', 'dim');
+        } catch (err) {
+            log(`hostFile failed: ${err.message}`, 'bad');
+        }
+    });
+
+    $('floodbtn').addEventListener('click', async () => {
+        if (!sdk) return;
+        const uuid = Array.from(sdk.connections.keys())[0];
+        if (!uuid) { log('no peer connected yet', 'bad'); return; }
+        try {
+            const ch = await sdk.openChannel(uuid, 'bulk');
+            log(`opened "${ch.label}" to ${uuid.slice(0, 8)}`, 'ok');
+
+            let drains = 0;
+            sdk.addEventListener('bufferedAmountLow', (e) => {
+                drains++;
+                if (drains <= 3) log(`  drain on ${e.detail.label} at ${e.detail.bufferedAmount} bytes`, 'dim');
+            });
+
+            const chunk = new Uint8Array(64 * 1024);
+            crypto.getRandomValues(chunk.subarray(0, 65536));
+            const total = parseInt($('floodmb').value, 10) * 1024 * 1024;
+            let sent = 0, peak = 0;
+            while (sent < total) {
+                await sdk._waitForChannelDrain(ch, 1048576);
+                if (ch.readyState !== 'open') break;
+                ch.send(chunk);
+                sent += chunk.byteLength;
+                peak = Math.max(peak, sdk.getBufferedAmount(uuid, 'bulk') || 0);
+            }
+            log(`flooded ${(sent / 1048576).toFixed(1)}MB; peak buffered ${peak} bytes; ${drains} drain events`, 'ok');
+            log(`control channel still open: ${sdk.connections.get(uuid)?.publisher?.dataChannel?.readyState}`, 'ok');
+        } catch (err) {
+            log(`flood failed: ${err.message}`, 'bad');
+        }
+    });
+
+    $('viewbtn').addEventListener('click', async () => {
+        if (!sdk) return;
+        const id = $('viewid').value.trim();
+        if (!id) { log('enter the stream ID VDO.Ninja is publishing', 'bad'); return; }
+        try {
+            await sdk.view(id, {
+                audio: false,
+                video: false,
+                allowresources: $('wantresources').checked
+            });
+            log(`viewing "${id}"  (downloads advertised${$('wantresources').checked ? ', allowresources advertised' : ''})`, 'ok');
+        } catch (err) {
+            log(`view failed: ${err.message}`, 'bad');
+        }
+    });
+
+    $('openvdo').addEventListener('click', () => {
+        const url = viewerUrl();
+        log(`opening ${url}`);
+        window.open(url, '_blank');
+    });
+
+    log('harness ready', 'dim');
+    log(`SDK build: ${typeof VDONinjaSDK === 'function' ? 'loaded' : 'MISSING'}`, typeof VDONinjaSDK === 'function' ? 'ok' : 'bad');
+</script>

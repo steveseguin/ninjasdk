@@ -183,8 +183,70 @@ node demos\node-room-media-recorder.js myroom
    - Simpler fan-out servers (for example `server.js` in the same repo) may deliver offers to anyone connected, even outside the intended room.
    - You can self-host these handshake servers, but support beyond the published docs is not provided.
 
+5. **Shutting down cleanly**: `disconnect()` returns a promise. Await it before exiting, or
+   you will tear the process down while cleanup is still running:
+
+   ```javascript
+   await vdo.disconnect();   // resolves once peers are closed and the socket is shut
+   ```
+
+   The `disconnected` event is **not** a completion signal — it also fires when the socket
+   closes, partway through teardown. Use the awaited promise, or the `teardownComplete`
+   event, which is emitted exactly once when cleanup genuinely finishes.
+
+## Known Issue: `@roamhq/wrtc` does not report `bufferedAmount`
+
+`bufferedAmount` stays 0 on `@roamhq/wrtc` no matter how much is queued — measured at 0
+after handing it 2.4MB. Consequences in Node with that adapter:
+
+- `getBufferedAmount()` always returns 0
+- the `bufferedAmountLow` event never fires
+- `sendBinary`'s `waitForDrain` is a no-op
+
+Browsers report it correctly, so backpressure works there. This is a limitation of the
+WebRTC implementation, not the SDK. Until it is fixed upstream, keep an application-level
+cap on outstanding sends in Node rather than relying on the drain signal.
+
+## Known Issue: `@roamhq/wrtc` segfaults on exit
+
+Once a data channel has existed in the process, `@roamhq/wrtc` can crash during native
+teardown at normal process exit — **after** everything has been closed correctly. Minimal
+reproduction, with no SDK involved:
+
+```bash
+node -e "const w=require('@roamhq/wrtc');const pc=new w.RTCPeerConnection();
+         const dc=pc.createDataChannel('x');dc.close();pc.close();"
+# Segmentation fault, exit 139
+```
+
+`process.getActiveResourcesInfo()` is empty and it still crashes. The symptom is nasty
+because it looks like anything but a native module bug: **a CLI that prints success and
+returns 139**.
+
+This is not something the SDK can fix — it is in the dependency's native teardown. Calling
+`process.exit()` explicitly avoids it:
+
+```javascript
+await vdo.disconnect();
+process.exit(0);   // sidesteps @roamhq/wrtc's native teardown crash
+```
+
+Only reach for `process.exit()` *after* awaiting `disconnect()`. Calling it earlier is the
+other way to crash the native module, and it will also truncate the `bye` messages peers
+rely on to notice you left promptly.
+
 ## Troubleshooting
 
 - **No data received**: Ensure you're running on native Windows/Mac/Linux, not WSL
 - **Connection fails**: Check firewall settings for WebRTC/UDP traffic
 - **Label not recognized**: Verify the SDK is sending label in `info.label` format
+- **Exit code 139 / segfault after a successful run**: `@roamhq/wrtc` native teardown, not
+  your code. See the known-issue section above
+- **Crash or hang on shutdown**: You are probably exiting before teardown finished. `await
+  vdo.disconnect()` rather than calling it and moving on
+- **`getBufferedAmount()` always returns 0**: `@roamhq/wrtc` does not track it. See the
+  known-issue section above
+- **`bytes instanceof Uint8Array` is false**: fixed in v1.5. The Node entry point evaluates
+  the SDK in a `vm` context, which previously meant typed arrays it returned carried that
+  context's constructors. The host realm's binary types are now shared into the context.
+  On older builds, duck-type or use `Buffer.from(bytes)` instead

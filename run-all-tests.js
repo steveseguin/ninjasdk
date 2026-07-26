@@ -942,6 +942,604 @@ async function runAllTests() {
     }
 }
 
+// Data-channel label routing (no network required)
+tests.push({
+    name: 'Data Channel Label Routing',
+    file: 'test-channel-routing.js',
+    code: `
+const crypto = require('crypto');
+const VDONinjaSDK = require('./vdoninja-sdk-node.js');
+
+global.crypto = crypto.webcrypto || crypto;
+global.document = { createElement: () => ({ innerText: '', textContent: '' }) };
+global.CustomEvent = class CustomEvent extends Event {
+    constructor(type, options) {
+        super(type, options);
+        this.detail = options?.detail;
+    }
+};
+
+// Minimal stand-in for RTCDataChannel; only what the router touches.
+function fakeChannel(label) {
+    return {
+        label: label,
+        readyState: 'open',
+        binaryType: 'blob',
+        bufferedAmount: 0,
+        listeners: {},
+        addEventListener(type, fn) { (this.listeners[type] = this.listeners[type] || []).push(fn); },
+        removeEventListener() {},
+        send() {},
+        close() { this.readyState = 'closed'; }
+    };
+}
+
+function fakeConnection() {
+    return {
+        uuid: 'peer-under-test',
+        type: 'viewer',
+        streamID: 'stream1',
+        dataChannel: null,
+        channels: new Map(),
+        info: {}
+    };
+}
+
+async function test() {
+    const sdk = new VDONinjaSDK();
+    let failures = 0;
+    const check = (label, ok) => {
+        if (ok) { console.log('  ✓ ' + label); }
+        else { console.log('  ✗ ' + label); failures++; }
+    };
+
+    // 1. The control channel is adopted as connection.dataChannel.
+    const conn = fakeConnection();
+    const control = fakeChannel('sendChannel');
+    sdk._handleIncomingDataChannel(conn, control);
+    check('sendChannel becomes the control channel', conn.dataChannel === control);
+    check('control channel is registered', conn.channels.get('sendChannel') === control);
+
+    // 2. A chunked channel must NOT replace the control channel. This is the
+    //    regression the router exists to prevent.
+    const chunked = fakeChannel('chunked');
+    sdk._handleIncomingDataChannel(conn, chunked);
+    check('chunked does not replace control channel', conn.dataChannel === control);
+    check('chunked is registered separately', conn.channels.get('chunked') === chunked);
+    check('chunked is set to arraybuffer', chunked.binaryType === 'arraybuffer');
+
+    // 3. A resources channel must not replace it either. Without opting in via
+    //    allowresources the SDK refuses it, matching VDO.Ninja.
+    const resources = fakeChannel('resources');
+    sdk._handleIncomingDataChannel(conn, resources);
+    check('resources does not replace control channel', conn.dataChannel === control);
+    check('unrequested resources channel is closed', resources.readyState === 'closed');
+
+    // 3b. Having advertised allowresources as a viewer, the channel is accepted.
+    //     The gate reads the viewer preferences actually sent, not publisher-side info.
+    const connRes = fakeConnection();
+    connRes.viewPreferences = { audio: true, video: true, allowresources: true };
+    sdk._handleIncomingDataChannel(connRes, fakeChannel('sendChannel'));
+    const wantedRes = fakeChannel('resources');
+    sdk._handleIncomingDataChannel(connRes, wantedRes);
+    check('requested resources channel is accepted', wantedRes.readyState === 'open');
+    check('resources channel is registered', connRes.channels.get('resources') === wantedRes);
+
+    // 4. Any other label is a file transfer and must not replace control either.
+    const file = fakeChannel('abc123fileid');
+    sdk._handleIncomingDataChannel(conn, file);
+    check('file channel does not replace control channel', conn.dataChannel === control);
+    check('file channel is registered', conn.channels.get('abc123fileid') === file);
+
+    // 5. VDO.Ninja treats a falsy label as the control channel.
+    const conn2 = fakeConnection();
+    const unlabelled = fakeChannel('');
+    sdk._handleIncomingDataChannel(conn2, unlabelled);
+    check('empty label is treated as control', conn2.dataChannel === unlabelled);
+
+    // 6. A file transfer header on a file channel must not be parsed as control.
+    const conn3 = fakeConnection();
+    sdk._handleIncomingDataChannel(conn3, fakeChannel('sendChannel'));
+    const priorControl = conn3.dataChannel;
+    const fileChan = fakeChannel('deadbeef');
+    sdk._handleIncomingDataChannel(conn3, fileChan);
+    let started = null;
+    sdk.addEventListener('fileTransferStart', (e) => { started = e.detail; });
+    fileChan.onmessage({ data: JSON.stringify({ type: 'filetransfer', size: 4, filename: 'x.bin', id: 'deadbeef' }) });
+    check('file header raises fileTransferStart', started && started.name === 'x.bin');
+    check('control channel survived the file transfer', conn3.dataChannel === priorControl);
+
+    // 7. Viewer capability advertisement. VDO.Ninja publishers gate provideFileList()
+    //    on 'downloads' and createResourceChannel() on 'allowresources === true'
+    //    (webrtc.js:12889-12894), so these keys must be present in what we send.
+    const defPrefs = { audio: true, video: true };
+    sdk._applyViewerCapabilities(defPrefs, {});
+    check('downloads advertised by default', defPrefs.downloads === true);
+    check('allowresources withheld by default', !('allowresources' in defPrefs));
+
+    const optOut = { audio: true, video: true };
+    sdk._applyViewerCapabilities(optOut, { downloads: false });
+    check('downloads can be opted out', optOut.downloads === false);
+
+    const optIn = { audio: true, video: true };
+    sdk._applyViewerCapabilities(optIn, { allowresources: true });
+    check('allowresources advertised on request', optIn.allowresources === true);
+
+    // 6b. A transfer whose bytes do not add up to the announced size must fail loudly.
+    //     EOF1 says "I stopped sending", not "you got everything".
+    const connShort = fakeConnection();
+    sdk._handleIncomingDataChannel(connShort, fakeChannel('sendChannel'));
+    sdk._inboundTransfers = sdk._inboundTransfers || new Map();
+    const short = { uuid: connShort.uuid, fileId: 'shortf', stream: false,
+                    chunks: [], received: 0, details: null, started: false, startTimer: null };
+    let shortErr = null;
+    short.promise = new Promise((res, rej) => { short.resolve = res; short.reject = rej; });
+    short.promise.catch(e => { shortErr = e.message; });
+    sdk._inboundTransfers.set(connShort.uuid + ':shortf', short);
+
+    const shortChan = fakeChannel('shortf');
+    sdk._handleIncomingDataChannel(connShort, shortChan);
+    shortChan.onmessage({ data: JSON.stringify({ type: 'filetransfer', size: 100, filename: 's.bin', id: 'shortf' }) });
+    shortChan.onmessage({ data: new Uint8Array(40).buffer });   // 40 of the promised 100
+    shortChan.onmessage({ data: 'EOF1' });
+    await new Promise(r => setTimeout(r, 20));
+    check('short transfer rejects instead of returning truncated data',
+          shortErr !== null && /Incomplete transfer/.test(shortErr));
+
+    // 6c. Reserved "x-" namespace. VDO.Ninja ignores these labels in both ondatachannel
+    //     handlers (webrtc.js isReservedChannelLabel). The SDK must honour the same
+    //     reservation: an x- channel is never a file transfer.
+    check('x- label recognised as reserved', sdk._isReservedChannelLabel('x-bulk') === true);
+    check('bare x is not reserved', sdk._isReservedChannelLabel('xbulk') === false);
+    check('non-string is not reserved',
+          sdk._isReservedChannelLabel(123) === false && sdk._isReservedChannelLabel(null) === false);
+
+    const connRes2 = fakeConnection();
+    sdk._handleIncomingDataChannel(connRes2, fakeChannel('sendChannel'));
+    const priorCtl = connRes2.dataChannel;
+    let opened = null;
+    sdk.addEventListener('channelOpen', (e) => { opened = e.detail; });
+    const bulk = fakeChannel('x-bulk');
+    sdk._handleIncomingDataChannel(connRes2, bulk);
+    check('reserved channel raises channelOpen', opened !== null && opened.label === 'x-bulk');
+    check('reserved channel hands over the raw channel', opened && opened.channel === bulk);
+    check('reserved channel does not replace the control channel', connRes2.dataChannel === priorCtl);
+    // If it had been treated as a file transfer it would have an onmessage handler
+    // waiting for a JSON filetransfer header.
+    check('reserved channel is not treated as a file transfer', typeof bulk.onmessage !== 'function');
+
+    // A hosted file must never take a label the peer is contractually ignoring.
+    let rejectedId = false;
+    try { sdk.hostFile(new Uint8Array(4), { name: 'a.bin', id: 'x-nope' }); }
+    catch (e) { rejectedId = /reserved/.test(e.message); }
+    check('hostFile rejects a reserved file ID', rejectedId);
+
+    // 7b. meta must survive as an object. VDO.Ninja only accepts info.meta when
+    //     typeof === "object" (webrtc.js:22099); a string makes it set meta = false,
+    //     and every resource is then silently discarded.
+    const metaIn = { sdkLogo: { type: 'image', label: 'SDK Logo', templateName: 'sdkLogo', value: 'pending', id: '1' } };
+    const metaOut = sdk._sanitizeMeta(metaIn);
+    check('object meta stays an object', metaOut && typeof metaOut === 'object');
+    check('meta template key preserved', !!(metaOut && metaOut.sdkLogo));
+    check('meta nested fields preserved', !!(metaOut && metaOut.sdkLogo && metaOut.sdkLogo.label === 'SDK Logo'));
+    check('string meta still sanitizes to a string', typeof sdk._sanitizeMeta('hello') === 'string');
+
+    // meta:null must never reach the wire. typeof null === "object", so a receiver
+    // type-checking for an object accepts it and then trips over it downstream — that is
+    // precisely the case VDO.Ninja had to add a truthiness guard for.
+    check('unrepresentable meta sanitizes to null, not an empty object',
+          sdk._sanitizeMeta(['a']) === null && sdk._sanitizeMeta(7) === null);
+
+    const metaConn = fakeConnection();
+    metaConn.type = 'publisher';
+    metaConn.info = { label: 'x', meta: ['not', 'an', 'object'] };
+    const sent = [];
+    const metaChan = fakeChannel('sendChannel');
+    metaChan.send = (d) => sent.push(d);
+    sdk._pendingInfo = {};
+    sdk._setupDataChannel(metaConn, metaChan);
+    metaChan.onopen();
+    const infoMsg = sent.map(s => { try { return JSON.parse(s); } catch (e) { return null; } })
+                        .find(m => m && m.info);
+    check('an info payload is still sent', !!infoMsg);
+    check('meta:null never reaches the wire',
+          !!infoMsg && !('meta' in infoMsg.info));
+
+    // 8. A peer's advertised capabilities gate our outbound resources.
+    const noGate = fakeConnection();
+    noGate.pc = { createDataChannel: (label) => fakeChannel(label) };
+    sdk.connections.set(noGate.uuid, { publisher: noGate });
+    let refusedErr = null;
+    try {
+        await sdk.sendResource(noGate.uuid, { templateName: 'x' }, new Uint8Array(4));
+    } catch (e) {
+        refusedErr = e.message;
+    }
+    check('sendResource refuses a peer that did not opt in',
+          refusedErr !== null && /allowresources/.test(refusedErr));
+
+    // ...and permits one that did.
+    const gated = fakeConnection();
+    gated.allowResources = true;
+    gated.pc = { createDataChannel: (label) => fakeChannel(label) };
+    sdk.connections.set(gated.uuid + '_ok', { publisher: gated });
+    let sendErr = null;
+    try {
+        await sdk.sendResource(gated.uuid + '_ok', { templateName: 'logo', type: 'image/png' }, new Uint8Array(32));
+    } catch (e) {
+        sendErr = e.message;
+    }
+    check('sendResource proceeds for an opted-in peer', sendErr === null);
+
+    if (failures === 0) {
+        console.log('  ✓ All routing assertions passed');
+        process.exit(0);
+    } else {
+        console.error('  ✗ ' + failures + ' routing assertion(s) failed');
+        process.exit(1);
+    }
+}
+test();`
+});
+
+// Native file transfer between two SDK peers
+tests.push({
+    name: 'Native File Transfer',
+    file: 'test-file-transfer.js',
+    code: `
+const wrtc = require('${webrtcLib}');
+const WebSocket = require('ws');
+const crypto = require('crypto');
+const VDONinjaSDK = require('./vdoninja-sdk-node.js');
+
+global.WebSocket = WebSocket;
+global.crypto = crypto.webcrypto || crypto;
+if (wrtc.RTCPeerConnection) {
+    global.RTCPeerConnection = wrtc.RTCPeerConnection;
+    global.RTCIceCandidate = wrtc.RTCIceCandidate;
+    global.RTCSessionDescription = wrtc.RTCSessionDescription;
+}
+global.document = { createElement: () => ({ innerText: '', textContent: '' }) };
+global.CustomEvent = class CustomEvent extends Event {
+    constructor(type, options) {
+        super(type, options);
+        this.detail = options?.detail;
+    }
+};
+global.btoa = (str) => Buffer.from(str).toString('base64');
+global.atob = (str) => Buffer.from(str, 'base64').toString();
+
+const WSS = process.env.WSS_URL || 'wss://apibackup.vdo.ninja';
+const TEST_ROOM = 'filexfer_' + Math.random().toString(36).substr(2, 9);
+const HOST_STREAM = 'host_' + Math.random().toString(36).substr(2, 9);
+
+// Big enough to span many 16KB chunks and exercise the drain path.
+const PAYLOAD_SIZE = 300 * 1024;
+const payload = crypto.randomBytes(PAYLOAD_SIZE);
+
+async function test() {
+    let host, peer;
+    const fail = (msg) => { console.error('  ✗ ' + msg); try { host && host.disconnect(); peer && peer.disconnect(); } catch (e) {} process.exit(1); };
+
+    const timeout = setTimeout(() => fail('Timed out waiting for file transfer'), 90000);
+
+    try {
+        host = new VDONinjaSDK({ host: WSS });
+        await host.connect();
+        await host.joinRoom({ room: TEST_ROOM });
+        await host.announce({ streamID: HOST_STREAM });
+
+        const hosted = host.hostFile(payload, { name: 'payload.bin' });
+        console.log('  ✓ Hosted file ' + hosted.id + ' (' + hosted.size + ' bytes)');
+        if (hosted.size !== PAYLOAD_SIZE) fail('Hosted size mismatch');
+
+        peer = new VDONinjaSDK({ host: WSS });
+
+        const listed = new Promise((resolve) => {
+            peer.addEventListener('fileList', (e) => resolve(e.detail));
+        });
+
+        let sawProgress = false;
+        peer.addEventListener('fileTransferProgress', () => { sawProgress = true; });
+
+        await peer.connect();
+        await peer.joinRoom({ room: TEST_ROOM });
+        await peer.view(HOST_STREAM);
+
+        const advert = await listed;
+        console.log('  ✓ Received file list from ' + advert.uuid);
+        if (!advert.files.length || advert.files[0].id !== hosted.id) fail('Advertised file list did not match');
+        if (advert.files[0].size !== PAYLOAD_SIZE) fail('Advertised size did not match');
+
+        const result = await peer.requestFile(advert.uuid, hosted.id);
+        clearTimeout(timeout);
+
+        console.log('  ✓ Transfer completed: ' + result.name + ' (' + result.bytes.length + ' bytes)');
+        if (result.bytes.length !== PAYLOAD_SIZE) fail('Received size ' + result.bytes.length + ' != ' + PAYLOAD_SIZE);
+        if (!Buffer.from(result.bytes).equals(payload)) fail('Received bytes did not match the source');
+        if (!sawProgress) fail('No fileTransferProgress events were emitted');
+        if (result.name !== 'payload.bin') fail('Filename did not survive the transfer');
+
+        console.log('  ✓ Byte-for-byte match over ' + Math.ceil(PAYLOAD_SIZE / 16384) + ' chunks');
+
+        host.disconnect();
+        peer.disconnect();
+        setTimeout(() => process.exit(0), 500);
+    } catch (error) {
+        clearTimeout(timeout);
+        fail(error.message || String(error));
+    }
+}
+test();`
+});
+
+// Lifecycle: awaitable teardown, unambiguous events, digested peer quality
+tests.push({
+    name: 'Lifecycle and Peer Quality',
+    file: 'test-lifecycle.js',
+    code: `
+const wrtc = require('${webrtcLib}');
+const WebSocket = require('ws');
+const crypto = require('crypto');
+const VDONinjaSDK = require('./vdoninja-sdk-node.js');
+
+global.WebSocket = WebSocket;
+global.crypto = crypto.webcrypto || crypto;
+if (wrtc.RTCPeerConnection) {
+    global.RTCPeerConnection = wrtc.RTCPeerConnection;
+    global.RTCIceCandidate = wrtc.RTCIceCandidate;
+    global.RTCSessionDescription = wrtc.RTCSessionDescription;
+}
+global.document = { createElement: () => ({ innerText: '', textContent: '' }) };
+global.CustomEvent = class CustomEvent extends Event {
+    constructor(type, options) { super(type, options); this.detail = options?.detail; }
+};
+global.btoa = (s) => Buffer.from(s).toString('base64');
+global.atob = (s) => Buffer.from(s, 'base64').toString();
+
+const WSS = process.env.WSS_URL || 'wss://apibackup.vdo.ninja';
+const ROOM = 'life_' + Math.random().toString(36).substr(2, 9);
+const STREAM = 'lifepub_' + Math.random().toString(36).substr(2, 9);
+
+let failures = 0;
+const check = (label, ok) => {
+    if (ok) console.log('  ✓ ' + label);
+    else { console.log('  ✗ ' + label); failures++; }
+};
+
+async function test() {
+    const timeout = setTimeout(() => { console.error('  ✗ timed out'); process.exit(1); }, 90000);
+
+    const pub = new VDONinjaSDK({ host: WSS });
+    const sub = new VDONinjaSDK({ host: WSS });
+
+    const events = [];
+    pub.addEventListener('disconnected', (e) => events.push({ name: 'disconnected', detail: e.detail }));
+    pub.addEventListener('teardownComplete', (e) => events.push({ name: 'teardownComplete', detail: e.detail }));
+
+    const peered = new Promise(res => pub.addEventListener('dataChannelOpen', e => res(e.detail)));
+
+    await pub.connect();
+    await pub.joinRoom({ room: ROOM });
+    await pub.announce({ streamID: STREAM });
+
+    await sub.connect();
+    await sub.joinRoom({ room: ROOM });
+    await sub.view(STREAM);
+
+    const peer = await peered;
+    console.log('  ✓ Peer connected: ' + peer.uuid.slice(0, 8));
+
+    // getPeerQuality: digested, not raw stats.
+    await new Promise(r => setTimeout(r, 3000));
+    const q = await pub.getPeerQuality(peer.uuid);
+    check('getPeerQuality returns a report', q !== null && typeof q === 'object');
+    if (q) {
+        console.log('    rtt=' + (q.rttMs === null ? 'n/a' : q.rttMs.toFixed(1) + 'ms') +
+                    ' pair=' + q.candidatePairType +
+                    ' relayed=' + q.relayed +
+                    ' loss=' + (q.lossRate === null ? 'n/a (data-only)' : q.lossRate));
+        check('reports a candidate pair type', typeof q.candidatePairType === 'string');
+        check('reports whether the path is relayed', typeof q.relayed === 'boolean');
+        check('reports a round-trip time', typeof q.rttMs === 'number' && q.rttMs >= 0);
+        // Data channels carry no RTP, so loss must be null rather than a fake zero.
+        check('loss is null on a data-only peer', q.lossRate === null);
+    }
+    check('getPeerQuality on an unknown peer returns null', (await pub.getPeerQuality('nope')) === null);
+
+    // disconnect() must be awaitable and resolve only once cleanup is done.
+    const returned = pub.disconnect();
+    check('disconnect() returns a promise', returned && typeof returned.then === 'function');
+    await returned;
+
+    check('connections cleared after await', pub.connections.size === 0);
+    check('signaling released after await', !pub.signaling);
+    check('state.connected false after await', pub.state.connected === false);
+
+    // Event disambiguation.
+    const teardowns = events.filter(e => e.name === 'teardownComplete');
+    check('teardownComplete emitted exactly once', teardowns.length === 1);
+
+    const disconnects = events.filter(e => e.name === 'disconnected');
+    check('disconnected carries a detail', disconnects.length > 0 && !!disconnects[0].detail);
+    check('intentional disconnect flagged as intentional',
+          disconnects.every(d => d.detail && d.detail.intentional === true));
+    check('intentional disconnect does not claim it will reconnect',
+          disconnects.every(d => d.detail && d.detail.willReconnect === false));
+    check('a disconnected event reports the teardown phase',
+          disconnects.some(d => d.detail && d.detail.phase === 'teardown'));
+
+    // Calling disconnect() twice must not tear down twice.
+    const again = pub.disconnect();
+    await again;
+    check('second disconnect() is a no-op',
+          events.filter(e => e.name === 'teardownComplete').length === 1);
+
+    await sub.disconnect();
+    clearTimeout(timeout);
+
+    if (failures === 0) { console.log('  ✓ All lifecycle assertions passed'); process.exit(0); }
+    else { console.error('  ✗ ' + failures + ' lifecycle assertion(s) failed'); process.exit(1); }
+}
+test().catch(e => { console.error('  ✗ ' + (e.message || e)); process.exit(1); });`
+});
+
+// Binary transport: reserved channels, backpressure, partial reliability
+tests.push({
+    name: 'Binary Transport',
+    file: 'test-binary.js',
+    code: `
+const wrtc = require('${webrtcLib}');
+const WebSocket = require('ws');
+const crypto = require('crypto');
+const VDONinjaSDK = require('./vdoninja-sdk-node.js');
+
+global.WebSocket = WebSocket;
+global.crypto = crypto.webcrypto || crypto;
+if (wrtc.RTCPeerConnection) {
+    global.RTCPeerConnection = wrtc.RTCPeerConnection;
+    global.RTCIceCandidate = wrtc.RTCIceCandidate;
+    global.RTCSessionDescription = wrtc.RTCSessionDescription;
+}
+global.document = { createElement: () => ({ innerText: '', textContent: '' }) };
+global.CustomEvent = class CustomEvent extends Event {
+    constructor(type, options) { super(type, options); this.detail = options?.detail; }
+};
+global.btoa = (s) => Buffer.from(s).toString('base64');
+global.atob = (s) => Buffer.from(s, 'base64').toString();
+
+const WSS = process.env.WSS_URL || 'wss://apibackup.vdo.ninja';
+const ROOM = 'bin_' + Math.random().toString(36).substr(2, 9);
+const STREAM = 'binpub_' + Math.random().toString(36).substr(2, 9);
+
+let failures = 0;
+const check = (label, ok) => {
+    if (ok) console.log('  ✓ ' + label);
+    else { console.log('  ✗ ' + label); failures++; }
+};
+
+async function test() {
+    const timeout = setTimeout(() => { console.error('  ✗ timed out'); process.exit(1); }, 90000);
+
+    const pub = new VDONinjaSDK({ host: WSS });
+    const sub = new VDONinjaSDK({ host: WSS });
+
+    const received = [];
+    sub.addEventListener('binaryReceived', (e) => received.push(e.detail));
+    const appChannels = [];
+    sub.addEventListener('channelOpen', (e) => appChannels.push(e.detail));
+
+    const peered = new Promise(res => pub.addEventListener('dataChannelOpen', e => res(e.detail)));
+
+    await pub.connect();
+    await pub.joinRoom({ room: ROOM });
+    await pub.announce({ streamID: STREAM });
+    await sub.connect();
+    await sub.joinRoom({ room: ROOM });
+    await sub.view(STREAM);
+
+    const peer = await peered;
+    const uuid = peer.uuid;
+    console.log('  ✓ Peer connected: ' + uuid.slice(0, 8));
+
+    // --- Binary passes through untouched (wishlist #1) ---------------------
+    const payload = crypto.randomBytes(50000);
+    await pub.sendBinary(payload, uuid);
+    await new Promise(r => setTimeout(r, 2500));
+
+    check('binaryReceived fired', received.length === 1);
+    if (received.length) {
+        const got = received[0].bytes;
+        check('bytes arrive as a Uint8Array', got instanceof Uint8Array);
+        check('byte length preserved (no base64, no JSON)', got.length === payload.length);
+        check('bytes are identical', Buffer.from(got).equals(payload));
+    }
+
+    // A JSON round-trip would inflate this; base64 would be ~33% larger.
+    check('payload was not stringified', received.length === 1 && received[0].bytes.length === 50000);
+
+    // --- Named channels (wishlist #4) --------------------------------------
+    const bulk = await pub.openChannel(uuid, 'bulk');
+    check('openChannel resolves once open', bulk.readyState === 'open');
+    check('label forced into the reserved namespace', bulk.label === 'x-bulk');
+    check('getChannel finds it by short name', pub.getChannel(uuid, 'bulk') === bulk);
+    check('getChannel finds it by full label', pub.getChannel(uuid, 'x-bulk') === bulk);
+
+    await new Promise(r => setTimeout(r, 2000));
+    check('peer surfaced it as an application channel',
+          appChannels.some(c => c.label === 'x-bulk'));
+    check('application channel is not the control channel',
+          appChannels.every(c => c.channel !== sub.connections.get(c.uuid)?.viewer?.dataChannel));
+
+    // Reopening returns the same channel rather than a duplicate.
+    const again = await pub.openChannel(uuid, 'bulk');
+    check('openChannel is idempotent', again === bulk);
+
+    // --- Partial reliability (wishlist #5) ---------------------------------
+    const lossy = await pub.openChannel(uuid, 'lossy', { ordered: false, maxRetransmits: 0 });
+    check('unordered channel opens', lossy.readyState === 'open');
+    check('unordered flag applied', lossy.ordered === false);
+
+    let mutuallyExclusive = false;
+    try {
+        await pub.openChannel(uuid, 'bad', { maxRetransmits: 1, maxPacketLifeTime: 100 });
+    } catch (e) { mutuallyExclusive = /mutually exclusive/.test(e.message); }
+    check('maxRetransmits + maxPacketLifeTime rejected', mutuallyExclusive);
+
+    // --- Backpressure (wishlist #3) ----------------------------------------
+    const buffered = pub.getBufferedAmount(uuid, 'bulk');
+    check('getBufferedAmount returns a number', typeof buffered === 'number');
+    check('getBufferedAmount on the control channel works',
+          typeof pub.getBufferedAmount(uuid) === 'number');
+    check('getBufferedAmount on an unknown peer is null',
+          pub.getBufferedAmount('nope') === null);
+
+    // Whether backpressure is observable at all depends on the WebRTC implementation.
+    // @roamhq/wrtc reports bufferedAmount: 0 no matter how much is queued, so the drain
+    // signal cannot fire there. Detect it rather than asserting browser behaviour.
+    const drained = new Promise(res => {
+        pub.addEventListener('bufferedAmountLow', e => res(e.detail));
+        setTimeout(() => res(null), 20000);
+    });
+    const blob = crypto.randomBytes(60000);
+    for (let i = 0; i < 40; i++) bulk.send(blob);
+    const filled = pub.getBufferedAmount(uuid, 'bulk');
+
+    if (filled > 0) {
+        check('buffer reflects queued bytes', filled > 0);
+        const drainEvent = await drained;
+        check('bufferedAmountLow fires as the buffer drains', drainEvent !== null);
+        if (drainEvent) check('drain event names the channel', drainEvent.label === 'x-bulk');
+    } else {
+        // Not a pass. State plainly what went unverified and why.
+        console.log('    SKIPPED: this WebRTC implementation reports bufferedAmount 0 after');
+        console.log('             queueing 2.4MB, so backpressure is unobservable here.');
+        console.log('             getBufferedAmount and bufferedAmountLow are exercised in');
+        console.log('             the browser interop harness instead.');
+    }
+
+    // --- Max message size (wishlist #6) ------------------------------------
+    const maxSize = pub.getMaxMessageSize(uuid);
+    console.log('    maxMessageSize: ' + (maxSize === null ? 'not reported by this impl' : maxSize));
+    check('getMaxMessageSize returns a number or null',
+          maxSize === null || (typeof maxSize === 'number' && maxSize > 0));
+    check('getMaxMessageSize on an unknown peer is null',
+          pub.getMaxMessageSize('nope') === null);
+
+    // --- Reserved namespace safety ------------------------------------------
+    check('control channel still usable after all of the above',
+          pub.sendData({ ping: 'still here' }, uuid) === true);
+
+    await pub.disconnect();
+    await sub.disconnect();
+    clearTimeout(timeout);
+
+    if (failures === 0) { console.log('  ✓ All binary transport assertions passed'); process.exit(0); }
+    else { console.error('  ✗ ' + failures + ' assertion(s) failed'); process.exit(1); }
+}
+test().catch(e => { console.error('  ✗ ' + (e.message || e)); process.exit(1); });`
+});
+
 // Run tests
 runAllTests().catch(error => {
     console.error('Fatal error:', error);

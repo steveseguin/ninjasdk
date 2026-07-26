@@ -21,6 +21,8 @@
   <body>
     <h1>VDO.Ninja SDK — API Reference</h1>
     <p class="tip">Tip: avoid reserved SDK types (<code>subscribe</code> | <code>unsubscribe</code> | <code>channelMessage</code>) for custom protocols.</p>
+    <p class="tip">For detailed option and event payloads, see the
+      <a href="./api-reference.md">Markdown API reference</a>.</p>
 
     <h2>Constructor</h2>
     <pre><code>const vdo = new VDONinjaSDK(options)</code></pre>
@@ -42,7 +44,9 @@
 
     <h2>Connection</h2>
     <ul>
-      <li><code>connect()</code>, <code>disconnect()</code></li>
+      <li><code>connect()</code> → <code>Promise&lt;void&gt;</code></li>
+      <li><code>disconnect()</code> → <code>Promise&lt;void&gt;</code>; await it until peer,
+        timer, and signaling cleanup genuinely finishes</li>
       <li><code>joinRoom({ room, password })</code>, <code>leaveRoom()</code></li>
       <li><code>autoConnect(roomOrOptions, filter?)</code> → <code>{ stop, streamID }</code></li>
     </ul>
@@ -56,7 +60,8 @@
 
     <h2>Viewing</h2>
     <ul>
-      <li><code>view(streamID, { audio=true, video=true, label? })</code></li>
+      <li><code>view(streamID, { audio=true, video=true, label?, downloads=true,
+        allowresources=false })</code></li>
       <li><code>stopViewing(streamID)</code></li>
     </ul>
 
@@ -70,9 +75,29 @@
     <h2>Data Communication</h2>
     <ul>
       <li><code>sendData(data, target?)</code> — flexible targeting with DC and fallback</li>
+      <li><code>sendBinary(data, uuid, options?)</code> — raw bytes on the reserved
+        <code>x-bin</code> lane, never the control channel</li>
+      <li><code>openChannel(uuid, label, options?)</code>,
+        <code>getChannel(uuid, label)</code></li>
+      <li><code>getBufferedAmount(uuid, label?)</code>,
+        <code>getMaxMessageSize(uuid)</code></li>
       <li><code>sendPing(uuid?)</code></li>
       <li><code>request(type, data, targetUUID, timeout?)</code>, <code>respond(id, data, targetUUID)</code></li>
       <li><code>onRequest(type, handler)</code></li>
+    </ul>
+
+    <h2>Native File and Resource Transfer</h2>
+    <ul>
+      <li><code>hostFile(source, options?)</code>, <code>unhostFile(id)</code>,
+        <code>getHostedFiles()</code></li>
+      <li><code>requestFile(uuid, fileId, options?)</code> — receive bytes or stream
+        <code>fileChunk</code> events</li>
+      <li><code>sendResource(uuid, metadata, data)</code> — requires the peer to advertise
+        <code>allowresources</code></li>
+      <li>Events: <code>fileList</code>, <code>fileTransferStart</code>,
+        <code>fileTransferProgress</code>, <code>fileChunk</code>,
+        <code>fileTransferComplete</code>, <code>fileTransferCancelled</code>,
+        <code>fileTransferError</code>, <code>resourceReceived</code></li>
     </ul>
 
     <h2>Pub/Sub</h2>
@@ -86,17 +111,28 @@
     <h2>Utilities & Aliases</h2>
     <ul>
       <li><code>getStats(uuid?)</code></li>
+      <li><code>getPeerQuality(uuid)</code> — normalized RTT, loss, route, relay,
+        bitrate, and byte metrics</li>
       <li>Aliases: <code>play|watch|startViewing → view</code>, <code>stream|broadcast|startPublishing|share → publish</code>, <code>quickStream|quickBroadcast|quickShare → quickPublish</code>, <code>stop|stopPlaying|stopWatching → stopViewing</code>, <code>stopStreaming|stopBroadcasting|stopSharing|unpublish → stopPublishing</code>, <code>join|enterRoom|enter → joinRoom</code>, <code>leave|exitRoom → leaveRoom</code></li>
     </ul>
 
+    <h2>TypeScript</h2>
+    <p>Browser and Node declarations ship with the package; no separate
+      <code>@types</code> package is required. The root, <code>/browser</code>, and
+      <code>/node</code> exports each resolve the matching declarations.</p>
+
     <h2>Events (Selected)</h2>
     <ul>
-      <li>Connection: <code>connected</code>, <code>disconnected</code>, <code>reconnecting</code>, <code>reconnected</code>, <code>reconnectFailed</code></li>
+      <li>Connection: <code>connected</code>, <code>disconnected</code>,
+        <code>teardownComplete</code>, <code>reconnecting</code>, <code>reconnected</code>,
+        <code>reconnectFailed</code></li>
       <li>Recovery: <code>connectionRecovering</code>, <code>connectionRecovered</code>, <code>connectionFailed</code>, <code>relayEscalated</code>, <code>relayRestored</code></li>
       <li>Iframe-friendly aliases: <code>hss-connection</code>, <code>room-peer-listing</code>, <code>push-connection</code>, <code>view-connection</code></li>
       <li>Room: <code>roomJoined</code>, <code>roomLeft</code>, <code>listing</code>, <code>peerListing</code></li>
       <li>Peer/DC: <code>peerConnected</code>, <code>peerDisconnected</code>, <code>dataChannelOpen</code>, <code>dataChannelClose</code>, <code>peerInfo</code>, <code>peerLatency</code></li>
-      <li>Data: <code>dataReceived</code> (<code>dataRecieved</code> alias), <code>data</code></li>
+      <li>Data: <code>dataReceived</code> (<code>dataRecieved</code> alias),
+        <code>data</code>, <code>binaryReceived</code>, <code>channelOpen</code>,
+        <code>bufferedAmountLow</code>, <code>unsupportedChannel</code></li>
       <li>Media: <code>track</code>, <code>trackAdded</code>, <code>trackRemoved</code>, <code>trackReplaced</code></li>
       <li>State: <code>publishing</code>, <code>publishingStopped</code>, <code>viewingStopped</code>, <code>iceRestart</code>, <code>connectionFailed</code>, <code>alert</code>, <code>error</code></li>
     </ul>

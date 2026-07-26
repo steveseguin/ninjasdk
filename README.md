@@ -45,6 +45,14 @@ npm install @roamhq/wrtc  # Recommended for full media support
 npm install node-datachannel  # For data channels only
 ```
 
+TypeScript declarations are included for the browser and Node entry points; no separate
+`@types` package is needed:
+
+```typescript
+import VDONinja, { PeerQuality, FileTransferResult } from '@vdoninja/sdk';
+import VDONinjaNode, { WebRTCInfo } from '@vdoninja/sdk/node';
+```
+
 ### Browser (CDN)
 ```html
 <script src="https://unpkg.com/@vdoninja/sdk/vdoninja-sdk.js"></script>
@@ -152,6 +160,12 @@ await vdo.publish(stream, { room: "videoroom" });
 - 🌐 **Resilient**: NAT traversal and firewall bypassing
 - 📤 **WHIP/WHEP Support**: Publish to Twitch, Meshcast, Cloudflare and more
 - 🧩 **Optional MCP Add-on**: `@vdoninja/mcp` for AI-agent rooms and private bot-to-bot workflows
+
+Additional transport features:
+
+- **Bulk Data**: Raw binary, additional channels, backpressure, and partial reliability
+- **Native Interop**: VDO.Ninja-compatible file transfer and resource channels
+- **Typed**: Browser and Node TypeScript declarations included
 
 ## Optional MCP Add-on (Minor Feature)
 
@@ -278,7 +292,7 @@ const vdo = new VDONinjaSDK({
 await vdo.connect();                  // Connect to signaling server
 await vdo.joinRoom({ room: "myroom", password: "optional" });
 await vdo.leaveRoom();               // Leave current room
-vdo.disconnect();                    // Disconnect entirely
+await vdo.disconnect();              // Disconnect after teardown genuinely finishes
 
 // Publishing
 await vdo.publish(mediaStream, {     // Publish media stream
@@ -302,7 +316,9 @@ await vdo.stopPublishing();          // Stop publishing
 await vdo.view("streamID", {         // View a specific stream
     audio: true,                     // Request audio
     video: true,                     // Request video
-    label: "Viewer Label"            // Optional label
+    label: "Viewer Label",           // Optional label
+    downloads: true,                 // Advertise willingness to receive file offers
+    allowresources: false            // Opt in to VDO.Ninja resource channels
 });
 await vdo.stopViewing("streamID");  // Stop viewing
 
@@ -314,6 +330,13 @@ vdo.sendData(data, {                 // Advanced targeting
     type: "viewer",                  // Target viewers only
     streamID: "streamID",            // Target stream connections
     allowFallback: true              // Allow WebSocket fallback
+});
+
+// Raw bytes and additional channels never use the JSON control channel
+await vdo.sendBinary(bytes, "targetUUID");
+const channel = await vdo.openChannel("targetUUID", "bulk", {
+    ordered: false,
+    maxRetransmits: 0
 });
 ```
 
@@ -503,7 +526,7 @@ vdo.addEventListener('error', (event) => {
 
 ### Connection Management
 - `async connect()` - Connect to signaling server
-- `disconnect()` - Disconnect from server  
+- `async disconnect()` - Disconnect and resolve after teardown genuinely finishes
 - `async joinRoom(options)` - Join a room
 - `leaveRoom()` - Leave current room
 
@@ -518,7 +541,18 @@ vdo.addEventListener('error', (event) => {
 
 ### Data Communication
 - `sendData(data, target)` - Send data with flexible targeting
+- `async sendBinary(data, uuid, options)` - Send raw bytes on a dedicated reserved channel
+- `async openChannel(uuid, label, options)` - Open an additional SDK-to-SDK channel
+- `getChannel(uuid, label)` - Get an existing additional channel
+- `getBufferedAmount(uuid, label?)` - Inspect queued channel bytes for backpressure
+- `getMaxMessageSize(uuid)` - Read the negotiated SCTP message limit
 - `sendPing(uuid)` - Send ping (manual; either role; DC-only)
+
+### Native File and Resource Transfer
+- `hostFile(source, options)` / `unhostFile(id)` - Offer or withdraw a file
+- `requestFile(uuid, fileId, options)` - Download a VDO.Ninja-compatible file
+- `getHostedFiles()` - List locally hosted files
+- `sendResource(uuid, metadata, data)` - Send a VDO.Ninja resource/template asset
 
 ### Track Management
 - `async addTrack(track, stream)` - Add track to publishers
@@ -527,6 +561,7 @@ vdo.addEventListener('error', (event) => {
 
 ### Statistics
 - `async getStats(uuid)` - Get connection statistics
+- `async getPeerQuality(uuid)` - Get normalized RTT, loss, route, relay, and byte metrics
 
 ### Utility Methods
 - `async quickPublish(options)` - Connect, join, and publish
@@ -609,18 +644,43 @@ prefer distinct type names to avoid collisions (e.g., `topicSubscribe`).
 
 ### Binary Data
 ```javascript
-// Send binary data
-const buffer = new ArrayBuffer(1024);
-vdo.sendData(buffer);
+// Raw bytes use a dedicated x-bin channel, never the JSON control channel.
+await vdo.sendBinary(new Uint8Array([1, 2, 3]), peerUUID);
 
-// Handle binary data
-vdo.addEventListener('dataReceived', (event) => {
-    const { data, uuid } = event.detail;
-    if (data instanceof ArrayBuffer) {
-        processBinaryData(data);
-    }
+vdo.addEventListener('binaryReceived', (event) => {
+    const { bytes, uuid } = event.detail;
+    processBinaryData(bytes, uuid);
 });
 ```
+
+For custom bulk protocols, use `openChannel()`. Labels are automatically placed in the
+reserved `x-` namespace, which VDO.Ninja safely ignores:
+
+```javascript
+const bulk = await vdo.openChannel(peerUUID, 'bulk', {
+    ordered: false,
+    maxRetransmits: 0
+});
+bulk.send(chunk);
+```
+
+### Native File Transfer
+
+```javascript
+// Publisher: advertise a file using VDO.Ninja's native transfer protocol
+const offered = vdo.hostFile(fileBytes, { name: 'report.pdf' });
+
+// Viewer: request an advertised file
+vdo.addEventListener('fileList', async (event) => {
+    const file = event.detail.files[0];
+    const result = await vdo.requestFile(event.detail.uuid, file.id);
+    saveBytes(result.bytes, result.name);
+});
+```
+
+File offers are capability-gated: viewers opt in with
+`view(streamID, { downloads: true })`, which is the default. Resource/template transfers
+similarly require `view(streamID, { allowresources: true })`.
 
 ### Request/Response
 ```javascript
@@ -833,7 +893,7 @@ See `demos/socialstreamninja-listener.js` for a complete example.
 2. **Bitrate**: Adjust based on network conditions
 3. **Codec**: H264 for compatibility, VP8/VP9 for quality
 4. **Broadcast**: Use broadcast mode for one-to-many
-5. **Binary**: Send binary data for efficiency
+5. **Binary**: Use `sendBinary()` or `openChannel()` for raw bytes; do not send them on the control channel
 
 ## Troubleshooting
 

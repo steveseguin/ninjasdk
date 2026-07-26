@@ -4,14 +4,28 @@
   "description": "AI-friendly P2P communication SDK for audio, video, and data. Includes WHIP/WHEP clients for publishing to Twitch, Meshcast, Cloudflare Stream",
   "main": "vdoninja-sdk.js",
   "browser": "vdoninja-sdk.js",
+  "types": "./vdoninja-sdk.d.ts",
   "exports": {
     ".": {
-      "browser": "./vdoninja-sdk.js",
-      "node": "./vdoninja-sdk-node.js",
+      "browser": {
+        "types": "./vdoninja-sdk.d.ts",
+        "default": "./vdoninja-sdk.js"
+      },
+      "node": {
+        "types": "./vdoninja-sdk-node.d.ts",
+        "default": "./vdoninja-sdk-node.js"
+      },
+      "types": "./vdoninja-sdk.d.ts",
       "default": "./vdoninja-sdk.js"
     },
-    "./node": "./vdoninja-sdk-node.js",
-    "./browser": "./vdoninja-sdk.js",
+    "./node": {
+      "types": "./vdoninja-sdk-node.d.ts",
+      "default": "./vdoninja-sdk-node.js"
+    },
+    "./browser": {
+      "types": "./vdoninja-sdk.d.ts",
+      "default": "./vdoninja-sdk.js"
+    },
     "./whip": "./whip-client.js",
     "./whep": "./whep-client.js"
   },
@@ -20,6 +34,7 @@
     "minify": "terser vdoninja-sdk.js -o vdoninja-sdk.min.js --compress --mangle --comments \"/VDO.Ninja SDK v/\"",
     "watch": "npm-watch",
     "test": "node run-all-tests.js",
+    "test:types": "tsc --noEmit --strict --lib es2020 --module node16 --moduleResolution node16 tests/types/consumer.ts tests/types/node-consumer.ts",
     "test:reliability": "node --test tests/sdk-reliability.test.js",
     "test:mcp": "node MCP/tests/run-mcp-tests-minimal.js",
     "test:mcp:all": "node MCP/tests/run-mcp-tests.js",
@@ -76,7 +91,8 @@
   "homepage": "https://github.com/steveseguin/ninjasdk#readme",
   "devDependencies": {
     "npm-watch": "^0.13.0",
-    "terser": "^5.31.0"
+    "terser": "^5.31.0",
+    "typescript": "^5.4.0"
   },
   "peerDependencies": {
     "@roamhq/wrtc": ">=0.8.0",
