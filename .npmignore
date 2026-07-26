@@ -25,6 +25,7 @@ node_modules/
 # IDE files
 .vscode/
 .idea/
+.claude/
 *.swp
 *.swo
 *~
@@ -39,3 +40,6 @@ npm-debug.log*
 
 # Build artifacts not needed
 *.map
+*.tgz
+ffmpeg.exe
+MCP/tests/artifacts/

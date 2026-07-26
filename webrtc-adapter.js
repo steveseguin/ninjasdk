@@ -76,8 +76,14 @@ class WebRTCAdapter {
         // 4. Try node-datachannel (requires wrapper)
         try {
             const nodeDataChannel = require('node-datachannel');
+            let nodeDataChannelPolyfill = null;
+            try {
+                nodeDataChannelPolyfill = require('node-datachannel/polyfill');
+            } catch (e) {
+                // Older node-datachannel releases did not expose the WebRTC polyfill.
+            }
             this.implementation = 'node-datachannel';
-            this._setupNodeDataChannel(nodeDataChannel);
+            this._setupNodeDataChannel(nodeDataChannel, nodeDataChannelPolyfill);
             return;
         } catch (e) {
             // node-datachannel not available
@@ -118,10 +124,26 @@ class WebRTCAdapter {
      * Setup node-datachannel with WebRTC-compatible wrapper
      * @private
      */
-    _setupNodeDataChannel(nodeDataChannel) {
-        const self = this;
+    _setupNodeDataChannel(nodeDataChannel, polyfill = null) {
+        // Current node-datachannel releases ship a maintained WebRTC-compatible
+        // RTCPeerConnection layer. Prefer it: besides matching the browser API, it
+        // translates RTCIceServer objects into libdatachannel's URL-string format.
+        if (polyfill && polyfill.RTCPeerConnection) {
+            this.RTCPeerConnection = polyfill.RTCPeerConnection;
+            this.RTCSessionDescription = polyfill.RTCSessionDescription;
+            this.RTCIceCandidate = polyfill.RTCIceCandidate;
+            this.mediaDevices = {
+                getUserMedia: async () => {
+                    throw new Error(
+                        'getUserMedia not supported with node-datachannel. Use @roamhq/wrtc for media capture.'
+                    );
+                },
+                enumerateDevices: async () => []
+            };
+            return;
+        }
         
-        // Create RTCPeerConnection wrapper
+        // Legacy fallback for node-datachannel releases without the polyfill export.
         this.RTCPeerConnection = class RTCPeerConnectionWrapper {
             constructor(config) {
                 this._pc = new nodeDataChannel.PeerConnection(

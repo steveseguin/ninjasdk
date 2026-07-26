@@ -77,7 +77,12 @@ Note: Stream and room IDs support alphanumeric and underscore; hyphens and other
 The SDK includes a universal WebRTC adapter (`webrtc-adapter.js`) that:
 - Auto-detects available WebRTC libraries
 - Provides a unified API across implementations
-- Falls back gracefully if no library is available
+- Reports a clear installation error if no implementation is available
+
+For current `node-datachannel` releases, the adapter uses the package's maintained WebRTC
+polyfill. That layer translates browser-style ICE server objects into libdatachannel's URL
+format while preserving the SDK's normal `RTCPeerConnection` contract. CI exercises both
+Node 18 and 20 with each supported adapter.
 
 ### Library Comparison
 

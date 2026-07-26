@@ -5,6 +5,12 @@ on:
     branches: [ main, master ]
     paths:
       - 'vdoninja-sdk.js'
+      - 'vdoninja-sdk-node.js'
+      - 'webrtc-adapter.js'
+      - 'vdoninja-sdk.d.ts'
+      - 'vdoninja-sdk-node.d.ts'
+      - 'whip-client.js'
+      - 'whep-client.js'
       - 'package.json'
   workflow_dispatch:
     inputs:
@@ -45,22 +51,22 @@ jobs:
     name: Test Node ${{ matrix.node-version }}
     
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
 
     - name: Check out VDO.Ninja signaling reference
-      uses: actions/checkout@v4
+      uses: actions/checkout@v7
       with:
         repository: steveseguin/vdoninja
         path: ecosystem/vdoninja
 
     - name: Check out Social Stream compatibility consumer
-      uses: actions/checkout@v4
+      uses: actions/checkout@v7
       with:
         repository: steveseguin/social_stream
         path: ecosystem/social_stream
     
     - name: Setup Node.js
-      uses: actions/setup-node@v4
+      uses: actions/setup-node@v7
       with:
         node-version: ${{ matrix.node-version }}
     
@@ -92,13 +98,13 @@ jobs:
       new_version: ${{ steps.version.outputs.new_version }}
     
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
       with:
         fetch-depth: 0
         token: ${{ secrets.PAT_TOKEN || secrets.GITHUB_TOKEN }}
         
     - name: Setup Node.js
-      uses: actions/setup-node@v4
+      uses: actions/setup-node@v7
       with:
         node-version: '24'
         registry-url: 'https://registry.npmjs.org'
@@ -166,12 +172,12 @@ jobs:
       (github.event_name == 'push' && github.ref == 'refs/heads/main')
     
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
       with:
         ref: main  # Get the latest with version bump
         
     - name: Setup Node.js
-      uses: actions/setup-node@v4
+      uses: actions/setup-node@v7
       with:
         node-version: '24'
         registry-url: 'https://registry.npmjs.org'
@@ -191,12 +197,12 @@ jobs:
     if: github.event_name == 'workflow_dispatch' && inputs.existing_version != ''
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
       with:
         ref: v${{ inputs.existing_version }}
 
     - name: Setup Node.js
-      uses: actions/setup-node@v4
+      uses: actions/setup-node@v7
       with:
         node-version: '24'
         registry-url: 'https://registry.npmjs.org'
@@ -219,7 +225,7 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
       with:
         ref: main  # Get the latest with version bump
         
@@ -228,6 +234,7 @@ jobs:
       with:
         tag_name: v${{ needs.version.outputs.new_version }}
         name: Release v${{ needs.version.outputs.new_version }}
+        generate_release_notes: true
         body: |
           ## VDO.Ninja SDK v${{ needs.version.outputs.new_version }}
           
@@ -247,13 +254,12 @@ jobs:
           <script src="https://cdn.jsdelivr.net/gh/steveseguin/ninjasdk@v${{ needs.version.outputs.new_version }}/vdoninja-sdk.min.js"></script>
           ```
           
-          ### What's Changed
-          See [commit history](https://github.com/steveseguin/ninjasdk/compare/v${{ needs.version.outputs.new_version }}...HEAD) for details.
-          
         files: |
           vdoninja-sdk.js
           vdoninja-sdk.min.js
           vdoninja-sdk-node.js
+          vdoninja-sdk.d.ts
+          vdoninja-sdk-node.d.ts
           webrtc-adapter.js
           package.json
           README.md

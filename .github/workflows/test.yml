@@ -21,10 +21,10 @@ jobs:
     name: Node ${{ matrix.node-version }} - ${{ matrix.webrtc-lib }}
     
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
     
     - name: Setup Node.js
-      uses: actions/setup-node@v4
+      uses: actions/setup-node@v7
       with:
         node-version: ${{ matrix.node-version }}
     
@@ -42,26 +42,7 @@ jobs:
     - name: Run basic connectivity test
       run: |
         cat > test-connectivity.js << 'EOF'
-        const wrtc = require('@roamhq/wrtc');
-        const WebSocket = require('ws');
-        const crypto = require('crypto');
-        const VDONinjaSDK = require('./vdoninja-sdk.js');
-        
-        // Polyfills for Node.js
-        global.WebSocket = WebSocket;
-        global.crypto = crypto.webcrypto || crypto;
-        global.RTCPeerConnection = wrtc.RTCPeerConnection;
-        global.RTCIceCandidate = wrtc.RTCIceCandidate;
-        global.RTCSessionDescription = wrtc.RTCSessionDescription;
-        global.document = { createElement: () => ({ innerText: '', textContent: '' }) };
-        global.CustomEvent = class CustomEvent extends Event {
-            constructor(type, options) {
-                super(type, options);
-                this.detail = options?.detail;
-            }
-        };
-        global.btoa = (str) => Buffer.from(str).toString('base64');
-        global.atob = (str) => Buffer.from(str, 'base64').toString();
+        const VDONinjaSDK = require('./vdoninja-sdk-node.js');
         
         const WSS = process.env.WSS_URL || 'wss://apibackup.vdo.ninja';
 
@@ -78,7 +59,7 @@ jobs:
                 await vdo.announce({ streamID: "stream-" + Math.random().toString(36).substr(2, 9) });
                 console.log('✅ Announced stream');
                 
-                vdo.disconnect();
+                await vdo.disconnect();
                 console.log('✅ Disconnected cleanly');
                 process.exit(0);
             } catch (error) {
@@ -93,26 +74,7 @@ jobs:
     - name: Run P2P data channel test
       run: |
         cat > test-p2p-datachannel.js << 'EOF'
-        const wrtc = require('@roamhq/wrtc');
-        const WebSocket = require('ws');
-        const crypto = require('crypto');
-        const VDONinjaSDK = require('./vdoninja-sdk.js');
-        
-        // Polyfills for Node.js
-        global.WebSocket = WebSocket;
-        global.crypto = crypto.webcrypto || crypto;
-        global.RTCPeerConnection = wrtc.RTCPeerConnection;
-        global.RTCIceCandidate = wrtc.RTCIceCandidate;
-        global.RTCSessionDescription = wrtc.RTCSessionDescription;
-        global.document = { createElement: () => ({ innerText: '', textContent: '' }) };
-        global.CustomEvent = class CustomEvent extends Event {
-            constructor(type, options) {
-                super(type, options);
-                this.detail = options?.detail;
-            }
-        };
-        global.btoa = (str) => Buffer.from(str).toString('base64');
-        global.atob = (str) => Buffer.from(str, 'base64').toString();
+        const VDONinjaSDK = require('./vdoninja-sdk-node.js');
         
         const WSS = process.env.WSS_URL || 'wss://apibackup.vdo.ninja';
         const TEST_ROOM = 'ci-p2p-' + Math.random().toString(36).substr(2, 9) + '-' + Date.now();
@@ -181,26 +143,7 @@ jobs:
     - name: Run bidirectional communication test
       run: |
         cat > test-bidirectional.js << 'EOF'
-        const wrtc = require('@roamhq/wrtc');
-        const WebSocket = require('ws');
-        const crypto = require('crypto');
-        const VDONinjaSDK = require('./vdoninja-sdk.js');
-        
-        // Polyfills for Node.js
-        global.WebSocket = WebSocket;
-        global.crypto = crypto.webcrypto || crypto;
-        global.RTCPeerConnection = wrtc.RTCPeerConnection;
-        global.RTCIceCandidate = wrtc.RTCIceCandidate;
-        global.RTCSessionDescription = wrtc.RTCSessionDescription;
-        global.document = { createElement: () => ({ innerText: '', textContent: '' }) };
-        global.CustomEvent = class CustomEvent extends Event {
-            constructor(type, options) {
-                super(type, options);
-                this.detail = options?.detail;
-            }
-        };
-        global.btoa = (str) => Buffer.from(str).toString('base64');
-        global.atob = (str) => Buffer.from(str, 'base64').toString();
+        const VDONinjaSDK = require('./vdoninja-sdk-node.js');
         
         const WSS = process.env.WSS_URL || 'wss://apibackup.vdo.ninja';
         const TEST_ROOM = 'ci-bidir-' + Math.random().toString(36).substr(2, 9) + '-' + Date.now();
@@ -256,29 +199,9 @@ jobs:
         timeout 30s node test-bidirectional.js
     
     - name: Run duplicate prevention test
-      if: matrix.webrtc-lib == '@roamhq/wrtc'
       run: |
         cat > test-no-duplicates.js << 'EOF'
-        const wrtc = require('@roamhq/wrtc');
-        const WebSocket = require('ws');
-        const crypto = require('crypto');
-        const VDONinjaSDK = require('./vdoninja-sdk.js');
-        
-        // Polyfills for Node.js
-        global.WebSocket = WebSocket;
-        global.crypto = crypto.webcrypto || crypto;
-        global.RTCPeerConnection = wrtc.RTCPeerConnection;
-        global.RTCIceCandidate = wrtc.RTCIceCandidate;
-        global.RTCSessionDescription = wrtc.RTCSessionDescription;
-        global.document = { createElement: () => ({ innerText: '', textContent: '' }) };
-        global.CustomEvent = class CustomEvent extends Event {
-            constructor(type, options) {
-                super(type, options);
-                this.detail = options?.detail;
-            }
-        };
-        global.btoa = (str) => Buffer.from(str).toString('base64');
-        global.atob = (str) => Buffer.from(str, 'base64').toString();
+        const VDONinjaSDK = require('./vdoninja-sdk-node.js');
         
         const WSS = process.env.WSS_URL || 'wss://apibackup.vdo.ninja';
         const TEST_ROOM = 'ci-dup-' + Math.random().toString(36).substr(2, 9) + '-' + Date.now();
@@ -444,26 +367,7 @@ jobs:
     - name: Run alias compatibility test
       run: |
         cat > test-aliases.js << 'EOF'
-        const wrtc = require('@roamhq/wrtc');
-        const WebSocket = require('ws');
-        const crypto = require('crypto');
-        const VDONinjaSDK = require('./vdoninja-sdk.js');
-        
-        // Polyfills for Node.js
-        global.WebSocket = WebSocket;
-        global.crypto = crypto.webcrypto || crypto;
-        global.RTCPeerConnection = wrtc.RTCPeerConnection;
-        global.RTCIceCandidate = wrtc.RTCIceCandidate;
-        global.RTCSessionDescription = wrtc.RTCSessionDescription;
-        global.document = { createElement: () => ({ innerText: '', textContent: '' }) };
-        global.CustomEvent = class CustomEvent extends Event {
-            constructor(type, options) {
-                super(type, options);
-                this.detail = options?.detail;
-            }
-        };
-        global.btoa = (str) => Buffer.from(str).toString('base64');
-        global.atob = (str) => Buffer.from(str, 'base64').toString();
+        const VDONinjaSDK = require('./vdoninja-sdk-node.js');
         
         async function test() {
             try {

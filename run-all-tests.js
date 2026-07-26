@@ -316,28 +316,7 @@ test();`
         name: 'Duplicate Prevention',
         file: 'test-no-duplicates.js', 
         code: `
-const wrtc = require('${webrtcLib}');
-const WebSocket = require('ws');
-const crypto = require('crypto');
-const VDONinjaSDK = require('./vdoninja-sdk.js');
-
-// Polyfills for Node.js
-global.WebSocket = WebSocket;
-global.crypto = crypto.webcrypto || crypto;
-if (wrtc.RTCPeerConnection) {
-    global.RTCPeerConnection = wrtc.RTCPeerConnection;
-    global.RTCIceCandidate = wrtc.RTCIceCandidate;
-    global.RTCSessionDescription = wrtc.RTCSessionDescription;
-}
-global.document = { createElement: () => ({ innerText: '', textContent: '' }) };
-global.CustomEvent = class CustomEvent extends Event {
-    constructor(type, options) {
-        super(type, options);
-        this.detail = options?.detail;
-    }
-};
-global.btoa = (str) => Buffer.from(str).toString('base64');
-global.atob = (str) => Buffer.from(str, 'base64').toString();
+const VDONinjaSDK = require('./vdoninja-sdk-node.js');
 
 const WSS = process.env.WSS_URL || 'wss://apibackup.vdo.ninja';
 
