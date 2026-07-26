@@ -80,9 +80,11 @@ all channels on that peer.
 5. Host sends 16384-byte binary chunks
 6. Host sends `EOF1` (complete) or `EOF2` (cancelled)
 
-The SDK's sender waits for `bufferedAmount` to drain between chunks. VDO.Ninja's does
-not. This is deliberate and invisible to the receiver: framing and chunk size are
-unchanged, so it stays wire-compatible while avoiding SCTP overrun on fast links.
+The SDK's sender waits for `bufferedAmount` to drain between chunks, then treats the
+receiver's post-`EOF1` channel close as the delivery acknowledgement. VDO.Ninja's sender
+does neither. This is deliberate and invisible to the receiver: framing and chunk size
+are unchanged, so it stays wire-compatible while avoiding SCTP overrun and premature
+close on native adapters.
 
 ### Resources
 
@@ -166,4 +168,3 @@ Compatibility checks should cover at least:
 - VDO.Ninja browser peers
 
 An embedded SDK consumer may not receive fixes until its vendored file is refreshed. Changes should therefore tolerate mixed SDK versions in the same room.
-

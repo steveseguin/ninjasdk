@@ -2954,21 +2954,85 @@ const VDON_RESOURCE_CHUNK_SIZE = 16384;
          * @private
          */
         _attachBufferedAmountLow(connection, channel, label) {
+            const threshold = VDON_DEFAULT_BUFFER_LOW;
             try {
-                channel.bufferedAmountLowThreshold = VDON_DEFAULT_BUFFER_LOW;
+                channel.bufferedAmountLowThreshold = threshold;
             } catch (e) { /* not all implementations expose this */ }
 
-            if (typeof channel.addEventListener !== 'function') return;
-            try {
-                channel.addEventListener('bufferedamountlow', () => {
-                    this._emit('bufferedAmountLow', {
-                        uuid: connection.uuid,
-                        streamID: connection.streamID,
-                        label: label,
-                        bufferedAmount: channel.bufferedAmount
-                    });
+            let wasAbove = false;
+            let emittedForCycle = true;
+            let pollTimer = null;
+
+            const emitLow = () => {
+                wasAbove = false;
+                emittedForCycle = true;
+                this._emit('bufferedAmountLow', {
+                    uuid: connection.uuid,
+                    streamID: connection.streamID,
+                    label: label,
+                    bufferedAmount: channel.bufferedAmount
                 });
-            } catch (e) { /* non-fatal */ }
+            };
+
+            const observe = () => {
+                if (typeof channel.bufferedAmount !== 'number') return;
+                if (channel.bufferedAmount > threshold) {
+                    wasAbove = true;
+                    emittedForCycle = false;
+                } else if (wasAbove && !emittedForCycle) {
+                    emitLow();
+                }
+            };
+
+            // Let getBufferedAmount() and sendBinary() record a just-queued high-water
+            // state. Some native adapters drain faster than a polling tick and never fire
+            // bufferedamountlow even though they do expose a useful bufferedAmount.
+            try {
+                Object.defineProperty(channel, '_sdkObserveBufferedAmount', {
+                    value: observe,
+                    configurable: true
+                });
+            } catch (e) {
+                try { channel._sdkObserveBufferedAmount = observe; } catch (e2) { /* non-fatal */ }
+            }
+
+            const onNativeLow = () => {
+                // _waitForChannelDrain temporarily raises the native threshold. Do not
+                // report that private threshold as the public low-water event; polling
+                // will emit when the stable SDK threshold is crossed.
+                if (typeof channel.bufferedAmountLowThreshold === 'number' &&
+                    channel.bufferedAmountLowThreshold !== threshold) {
+                    observe();
+                    return;
+                }
+                emitLow();
+            };
+
+            const cleanup = () => {
+                if (pollTimer) {
+                    clearInterval(pollTimer);
+                    pollTimer = null;
+                }
+                if (typeof channel.removeEventListener === 'function') {
+                    try { channel.removeEventListener('bufferedamountlow', onNativeLow); } catch (e) { /* non-fatal */ }
+                    try { channel.removeEventListener('close', cleanup); } catch (e) { /* non-fatal */ }
+                }
+                if (channel._sdkObserveBufferedAmount === observe) {
+                    try { delete channel._sdkObserveBufferedAmount; } catch (e) { /* non-fatal */ }
+                }
+            };
+
+            if (typeof channel.addEventListener === 'function') {
+                try { channel.addEventListener('bufferedamountlow', onNativeLow); } catch (e) { /* non-fatal */ }
+                try { channel.addEventListener('close', cleanup); } catch (e) { /* non-fatal */ }
+            }
+
+            // @roamhq/wrtc on Linux reports bufferedAmount but does not reliably emit
+            // bufferedamountlow. Polling makes the public event portable; unref keeps a
+            // native channel that forgets to close from holding a Node process open.
+            pollTimer = setInterval(observe, 25);
+            if (pollTimer && typeof pollTimer.unref === 'function') pollTimer.unref();
+            observe();
         }
 
         /**
@@ -2990,7 +3054,11 @@ const VDON_RESOURCE_CHUNK_SIZE = 16384;
                 ? this.getChannel(uuid, label)
                 : connection.dataChannel;
             if (!channel || typeof channel.bufferedAmount !== 'number') return null;
-            return channel.bufferedAmount;
+            const bufferedAmount = channel.bufferedAmount;
+            if (typeof channel._sdkObserveBufferedAmount === 'function') {
+                try { channel._sdkObserveBufferedAmount(); } catch (e) { /* non-fatal */ }
+            }
+            return bufferedAmount;
         }
 
         /**
@@ -3029,6 +3097,8 @@ const VDON_RESOURCE_CHUNK_SIZE = 16384;
          * @param {boolean} [options.ordered=true]
          * @param {number} [options.maxRetransmits]
          * @param {number} [options.maxPacketLifeTime]
+         * @param {string} [options.protocol]
+         * @param {number} [options.timeout=15000] - Ms to wait for the channel to open
          * @param {boolean} [options.waitForDrain=true] - Apply backpressure before sending
          * @returns {Promise<boolean>} Whether the bytes were handed to the transport
          */
@@ -3040,7 +3110,9 @@ const VDON_RESOURCE_CHUNK_SIZE = 16384;
             const channel = await this.openChannel(uuid, VDON_CHANNEL_BINARY, {
                 ordered: options.ordered,
                 maxRetransmits: options.maxRetransmits,
-                maxPacketLifeTime: options.maxPacketLifeTime
+                maxPacketLifeTime: options.maxPacketLifeTime,
+                protocol: options.protocol,
+                timeout: options.timeout
             });
 
             if (channel.readyState !== 'open') return false;
@@ -3051,6 +3123,9 @@ const VDON_RESOURCE_CHUNK_SIZE = 16384;
             }
 
             channel.send(bytes);
+            if (typeof channel._sdkObserveBufferedAmount === 'function') {
+                try { channel._sdkObserveBufferedAmount(); } catch (e) { /* non-fatal */ }
+            }
             return true;
         }
 
@@ -3552,6 +3627,16 @@ const VDON_RESOURCE_CHUNK_SIZE = 16384;
             // hide it.
             await this._waitForChannelFlush(channel);
 
+            // bufferedAmount is not a delivery acknowledgement. Some native adapters
+            // report zero while ordered SCTP frames are still in flight, so closing here
+            // can discard the tail of the file. Both VDO.Ninja and this SDK close the
+            // receive side after processing EOF1; prefer that peer close as the delivery
+            // acknowledgement, with a timeout for non-conforming receivers.
+            const receiverClosed = await this._waitForChannelClose(channel);
+            if (!receiverClosed && channel.readyState === 'open') {
+                try { channel.close(); } catch (e) { /* already closing */ }
+            }
+
             this._emit('fileTransferComplete', {
                 uuid: transfer.uuid,
                 streamID: connection ? connection.streamID : null,
@@ -3560,7 +3645,6 @@ const VDON_RESOURCE_CHUNK_SIZE = 16384;
                 size: file.size,
                 direction: 'outbound'
             });
-            try { channel.close(); } catch (e) { /* already closing */ }
         }
 
         /**
@@ -3583,6 +3667,76 @@ const VDON_RESOURCE_CHUNK_SIZE = 16384;
                     }
                 }, 25);
                 if (poll && typeof poll.unref === 'function') poll.unref();
+            });
+        }
+
+        /**
+         * Wait for the receiver to close a completed ordered transfer.
+         *
+         * EOF1 is the native protocol's completion frame. VDO.Ninja and the SDK both
+         * close their receive channel only after processing it, which is a stronger
+         * delivery signal than bufferedAmount on adapters that report zero too early.
+         *
+         * @private
+         * @param {RTCDataChannel} channel
+         * @param {number} [timeoutMs=15000]
+         * @returns {Promise<boolean>} True when the peer close was observed
+         */
+        _waitForChannelClose(channel, timeoutMs = 15000) {
+            if (!channel || channel.readyState === 'closed' || channel.readyState === 'closing') {
+                return Promise.resolve(true);
+            }
+
+            return new Promise((resolve) => {
+                let settled = false;
+                let removeCloseListener = null;
+                let restoreOnClose = null;
+
+                const done = (closed) => {
+                    if (settled) return;
+                    settled = true;
+                    clearTimeout(timer);
+                    if (removeCloseListener) {
+                        try { removeCloseListener(); } catch (e) { /* non-fatal */ }
+                    }
+                    if (restoreOnClose) {
+                        try { restoreOnClose(); } catch (e) { /* non-fatal */ }
+                    }
+                    resolve(closed);
+                };
+
+                const onClose = () => done(true);
+                const timer = setTimeout(() => done(false), timeoutMs);
+                if (timer && typeof timer.unref === 'function') timer.unref();
+
+                if (typeof channel.addEventListener === 'function') {
+                    try {
+                        channel.addEventListener('close', onClose);
+                        removeCloseListener = () => channel.removeEventListener('close', onClose);
+                    } catch (e) { /* fall through to onclose wrapping */ }
+                }
+
+                if (!removeCloseListener) {
+                    const previous = channel.onclose;
+                    const wrapped = function (event) {
+                        try {
+                            if (typeof previous === 'function') previous.call(this, event);
+                        } finally {
+                            onClose();
+                        }
+                    };
+                    try {
+                        channel.onclose = wrapped;
+                        restoreOnClose = () => {
+                            if (channel.onclose === wrapped) channel.onclose = previous;
+                        };
+                    } catch (e) { /* timeout remains the fallback */ }
+                }
+
+                // Guard against a peer close between the first state check and listener.
+                if (channel.readyState === 'closed' || channel.readyState === 'closing') {
+                    done(true);
+                }
             });
         }
 

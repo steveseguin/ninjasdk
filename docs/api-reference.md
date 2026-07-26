@@ -131,9 +131,11 @@ for (const chunk of chunks) {
 
 ### Implementation note: backpressure needs a transport that reports it
 
-`@roamhq/wrtc` reports `bufferedAmount: 0` no matter how much is queued — 2.4MB in
-testing. So under that adapter `getBufferedAmount` always returns 0, `bufferedAmountLow`
-never fires, and `waitForDrain` is a no-op. Browsers report it correctly.
+Some `@roamhq/wrtc` builds report `bufferedAmount: 0` no matter how much is queued —
+2.4MB in Windows testing. Other builds report queued bytes but omit the native
+`bufferedamountlow` event; the SDK polls as a fallback for those builds. If a build always
+reports zero, `getBufferedAmount` remains zero, `bufferedAmountLow` cannot observe a
+high-to-low transition, and `waitForDrain` is a no-op. Browsers report it correctly.
 
 This is a limitation of the WebRTC implementation, not the SDK. If you need flow control
 in Node today, keep an application-level cap on outstanding sends rather than relying on

@@ -716,6 +716,102 @@ test('file advertisements wait for downloads capability and remain de-duplicated
   );
 });
 
+test('bufferedAmountLow falls back to polling when an adapter omits the native event', async () => {
+  const sdk = makeSDK();
+  const listeners = new Map();
+  const channel = {
+    label: 'x-bulk',
+    readyState: 'open',
+    bufferedAmount: 0,
+    bufferedAmountLowThreshold: 0,
+    addEventListener(type, listener) {
+      if (!listeners.has(type)) listeners.set(type, new Set());
+      listeners.get(type).add(listener);
+    },
+    removeEventListener(type, listener) {
+      if (listeners.has(type)) listeners.get(type).delete(listener);
+    }
+  };
+  const dispatch = (type) => {
+    for (const listener of listeners.get(type) || []) listener({ type, target: channel });
+  };
+
+  const events = [];
+  sdk.addEventListener('bufferedAmountLow', event => events.push(event.detail));
+  sdk._attachBufferedAmountLow({ uuid: 'poll-peer', streamID: 'poll-stream' }, channel, channel.label);
+
+  channel.bufferedAmount = 600000;
+  channel._sdkObserveBufferedAmount();
+  channel.bufferedAmount = 0;
+  await wait(60);
+
+  assert.equal(events.length, 1);
+  assert.equal(events[0].uuid, 'poll-peer');
+  assert.equal(events[0].label, 'x-bulk');
+
+  channel.readyState = 'closed';
+  dispatch('close');
+  assert.equal(channel._sdkObserveBufferedAmount, undefined);
+});
+
+test('file sender waits for the receiver EOF close when bufferedAmount reports zero early', async () => {
+  const sdk = makeSDK();
+  const listeners = new Map();
+  const sent = [];
+  let localCloseCalls = 0;
+  const channel = {
+    label: 'file-one',
+    readyState: 'open',
+    bufferedAmount: 0,
+    onclose: null,
+    addEventListener(type, listener) {
+      if (!listeners.has(type)) listeners.set(type, new Set());
+      listeners.get(type).add(listener);
+    },
+    removeEventListener(type, listener) {
+      if (listeners.has(type)) listeners.get(type).delete(listener);
+    },
+    send(value) { sent.push(value); },
+    close() {
+      localCloseCalls++;
+      this.readyState = 'closed';
+    }
+  };
+  const remoteClose = () => {
+    channel.readyState = 'closed';
+    for (const listener of listeners.get('close') || []) listener({ type: 'close', target: channel });
+    if (typeof channel.onclose === 'function') channel.onclose({ type: 'close', target: channel });
+  };
+
+  let completed = 0;
+  sdk.addEventListener('fileTransferComplete', () => { completed++; });
+  const file = {
+    id: 'file-one',
+    name: 'one.bin',
+    size: 3,
+    read: async () => new Uint8Array([1, 2, 3])
+  };
+  const transfer = { fileId: file.id, uuid: 'file-peer', cancelled: false, channel };
+
+  let settled = false;
+  const sending = sdk._streamFileChunks(
+    channel,
+    file,
+    transfer,
+    { streamID: 'file-stream' }
+  ).then(() => { settled = true; });
+
+  await wait(5);
+  assert.equal(sent[sent.length - 1], 'EOF1');
+  assert.equal(settled, false);
+  assert.equal(localCloseCalls, 0);
+
+  remoteClose();
+  await sending;
+  assert.equal(completed, 1);
+  assert.equal(localCloseCalls, 0);
+});
+
 test('resource sends are serialized as complete metadata/chunk sequences', async () => {
   const sdk = makeSDK();
   const frames = [];

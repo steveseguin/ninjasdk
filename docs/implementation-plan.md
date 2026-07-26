@@ -185,9 +185,10 @@ Two findings recorded rather than worked around:
 - **Binary must never touch the control channel.** VDO.Ninja renders any object payload
   there as a WebP image (`webrtc.js:21219`), so bytes would corrupt a viewer rather than
   be ignored. `sendBinary` uses a dedicated `x-bin` lane.
-- **`@roamhq/wrtc` never reports `bufferedAmount`.** It stays 0 after 2.4MB queued, so
-  backpressure is unobservable in Node with that adapter. Browsers are fine. Documented in
-  README-NODE.md; the Node test detects and reports the gap rather than asserting past it.
+- **`@roamhq/wrtc` backpressure varies by platform.** The Windows build stays at 0 after
+  2.4MB queued; Linux CI reports queued bytes but omits the native low-buffer event. The
+  SDK polls when bytes are observable and documents the unavoidable zero-reporting case
+  in README-NODE.md.
 
 <details>
 <summary>Original plan</summary>

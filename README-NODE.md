@@ -194,13 +194,17 @@ node demos\node-room-media-recorder.js myroom
    closes, partway through teardown. Use the awaited promise, or the `teardownComplete`
    event, which is emitted exactly once when cleanup genuinely finishes.
 
-## Known Issue: `@roamhq/wrtc` does not report `bufferedAmount`
+## Known Issue: `@roamhq/wrtc` backpressure varies by platform
 
-`bufferedAmount` stays 0 on `@roamhq/wrtc` no matter how much is queued — measured at 0
-after handing it 2.4MB. Consequences in Node with that adapter:
+Some `@roamhq/wrtc` builds report `bufferedAmount` as 0 no matter how much is queued —
+measured at 0 after handing it 2.4MB on Windows. Other builds, including Linux CI, report
+queued bytes but omit the native `bufferedamountlow` event; the SDK now polls as a
+fallback for those builds.
+
+Where `bufferedAmount` stays at 0:
 
 - `getBufferedAmount()` always returns 0
-- the `bufferedAmountLow` event never fires
+- the SDK cannot observe a high-to-low transition, so `bufferedAmountLow` cannot fire
 - `sendBinary`'s `waitForDrain` is a no-op
 
 Browsers report it correctly, so backpressure works there. This is a limitation of the
@@ -244,8 +248,8 @@ rely on to notice you left promptly.
   your code. See the known-issue section above
 - **Crash or hang on shutdown**: You are probably exiting before teardown finished. `await
   vdo.disconnect()` rather than calling it and moving on
-- **`getBufferedAmount()` always returns 0**: `@roamhq/wrtc` does not track it. See the
-  known-issue section above
+- **`getBufferedAmount()` always returns 0**: this `@roamhq/wrtc` build does not report
+  its queue. See the known-issue section above
 - **`bytes instanceof Uint8Array` is false**: fixed in v1.5. The Node entry point evaluates
   the SDK in a `vm` context, which previously meant typed arrays it returned carried that
   context's constructors. The host realm's binary types are now shared into the context.
