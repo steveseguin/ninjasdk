@@ -1,4 +1,4 @@
-// VDO.Ninja SDK v1.5.1 — AGPL-3.0-only + SDK Exception; see LICENSE-SDK-EXCEPTION
+// VDO.Ninja SDK v1.5.2 — AGPL-3.0-only + SDK Exception; see LICENSE-SDK-EXCEPTION
 
 const MEDIA_STREAM_TRACK_ENABLED_DESCRIPTOR =
     (typeof MediaStreamTrack !== 'undefined' && MediaStreamTrack?.prototype)
@@ -386,7 +386,7 @@ const VDON_RESOURCE_CHUNK_SIZE = 16384;
          * @returns {string} Current SDK version
          */
         static get VERSION() {
-            return '1.5.1';
+            return '1.5.2';
         }
         
         /**
