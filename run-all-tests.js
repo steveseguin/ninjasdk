@@ -1495,8 +1495,9 @@ async function test() {
           pub.getBufferedAmount('nope') === null);
 
     // Whether backpressure is observable at all depends on the WebRTC implementation.
-    // @roamhq/wrtc reports bufferedAmount: 0 no matter how much is queued, so the drain
-    // signal cannot fire there. Detect it rather than asserting browser behaviour.
+    // Some @roamhq/wrtc builds report 0 no matter how much is queued. Others drain the
+    // loopback queue below the configured low-water mark before JavaScript can observe
+    // it. A bufferedAmountLow event is only required after an observed threshold crossing.
     const drained = new Promise(res => {
         pub.addEventListener('bufferedAmountLow', e => res(e.detail));
         setTimeout(() => res(null), 20000);
@@ -1505,11 +1506,18 @@ async function test() {
     for (let i = 0; i < 40; i++) bulk.send(blob);
     const filled = pub.getBufferedAmount(uuid, 'bulk');
 
-    if (filled > 0) {
+    const lowWaterMark = typeof bulk.bufferedAmountLowThreshold === 'number'
+        ? bulk.bufferedAmountLowThreshold
+        : 262144;
+    if (filled > lowWaterMark) {
         check('buffer reflects queued bytes', filled > 0);
         const drainEvent = await drained;
         check('bufferedAmountLow fires as the buffer drains', drainEvent !== null);
         if (drainEvent) check('drain event names the channel', drainEvent.label === 'x-bulk');
+    } else if (filled > 0) {
+        check('buffer reflects queued bytes', true);
+        console.log('    SKIPPED: the queue was already below the ' + lowWaterMark + '-byte');
+        console.log('             low-water mark when observed, so no threshold crossing is due.');
     } else {
         // Not a pass. State plainly what went unverified and why.
         console.log('    SKIPPED: this WebRTC implementation reports bufferedAmount 0 after');

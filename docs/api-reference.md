@@ -117,6 +117,8 @@ Events:
 - channelOpen: { uuid, streamID, label, channel } — a peer opened a reserved channel other
   than the SDK's own `x-bin` lane; the raw channel is handed over
 - bufferedAmountLow: { uuid, streamID, label, bufferedAmount }
+  - Emitted after an observed queue above the SDK's 256 KiB low-water mark drains to or
+    below it. A positive value already below the mark does not imply a pending event.
 
 ```js
 // Bulk on its own channel, unreliable and unordered, with backpressure

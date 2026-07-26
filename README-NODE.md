@@ -201,6 +201,10 @@ measured at 0 after handing it 2.4MB on Windows. Other builds, including Linux C
 queued bytes but omit the native `bufferedamountlow` event; the SDK now polls as a
 fallback for those builds.
 
+`bufferedAmountLow` follows the browser threshold semantics: the SDK emits it after an
+observed queue above 256 KiB drains to or below 256 KiB. A positive amount that is already
+below that threshold does not, by itself, imply that an event is pending.
+
 Where `bufferedAmount` stays at 0:
 
 - `getBufferedAmount()` always returns 0
