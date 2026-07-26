@@ -759,6 +759,8 @@ test('file sender waits for the receiver EOF close when bufferedAmount reports z
   const listeners = new Map();
   const sent = [];
   let localCloseCalls = 0;
+  let binaryReachedTransport = false;
+  let eofPrecededBinary = false;
   const channel = {
     label: 'file-one',
     readyState: 'open',
@@ -771,7 +773,14 @@ test('file sender waits for the receiver EOF close when bufferedAmount reports z
     removeEventListener(type, listener) {
       if (listeners.has(type)) listeners.get(type).delete(listener);
     },
-    send(value) { sent.push(value); },
+    send(value) {
+      sent.push(value);
+      if (value === 'EOF1') {
+        eofPrecededBinary = !binaryReachedTransport;
+      } else {
+        setTimeout(() => { binaryReachedTransport = true; }, 0);
+      }
+    },
     close() {
       localCloseCalls++;
       this.readyState = 'closed';
@@ -801,8 +810,9 @@ test('file sender waits for the receiver EOF close when bufferedAmount reports z
     { streamID: 'file-stream' }
   ).then(() => { settled = true; });
 
-  await wait(5);
+  await wait(35);
   assert.equal(sent[sent.length - 1], 'EOF1');
+  assert.equal(eofPrecededBinary, false);
   assert.equal(settled, false);
   assert.equal(localCloseCalls, 0);
 

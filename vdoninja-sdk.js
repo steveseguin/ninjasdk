@@ -3618,20 +3618,23 @@ const VDON_RESOURCE_CHUNK_SIZE = 16384;
                 });
             }
 
-            channel.send(VDON_FILE_EOF_COMPLETE);
-
-            // Let the buffer empty before closing. Small transfers otherwise finish
-            // inside a single millisecond and close() lands while hundreds of KB are
-            // still queued — the peer sees the close and drops the transfer. VDO.Ninja's
-            // own sender never hits this because its FileReader loop is slow enough to
-            // hide it.
+            // Put the terminator on the channel only after the binary body has left the
+            // JavaScript-facing queue. VDO.Ninja's FileReader loop naturally crosses a
+            // task boundary between chunks; in-memory sources do not, and some native
+            // adapters can otherwise surface EOF before their final binary message.
             await this._waitForChannelFlush(channel);
+            await new Promise(resolve => setTimeout(resolve, 25));
+            if (channel.readyState !== 'open') {
+                throw new Error(`File transfer channel for ${file.id} closed before EOF`);
+            }
+            channel.send(VDON_FILE_EOF_COMPLETE);
 
             // bufferedAmount is not a delivery acknowledgement. Some native adapters
             // report zero while ordered SCTP frames are still in flight, so closing here
             // can discard the tail of the file. Both VDO.Ninja and this SDK close the
             // receive side after processing EOF1; prefer that peer close as the delivery
             // acknowledgement, with a timeout for non-conforming receivers.
+            await this._waitForChannelFlush(channel);
             const receiverClosed = await this._waitForChannelClose(channel);
             if (!receiverClosed && channel.readyState === 'open') {
                 try { channel.close(); } catch (e) { /* already closing */ }
