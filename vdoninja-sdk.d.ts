@@ -246,7 +246,7 @@ export interface VDONinjaEventMap {
 
     dataReceived: { data: unknown; uuid: string; streamID?: string | null; fallback?: boolean };
     /** Long-standing misspelling, still emitted alongside dataReceived. */
-    dataRecieved: { data: unknown; uuid: string; streamID?: string | null };
+    dataRecieved: { data: unknown; uuid: string; streamID?: string | null; fallback?: boolean };
 
     track: { track: MediaStreamTrack; streams?: MediaStream[]; uuid: string; streamID: string | null };
 

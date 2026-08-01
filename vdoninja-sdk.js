@@ -8189,7 +8189,7 @@ const VDON_RESOURCE_CHUNK_SIZE = 16384;
          * - uuid: Target specific UUID
          * - type: Connection type ('viewer' or 'publisher')
          * - streamID: Target specific stream ID
-         * - allowFallback: Whether to use WebSocket fallback if data channel unavailable (default: true)
+         * - allowFallback: Whether to use WebSocket fallback if data channel unavailable (default: false)
          * 
          * Behavior:
          * - When UUID is specified without type, tries viewer connection first, then publisher
@@ -8203,7 +8203,7 @@ const VDON_RESOURCE_CHUNK_SIZE = 16384;
          * - sendData(data, { preference: 'all' }) // Send via ALL connections (may duplicate)
          * - sendData(data, { uuid: "uuid123", preference: 'viewer' }) // Use viewer channel
          * - sendData(data, { type: 'publisher' }) // Send to all publisher connections
-         * - sendData(data, { uuid: "uuid123", allowFallback: false }) // No WebSocket fallback
+         * - sendData(data, { uuid: "uuid123", allowFallback: true }) // Opt into WebSocket fallback
          */
         sendData(data, target = null) {
             const msg = { pipe: data };
