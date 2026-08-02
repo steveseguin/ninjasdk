@@ -27,7 +27,7 @@ VDO.Ninja SDK is a peer-to-peer (P2P) communication framework that enables direc
 
 - **No Human Intervention Required**: No CAPTCHA, no account creation, no email verification
 - **Server-Free Architecture**: After initial WebRTC handshake, all communication is P2P
-- **Free Forever**: No hosting costs, no API fees, no usage limits
+- **No SDK License Fee**: Hosted services operated by Steve Seguin remain subject to rate limits and operational policies
 - **Data Channel Focus**: Perfect for AI bots that need bidirectional data communication
 - **Works Locally**: Can run without SSL for local development/testing
 - **Simple API**: Minimal code required to establish connections
@@ -568,9 +568,11 @@ await vdo.announce({ streamID: 'langchain_bot' });
 
 ## License
 
-SDK core (`vdoninja-sdk.js`, `vdoninja-sdk.min.js`) is licensed under AGPL-3.0-only with an additional permission for unmodified official builds. See `LICENSE` and `LICENSE-SDK-EXCEPTION`.
+SDK core (`vdoninja-sdk.js`, `vdoninja-sdk.min.js`, and `vdoninja-sdk.d.ts`) is licensed under MPL-2.0. Distributed modifications to those files remain subject to MPL-2.0, while separate files in a larger application may use other licenses. See `LICENSE` and `LICENSING.md`.
 
 SDK extras (`vdoninja-sdk-node.js`, `webrtc-adapter.js`, `whip-client.js`, `whep-client.js`) are MIT licensed. See `LICENSE-MIT`.
+
+The `@vdoninja/mcp` wrapper is MIT licensed. It depends on the MPL-2.0 SDK core.
 
 ## Support Resources
 

@@ -84,7 +84,7 @@
     "webrtc-http"
   ],
   "author": "Steve Seguin",
-  "license": "AGPL-3.0-only",
+  "license": "MPL-2.0",
   "bugs": {
     "url": "https://github.com/steveseguin/ninjasdk/issues"
   },

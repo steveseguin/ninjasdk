@@ -33,8 +33,7 @@ You represent that:
 
 This assignment allows the Maintainer to:
 
-- Relicense contributions as needed to maintain the SDK exception (allowing
-  unmodified official builds to be used in proprietary works).
+- Offer the Project under open-source, proprietary, or commercial terms.
 - Enforce the Project's licensing terms consistently.
 - Make future licensing decisions without needing to contact every contributor.
 

@@ -3,9 +3,8 @@
  * 
  * This demo is MIT licensed; see LICENSE-DEMOS.
  * 
- * Note: The VDO.Ninja SDK core (`vdoninja-sdk.js`, `vdoninja-sdk.min.js`) is licensed under
- * AGPL-3.0-only with an additional permission for unmodified official builds.
- * See LICENSE and LICENSE-SDK-EXCEPTION.
+ * Note: The VDO.Ninja SDK core (`vdoninja-sdk.js`, `vdoninja-sdk.min.js`) is
+ * separately licensed under MPL-2.0; see LICENSE.
  */
 
 // Live demo functionality with two peers

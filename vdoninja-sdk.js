@@ -1,4 +1,11 @@
-// VDO.Ninja SDK v1.5.3 — AGPL-3.0-only + SDK Exception; see LICENSE-SDK-EXCEPTION
+/*! VDO.Ninja SDK v1.5.3
+ * Copyright (c) 2025-2026 Steve Seguin. All rights reserved.
+ * SPDX-License-Identifier: MPL-2.0
+ *
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ */
 
 const MEDIA_STREAM_TRACK_ENABLED_DESCRIPTOR =
     (typeof MediaStreamTrack !== 'undefined' && MediaStreamTrack?.prototype)
@@ -56,27 +63,11 @@ const VDON_FILE_EOF_CANCELLED = 'EOF2';
 const VDON_RESOURCE_CHUNK_SIZE = 16384;
 /**
  * VDO.Ninja SDK - OFFICIAL SDK FOR VDO.NINJA WEBSOCKET API
- * Copyright (C) 2025 Steve Seguin and contributors
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as published by
- * the Free Software Foundation, version 3 of the License only (AGPL-3.0-only).
  *
- * Additional Permission:
- * Unmodified official builds of `vdoninja-sdk.js` and `vdoninja-sdk.min.js` may
- * be used and distributed as part of proprietary works under the terms in
- * `LICENSE-SDK-EXCEPTION`.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- * 
- * You should have received a copy of the GNU Affero General Public License
- * along with this program. If not, see <https://www.gnu.org/licenses/>.
- * 
- * IMPORTANT USAGE NOTICE:
- * =======================
+ * HOSTED SERVICE USAGE NOTICE:
+ * ============================
+ * These operational rules apply when using infrastructure or services operated
+ * by Steve Seguin. They are separate from the MPL-2.0 software license.
  * 
  * 1. Direct WebSocket API access is NOT APPROVED and may result in blocking
  * 2. Always use this SDK - it ensures proper usage patterns and handles API updates
@@ -87,8 +78,9 @@ const VDON_RESOURCE_CHUNK_SIZE = 16384;
  * 7. Rooms are limited to ~80 connections, viewer connections may also be limited
  * 8. Higher rate limits available on request for legitimate use cases
  * 
- * By using this SDK, you agree to respect these guidelines to keep the service
- * free and available for everyone. Abuse hurts the entire ecosystem.
+ * Access to Steve-operated services is governed by the applicable Terms of
+ * Service and operational policies. Abuse may result in access being limited,
+ * suspended, or withdrawn.
  * 
  * WebSocket Client-Server Communication Protocol for VDO.Ninja
  *
@@ -373,7 +365,7 @@ const VDON_RESOURCE_CHUNK_SIZE = 16384;
  *     sdk.sendData(data, { streamID: "user1", type: "viewer" })  // To viewers of stream
  * 
  * @author Steve Seguin
- * @license AGPL-3.0-only (with additional permission; see LICENSE-SDK-EXCEPTION)
+ * @license MPL-2.0
  */
 
 (function (global) {

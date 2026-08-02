@@ -26,13 +26,11 @@ npm run build
 ## Pull Request Guidelines
 
 1. **PRs are strongly preferred over private forks.**  
-   Contributing changes back ensures the SDK exception (allowing unmodified
-   official builds in proprietary apps) is maintained for everyone. A unified
-   SDK and API is a core goal of this project.
+   Contributing changes back helps keep the SDK and API unified and makes fixes
+   available to everyone using the official distribution.
 
-2. **If the "byte-for-byte identical" requirement is problematic for your use
-   case**, open a PR to request an additional build variant. We're happy to
-   include it in the official distribution.
+2. **Changes to MPL-covered SDK core files remain MPL-2.0 when distributed.**
+   Separate application files, wrappers, and integrations may use other licenses.
 
 3. **Keep PRs focused.** One feature or fix per PR makes review easier.
 
@@ -46,7 +44,7 @@ npm run build
 By submitting a pull request, you agree to the [CLA](CLA.md). In short, you
 assign your contribution rights to the maintainer so that:
 
-- The SDK exception can be preserved.
+- The project can be enforced, relicensed, and commercially licensed consistently.
 - Future licensing decisions can be made consistently without needing to contact
   every contributor.
 

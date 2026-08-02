@@ -1,11 +1,10 @@
 /**
  * VDO.Ninja SDK Demo - Stylesheet
- * 
- * This demo code is released into the public domain (CC0 1.0 Universal).
- * You may use, modify, and distribute this demo code without any restrictions.
- * 
- * Note: The VDO.Ninja SDK itself (vdoninja-sdk.js) remains licensed under AGPL-3.0.
- * See: https://github.com/steveseguin/ninjasdk/blob/main/LICENSE
+ * Copyright (c) 2025-2026 Steve Seguin
+ * SPDX-License-Identifier: MIT
+ *
+ * This landing-page demo stylesheet is MIT licensed; see LICENSE-MIT.
+ * The VDO.Ninja SDK core remains separately licensed under MPL-2.0; see LICENSE.
  */
 
 :root {

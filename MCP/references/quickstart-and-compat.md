@@ -198,7 +198,7 @@ npm run test:mcp:all
 - Registry metadata is in `MCP/server.json`.
 - Tool contracts are in `MCP/references/mcp-tool-contract.md`.
 - `@vdoninja/mcp` depends on `@vdoninja/sdk`, so SDK is installed transitively.
-- License model matches SDK packaging: AGPL-3.0-only with an additional unmodified-distribution exception (`MCP/LICENSE-SDK-EXCEPTION`).
+- The MCP wrapper is MIT licensed. Its `@vdoninja/sdk` dependency remains separately licensed under MPL-2.0.
 
 ## Optional Advanced Diagnostics
 

@@ -1,4 +1,7 @@
 #!/usr/bin/env node
+// Copyright (c) 2026 Steve Seguin
+// SPDX-License-Identifier: MIT
+
 'use strict';
 
 const readline = require('node:readline');

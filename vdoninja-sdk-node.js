@@ -1,4 +1,6 @@
+// Copyright (c) 2025-2026 Steve Seguin
 // SPDX-License-Identifier: MIT
+// See LICENSE-MIT for the full terms.
 /**
  * VDO.Ninja SDK - Node.js Version with WebRTC Adapter
  * 

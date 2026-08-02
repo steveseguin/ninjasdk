@@ -1,3 +1,4 @@
+// Copyright (c) 2025-2026 Steve Seguin
 // SPDX-License-Identifier: MIT
 // WHIP Client v1.0.0
 // WebRTC-HTTP Ingestion Protocol client for publishing media streams

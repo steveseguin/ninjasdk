@@ -31,7 +31,7 @@ npm run test:node # Run Node.js example
 
 - Do NOT access the WebSocket API directly; always use this SDK
 - Do NOT edit `vdoninja-sdk.min.js`; it is a build artifact
-- License: AGPL-3.0-only with SDK Exception (see LICENSE-SDK-EXCEPTION)
+- License: SDK core is MPL-2.0; wrappers and MCP are MIT (see LICENSING.md)
 
 ---
 

@@ -1,3 +1,7 @@
+// Copyright (c) 2025-2026 Steve Seguin
+// SPDX-License-Identifier: MIT
+// See LICENSE-MIT for the full terms.
+
 /// <reference lib="dom" />
 
 import VDONinja from './vdoninja-sdk';

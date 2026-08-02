@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Steve Seguin
+// SPDX-License-Identifier: MIT
+
 /**
  * Cloudflare Worker proxy template for a remote MCP HTTP endpoint.
  *

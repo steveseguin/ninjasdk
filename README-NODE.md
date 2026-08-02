@@ -263,3 +263,9 @@ rely on to notice you left promptly.
   the SDK in a `vm` context, which previously meant typed arrays it returned carried that
   context's constructors. The host realm's binary types are now shared into the context.
   On older builds, duck-type or use `Buffer.from(bytes)` instead
+
+## License
+
+`vdoninja-sdk-node.js`, its Node typings, and `webrtc-adapter.js` are MIT licensed under
+`LICENSE-MIT`. The Node entry point loads and extends `vdoninja-sdk.js`, which remains
+MPL-2.0 under `LICENSE`; the wrapper's MIT license does not relicense the SDK core.

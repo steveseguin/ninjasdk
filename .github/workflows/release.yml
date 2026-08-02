@@ -140,12 +140,26 @@ jobs:
         echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
         
     - name: Update SDK version in file
+      env:
+        NEW_VERSION: ${{ steps.version.outputs.new_version }}
       run: |
-        # Update header comment
-        sed -i "1s/.*/\/\/ VDO.Ninja SDK v${{ steps.version.outputs.new_version }} — AGPL-3.0-only + SDK Exception; see LICENSE-SDK-EXCEPTION/" vdoninja-sdk.js
-        
-        # Update static VERSION getter
-        sed -i "s/return '[0-9]\+\.[0-9]\+\.[0-9]\+';/return '${{ steps.version.outputs.new_version }}';/" vdoninja-sdk.js
+        node <<'NODE'
+        const fs = require('node:fs');
+
+        const file = 'vdoninja-sdk.js';
+        const version = process.env.NEW_VERSION;
+        const bannerPattern = /VDO\.Ninja SDK v\d+\.\d+\.\d+/;
+        const getterPattern = /return '\d+\.\d+\.\d+';/;
+        let source = fs.readFileSync(file, 'utf8');
+
+        if (!bannerPattern.test(source) || !getterPattern.test(source)) {
+          throw new Error('Could not find the SDK version banner or VERSION getter');
+        }
+
+        source = source.replace(bannerPattern, `VDO.Ninja SDK v${version}`);
+        source = source.replace(getterPattern, `return '${version}';`);
+        fs.writeFileSync(file, source);
+        NODE
         
     - name: Install dependencies
       run: npm install
@@ -263,5 +277,8 @@ jobs:
           webrtc-adapter.js
           package.json
           README.md
+          LICENSE
+          LICENSE-MIT
+          LICENSING.md
         draft: false
         prerelease: false

@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Steve Seguin
+// SPDX-License-Identifier: MIT
+
 'use strict';
 
 function loadVDONinjaSDK() {

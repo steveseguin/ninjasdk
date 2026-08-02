@@ -3,7 +3,7 @@
 [![SDK Tests](https://github.com/steveseguin/ninjasdk/actions/workflows/test.yml/badge.svg)](https://github.com/steveseguin/ninjasdk/actions/workflows/test.yml)
 [![npm version](https://img.shields.io/npm/v/@vdoninja/sdk.svg)](https://www.npmjs.com/package/@vdoninja/sdk)
 [![npm downloads](https://img.shields.io/npm/dm/@vdoninja/sdk.svg)](https://www.npmjs.com/package/@vdoninja/sdk)
-[![License: AGPL-3.0-only + Exception](https://img.shields.io/badge/License-AGPL--3.0--only%20%2B%20Exception-blue.svg)](LICENSE-SDK-EXCEPTION)
+[![License: MPL-2.0](https://img.shields.io/badge/License-MPL--2.0-brightgreen.svg)](LICENSE)
 
 AI-friendly P2P communication SDK for audio, video, and data streaming. Build peer-to-peer applications without servers, user accounts, or complex infrastructure.
 
@@ -31,7 +31,7 @@ The SDK deliberately supports several layers. Media publishing/viewing and gener
 - **Connection Limits**: ~80 connections per room, viewer limits may apply
 - **Data Policy**: Only WebRTC handshake data allowed through WebSocket - all other data must use P2P channels
 
-By using this SDK, you agree to respect these guidelines to keep the service free for everyone.
+Use of VDO.Ninja services operated by Steve Seguin is subject to applicable Terms of Service, operational policies, rate limits, and access controls.
 
 ## Installation
 
@@ -940,27 +940,28 @@ try {
 
 Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
-By submitting a pull request, you agree to the [Contributor License Agreement (CLA)](CLA.md), which assigns your contribution rights to the maintainer so that the SDK exception can be preserved and licensing decisions can be made consistently.
+By submitting a pull request, you agree to the [Contributor License Agreement (CLA)](CLA.md), which assigns your contribution rights to Steve Seguin so the project can be enforced, relicensed, and commercially licensed consistently.
 
 ## License
 
 ### SDK Core
-`vdoninja-sdk.js` and `vdoninja-sdk.min.js` are licensed under AGPL-3.0-only with an additional permission for unmodified official builds. See [LICENSE](LICENSE) and [LICENSE-SDK-EXCEPTION](LICENSE-SDK-EXCEPTION).
+`vdoninja-sdk.js`, `vdoninja-sdk.min.js`, and `vdoninja-sdk.d.ts` are licensed under the [Mozilla Public License 2.0](LICENSE) (`MPL-2.0`). You may use, bundle, minify, and distribute the SDK as part of an MIT, AGPL, or proprietary larger work without relicensing the rest of that work. Distribution must preserve the applicable notices and make the MPL-covered source available as required by MPL-2.0. If you distribute modifications to an MPL-covered SDK file, that file and its source remain subject to MPL-2.0.
 
-**What "unmodified official build" means:**
-- The SDK file must be **byte-for-byte identical** to a versioned official release (npm `@vdoninja/sdk@X.Y.Z`, GitHub tag `vX.Y.Z`, or a byte-identical CDN mirror like unpkg/jsDelivr).
-- **Bundlers beware:** most build tools (webpack, rollup, vite, esbuild, etc.) re-minify or transform dependencies, which changes bytes. If you bundle/transform the SDK into your app, the exception likely **does not apply** and the SDK is governed by plain AGPL-3.0-only.
-- **Self-hosting is fine:** you don't have to use a CDN. You can copy the official versioned file to your own server and serve it as a static asset—just keep it byte-identical.
-
-**Want to modify the SDK or need a different build format?** Contributing changes via a pull request ensures the exception allowance is maintained for everyone. A singular, unified SDK and API is a core goal of this project. If the "byte-for-byte identical" requirement is problematic for your use case (e.g., you need an ESM or CJS bundle), please open a PR to propose an additional official build variant—we're happy to include it in the distribution.
+The SDK is not marked "Incompatible With Secondary Licenses," preserving compatibility with VDO.Ninja's AGPL-3.0 code.
 
 ### SDK Extras
-`vdoninja-sdk-node.js`, `webrtc-adapter.js`, `whip-client.js`, and `whep-client.js` are MIT licensed. See [LICENSE-MIT](LICENSE-MIT).
+`vdoninja-sdk-node.js`, `vdoninja-sdk-node.d.ts`, `webrtc-adapter.js`, `whip-client.js`, and `whep-client.js` are MIT licensed. See [LICENSE-MIT](LICENSE-MIT). The Node wrapper loads and extends the MPL-2.0 SDK core; its MIT license does not relicense the core.
+
+### MCP Wrapper
+
+The `@vdoninja/mcp` wrapper under [`MCP/`](MCP/) is MIT licensed. It depends on `@vdoninja/sdk`, whose core remains MPL-2.0.
 
 ### Demos and Examples
 Demo files (the `demos/` folder) are MIT licensed. See [LICENSE-DEMOS](LICENSE-DEMOS).
 
 Note: demo files are excluded from the npm package via `.npmignore`.
+
+See [LICENSING.md](LICENSING.md) for the complete file map and the separate trademark and hosted-service terms.
 
 ## Support
 
@@ -970,4 +971,4 @@ Note: demo files are excluded from the npm package via `.npmignore`.
 
 ---
 
-Built with ❤️ by the VDO.Ninja community. Special thanks to all contributors and the broader WebRTC ecosystem.
+Built by Steve Seguin with appreciation for the broader WebRTC ecosystem.

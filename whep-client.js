@@ -1,3 +1,4 @@
+// Copyright (c) 2025-2026 Steve Seguin
 // SPDX-License-Identifier: MIT
 // WHEP Client v1.0.0
 // WebRTC-HTTP Egress Protocol client for consuming media streams

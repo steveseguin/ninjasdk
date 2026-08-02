@@ -1,12 +1,12 @@
 <!DOCTYPE html>
 <!--
     VDO.Ninja SDK Demo - Main Landing Page
-    
-    This demo code is released into the public domain (CC0 1.0 Universal).
-    You may use, modify, and distribute this demo code without any restrictions.
-    
-    Note: The VDO.Ninja SDK core (`vdoninja-sdk.js`, `vdoninja-sdk.min.js`) is licensed under AGPL-3.0-only with an additional permission for unmodified official builds.
-    See: https://github.com/steveseguin/ninjasdk/blob/main/LICENSE and https://github.com/steveseguin/ninjasdk/blob/main/LICENSE-SDK-EXCEPTION
+    Copyright (c) 2025-2026 Steve Seguin
+    SPDX-License-Identifier: MIT
+
+    This landing-page demo is MIT licensed; see LICENSE-MIT.
+    The VDO.Ninja SDK core (`vdoninja-sdk.js`, `vdoninja-sdk.min.js`, and
+    `vdoninja-sdk.d.ts`) is separately licensed under MPL-2.0; see LICENSE.
 -->
 <html lang="en">
 <head>
@@ -1049,7 +1049,7 @@ vdo.addEventListener('error', (event) => {
                 </div>
                 <div class="faq-item">
                     <h3>Can I use this commercially?</h3>
-                    <p>Yes! Commercial use is allowed. Unmodified official SDK builds (<code>vdoninja-sdk.js</code> / <code>vdoninja-sdk.min.js</code>) may be used in proprietary applications under the additional permission in <code>LICENSE-SDK-EXCEPTION</code>. If you modify the SDK core, that additional permission does not apply and the SDK is governed by AGPL-3.0-only.</p>
+                    <p>Yes. MPL-2.0 permits the SDK to be used and distributed in a larger proprietary application without relicensing the application's separate files. You must preserve the SDK's notices and make its MPL-covered source available as required. If you distribute a modified MPL-covered SDK file, that file and its source remain subject to MPL-2.0.</p>
                 </div>
                 <div class="faq-item">
                     <h3>What platforms are supported?</h3>
@@ -1177,7 +1177,7 @@ vdo.addEventListener('error', (event) => {
                         <span class="version-badge">Latest</span>
                         <span class="size-badge">~45KB minified</span>
                     </div>
-                    <p style="font-size:0.85em;color:#94a3b8;margin-top:0.5rem;">For proprietary use under the SDK exception, pin a specific version (e.g., <code>@v1.3.17</code>) to ensure your build stays byte-identical to an official release.</p>
+                    <p style="font-size:0.85em;color:#94a3b8;margin-top:0.5rem;">Pin a specific release tag (for example, <code>@vX.Y.Z</code>) when you need reproducible builds.</p>
                 </div>
                 <div class="download-option">
                     <h3>💾 Direct Download</h3>
@@ -1191,8 +1191,8 @@ vdo.addEventListener('error', (event) => {
                         </a>
                     </div>
                     <div class="download-meta">
-                        <span class="version-badge">v1.1.0</span>
-                        <span class="license-badge">AGPLv3-only + Exception</span>
+                        <span class="version-badge">Current release</span>
+                        <span class="license-badge">MPL-2.0</span>
                     </div>
                 </div>
                 <div class="download-option">
@@ -1204,7 +1204,7 @@ npm install ws @roamhq/wrtc  # or node-datachannel
 # Use in your code
 const VDONinjaSDK = require('./vdoninja-sdk-node.js');</code></pre>
                     <div class="download-meta">
-                        <span class="version-badge">v1.1.0</span>
+                        <span class="version-badge">Current release</span>
                         <a href="README-NODE.md" style="margin-left: 10px;">Node.js Docs</a>
                     </div>
                 </div>
@@ -1299,7 +1299,7 @@ const VDONinjaSDK = require('./vdoninja-sdk-node.js');</code></pre>
                 <div class="footer-section">
                     <h4>VDO.Ninja SDK</h4>
                     <p>Free, open-source P2P communication framework</p>
-                    <p class="footer-license">Licensed under AGPLv3-only + Exception</p>
+                    <p class="footer-license">SDK core licensed under MPL-2.0</p>
                 </div>
                 <div class="footer-section">
                     <h4>Links</h4>
@@ -1320,7 +1320,7 @@ const VDONinjaSDK = require('./vdoninja-sdk-node.js');</code></pre>
                 </div>
             </div>
             <div class="footer-bottom">
-                <p>&copy; 2024 VDO.Ninja SDK. Created with ❤️ by the VDO.Ninja community.</p>
+                <p>&copy; 2025-2026 Steve Seguin.</p>
             </div>
         </div>
     </footer>
