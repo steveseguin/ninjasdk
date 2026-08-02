@@ -101,7 +101,9 @@ export type DataTarget =
           uuid?: string;
           type?: 'viewer' | 'publisher';
           streamID?: string;
+          /** Data-channel routing. Default 'any': publisher first, then viewer. */
           preference?: 'any' | 'viewer' | 'publisher' | 'all';
+          /** Use WebSocket signaling when no matching data channel is available. Default false. */
           allowFallback?: boolean;
       };
 
@@ -246,7 +248,7 @@ export interface VDONinjaEventMap {
 
     dataReceived: { data: unknown; uuid: string; streamID?: string | null; fallback?: boolean };
     /** Long-standing misspelling, still emitted alongside dataReceived. */
-    dataRecieved: { data: unknown; uuid: string; streamID?: string | null };
+    dataRecieved: { data: unknown; uuid: string; streamID?: string | null; fallback?: boolean };
 
     track: { track: MediaStreamTrack; streams?: MediaStream[]; uuid: string; streamID: string | null };
 

@@ -28,9 +28,10 @@ async function main() {
     console.log('Platforms: Twitch, YouTube, TikTok, Kick, X, Facebook, Discord, Instagram, and more');
     console.log('Label: dock (identifies us as a chat overlay client)\n');
     
-    // Initialize SDK with socialstream.ninja host
+    // Initialize the SDK with Social Stream's VDO.Ninja-compatible signaling host.
+    // Chat payloads travel over the resulting peer-to-peer WebRTC data channel.
     const sdk = new VDONinjaSDK({
-        host: 'wss://wss.socialstream.ninja',  // SSN WebSocket server
+        host: 'wss://wss.socialstream.ninja',
         room: sessionID,  // SSN calls this "session ID" not "room ID"
         password: false,  // Disable password
         debug: false

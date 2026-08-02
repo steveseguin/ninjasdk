@@ -74,7 +74,9 @@ const vdo = new VDONinjaSDK(options)
 ## Data Communication
 
 - sendData(data, target?): boolean
-  - target: undefined → all; 'uuid' → specific; { uuid?, type?: 'viewer'|'publisher', streamID?, preference?: 'any'|'viewer'|'publisher'|'all', allowFallback? }
+  - target: undefined → all connected peers; 'uuid' → a specific peer; { uuid?, type?: 'viewer'|'publisher', streamID?, preference?: 'any'|'viewer'|'publisher'|'all', allowFallback? }
+  - preference controls data-channel routing. 'any' (default) tries publisher first, then viewer; an explicit role uses only that role; 'all' may duplicate messages.
+  - allowFallback controls the separate WebSocket signaling fallback. It defaults to false; set it to true to opt in.
 - sendPing(uuid?): boolean
 - request(requestType, data, targetUUID, timeout=5000): Promise<any>
 - respond(requestId, data, targetUUID): boolean
@@ -323,7 +325,7 @@ State & Errors
 - Reserved pipe types: 'subscribe' | 'unsubscribe' | 'channelMessage' are used by the SDK pub/sub system and do not emit dataReceived; use the pub/sub helpers and events.
 - Viewer preferences (audio/video) are sent viewer → publisher via the viewer data channel, not the reverse.
 - Legacy support: quickView and autoConnect can infer data-only; you can also pass { dataOnly:true }.
-- WebSocket fallback: sendData can deliver via signaling when allowFallback is true; dataReceived includes { fallback:true }.
+- WebSocket fallback: sendData can deliver via signaling when allowFallback is true (default false); dataReceived includes { fallback:true }.
 
 ---
 
