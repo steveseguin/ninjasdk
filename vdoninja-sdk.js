@@ -8189,16 +8189,19 @@ const VDON_RESOURCE_CHUNK_SIZE = 16384;
          * - uuid: Target specific UUID
          * - type: Connection type ('viewer' or 'publisher')
          * - streamID: Target specific stream ID
+         * - preference: Data-channel routing ('any', 'viewer', 'publisher', or 'all'; default: 'any')
          * - allowFallback: Whether to use WebSocket fallback if data channel unavailable (default: false)
          * 
          * Behavior:
-         * - When UUID is specified without type, tries viewer connection first, then publisher
+         * - The default 'any' preference tries the publisher data channel first, then the viewer data channel
+         * - An explicit 'viewer' or 'publisher' preference only tries that connection type
+         * - The 'all' preference sends on both connection types when available and may duplicate messages
          * - When type is specified, only tries that specific connection type
          * - If data channel is not available and allowFallback is true, uses WebSocket signaling
-         * - This ensures messages reach the peer even in mesh scenarios or when data channels fail
+         * - Data-channel preference is separate from WebSocket fallback, which is opt-in
          * 
          * Examples:
-         * - sendData(data) // Send to all via publisher connections (no duplicates)
+         * - sendData(data) // Send once to every reachable peer (publisher channel preferred)
          * - sendData(data, "uuid123") // Send to specific peer (publisher channel preferred)
          * - sendData(data, { preference: 'all' }) // Send via ALL connections (may duplicate)
          * - sendData(data, { uuid: "uuid123", preference: 'viewer' }) // Use viewer channel

@@ -400,13 +400,13 @@ peerA.sendData("Hello", { preference: 'all' });  // peerB receives TWICE
 The SDK intelligently routes messages to prevent duplicates when dual connections exist:
 
 ```javascript
-// Default behavior (no target): publisher preferred (no duplicates)
-peer.sendData(data);  // Tries publisher first, viewer fallback if needed
+// Default behavior (no target): publisher data channel preferred (no duplicates)
+peer.sendData(data);  // Tries publisher data channel first, then viewer data channel
 
 // Explicit channel selection (optional)
 peer.sendData(data, { preference: 'publisher' });  // ONLY use publisher channel
 peer.sendData(data, { preference: 'viewer' });     // ONLY use viewer channel  
-peer.sendData(data, { preference: 'any' });        // Publisher first, viewer fallback (default)
+peer.sendData(data, { preference: 'any' });        // Publisher data channel, then viewer (default)
 peer.sendData(data, { preference: 'all' });        // Use ALL channels (duplicates!)
 
 // Target specific peer
@@ -415,12 +415,14 @@ peer.sendData(data, { uuid: "...", preference: 'viewer' }); // Force viewer chan
 ```
 
 **Preference options:**
-- `'any'` (default): Try publisher first, automatically fallback to viewer if needed
-- `'publisher'`: Use ONLY publisher channel (no fallback)
-- `'viewer'`: Use ONLY viewer channel (no fallback)
+- `'any'` (default): Try the publisher data channel first, then the viewer data channel
+- `'publisher'`: Use only the publisher data channel
+- `'viewer'`: Use only the viewer data channel
 - `'all'`: Send via ALL available connections (intentional duplicates)
 
-**Note:** The default `'any'` preference ensures messages always get through while preventing duplicates. It tries the publisher channel first (as that's typically the announcing peer's primary channel), but automatically uses the viewer channel if the publisher channel isn't available.
+**Note:** The default `'any'` preference tries one available data channel per peer while preventing duplicates. It tries the publisher channel first (as that's typically the announcing peer's primary channel), then uses the viewer channel if the publisher channel isn't available.
+
+These preferences select between WebRTC data channels. WebSocket signaling fallback is separate and disabled by default; opt in with `{ allowFallback: true }`.
 
 ## Salt Configuration (Important!)
 

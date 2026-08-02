@@ -74,7 +74,9 @@
 
     <h2>Data Communication</h2>
     <ul>
-      <li><code>sendData(data, target?)</code> — flexible targeting with DC and fallback</li>
+      <li><code>sendData(data, target?)</code> — data-channel routing defaults to
+        publisher first, then viewer. WebSocket signaling fallback is separate, disabled by
+        default, and enabled with <code>{ allowFallback: true }</code>.</li>
       <li><code>sendBinary(data, uuid, options?)</code> — raw bytes on the reserved
         <code>x-bin</code> lane, never the control channel</li>
       <li><code>openChannel(uuid, label, options?)</code>,

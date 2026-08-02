@@ -101,7 +101,9 @@ export type DataTarget =
           uuid?: string;
           type?: 'viewer' | 'publisher';
           streamID?: string;
+          /** Data-channel routing. Default 'any': publisher first, then viewer. */
           preference?: 'any' | 'viewer' | 'publisher' | 'all';
+          /** Use WebSocket signaling when no matching data channel is available. Default false. */
           allowFallback?: boolean;
       };
 
