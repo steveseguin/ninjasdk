@@ -159,7 +159,7 @@ await vdo.publish(stream, { room: "videoroom" });
 - 📡 **Flexible**: Audio, video, and data channels
 - 🌐 **Resilient**: NAT traversal and firewall bypassing
 - 📤 **WHIP/WHEP Support**: Publish to Twitch, Meshcast, Cloudflare and more
-- 🧩 **Optional MCP Add-on**: `@vdoninja/mcp` for AI-agent rooms and private bot-to-bot workflows
+- 🧩 **Optional MCP Add-on**: [`@vdoninja/mcp`](https://github.com/steveseguin/ninjamcp) for AI-agent rooms and private bot-to-bot workflows
 
 Additional transport features:
 
@@ -954,7 +954,7 @@ The SDK is not marked "Incompatible With Secondary Licenses," preserving compati
 
 ### MCP Wrapper
 
-The `@vdoninja/mcp` wrapper under [`MCP/`](MCP/) is MIT licensed. It depends on `@vdoninja/sdk`, whose core remains MPL-2.0.
+The separately published [`@vdoninja/mcp`](https://github.com/steveseguin/ninjamcp) wrapper is MIT licensed. It depends on `@vdoninja/sdk`, whose core remains MPL-2.0.
 
 ### Demos and Examples
 Demo files (the `demos/` folder) are MIT licensed. See [LICENSE-DEMOS](LICENSE-DEMOS).

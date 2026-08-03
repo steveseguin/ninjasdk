@@ -93,10 +93,10 @@ Do not treat a room name as an access-control secret. Agents should validate mes
 
 ## Client configuration and skill material
 
-- Client-specific configurations: [MCP client examples](../MCP/references/client-config-examples.md)
-- Installable skill: [MCP/SKILL.md](../MCP/SKILL.md)
-- Exact tool contract: [MCP tool contract](../MCP/references/mcp-tool-contract.md)
-- Security and transport notes: [MCP quickstart](../MCP/references/quickstart-and-compat.md)
+- Client-specific configurations: [MCP client examples](https://github.com/steveseguin/ninjamcp/blob/main/references/client-config-examples.md)
+- Installable skill: [MCP skill](https://github.com/steveseguin/ninjamcp/blob/main/SKILL.md)
+- Exact tool contract: [MCP tool contract](https://github.com/steveseguin/ninjamcp/blob/main/references/mcp-tool-contract.md)
+- Security and transport notes: [MCP quickstart](https://github.com/steveseguin/ninjamcp/blob/main/references/quickstart-and-compat.md)
 
 ## Troubleshooting
 
@@ -106,4 +106,3 @@ Do not treat a room name as an access-control secret. Agents should validate mes
 4. Wait for `peer_connected` and `data_channel_open` before assuming delivery.
 5. Retry with TURN when direct connectivity is unavailable.
 6. Use `vdo_receive` to inspect `sdk_error`, `connection_failed`, and `reconnect_scheduled` events.
-

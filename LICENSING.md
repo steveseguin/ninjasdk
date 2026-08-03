@@ -24,7 +24,7 @@ The following wrappers and companion clients are licensed under the [MIT License
 
 The Node wrapper loads and extends the MPL-2.0 SDK core. Its MIT license applies only to the wrapper; it does not relicense the SDK core.
 
-Files under [`demos/`](demos/) are separately licensed under [LICENSE-DEMOS](LICENSE-DEMOS). The root SDK landing-page demo (`index.html` and `style.css`) is also MIT licensed. The entire [`MCP/`](MCP/) package is separately MIT licensed under [MCP/LICENSE](MCP/LICENSE). An MIT-licensed wrapper or example does not relicense SDK core or third-party code that it loads, imports, embeds, or references.
+Files under [`demos/`](demos/) are separately licensed under [LICENSE-DEMOS](LICENSE-DEMOS). The root SDK landing-page demo (`index.html` and `style.css`) is also MIT licensed. The separately published [`@vdoninja/mcp`](https://github.com/steveseguin/ninjamcp) wrapper is MIT licensed under its own license and is not part of this SDK repository or npm package. An MIT-licensed wrapper or example does not relicense SDK core or third-party code that it loads, imports, embeds, or references.
 
 Third-party components retain their own copyright and license notices. An express file- or directory-specific notice controls for that component.
 

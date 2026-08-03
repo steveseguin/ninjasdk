@@ -1,6 +1,5 @@
 # Development files
 demos/
-MCP/
 tests/
 run-all-tests.js
 test-*.html
@@ -45,4 +44,3 @@ npm-debug.log*
 *.map
 *.tgz
 ffmpeg.exe
-MCP/tests/artifacts/

@@ -1,9 +1,13 @@
-name: MCP Tests
+name: MCP Compatibility
 
 on:
   pull_request:
     paths:
-      - 'MCP/**'
+      - 'vdoninja-sdk.js'
+      - 'vdoninja-sdk-node.js'
+      - 'vdoninja-sdk.d.ts'
+      - 'vdoninja-sdk-node.d.ts'
+      - 'webrtc-adapter.js'
       - 'package.json'
       - 'package-lock.json'
       - '.github/workflows/mcp-tests.yml'
@@ -12,17 +16,24 @@ on:
       - main
       - master
     paths:
-      - 'MCP/**'
+      - 'vdoninja-sdk.js'
+      - 'vdoninja-sdk-node.js'
+      - 'vdoninja-sdk.d.ts'
+      - 'vdoninja-sdk-node.d.ts'
+      - 'webrtc-adapter.js'
       - 'package.json'
       - 'package-lock.json'
       - '.github/workflows/mcp-tests.yml'
+  schedule:
+    - cron: '30 2 * * *'
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
-  test-mcp:
-    name: Node ${{ matrix.node-version }} MCP
+  test-mcp-compatibility:
+    name: Node ${{ matrix.node-version }} SDK + MCP
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -30,7 +41,7 @@ jobs:
         node-version: [18, 20]
 
     steps:
-      - name: Checkout
+      - name: Check out SDK
         uses: actions/checkout@v7
 
       - name: Setup Node.js
@@ -39,10 +50,26 @@ jobs:
           node-version: ${{ matrix.node-version }}
           cache: npm
 
-      - name: Install dependencies
+      - name: Pack the SDK checkout
         run: |
           npm ci
-          npm install --no-save @roamhq/wrtc
+          npm pack --pack-destination "$RUNNER_TEMP"
+          SDK_VERSION=$(node -p "require('./package.json').version")
+          echo "SDK_TARBALL=$RUNNER_TEMP/vdoninja-sdk-$SDK_VERSION.tgz" >> "$GITHUB_ENV"
 
-      - name: Run MCP tests
-        run: npm run test:mcp
+      - name: Check out canonical MCP package
+        uses: actions/checkout@v7
+        with:
+          repository: steveseguin/ninjamcp
+          path: ecosystem/ninjamcp
+
+      - name: Install MCP with the packed SDK
+        working-directory: ecosystem/ninjamcp
+        run: |
+          npm install
+          npm install --no-save "$SDK_TARBALL"
+          npm ls @vdoninja/sdk
+
+      - name: Run canonical MCP tests
+        working-directory: ecosystem/ninjamcp
+        run: npm run test:all
