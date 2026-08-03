@@ -1,5 +1,6 @@
 # Development files
 demos/
+MCP/
 tests/
 run-all-tests.js
 test-*.html
