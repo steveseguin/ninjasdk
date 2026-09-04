@@ -1,4 +1,4 @@
-/*! VDO.Ninja SDK v1.5.5
+/*! VDO.Ninja SDK v1.6.0
  * Copyright (c) 2025-2026 Steve Seguin. All rights reserved.
  * SPDX-License-Identifier: MPL-2.0
  *
@@ -378,7 +378,7 @@ const VDON_RESOURCE_CHUNK_SIZE = 16384;
          * @returns {string} Current SDK version
          */
         static get VERSION() {
-            return '1.5.5';
+            return '1.6.0';
         }
         
         /**
