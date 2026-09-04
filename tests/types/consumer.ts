@@ -41,6 +41,11 @@ async function main() {
         if (d.intentional && d.phase === 'teardown') { /* cleanup finished */ }
     });
     vdo.on('teardownComplete', (e) => { const r: string = e.detail.reason; void r; });
+    vdo.on('obsState', (e) => {
+        const visible: boolean | null | undefined = e.detail.state.visibility;
+        const changed: boolean | null | undefined = e.detail.update.sourceActive;
+        void visible; void changed;
+    });
 
     await vdo.disconnect();   // awaitable
     void id; void size;

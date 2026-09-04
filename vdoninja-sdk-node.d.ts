@@ -25,6 +25,7 @@ export type {
     SDKState,
     DisconnectedDetail,
     FileTransferProgressDetail,
+    OBSState,
     VDONinjaEventMap,
     VDONinjaEvent
 } from './vdoninja-sdk';

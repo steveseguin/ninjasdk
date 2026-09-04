@@ -2094,6 +2094,7 @@ const VDON_RESOURCE_CHUNK_SIZE = 16384;
                 streamID: null,
                 session: null,  // Session ID for this WebRTC connection
                 info: {label: options?.label || null},
+                obsState: {},
                 allowAudio: true,
                 allowVideo: true,
                 viewOptions: {},
@@ -4315,6 +4316,22 @@ const VDON_RESOURCE_CHUNK_SIZE = 16384;
                     }
                     if ('allowresources' in msg) {
                         connection.allowResources = msg.allowresources === true;
+                    }
+
+                    // OBS sends its browser-source state to publishers over the normal
+                    // control channel. Updates are sparse, so retain the merged state per
+                    // peer while also exposing the exact fields changed by this message.
+                    // This is independent of the chain below because initial settings can
+                    // contain obsState alongside audio/video preferences.
+                    if (msg.obsState && typeof msg.obsState === 'object' && !Array.isArray(msg.obsState)) {
+                        const update = Object.assign({}, msg.obsState);
+                        connection.obsState = Object.assign({}, connection.obsState || {}, update);
+                        this._emit('obsState', {
+                            uuid: connection.uuid,
+                            streamID: connection.streamID,
+                            state: Object.assign({}, connection.obsState),
+                            update
+                        });
                     }
 
                     // Handle different message types

@@ -232,6 +232,17 @@ export interface FileTransferProgressDetail {
     progress: number;
 }
 
+/** OBS browser-source state received from a connected VDO.Ninja viewer. */
+export interface OBSState {
+    visibility?: boolean | null;
+    sourceActive?: boolean | null;
+    streaming?: boolean | null;
+    recording?: boolean | null;
+    virtualcam?: boolean | null;
+    details?: Record<string, unknown> | null;
+    [key: string]: unknown;
+}
+
 /**
  * Event payloads by name. Not exhaustive — see docs/api-reference.md for the full list.
  */
@@ -254,6 +265,8 @@ export interface VDONinjaEventMap {
     dataChannelClose: { uuid: string; type: string; streamID: string | null };
     peerInfo: { uuid: string; streamID: string | null; info: Record<string, unknown> };
     peerLatency: { uuid: string; latency: number; streamID: string | null };
+    /** Sparse OBS update plus the SDK's merged state for this peer. */
+    obsState: { uuid: string; streamID: string | null; state: OBSState; update: OBSState };
 
     dataReceived: { data: unknown; uuid: string; streamID?: string | null; fallback?: boolean };
     /** Long-standing misspelling, still emitted alongside dataReceived. */

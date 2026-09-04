@@ -169,7 +169,7 @@ test('runtime module aliases match the published type declarations', async () =>
 
 test('tracked minified bundle includes the current public transport surface', () => {
   const minified = fs.readFileSync(path.resolve(__dirname, '../vdoninja-sdk.min.js'), 'utf8');
-  for (const marker of ['sendBinary', 'hostFile', 'teardownComplete']) {
+  for (const marker of ['sendBinary', 'hostFile', 'teardownComplete', 'obsState']) {
     assert.match(minified, new RegExp(marker), `minified SDK is missing ${marker}`);
   }
 });
@@ -714,6 +714,51 @@ test('file advertisements wait for downloads capability and remain de-duplicated
     channel.sent.filter(message => message.fileList).map(message => message.fileList.map(file => file.id)),
     [['file-one'], ['file-two']]
   );
+});
+
+test('OBS state updates are merged per peer and emitted alongside viewer preferences', async () => {
+  const sdk = makeSDK();
+  const channel = new MockDataChannel();
+  const connection = {
+    uuid: 'obs-viewer',
+    type: 'publisher',
+    streamID: 'camera-one',
+    pc: new MockPeerConnection(),
+    dataChannel: channel,
+    channels: new Map([['sendChannel', channel]]),
+    info: {}
+  };
+  sdk.connections.set(connection.uuid, { publisher: connection });
+  sdk._setupDataChannel(connection, channel);
+
+  const updates = [];
+  sdk.addEventListener('obsState', event => updates.push(event.detail));
+
+  await channel.onmessage({
+    data: JSON.stringify({ audio: true, video: true, obsState: { visibility: true } })
+  });
+  await channel.onmessage({
+    data: JSON.stringify({ obsState: { sourceActive: true, recording: true } })
+  });
+
+  assert.equal(updates.length, 2);
+  assert.deepEqual(updates[0], {
+    uuid: 'obs-viewer',
+    streamID: 'camera-one',
+    state: { visibility: true },
+    update: { visibility: true }
+  });
+  assert.deepEqual(updates[1], {
+    uuid: 'obs-viewer',
+    streamID: 'camera-one',
+    state: { visibility: true, sourceActive: true, recording: true },
+    update: { sourceActive: true, recording: true }
+  });
+  assert.deepEqual(connection.obsState, {
+    visibility: true,
+    sourceActive: true,
+    recording: true
+  });
 });
 
 test('bufferedAmountLow falls back to polling when an adapter omits the native event', async () => {

@@ -291,6 +291,7 @@ Peer & Channel
 - dataChannelOpen { uuid, type, streamID }, dataChannelClose { uuid, type, streamID }
 - peerInfo { uuid, streamID, info }
 - peerLatency { uuid, latency, streamID }
+- obsState { uuid, streamID, state, update } — OBS browser-source state received by an SDK publisher. `update` contains the sparse fields from the latest message; `state` is the merged state for that OBS peer.
 
 Data
 - dataReceived { data, uuid, streamID?, fallback? }
@@ -326,6 +327,7 @@ State & Errors
 - Viewer preferences (audio/video) are sent viewer → publisher via the viewer data channel, not the reverse.
 - Legacy support: quickView and autoConnect can infer data-only; you can also pass { dataOnly:true }.
 - WebSocket fallback: sendData can deliver via signaling when allowFallback is true (default false); dataReceived includes { fallback:true }.
+- OBS state is reported per connected OBS viewer. Applications combining multiple OBS browser sources should aggregate by `uuid`; common fields are `visibility`, `sourceActive`, `recording`, and `streaming`.
 
 ---
 

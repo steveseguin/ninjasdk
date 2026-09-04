@@ -484,6 +484,12 @@ vdo.addEventListener('peerInfo', (event) => {
     const { uuid, streamID, info } = event.detail;
     console.log('Peer info updated:', uuid, streamID, info); // info.label available
 });
+
+// An OBS browser source viewing this publisher changed tally-related state.
+vdo.addEventListener('obsState', (event) => {
+    const { uuid, state, update } = event.detail;
+    console.log('OBS state changed:', uuid, update, 'merged state:', state);
+});
 ```
 ## Publisher Info (Data Channel)
 
