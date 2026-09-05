@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>OBS Tally to VRChat OSC — VDO.Ninja SDK Guide</title>
+  <meta name="description" content="Tested Node samples for VDO.Ninja browser camera and screen tally: SDK room discovery, alpha API snapshots, and VRChat OSC output.">
+  <link rel="icon" type="image/svg+xml" href="../favicon.svg">
+  <style>
+    :root { color-scheme: dark; }
+    body { margin: 0 auto; max-width: 940px; padding: 24px; font: 17px/1.65 system-ui, sans-serif; background: #0f172a; color: #e2e8f0; }
+    a { color: #a5b4fc; text-underline-offset: 3px; }
+    h1, h2, h3 { line-height: 1.25; color: #fff; }
+    h1 { font-size: clamp(2rem, 5vw, 3rem); }
+    h2 { margin-top: 2.5rem; }
+    code { background: #1e293b; padding: 2px 5px; border-radius: 4px; overflow-wrap: anywhere; }
+    pre { padding: 18px; background: #1e293b; border-radius: 8px; overflow-x: auto; }
+    pre code { padding: 0; overflow-wrap: normal; }
+    nav { display: flex; flex-wrap: wrap; gap: 12px 24px; }
+    .intro, .note { background: #1e293b; border-left: 3px solid #818cf8; padding: 16px 20px; }
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { text-align: left; padding: 12px; border-bottom: 1px solid #334155; }
+    .muted { color: #cbd5e1; }
+    li { margin: 8px 0; }
+    footer { margin-top: 48px; border-top: 1px solid #334155; padding-top: 20px; }
+  </style>
+</head>
+<body>
+  <nav aria-label="Site"><a href="../index.html#guides">SDK guides</a><a href="../demos/">All demos</a><a href="https://github.com/steveseguin/ninjasdk/tree/main/demos/tally-osc">Sample source on GitHub</a></nav>
+  <main>
+    <h1>OBS tally to VRChat OSC</h1>
+    <p class="intro">Camera operators keep publishing from their browsers. A Node script discovers room streams and labels with the SDK, reads OBS tally through the updated alpha API, and sends the selected stream's program/preview state to OSC.</p>
+    <p><strong>Tested with actual OBS Browser Sources against <a href="https://vdo.ninja/alpha/">VDO.Ninja alpha</a>.</strong> Includes browser camera and screen publishing, late joins, disconnect cleanup, and UDP output. VRChat avatar rendering itself was not tested.</p>
+    <nav aria-label="Guide sections"><a href="#choose">Choose a method</a><a href="#setup">Run the sample</a><a href="#discovery">Stream IDs and labels</a><a href="#state">Tally and late joins</a><a href="#api">API details</a><a href="#marker">SDK marker</a><a href="#osc">VRChat setup</a></nav>
+
+    <h2 id="choose">Choose a method</h2>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Method</th><th>Use it for</th><th>Configuration</th></tr></thead>
+      <tbody>
+        <tr><td>SDK discovery + API tally</td><td>List browser publishers and select their camera or screen by ID or label.</td><td><a href="../demos/tally-osc/config.example.json">Hybrid JSON</a></td></tr>
+        <tr><td>API only</td><td>Read streams known to the reporting OBS or publisher pages, without native WebRTC.</td><td><a href="../demos/tally-osc/api-only.example.json">API-only JSON</a></td></tr>
+        <tr><td>SDK data-only marker</td><td>Track a marker Browser Source placed in an OBS scene, without Node capturing media.</td><td><a href="../demos/tally-osc/sdk-marker.example.json">Marker JSON</a></td></tr>
+      </tbody>
+    </table></div>
+    <p>Playing someone else's feed with the SDK does not subscribe to the tally that OBS sends to their publishing page. Read that publisher's <code>&amp;api</code>, or the actual OBS viewing page's <code>&amp;api</code>. The marker method tracks the marker itself.</p>
+
+    <h2 id="setup">Run the sample</h2>
+    <p>Use Node 22 and this repository's SDK source, which includes the peer-label fix. The published npm 1.6.0 package alone does not include that fix. Clone the repository or <a href="https://github.com/steveseguin/ninjasdk/archive/refs/heads/main.zip">download its ZIP</a>, then run commands from the repository root:</p>
+    <pre><code>git clone https://github.com/steveseguin/ninjasdk.git
+cd ninjasdk
+npm install
+npm install --no-save @roamhq/wrtc@0.10.0</code></pre>
+    <p>The camera operator opens this alpha URL and joins with camera or screen sharing. Replace the uppercase values consistently throughout:</p>
+    <pre><code>https://vdo.ninja/alpha/?push=CAMERA_ID&amp;room=ROOM_ID&amp;password=false&amp;label=CameraOne</code></pre>
+    <p>Add an OBS Browser Source with this URL:</p>
+    <pre><code>https://vdo.ninja/alpha/?scene=0&amp;room=ROOM_ID&amp;view=CAMERA_ID&amp;password=false&amp;api=OBS_API_ID</code></pre>
+    <p><strong>Include <code>scene=0</code> in this room-source example.</strong> Without scene mode, the room/view combination may open a guest join page. For an existing director-generated scene link, keep its scene parameters and add a unique <code>&amp;api=OBS_API_ID</code>.</p>
+    <p>Disable OBS's <strong>Shutdown source when not visible</strong> and <strong>Refresh browser when scene becomes active</strong>. Default read access to OBS status information is sufficient.</p>
+    <p>Give each reporting page its own API ID; multiple listeners can share that ID. Keep IDs private because they also permit remote API commands. Generate one with:</p>
+    <pre><code>node -e "console.log(require('crypto').randomBytes(18).toString('hex'))"</code></pre>
+    <p>Copy <code>demos/tally-osc/config.example.json</code> to <code>tally-config.json</code>. Fill in your room, reporting API IDs, and selected stream:</p>
+    <pre><code>{
+  "room": "ROOM_ID",
+  "password": false,
+  "apiIds": ["OBS_API_ID"],
+  "streamID": "CAMERA_ID",
+  "osc": { "host": "127.0.0.1", "port": 9000 }
+}</code></pre>
+    <p>The example disables the room password. For a protected room, use the same password in the config and links, URL-encoding the link value. Start the bridge:</p>
+    <pre><code>node demos/tally-osc/bridge.cjs tally-config.json</code></pre>
+    <p>In its terminal, use <code>list</code>, <code>select CAMERA_ID</code>, <code>select CameraOne</code>, or <code>quit</code>. Put your chosen stream ID in the config to preserve selection between runs.</p>
+
+    <h2 id="discovery">Stream IDs, labels, and screen sharing</h2>
+    <p>SDK <code>listing</code> and <code>videoaddedtoroom</code> events discover streams. The sample views them with audio/video disabled so <code>peerInfo</code> can provide each remote label. It never captures the operator's screen itself.</p>
+    <p>Use stream IDs as keys and labels for display. Names can repeat; selecting a duplicate label is rejected. The list remembers previously seen streams, including ones that have left.</p>
+    <p>A standalone screen publisher has its own stream ID. An attached screen can use a separate ID ending in <code>:s</code>; select that exact ID from API details. The sample does not pass colon IDs through SDK <code>view()</code>, which sanitizes them. Attached-screen layouts have not been live-tested by this harness.</p>
+
+    <h2 id="state">Tally state and late joins</h2>
+    <p>Before a show, put each source in Program once, let the transition finish, then put it in Preview. OBS can initially report <code>sourceActive:null</code> until an activity change. Unknown state stays unknown; it is not assumed to be Preview.</p>
+    <div class="table-wrap"><table>
+      <thead><tr><th>State</th><th>Program</th><th>Preview</th><th>Known</th></tr></thead>
+      <tbody>
+        <tr><td>Program</td><td>true</td><td>false</td><td>true</td></tr>
+        <tr><td>Preview only</td><td>false</td><td>true</td><td>true</td></tr>
+        <tr><td>Hidden / excluded from VDO scene</td><td>false</td><td>false</td><td>true</td></tr>
+        <tr><td>Disconnected / unknown</td><td>false</td><td>false</td><td>false</td></tr>
+      </tbody>
+    </table></div>
+    <p>Once OBS has reported its state, a late API listener requests a snapshot and gets the current tally without another switch. The bridge polls every 3 seconds, expires nonresponsive reporting pages after 15 seconds, and reconnects the API socket. Program takes priority if several sources show the selected stream. Program means OBS source activity, not that OBS is broadcasting to the internet.</p>
+
+    <h2 id="api">API-only monitoring and event details</h2>
+    <p>Use the API-only config and the same bridge command; omit <code>room</code> and <code>sdkPublishID</code>. No native WebRTC dependency is needed for this mode. Labels and streams come from reporting pages' details rather than SDK room discovery.</p>
+    <p>You can put <code>&amp;api=UNIQUE_ID</code> on the OBS scene/view page or the camera operator's alpha publishing page. The OBS side reports its own state and viewed streams. The publishing side reports OBS state received for its own outgoing feed. A director publishing media follows that same rule; it is not automatically a room-wide tally monitor.</p>
+    <pre><code>const WebSocket = require('ws');
+const ws = new WebSocket('wss://api.vdo.ninja');
+ws.on('open', () =&gt; {
+  ws.send(JSON.stringify({ join: 'YOUR_API_ID' }));
+  ws.send(JSON.stringify({ action: 'getDetails', cib: 'tally-snapshot' }));
+});
+ws.on('message', raw =&gt; {
+  const message = JSON.parse(raw);
+  if (message.update?.action === 'obs-state') {
+    console.log('Live tally:', message.update.value);
+  }
+  if (message.callback?.cib === 'tally-snapshot') {
+    console.log('Snapshot:', message.callback.result);
+  }
+});</code></pre>
+    <p>Updates include <code>source</code>, <code>UUID</code>, <code>streamID</code>, <code>connected</code>, <code>obsState</code>, and <code>sceneDisplay</code>. Local entries describe the OBS page; remote entries describe an OBS viewer seen by a publisher. UUID identifies a connection. Null stream IDs represent page-level state and must not be assigned to every participant.</p>
+    <p><code>getDetails</code> returns stream records with <code>tally</code> arrays. Replace each reporting endpoint's snapshot to remove vanished peers. A connected API socket alone does not mean its reporting page is online. The iframe <code>getStreamInfo</code> response also includes tally snapshots; iframe <code>tally</code> events use the full entry, while legacy <code>obs-state</code> events remain sparse.</p>
+    <p>This documented remote-control API is separate from the SDK handshake server. Use the SDK for signaling.</p>
+
+    <h2 id="marker">SDK-only data marker</h2>
+    <p>Use the marker config with a unique <code>sdkPublishID</code> and <code>password:false</code>. The same bridge calls <code>announce()</code> to publish a data-only marker and listens for <code>obsState</code>. Add an enabled Browser Source in the OBS scene:</p>
+    <pre><code>https://vdo.ninja/alpha/?view=YOUR_UNIQUE_MARKER_STREAM_ID&amp;password=false</code></pre>
+    <p>No camera, screen capture, or <code>&amp;api</code> is needed. It tracks that marker's presence in OBS, not another camera's inclusion within a VDO scene. For independent markers, use distinct IDs and bridge configurations.</p>
+    <p>SDK <code>disconnected</code> has socket and teardown phases. Await <code>sdk.disconnect()</code> or listen for the separate <code>teardownComplete</code> event for final cleanup.</p>
+
+    <h2 id="osc">VRChat and testing OSC</h2>
+    <p>Enable <strong>OSC &gt; Enabled</strong> in VRChat's Action Menu. Its default receiving port is UDP 9000. Configure avatar boolean parameters <code>TallyProgram</code>, <code>TallyPreview</code>, and <code>TallyKnown</code> to drive your lights. Default addresses are <code>/avatar/parameters/NAME</code>; all three are configurable in the bridge. See the official <a href="https://docs.vrchat.com/docs/osc-overview">OSC overview</a> and <a href="https://docs.vrchat.com/docs/osc-avatar-parameters">avatar parameter guide</a>.</p>
+    <p>Run the script on the VRChat machine or set <code>osc.host</code> to its reachable address. Boolean packets are sent on changes and every 3 seconds. Quitting clears all three parameters.</p>
+    <p>To verify packets without VRChat, temporarily set <code>osc.port</code> to 9002 and start the included receiver in another terminal:</p>
+    <pre><code>node demos/tally-osc/udp-monitor.cjs 9002</code></pre>
+    <p>Switch OBS scenes and watch the booleans. Restore port 9000 for VRChat.</p>
+
+    <h2>Source, tests, and limits</h2>
+    <ul>
+      <li><a href="https://github.com/steveseguin/ninjasdk/blob/main/demos/tally-osc/README.md">Complete sample README</a></li>
+      <li><a href="https://github.com/steveseguin/ninjasdk/blob/main/demos/tally-osc/bridge.cjs">Runnable bridge source</a> and <a href="https://github.com/steveseguin/ninjasdk/tree/main/demos/tally-osc">all sample files</a></li>
+      <li><a href="https://github.com/steveseguin/ninjasdk/blob/main/tests/tally-osc.test.cjs">Automated snapshot / UDP tests</a></li>
+      <li><a href="https://github.com/steveseguin/ninjasdk/blob/main/tests/interop/tally-alpha-live.cjs">Opt-in real OBS test harness</a> — requires an isolated OBS instance; see the sample README.</li>
+    </ul>
+    <p class="muted">Validated September 5, 2026: OBS 32.2.2, OBS WebSocket 5.7.4, Node 22.14.0, and @roamhq/wrtc 0.10.0. Browser camera and getDisplayMedia runs used Chromium's synthetic capture devices and actual OBS activity events. Actual UDP output was verified; avatar rendering, attached :s screen layouts, and every director layout were not. This sample does not implement vMix tally.</p>
+  </main>
+  <footer><a href="../index.html#guides">Back to SDK guides</a> · <a href="../demos/">Browse demos</a></footer>
+</body>
+</html>

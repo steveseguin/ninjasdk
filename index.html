@@ -256,6 +256,7 @@
                     </ul>
                 </li>
                 <li><a href="#download">Download</a></li>
+                <li><a href="#guides">Guides</a></li>
                 <li><a href="#faq">FAQ</a></li>
                 <li><a href="#usage-guidelines">Guidelines</a></li>
                 <li><a href="https://github.com/steveseguin/ninjasdk" target="_blank">GitHub</a></li>
@@ -736,6 +737,10 @@ await vdo.publish(stream, { room: "videoroom" });</code></pre>
                     <h3>Node Audio Room Recorder</h3>
                     <p>CLI sample that records every room participant’s audio track to timestamped WAV files.</p>
                 </a>
+                <a href="docs/tally.html" class="example-card">
+                    <h3>OBS Tally to OSC</h3>
+                    <p>Node samples for browser camera/screen tally, room labels, and VRChat lights. Includes API-only and SDK marker options.</p>
+                </a>
                 <a href="demos/" class="example-card">
                     <h3>All Demos</h3>
                     <p>Browse all JavaScript and Node.js samples</p>
@@ -878,6 +883,26 @@ await vdo.connect({
     datamode: 1  // Data only, no media
 });</code></pre>
                 </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="guides" class="section">
+        <div class="container">
+            <h2 class="section-title">Guides</h2>
+            <div class="examples-grid">
+                <a href="docs/tally.html" class="example-card">
+                    <h3>OBS Tally and VRChat OSC</h3>
+                    <p>Keep camera operators in their browsers. Discover streams with the SDK, collect alpha API tally, and forward program/preview to OSC. Follow the tested setup and download the sample code.</p>
+                </a>
+                <a href="https://github.com/steveseguin/ninjasdk/blob/main/docs/recording.md" class="example-card">
+                    <h3>Recording Media</h3>
+                    <p>Record incoming tracks in a browser or Node application.</p>
+                </a>
+                <a href="https://github.com/steveseguin/ninjasdk/blob/main/docs/reliability-and-recovery.md" class="example-card">
+                    <h3>Connections and Recovery</h3>
+                    <p>Understand reconnects, ICE recovery, and connection lifecycle events.</p>
+                </a>
             </div>
         </div>
     </section>

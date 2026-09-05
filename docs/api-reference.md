@@ -290,6 +290,9 @@ Peer & Channel
 - peerDisconnected { uuid }
 - dataChannelOpen { uuid, type, streamID }, dataChannelClose { uuid, type, streamID }
 - peerInfo { uuid, streamID, info }
+  - Received remote metadata, including `info.label`; processed even when bundled with audio/video preferences. It can arrive after `peerConnected`.
+  - `connection.info` starts empty and contains remote metadata only; `connection.localInfo` holds outgoing publisher metadata.
+  - Connection roles are local: `publisher` connections carry your stream ID; `viewer` connections carry the remote publisher's stream ID. Use room discovery plus viewer-side `peerInfo` to build a stream/name list.
 - peerLatency { uuid, latency, streamID }
 - obsState { uuid, streamID, state, update } — OBS browser-source state received by an SDK publisher. `update` contains the sparse fields from the latest message; `state` is the merged state for that OBS peer.
 

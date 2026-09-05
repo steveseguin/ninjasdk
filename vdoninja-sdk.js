@@ -2093,7 +2093,8 @@ const VDON_RESOURCE_CHUNK_SIZE = 16384;
                 channels: new Map(), // label -> RTCDataChannel, including the control channel
                 streamID: null,
                 session: null,  // Session ID for this WebRTC connection
-                info: {label: options?.label || null},
+                info: {}, // Remote metadata, populated by incoming info messages
+                localInfo: options?.label ? { label: options.label } : {},
                 obsState: {},
                 allowAudio: true,
                 allowVideo: true,
@@ -4204,8 +4205,8 @@ const VDON_RESOURCE_CHUNK_SIZE = 16384;
                 // Send publisher info (label, meta, etc) to viewer when DC opens
                 if (connection.type === 'publisher') {
                     try {
-                        // Merge connection.info and _pendingInfo to build outbound info payload
-                        const infoCombined = Object.assign({}, this._pendingInfo || {}, connection.info || {});
+                        // Never echo received peer metadata as our own publisher identity.
+                        const infoCombined = Object.assign({}, this._pendingInfo || {}, connection.localInfo || {});
                         // Sanitize string fields
                         if (infoCombined.label) infoCombined.label = this._sanitizeLabel(infoCombined.label);
                         // _sanitizeMeta returns null for anything it cannot represent (an
@@ -4334,6 +4335,16 @@ const VDON_RESOURCE_CHUNK_SIZE = 16384;
                         });
                     }
 
+                    // Metadata can accompany preferences or other control fields.
+                    if (msg.info && typeof msg.info === 'object' && !Array.isArray(msg.info)) {
+                        connection.info = Object.assign(connection.info || {}, msg.info);
+                        this._emit('peerInfo', {
+                            uuid: connection.uuid,
+                            streamID: connection.streamID,
+                            info: connection.info
+                        });
+                    }
+
                     // Handle different message types
                     if (msg.description) {
                         this._log('Received SDP via data channel');
@@ -4356,14 +4367,6 @@ const VDON_RESOURCE_CHUNK_SIZE = 16384;
                         if (this.localStream && this._updateTracksForConnection) {
                             await this._updateTracksForConnection(connection);
                         }
-                    } else if (msg.info && typeof msg.info === 'object') {
-                        // Update connection info (e.g., label) and emit event
-                        connection.info = Object.assign(connection.info || {}, msg.info);
-                        this._emit('peerInfo', {
-                            uuid: connection.uuid,
-                            streamID: connection.streamID,
-                            info: connection.info
-                        });
                     } else if (msg.ping) {
                         // Respond to ping regardless of role, matching reference behavior
                         try {
@@ -6151,13 +6154,13 @@ const VDON_RESOURCE_CHUNK_SIZE = 16384;
 
             // Create connection for the viewer
             const connection = await this._createConnection(msg.UUID, 'publisher');
-            // Propagate pending info/label into connection
+            // Keep outbound publisher metadata separate from received peer info.
             if (this._pendingLabel && typeof this._pendingLabel === 'string') {
-                connection.info = connection.info || {};
-                connection.info.label = this._sanitizeLabel(this._pendingLabel);
+                connection.localInfo = connection.localInfo || {};
+                connection.localInfo.label = this._sanitizeLabel(this._pendingLabel);
             }
             if (this._pendingInfo && typeof this._pendingInfo === 'object') {
-                connection.info = Object.assign(connection.info || {}, this._pendingInfo);
+                connection.localInfo = Object.assign(connection.localInfo || {}, this._pendingInfo);
             }
             connection.streamID = this.state.streamID;
 
@@ -6240,11 +6243,11 @@ const VDON_RESOURCE_CHUNK_SIZE = 16384;
             // Create connection for the viewer
             const connection = await this._createConnection(msg.UUID, 'publisher');
             if (this._pendingLabel && typeof this._pendingLabel === 'string') {
-                connection.info = connection.info || {};
-                connection.info.label = this._sanitizeLabel(this._pendingLabel);
+                connection.localInfo = connection.localInfo || {};
+                connection.localInfo.label = this._sanitizeLabel(this._pendingLabel);
             }
             if (this._pendingInfo && typeof this._pendingInfo === 'object') {
-                connection.info = Object.assign(connection.info || {}, this._pendingInfo);
+                connection.localInfo = Object.assign(connection.localInfo || {}, this._pendingInfo);
             }
             connection.streamID = this.state.streamID;
             
@@ -6665,11 +6668,11 @@ const VDON_RESOURCE_CHUNK_SIZE = 16384;
             // Create connection for the viewer
             const connection = await this._createConnection(msg.UUID, 'publisher');
             if (this._pendingLabel && typeof this._pendingLabel === 'string') {
-                connection.info = connection.info || {};
-                connection.info.label = this._sanitizeLabel(this._pendingLabel);
+                connection.localInfo = connection.localInfo || {};
+                connection.localInfo.label = this._sanitizeLabel(this._pendingLabel);
             }
             if (this._pendingInfo && typeof this._pendingInfo === 'object') {
-                connection.info = Object.assign(connection.info || {}, this._pendingInfo);
+                connection.localInfo = Object.assign(connection.localInfo || {}, this._pendingInfo);
             }
             connection.streamID = this.state.streamID;
             

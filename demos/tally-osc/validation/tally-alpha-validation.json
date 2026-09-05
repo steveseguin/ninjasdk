@@ -1,0 +1,19 @@
+{
+  "date": "2026-09-05T14:52:35.478Z",
+  "alpha": "https://vdo.ninja/alpha/",
+  "obs": "32.2.2",
+  "obsWebSocket": "5.7.4",
+  "node": "v22.14.0",
+  "results": [
+    "SDK discovers browser camera and its correct label",
+    "OBS alpha reports camera connection",
+    "Program reaches OBS-side API and guest-side API",
+    "API-only late subscriber gets current program without a new transition",
+    "Preview reaches both API paths",
+    "Inactive clears program and preview",
+    "Real UDP receiver gets OSC Program=true and Preview=true packets",
+    "Browser publisher disconnect removes stale tally",
+    "SDK-only data-channel marker receives actual OBS program and preview"
+  ],
+  "udpPackets": 129
+}

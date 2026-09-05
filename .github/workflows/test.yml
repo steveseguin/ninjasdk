@@ -36,6 +36,9 @@ jobs:
     - name: Run deterministic reliability tests
       run: npm run test:reliability
 
+    - name: Test tally snapshots and OSC output
+      run: node --test tests/tally-osc.test.cjs
+
     - name: Verify TypeScript entry points
       run: npm run test:types
     

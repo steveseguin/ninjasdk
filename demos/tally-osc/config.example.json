@@ -1,0 +1,13 @@
+{
+  "room": "YOUR_ROOM",
+  "password": false,
+  "apiIds": ["YOUR_UNIQUE_OBS_API_ID"],
+  "streamID": "YOUR_CAMERA_OR_SCREEN_STREAM_ID",
+  "osc": {
+    "host": "127.0.0.1",
+    "port": 9000,
+    "program": "/avatar/parameters/TallyProgram",
+    "preview": "/avatar/parameters/TallyPreview",
+    "known": "/avatar/parameters/TallyKnown"
+  }
+}

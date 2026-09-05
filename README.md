@@ -13,6 +13,7 @@ AI-friendly P2P communication SDK for audio, video, and data streaming. Build pe
 | --- | --- |
 | Publish or view VDO.Ninja audio/video | [Audio/video quick start](#audiovideo-example) and [API reference](docs/api-reference.md) |
 | Record incoming media | [Recording guide](docs/recording.md) |
+| Show OBS camera/screen tally in VRChat | [Tally guide and runnable samples](demos/tally-osc/README.md) |
 | Add P2P messaging to an application | [Basic data channel example](#basic-data-channel-example) |
 | Let AI agents communicate in rooms | [Agent network guide](docs/agent-network.md) |
 | Understand reconnect and ICE recovery | [Reliability and recovery](docs/reliability-and-recovery.md) |
@@ -22,9 +23,9 @@ The SDK deliberately supports several layers. Media publishing/viewing and gener
 
 ## ⚠️ IMPORTANT: Usage Guidelines
 
-**Direct WebSocket API access is NOT APPROVED.** You must use this SDK to interact with VDO.Ninja services.
+**Direct handshake-server WebSocket access is NOT APPROVED.** Use this SDK for VDO.Ninja signaling. The documented `&api` remote-control endpoint is separate and is supported by the [tally sample](demos/tally-osc/README.md).
 
-- **SDK Required**: Direct WebSocket connections will be blocked
+- **SDK Required**: Direct handshake-server WebSocket connections will be blocked
 - **API Stability**: The WebSocket API may change without notice - the SDK handles these updates
 - **Rate Limits**: Excessive requests are throttled/blocked. Higher limits available on request
 - **Serverless Philosophy**: No state management or data relay through the signaling server
@@ -491,6 +492,30 @@ vdo.addEventListener('obsState', (event) => {
     console.log('OBS state changed:', uuid, update, 'merged state:', state);
 });
 ```
+### Discovering participants and their names
+
+Use `listing` for existing room streams and `videoaddedtoroom` for newly announced
+streams. Listings may not include labels. View the discovered stream with
+`await vdo.view(streamID, { audio: false, video: false })` to establish a control
+connection without requesting media, then listen for `peerInfo` to receive its
+label. Register listeners before joining/viewing. Use stream IDs as selection
+keys and labels as display text; labels can change or be shared by multiple people.
+
+`peerConnected` reports a transport connection, not a complete participant record.
+`connection.type` is the SDK's **local** role: on a `viewer` connection,
+`connection.streamID` identifies the remote stream; on a `publisher` connection,
+it identifies the SDK's own stream being sent to that viewer. `connection.info`
+contains received remote metadata and starts empty. Outgoing publisher metadata
+is stored separately in `connection.localInfo`. Wait for `peerInfo` rather than
+expecting a label at `peerConnected`.
+
+Viewing a camera stream does not expose the OBS tally that other viewers send to
+that camera's publisher. An SDK publisher receives `obsState` when OBS views
+**its** stream. Register the listener before establishing connections; the browser
+peer supplies initial state asynchronously, and an empty `connection.obsState`
+means unknown, not off air. There is no SDK snapshot-request method or automatic
+room-wide tally relay.
+
 ## Publisher Info (Data Channel)
 
 When a publisher’s data channel (label `sendChannel`) opens, the SDK sends a publisher info payload to the viewer:
@@ -726,6 +751,20 @@ Quick highlights:
 
 ## Examples
 
+### OBS tally and VRChat OSC
+
+Browser camera operators can keep publishing normally while a Node script discovers streams and labels, reads tally through the alpha `&api`, and sends program/preview booleans to OSC.
+
+- [Complete setup guide](demos/tally-osc/README.md) · [Website guide](https://sdk.vdo.ninja/docs/tally.html)
+- [SDK discovery + API tally configuration](demos/tally-osc/config.example.json)
+- [API-only configuration](demos/tally-osc/api-only.example.json)
+- [SDK-only data marker configuration](demos/tally-osc/sdk-marker.example.json)
+- [Runnable bridge](demos/tally-osc/bridge.cjs) · [UDP test receiver](demos/tally-osc/udp-monitor.cjs)
+
+The guide covers room discovery, duplicate labels, screen IDs, initial state, reconnects, OBS setup, and OSC parameters. Tested with real OBS against deployed alpha, including browser camera and screen publishing. Merely viewing another publisher with the SDK does not subscribe to that publisher's received tally.
+
+### Other examples
+
 - [Data Channel Demo](demos/vdoninja-sdk-datachannel-demo.html) - Real-time messaging
 - [Broadcast Demo](demos/vdoninja-sdk-broadcast-demo.html) - One-to-many streaming
 - [Canvas Streaming](demos/vdoninja-sdk-canvas-demo.html) - Stream canvas as video
@@ -936,6 +975,7 @@ try {
 ```
 
 ## Ecosystem
+
 
 - [VDO.Ninja](https://vdo.ninja) - Live streaming platform
 - [Social Stream Ninja](https://socialstream.ninja) - Social media aggregator

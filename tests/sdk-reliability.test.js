@@ -716,6 +716,66 @@ test('file advertisements wait for downloads capability and remain de-duplicated
   );
 });
 
+test('peer info is processed alongside preferences and OBS state', async () => {
+  const sdk = makeSDK();
+  const channel = new MockDataChannel();
+  const connection = {
+    uuid: 'remote-viewer', type: 'publisher', streamID: 'bot-stream',
+    pc: new MockPeerConnection(), dataChannel: channel, channels: new Map(),
+    info: { language: 'en' }
+  };
+  sdk.connections.set(connection.uuid, { publisher: connection });
+  sdk._setupDataChannel(connection, channel);
+  const infos = [];
+  const states = [];
+  sdk.addEventListener('peerInfo', event => infos.push(event.detail));
+  sdk.addEventListener('obsState', event => states.push(event.detail));
+
+  await channel.onmessage({ data: JSON.stringify({
+    audio: false, video: true, info: { label: 'tester' },
+    obsState: { visibility: true }
+  }) });
+
+  assert.equal(infos.length, 1);
+  assert.deepEqual(infos[0], {
+    uuid: 'remote-viewer', streamID: 'bot-stream',
+    info: { language: 'en', label: 'tester' }
+  });
+  assert.equal(connection.allowAudio, false);
+  assert.equal(connection.allowVideo, true);
+  assert.deepEqual(states[0].state, { visibility: true });
+
+  await channel.onmessage({ data: JSON.stringify({ info: { label: 'renamed' } }) });
+  assert.equal(infos.length, 2);
+  assert.deepEqual(connection.info, { language: 'en', label: 'renamed' });
+});
+
+for (const handler of ['_handleJoinRoom', '_handlePlayRequest', '_handleOfferSDPRequest']) {
+  test(`${handler} keeps local publisher metadata separate from remote peer info`, async () => {
+    const sdk = makeSDK();
+    sdk._sanitizeLabel = label => label;
+    sdk._pendingLabel = 'Tally bot';
+    sdk._pendingInfo = { label: 'Tally bot', custom: 'local-only' };
+    sdk.state.publishing = true;
+    sdk.state.streamID = 'bot-stream';
+    sdk._createOffer = async () => ({ type: 'offer', sdp: 'offer' });
+    sdk._sendMessageWS = () => {};
+
+    await sdk[handler]({ UUID: 'remote-viewer', streamID: 'bot-stream' });
+    const connection = sdk.connections.get('remote-viewer').publisher;
+    assert.equal(connection.info.label ?? null, null);
+    assert.equal(connection.info.custom, undefined);
+
+    const channel = connection.dataChannel;
+    await channel.onmessage({ data: JSON.stringify({ info: { label: 'tester' } }) });
+    channel.onopen();
+    const outbound = channel.sent.find(message => message.info);
+    assert.deepEqual(outbound.info, { label: 'Tally bot', custom: 'local-only' });
+    assert.deepEqual(connection.info, { label: 'tester' });
+    sdk.disconnect();
+  });
+}
+
 test('OBS state updates are merged per peer and emitted alongside viewer preferences', async () => {
   const sdk = makeSDK();
   const channel = new MockDataChannel();

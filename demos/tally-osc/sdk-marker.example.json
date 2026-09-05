@@ -1,0 +1,5 @@
+{
+  "sdkPublishID": "YOUR_UNIQUE_MARKER_STREAM_ID",
+  "password": false,
+  "osc": { "host": "127.0.0.1", "port": 9000 }
+}
