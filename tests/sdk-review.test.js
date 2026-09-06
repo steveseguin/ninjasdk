@@ -1,7 +1,9 @@
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { createHash } = require('node:crypto');
+const { createHash, webcrypto } = require('node:crypto');
+// Node 18 does not expose the browser Web Crypto global by default.
+if (!global.crypto) global.crypto = webcrypto;
 if (!global.CustomEvent) global.CustomEvent = class extends Event {
   constructor(type, options) { super(type); this.detail = options?.detail; }
 };
