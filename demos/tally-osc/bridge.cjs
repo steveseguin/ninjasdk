@@ -170,7 +170,15 @@ class TallyBridge extends EventEmitter {
     }
     for (const id of this.config.apiIds || []) this.connectAPI(id);
     if (this.config.room || this.config.sdkPublishID) {
-      const SDK = require('../../vdoninja-sdk-node.js');
+      let sdkPath;
+      try { sdkPath = require.resolve('../../vdoninja-sdk-node.js'); }
+      catch (error) {
+        if (error.code !== 'MODULE_NOT_FOUND') throw error;
+        sdkPath = require.resolve('@vdoninja/sdk/node');
+      }
+      // Loading stays outside the catch: missing SDK dependencies and initialization
+      // errors must not silently switch implementations.
+      const SDK = require(sdkPath);
       this.sdk = new SDK({ salt: 'vdo.ninja', ...(this.config.password !== undefined ? { password: this.config.password } : {}) });
       this.sdk.addEventListener('error', event => this.emit('warning', 'SDK: ' + JSON.stringify(event.detail)));
       const viewing = new Set();

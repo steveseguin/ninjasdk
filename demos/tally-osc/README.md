@@ -8,6 +8,19 @@ Use this repository's SDK source: it contains the peer-label fix. Installing the
 
 ## Quick start: browser publishers + SDK discovery + OBS API
 
+### Which config should I copy?
+
+| Your setup | Example |
+| --- | --- |
+| Each camera operator uses the VRCTally avatar asset | **[vrctally.example.json](vrctally.example.json)** — label matching, integer OSC paths, and 500 ms heartbeat |
+| Generic OSC lights with SDK room discovery | [config.example.json](config.example.json) — room, selected stream ID, and generic boolean OSC paths |
+| Generic OSC lights using only API details | [api-only.example.json](api-only.example.json) — no SDK room discovery |
+| An SDK data-only source placed in an OBS scene | [sdk-marker.example.json](sdk-marker.example.json) |
+
+`config.example.json` is the generic example, not an outdated VRCTally config. For Miniontoby's per-operator setup, copy `vrctally.example.json` and follow the [VRCTally instructions](#vrctally-per-camera-operator). **That bridge config does not need a room**: it gets labels and tally from the operator's API-enabled publishing page. The publishing URL still retains its room settings.
+
+### Install and run
+
 For camera operators using the [Happyrobot33/VRCTally avatar project](https://github.com/Happyrobot33/VRCTally/), use the [per-operator setup](#vrctally-per-camera-operator) below. It matches a display label and does not require sharing the OBS or director API ID.
 
 Use Node 22 (tested with 22.14.0 on Windows). Clone this repository, or download and extract its [source ZIP](https://github.com/steveseguin/ninjasdk/archive/refs/heads/main.zip):
@@ -18,6 +31,8 @@ cd ninjasdk
 ```
 
 Run the following commands from the repository root.
+
+The bridge prefers the repository's local SDK. If you copy the sample outside this repository, SDK modes fall back to `@vdoninja/sdk/node`; install it with `npm install @vdoninja/sdk@^1.6.1 @roamhq/wrtc@0.10.0 ws`. API-only modes, including `vrctally.example.json`, never load the SDK and only need `npm install ws`. Run a copied script with `node bridge.cjs tally-config.json`.
 
 1. Install dependencies:
 

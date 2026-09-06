@@ -7,6 +7,49 @@ const { TallyBridge, classify, oscBoolean, oscInteger } = require('../demos/tall
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 const entry = (state, extra = {}) => ({ source: 'local', UUID: 'camera-peer', streamID: 'camera', connected: true, obsState: state, sceneDisplay: null, ...extra });
 
+test('SDK loading prefers local source, supports copied samples, and preserves load errors', async () => {
+  const fs = require('node:fs');
+  const vm = require('node:vm');
+  const source = fs.readFileSync(require.resolve('../demos/tally-osc/bridge.cjs'), 'utf8');
+  for (const mode of ['local', 'package', 'broken-local', 'api-only']) {
+    const resolutions = [], loads = [];
+    const loadError = Object.assign(new Error('Missing SDK dependency'), { code: 'MODULE_NOT_FOUND' });
+    class SDK {
+      addEventListener() {}
+      async connect() {}
+      async joinRoom() {}
+      async disconnect() {}
+    }
+    const fakeRequire = name => {
+      if (name === 'local-sdk' || name === 'package-sdk') {
+        loads.push(name);
+        if (mode === 'broken-local') throw loadError;
+        return SDK;
+      }
+      return require(name);
+    };
+    fakeRequire.resolve = name => {
+      resolutions.push(name);
+      if (name === '../../vdoninja-sdk-node.js') {
+        if (mode === 'package') throw Object.assign(new Error('Local file absent'), { code: 'MODULE_NOT_FOUND' });
+        return 'local-sdk';
+      }
+      assert.equal(name, '@vdoninja/sdk/node');
+      return 'package-sdk';
+    };
+    const sandbox = { require: fakeRequire, module: { exports: {} }, Buffer, console, setInterval, clearInterval, setTimeout, clearTimeout };
+    vm.runInNewContext(source, sandbox);
+    const bridge = new sandbox.module.exports.TallyBridge(mode === 'api-only' ? {} : { room: 'test' });
+    try {
+      if (mode === 'broken-local') await assert.rejects(bridge.start(), error => error === loadError);
+      else await bridge.start();
+      assert.deepEqual(loads, mode === 'api-only' ? [] : [mode === 'package' ? 'package-sdk' : 'local-sdk']);
+      assert.equal(resolutions.includes('@vdoninja/sdk/node'), mode === 'package');
+      if (mode === 'api-only') assert.deepEqual(resolutions, []);
+    } finally { await bridge.close(); }
+  }
+});
+
 test('tally classification preserves unknown, scene exclusion and program precedence', () => {
   assert.deepEqual(classify([]), { program: false, preview: false, known: false });
   assert.deepEqual(classify([entry({ visibility: true, sourceActive: null })]), { program: false, preview: false, known: false });
