@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://sdk.vdo.ninja/</loc></url>
+  <url><loc>https://sdk.vdo.ninja/docs/tally.html</loc></url>
+  <url><loc>https://sdk.vdo.ninja/docs/guides.html</loc></url>
+  <url><loc>https://sdk.vdo.ninja/docs/connecting.html</loc></url>
+  <url><loc>https://sdk.vdo.ninja/docs/data-messaging.html</loc></url>
+  <url><loc>https://sdk.vdo.ninja/docs/file-transfer.html</loc></url>
+  <url><loc>https://sdk.vdo.ninja/docs/agent-network.html</loc></url>
+  <url><loc>https://sdk.vdo.ninja/docs/remote-control.html</loc></url>
+  <url><loc>https://sdk.vdo.ninja/docs/recording.html</loc></url>
+  <url><loc>https://sdk.vdo.ninja/docs/streaming.html</loc></url>
+  <url><loc>https://sdk.vdo.ninja/docs/reliability-and-recovery.html</loc></url>
+  <url><loc>https://sdk.vdo.ninja/docs/compatibility.html</loc></url>
+  <url><loc>https://sdk.vdo.ninja/docs/api-reference.html</loc></url>
+  <url><loc>https://sdk.vdo.ninja/docs/validation.html</loc></url>
+</urlset>

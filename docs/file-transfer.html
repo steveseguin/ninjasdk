@@ -1,0 +1,111 @@
+<!doctype html>
+<!-- Generated from file-transfer.md by npm run docs:build. Edit the Markdown source. -->
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Transfer files between peers | VDO.Ninja SDK</title><meta name="description" content="Transfer files between peers. VDO.Ninja SDK options, practical examples, requirements, and validation limits.">
+<link rel="canonical" href="https://sdk.vdo.ninja/docs/file-transfer.html">
+<meta property="og:title" content="Transfer files between peers"><meta property="og:description" content="Transfer files between peers. VDO.Ninja SDK options, practical examples, requirements, and validation limits.">
+<meta property="og:type" content="article"><meta property="og:url" content="https://sdk.vdo.ninja/docs/file-transfer.html">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="guide.css"></head>
+<body><a class="skip" href="#content">Skip to content</a><header><nav aria-label="Main"><a href="../index.html">VDO.Ninja SDK</a><a href="guides.html">Choose a guide</a><a href="api-reference.html">API reference</a><a href="../demos/">Demos</a></nav></header>
+<div class="layout"><aside><nav aria-label="On this page"><strong>On this page</strong><a href="#choose-a-transport">Choose a transport</a><a href="#host-a-file">Host a file</a><a href="#receive-a-selected-file">Receive a selected file</a><a href="#large-files-and-completion">Large files and completion</a><a href="#download-from-a-vdoninja-page">Download from a VDO.Ninja page</a><a href="#troubleshooting">Troubleshooting</a></nav></aside>
+<main id="content"><h1 id="transfer-files-between-peers">Transfer files between peers</h1>
+<p>Use this for exchanging a recording, a report, or a project asset while both peers are connected. Files are served by the sender; the signaling service does not store them for later download.</p>
+<h2 id="choose-a-transport">Choose a transport</h2>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Comparison table"><table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Use it for</th>
+<th>What it does not provide</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>hostFile</code> + <code>requestFile</code></td>
+<td>Named files; SDK-to-SDK or native VDO.Ninja downloads</td>
+<td>Persistent hosting or automatic resume across disconnects</td>
+</tr>
+<tr>
+<td><code>sendBinary</code> / <code>openChannel</code></td>
+<td>Your own binary application protocol between SDK peers</td>
+<td>Native VDO.Ninja download UI, filenames, or file assembly</td>
+</tr>
+<tr>
+<td>MCP file tools</td>
+<td>Agent workflows using the separate MCP package</td>
+<td>Native VDO.Ninja file-protocol compatibility for MCP envelopes</td>
+</tr>
+</tbody>
+</table></div>
+<p>Native VDO.Ninja ignores the reserved <code>x-*</code> channels used by <code>sendBinary</code>; use <code>hostFile</code> for files a VDO.Ninja page should download.</p>
+<h2 id="host-a-file">Host a file</h2>
+<p>First <a href="connecting.html">connect your peers</a>. The sender must announce/publish, and the receiver must view it with downloads enabled (the default). In the browser, pass a <code>File</code> from an input; in Node, pass a Buffer or other typed array.</p>
+<pre><code class="language-javascript">// Sender; vdo is an SDK instance. Call before or after peers connect.
+const bytes = new TextEncoder().encode('A report from this peer.');
+const offer = vdo.hostFile(bytes, { name: 'report.txt' });
+console.log(offer.id, offer.name, offer.size);
+
+// Later, stop serving it:
+// vdo.unhostFile(offer.id);
+</code></pre>
+<p><code>hostFile</code> returns an offer immediately, not a delivery promise. <code>restricted: peerUUID</code> limits serving to one current peer UUID; omit it to offer to eligible peers. This restriction does not authenticate a person's identity. <code>unhostFile</code> stops serving and cancels active transfers, but the native protocol cannot erase an offer already displayed in another page's chat.</p>
+<h2 id="receive-a-selected-file">Receive a selected file</h2>
+<p>Register <code>fileList</code> before calling <code>view()</code> so you do not miss the initial offer. This example is for trusted peers and accepts only the expected small report. A real UI should show the filename/size and let the user choose.</p>
+<pre><code class="language-javascript">const downloading = new Set();
+vdo.addEventListener('fileList', async ({ detail }) =&gt; {
+    const file = detail.files.find(file =&gt; file.name === 'report.txt');
+    if (!file || file.size &gt; 1_000_000) return;
+    const key = `${detail.uuid}:${file.id}`;
+    if (downloading.has(key)) return;
+    downloading.add(key);
+    try {
+        const result = await vdo.requestFile(detail.uuid, file.id, { timeout: 30000 });
+        console.log(new TextDecoder().decode(result.bytes));
+    } catch (error) {
+        console.error('Download failed:', error.message);
+        downloading.delete(key); // Permit an explicit retry if offered again.
+    }
+});
+// After joining the sender's room:
+await vdo.view('sender_stream', { audio: false, video: false, downloads: true });
+</code></pre>
+<p>Treat remote names, sizes, and contents as untrusted. Never use a supplied filename directly as a filesystem path or execute downloaded content. Application size checks are useful selection filters, not hard protection against a malicious sender's false metadata.</p>
+<h2 id="large-files-and-completion">Large files and completion</h2>
+<p>The default receiver assembles the whole file in memory. <code>{ stream: true }</code> emits <code>fileChunk</code> events and omits <code>result.bytes</code>; register the handler first and filter by peer UUID <strong>and</strong> file ID. The chunk event is synchronous and does not await an asynchronous disk writer. If storage is slower than the network, you must manage its queue and limits yourself.</p>
+<p>The <code>timeout</code> option limits waiting for the transfer to <strong>start</strong>; it is not a whole-download deadline. Completion rejects on early channel closure or a mismatched byte count. The protocol's size check is not a content checksum; verify an independently trusted hash if your application needs content integrity beyond transport encryption.</p>
+<h2 id="download-from-a-vdoninja-page">Download from a VDO.Ninja page</h2>
+<p>Open a viewer with the sender's room, stream ID, password, salt, and signaling host; enable its chat button with <code>&amp;cb</code>. The offer appears in chat with a native download action. See <a href="connecting.html#publish-video-to-a-vdoninja-viewer">matching viewer URLs</a>.</p>
+<p>For a complete tested Node example, run <code>node demos/sdk-workflows.cjs</code>. For native browser interoperability, use the <a href="https://github.com/steveseguin/ninjasdk/blob/main/tests/interop/README.md">interop harness instructions</a>. The native file protocol is separate from the MCP package's resumable transfer tools.</p>
+<h2 id="troubleshooting">Troubleshooting</h2>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Comparison table"><table>
+<thead>
+<tr>
+<th>Symptom</th>
+<th>Check</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>No offers</td>
+<td>Receiver viewed the sender with <code>downloads: true</code>; handler registered before connection</td>
+</tr>
+<tr>
+<td>Offer remains after unhosting</td>
+<td>Expected native protocol limitation; requests are refused</td>
+</tr>
+<tr>
+<td>Download times out before starting</td>
+<td>Peer is online, channel open, restriction UUID matches, file still hosted</td>
+</tr>
+<tr>
+<td>Memory grows</td>
+<td>Default mode buffers the full download; use streaming plus bounded storage handling</td>
+</tr>
+<tr>
+<td>Native page ignores binary</td>
+<td><code>sendBinary</code> is a custom SDK lane, not native file transfer</td>
+</tr>
+</tbody>
+</table></div>
+</main></div>
+<footer><a href="file-transfer.md">Markdown source</a> · <a href="validation.html">Validation and limits</a> · <a href="https://github.com/steveseguin/ninjasdk">Repository</a></footer></body></html>

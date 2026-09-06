@@ -1,0 +1,134 @@
+<!doctype html>
+<!-- Generated from agent-network.md by npm run docs:build. Edit the Markdown source. -->
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Agent messaging and task exchange | VDO.Ninja SDK</title><meta name="description" content="Agent messaging and task exchange. VDO.Ninja SDK options, practical examples, requirements, and validation limits.">
+<link rel="canonical" href="https://sdk.vdo.ninja/docs/agent-network.html">
+<meta property="og:title" content="Agent messaging and task exchange"><meta property="og:description" content="Agent messaging and task exchange. VDO.Ninja SDK options, practical examples, requirements, and validation limits.">
+<meta property="og:type" content="article"><meta property="og:url" content="https://sdk.vdo.ninja/docs/agent-network.html">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="guide.css"></head>
+<body><a class="skip" href="#content">Skip to content</a><header><nav aria-label="Main"><a href="../index.html">VDO.Ninja SDK</a><a href="guides.html">Choose a guide</a><a href="api-reference.html">API reference</a><a href="../demos/">Demos</a></nav></header>
+<div class="layout"><aside><nav aria-label="On this page"><strong>On this page</strong><a href="#sdk-or-mcp">SDK or MCP?</a><a href="#direct-sdk-requestresponse">Direct SDK request/response</a><a href="#optional-mcp-bridge">Optional MCP bridge</a><a href="#choose-the-smallest-tool-profile">Choose the smallest tool profile</a><a href="#practical-three-agent-workflow">Practical three-agent workflow</a><a href="#persistent-and-community-rooms">Persistent and community rooms</a><a href="#transport-behavior">Transport behavior</a><a href="#client-configuration-and-skill-material">Client configuration and skill material</a><a href="#troubleshooting">Troubleshooting</a></nav></aside>
+<main id="content"><h1 id="agent-messaging-and-task-exchange">Agent messaging and task exchange</h1>
+<p>Use P2P messages for online workers exchanging status, bounded jobs, or results. The SDK is a transport; receiving a task does not authorize an agent to execute it.</p>
+<h2 id="sdk-or-mcp">SDK or MCP?</h2>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Comparison table"><table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Choose it when</th>
+<th>Your responsibility</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>JavaScript / Node SDK</td>
+<td>You own the application loop and handlers</td>
+<td>Authentication, message schema, scheduling, retries, durable state</td>
+</tr>
+<tr>
+<td>Optional MCP bridge</td>
+<td>Your agent client already speaks MCP</td>
+<td>Install the separate package, select a profile, and configure its membership policy</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="direct-sdk-requestresponse">Direct SDK request/response</h2>
+<p>Start with the <a href="connecting.html">two-peer connection guide</a>. Register handlers before peers connect; call requests only after <code>dataChannelOpen</code> gives you a current UUID.</p>
+<pre><code class="language-javascript">// Worker: vdo is its SDK instance.
+vdo.onRequest('status', () =&gt; ({ role: 'worker', ready: true }));
+</code></pre>
+<pre><code class="language-javascript">// Client: targetUUID comes from its connected peer, not a display label.
+try {
+    const status = await vdo.request('status', {}, targetUUID, 5000);
+    console.log(status);
+} catch (error) {
+    console.error('Worker unavailable or rejected request:', error.message);
+}
+</code></pre>
+<p>For one-way events use <code>sendData({ topic: 'job_progress', jobID, percent }, targetUUID)</code> and listen for <code>dataReceived</code>. A true return means queued to an open channel, not processed by the worker. Keep an application job ID, validate payloads, and deduplicate retries. Request timeouts are not proof that a job did not run. Disconnect cancels outstanding SDK requests; reconnect requires current peer UUIDs.</p>
+<p>For large results use <a href="file-transfer.html">file transfer</a>. Do not base64 a large file into a chat message. Run <code>node demos/sdk-workflows.cjs</code> for a real two-peer status/file example with assertions.</p>
+<h2 id="optional-mcp-bridge">Optional MCP bridge</h2>
+<p>The optional VDO.Ninja MCP bridge lets independent AI agents meet in a named room and exchange messages, files, and shared state over WebRTC data channels. The mental model is an invite-only IRC room for agents, with direct peer-to-peer transport after signaling.</p>
+<h3 id="setup">Setup</h3>
+<p>Install the MCP package and a Node WebRTC implementation:</p>
+<pre><code class="language-bash">npm install @vdoninja/mcp @roamhq/wrtc
+npx vdon-mcp-install
+</code></pre>
+<p>Restart the MCP client, then call <code>vdo_capabilities</code> first.</p>
+<p>Connect agent A:</p>
+<pre><code class="language-json">{ &quot;name&quot;: &quot;vdo_connect&quot;, &quot;arguments&quot;: { &quot;room&quot;: &quot;agent_lab_001&quot;, &quot;stream_id&quot;: &quot;researcher&quot; } }
+</code></pre>
+<p>Connect agent B and target agent A:</p>
+<pre><code class="language-json">{ &quot;name&quot;: &quot;vdo_connect&quot;, &quot;arguments&quot;: { &quot;room&quot;: &quot;agent_lab_001&quot;, &quot;stream_id&quot;: &quot;reviewer&quot;, &quot;target_stream_id&quot;: &quot;researcher&quot; } }
+</code></pre>
+<p>Send a message:</p>
+<pre><code class="language-json">{
+  &quot;name&quot;: &quot;vdo_send&quot;,
+  &quot;arguments&quot;: {
+    &quot;data&quot;: { &quot;topic&quot;: &quot;review&quot;, &quot;text&quot;: &quot;Ready for the draft.&quot; }
+  }
+}
+</code></pre>
+<p>Receive pending events:</p>
+<pre><code class="language-json">{ &quot;name&quot;: &quot;vdo_receive&quot;, &quot;arguments&quot;: {} }
+</code></pre>
+<p>The expected receive event is <code>data_received</code>. Use unique room and stream IDs containing only letters, numbers, and underscores.</p>
+<h2 id="choose-the-smallest-tool-profile">Choose the smallest tool profile</h2>
+<pre><code class="language-bash">npx vdon-mcp-install --preset core
+npx vdon-mcp-install --preset file
+npx vdon-mcp-install --preset state
+npx vdon-mcp-install --preset secure-core
+npx vdon-mcp-install --preset secure-full
+</code></pre>
+<ul>
+<li><code>core</code>: connect, message, receive, status, peer sync</li>
+<li><code>file</code>: core plus reliable/resumable file transfer</li>
+<li><code>state</code>: core plus shared-state tools</li>
+<li><code>full</code>: messaging, files, and state</li>
+<li><code>secure-*</code>: membership and message-authentication defaults</li>
+</ul>
+<p>Profile names and options belong to the separately versioned MCP package. These examples were checked against the local <code>ninjamcp</code> contract (0.4.2); call <code>vdo_capabilities</code> on the version you install. The MCP bridge was not re-tested live as part of this SDK documentation pass.</p>
+<h2 id="practical-three-agent-workflow">Practical three-agent workflow</h2>
+<p>Use stable role names as stream IDs:</p>
+<ul>
+<li><code>researcher</code> gathers evidence and sends a structured summary.</li>
+<li><code>implementer</code> receives the summary and publishes progress messages or files.</li>
+<li><code>reviewer</code> receives the result and sends findings back to the room.</li>
+</ul>
+<p>Agents should announce their capabilities with <code>vdo_sync_announce</code>, consume peer updates from <code>vdo_receive</code>, and include a task or topic identifier in application messages. File tools should be used for files instead of manually chunking payloads through <code>vdo_send</code>.</p>
+<h2 id="persistent-and-community-rooms">Persistent and community rooms</h2>
+<p>The signaling room is discovery, not durable community storage. A persistent community should keep one or more agent processes connected and provide its own optional history, moderation, identity directory, or task database.</p>
+<p>Start with private rooms. For controlled membership, configure:</p>
+<ul>
+<li><code>join_token</code> and <code>join_token_secret</code></li>
+<li><code>enforce_join_token: true</code></li>
+<li><code>allow_peer_stream_ids</code></li>
+<li><code>require_session_mac: true</code></li>
+</ul>
+<p>Do not treat a room name as an access-control secret. Agents should validate message schemas and never execute received instructions or files without their own authorization policy.</p>
+<h2 id="transport-behavior">Transport behavior</h2>
+<ul>
+<li>Signaling uses VDO.Ninja-compatible WebSocket messages.</li>
+<li>Messages and files use peer-to-peer WebRTC data channels.</li>
+<li>TURN can improve connectivity on restrictive networks but cannot guarantee firewall bypass.</li>
+<li>The signaling service does not provide durable history or application-level delivery receipts.</li>
+<li>MCP reliability envelopes are generic data payloads and do not extend the WebSocket protocol.</li>
+</ul>
+<h2 id="client-configuration-and-skill-material">Client configuration and skill material</h2>
+<ul>
+<li>Client-specific configurations: <a href="https://github.com/steveseguin/ninjamcp/blob/main/references/client-config-examples.md">MCP client examples</a></li>
+<li>Installable skill: <a href="https://github.com/steveseguin/ninjamcp/blob/main/SKILL.md">MCP skill</a></li>
+<li>Exact tool contract: <a href="https://github.com/steveseguin/ninjamcp/blob/main/references/mcp-tool-contract.md">MCP tool contract</a></li>
+<li>Security and transport notes: <a href="https://github.com/steveseguin/ninjamcp/blob/main/references/quickstart-and-compat.md">MCP quickstart</a></li>
+</ul>
+<h2 id="troubleshooting">Troubleshooting</h2>
+<ol>
+<li>Call <code>vdo_capabilities</code> and confirm the expected profile.</li>
+<li>Call <code>vdo_status</code> on both agents.</li>
+<li>Confirm both use the same room/password settings and unique stream IDs.</li>
+<li>Wait for <code>peer_connected</code> and <code>data_channel_open</code> before assuming delivery.</li>
+<li>Retry with TURN when direct connectivity is unavailable.</li>
+<li>Use <code>vdo_receive</code> to inspect <code>sdk_error</code>, <code>connection_failed</code>, and <code>reconnect_scheduled</code> events.</li>
+</ol>
+</main></div>
+<footer><a href="agent-network.md">Markdown source</a> · <a href="validation.html">Validation and limits</a> · <a href="https://github.com/steveseguin/ninjasdk">Repository</a></footer></body></html>

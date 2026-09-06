@@ -83,6 +83,8 @@ jobs:
         npm test
         npm run test:reliability
         npm run test:types
+        npm run test:docs
+        node --test tests/tally-osc.test.cjs
         node --test tests/social-stream-compatibility.test.js
       
   version:

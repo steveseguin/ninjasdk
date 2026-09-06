@@ -2,15 +2,15 @@
 
 ## Complete SDK Knowledge for AI Systems
 
-This document contains all the information needed for AI systems to understand and implement the VDO.Ninja SDK. Copy this entire document to provide comprehensive context to your LLM.
+Use the [guide chooser](docs/guides.md) to select an integration and the [API reference](docs/api-reference.md) for signatures. This document supplies additional context; the task guides include validated examples and explicit limits.
 
 ---
 
 ## ⚠️ CRITICAL: Usage Requirements
 
-**IMPORTANT**: Direct WebSocket API access is NOT permitted. Your AI system MUST use this SDK.
+**IMPORTANT**: Use this SDK for handshake-server signaling. The documented `&api` page-control WebSocket is a separate supported interface; see [remote control](docs/remote-control.md).
 
-- **SDK ONLY**: Direct WebSocket connections to VDO.Ninja servers will be blocked
+- **SDK signaling**: Do not implement direct handshake-server access
 - **API Changes**: The WebSocket API may change without notice - only the SDK is guaranteed to work
 - **Rate Limits**: Excessive requests will result in throttling or blocking
 - **Data Policy**: Only WebRTC handshake data through WebSocket - all application data must use P2P
@@ -21,15 +21,15 @@ Failure to follow these guidelines may result in your application being blocked.
 
 ## What is VDO.Ninja SDK?
 
-VDO.Ninja SDK is a peer-to-peer (P2P) communication framework that enables direct audio, video, and data streaming between browsers without requiring servers, user accounts, or complex infrastructure. It's specifically designed to be AI-friendly, allowing bots and automated systems to create real-time communication applications.
+VDO.Ninja SDK connects browsers and Node applications for audio, video, and data. Hosted signaling coordinates peers, and WebRTC transports their media and messages directly or through TURN. Your application supplies storage, authorization, and its own task logic.
 
 ## Key Features for AI Implementation
 
 - **No Human Intervention Required**: No CAPTCHA, no account creation, no email verification
-- **Server-Free Architecture**: After initial WebRTC handshake, all communication is P2P
+- **WebRTC transport**: Media/data use direct peer connections or encrypted TURN relay paths
 - **No SDK License Fee**: Hosted services operated by Steve Seguin remain subject to rate limits and operational policies
 - **Data Channel Focus**: Perfect for AI bots that need bidirectional data communication
-- **Works Locally**: Can run without SSL for local development/testing
+- **Local development**: Use localhost as a secure browser context; deployed capture pages need HTTPS
 - **Simple API**: Minimal code required to establish connections
 
 ## Installation
@@ -42,14 +42,14 @@ VDO.Ninja SDK is a peer-to-peer (P2P) communication framework that enables direc
 ### Node.js Support
 ```bash
 # Install required dependencies
-npm install ws @roamhq/wrtc  # or node-datachannel instead of @roamhq/wrtc
+npm install @vdoninja/sdk @roamhq/wrtc
 
 # Use the Node.js version
-const VDONinjaSDK = require('./vdoninja-sdk-node.js');
+const VDONinjaSDK = require('@vdoninja/sdk/node');
 ```
 See [README-NODE.md](README-NODE.md) for detailed Node.js setup.
 
-> **Viewer workflow tip:** When sharing **room-based** links from Node publishers, append `?scene&room=ROOMNAME` so viewers land in listen-only mode. For **direct view links** (`?view=STREAMID` without a room), do NOT add `&scene` or `&solo` — those are only for room-based viewing. Keep room and stream identifiers alphanumeric/underscore (the SDK will auto-sanitize other characters). If you choose `password: false`, remind viewers to include `&password=false` in the URL; with the default password you can share the hashed `sdk.state.streamID` directly without extra parameters. Note: `password: ""` (empty string) in the SDK means "use default password", not "disabled".
+**Viewer workflow:** `sdk.state.streamID` is the sanitized public stream ID, not the password-hashed wire ID. Room-scoped publishers need the same room and scene selection in viewer links. Match password, salt, and signaling host; see the [connection guide](docs/connecting.md) for tested URL construction, including literal percent characters. The default password is shared, and an empty string selects it rather than disabling signaling encryption.
 
 ## Core Concepts
 

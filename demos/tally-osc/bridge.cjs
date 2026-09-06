@@ -5,12 +5,19 @@ const readline = require('node:readline');
 const { EventEmitter } = require('node:events');
 const WebSocket = require('ws');
 
-function oscBoolean(address, value) {
-  const string = text => {
+function oscString(text) {
     const bytes = Buffer.from(text + '\0');
     return Buffer.concat([bytes, Buffer.alloc((4 - bytes.length % 4) % 4)]);
-  };
-  return Buffer.concat([string(address), string(value ? ',T' : ',F')]);
+}
+
+function oscBoolean(address, value) {
+  return Buffer.concat([oscString(address), oscString(value ? ',T' : ',F')]);
+}
+
+function oscInteger(address, value) {
+  const payload = Buffer.alloc(4);
+  payload.writeInt32BE(value ? 1 : 0);
+  return Buffer.concat([oscString(address), oscString(',i'), payload]);
 }
 
 function classify(entries) {
@@ -34,6 +41,8 @@ class TallyBridge extends EventEmitter {
     this.streams = new Map();
     this.endpoints = new Map();
     this.selected = config.streamID || null;
+    this.selectedLabel = config.label || null;
+    if (this.selected && this.selectedLabel) throw new Error('Choose streamID or label, not both');
     this.closed = false;
     this.osc = dgram.createSocket('udp4');
     this.osc.on('error', error => this.emit('warning', 'OSC: ' + error.message));
@@ -41,12 +50,14 @@ class TallyBridge extends EventEmitter {
     for (const key of ['program', 'preview', 'known']) if (!this.oscConfig[key].startsWith('/')) throw new Error('OSC addresses must start with /');
     if (!Number.isInteger(this.oscConfig.port) || this.oscConfig.port < 1 || this.oscConfig.port > 65535) throw new Error('Invalid OSC port');
     this.lastState = '';
+    if (this.oscConfig.profile && this.oscConfig.profile !== 'vrctally') throw new Error('Unknown OSC profile');
+    this.heartbeat = false;
   }
 
   remember(streamID, label) {
     if (!streamID) return;
     const previous = this.streams.get(streamID) || {};
-    this.streams.set(streamID, { streamID, label: label || previous.label || '' });
+    this.streams.set(streamID, { streamID, label: typeof label === 'string' ? label : previous.label || '' });
     this.emit('streams', [...this.streams.values()]);
   }
 
@@ -57,7 +68,8 @@ class TallyBridge extends EventEmitter {
       if (matches.length !== 1) throw new Error('Use a stream ID or one unique exact label from list.');
       id = matches[0].streamID;
     }
-    this.selected = id;
+    this.selectedLabel = this.streams.has(value) ? null : value;
+    this.selected = this.selectedLabel ? null : id;
     this.publishState();
     return id;
   }
@@ -91,12 +103,18 @@ class TallyBridge extends EventEmitter {
   }
 
   currentState() {
-    const entries = [];
+    const active = [];
     for (const peer of this.endpoints.values()) {
       if (Date.now() - peer.seen > (this.config.staleAfterMs || 15000)) continue;
-      for (const entry of peer.entries.values()) if (entry.streamID === this.selected) entries.push(entry);
+      for (const entry of peer.entries.values()) if (entry.connected) active.push(entry);
     }
-    return { streamID: this.selected, ...classify(entries) };
+    let streamID = this.selected;
+    if (this.selectedLabel) {
+      const matches = [...new Set(active.filter(entry => this.streams.get(entry.streamID)?.label === this.selectedLabel).map(entry => entry.streamID))];
+      streamID = matches.length === 1 ? matches[0] : null;
+    }
+    const state = classify(active.filter(entry => streamID && entry.streamID === streamID));
+    return { streamID, ...state, standby: !(state.program || state.preview), error: !state.known };
   }
 
   publishState(force = false) {
@@ -105,8 +123,15 @@ class TallyBridge extends EventEmitter {
     if (!force && serialized === this.lastState) return;
     const changed = serialized !== this.lastState;
     this.lastState = serialized;
-    for (const key of ['program', 'preview', 'known']) {
-      this.osc.send(oscBoolean(this.oscConfig[key], state[key]), this.oscConfig.port, this.oscConfig.host);
+    if (this.oscConfig.profile === 'vrctally') {
+      const paths = { program: ['VRCTally_Program', 'VRCLLime_Program_Active'], preview: ['VRCTally_Preview', 'VRCLLime_Preview_Active'], standby: ['VRCTally_Standby'], error: ['VRCTally_Error'] };
+      for (const [key, names] of Object.entries(paths)) {
+        for (const name of names) this.osc.send(oscInteger('/avatar/parameters/' + name, state[key]), this.oscConfig.port, this.oscConfig.host);
+      }
+    } else {
+      for (const key of ['program', 'preview', 'known']) {
+        this.osc.send(oscBoolean(this.oscConfig[key], state[key]), this.oscConfig.port, this.oscConfig.host);
+      }
     }
     if (changed) this.emit('state', state);
   }
@@ -137,6 +162,12 @@ class TallyBridge extends EventEmitter {
   }
 
   async start() {
+    if (this.oscConfig.profile === 'vrctally' && !this.heartbeatTimer) {
+      this.heartbeatTimer = setInterval(() => {
+        this.heartbeat = !this.heartbeat;
+        this.osc.send(oscInteger('/avatar/parameters/VRCTally_Heartbeat', this.heartbeat), this.oscConfig.port, this.oscConfig.host);
+      }, 500);
+    }
     for (const id of this.config.apiIds || []) this.connectAPI(id);
     if (this.config.room || this.config.sdkPublishID) {
       const SDK = require('../../vdoninja-sdk-node.js');
@@ -193,6 +224,7 @@ class TallyBridge extends EventEmitter {
     if (this.closed) return;
     this.closed = true;
     clearInterval(this.timer);
+    clearInterval(this.heartbeatTimer);
     for (const peer of this.endpoints.values()) {
       clearTimeout(peer.timer);
       if (peer.socket) peer.socket.close();
@@ -234,4 +266,4 @@ async function cli() {
   catch (error) { console.error(error.message); await quit(1); }
 }
 if (require.main === module) cli().catch(error => { console.error(error.message); process.exitCode = 1; });
-module.exports = { TallyBridge, classify, oscBoolean };
+module.exports = { TallyBridge, classify, oscBoolean, oscInteger };

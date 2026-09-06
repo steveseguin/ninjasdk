@@ -8,6 +8,8 @@ Use this repository's SDK source: it contains the peer-label fix. Installing the
 
 ## Quick start: browser publishers + SDK discovery + OBS API
 
+For camera operators using the [Happyrobot33/VRCTally avatar project](https://github.com/Happyrobot33/VRCTally/), use the [per-operator setup](#vrctally-per-camera-operator) below. It matches a display label and does not require sharing the OBS or director API ID.
+
 Use Node 22 (tested with 22.14.0 on Windows). Clone this repository, or download and extract its [source ZIP](https://github.com/steveseguin/ninjasdk/archive/refs/heads/main.zip):
 
 ```sh
@@ -65,7 +67,7 @@ Run the following commands from the repository root.
    quit
    ```
 
-   `list` shows remembered stream IDs and labels, including previously seen streams that have left. SDK `listing` / `videoaddedtoroom` discover streams; data-only viewing allows `peerInfo` to supply the remote label. Labels can repeat, so use IDs as keys. Selection by label only works when that exact label has one match. Set `streamID` in the config to preserve the selection between runs.
+   `list` shows remembered stream IDs and labels, including previously seen streams that have left. SDK `listing` / `videoaddedtoroom` discover streams; data-only viewing allows `peerInfo` to supply the remote label. Labels can repeat, so use IDs as keys. Terminal selection by label requires one remembered match. Set `streamID` or `label` in the config to preserve the selection between runs; a configured label resolves against fresh connected entries and can follow a new stream ID.
 
 6. Before a show, put each source in Program once, let the transition finish, then put it in Preview. Verify these states:
 
@@ -127,7 +129,43 @@ The SDK uses `announce()` to publish a data-only marker and listens for `obsStat
 
 For browser-published cameras, use the hybrid or API-only options above. Merely joining their room and viewing their feeds is not an alternative tally subscription.
 
-SDK `disconnected` currently has socket and teardown phases. This sample awaits `sdk.disconnect()` during shutdown; if writing your own listener, listen for the separate `teardownComplete` event when you need one final cleanup notification.
+SDK `disconnect()` now emits `disconnected` once after local cleanup, with `phase: 'teardown'`. Unexpected socket loss emits `phase: 'socket'` immediately. Repeated local calls share the same promise and do not emit again. Await `sdk.disconnect()` or listen for `teardownComplete` when coordinating final cleanup.
+
+## VRCTally: per camera operator
+
+Each operator runs the bridge on their VRChat machine and reports from **their own VDO.Ninja publishing page**. That page already receives its OBS viewers' tally. The OBS scene/view URL does not need an API ID for this arrangement. No central OBS or director control ID is shared with operators.
+
+An `&api` value is a shared control-channel ID, **not an account API key**: no registration or purchased key is needed. It still permits control of the page bearing it, so generate a separate unpredictable ID for each operator and keep it private. This sample does not turn that endpoint into a read-only tally API. Only share the normal viewing link, without the publisher's API ID.
+
+1. Install this repository's dependencies with `npm install`. This API-only setup does not need native WebRTC.
+2. Generate your own ID: `node -e "console.log(require('crypto').randomBytes(18).toString('hex'))"`.
+3. Add that ID to your existing alpha **publishing** link, retaining its room/password settings. Example:
+
+   ```text
+   https://vdo.ninja/alpha/?push=CAMERA_ID&room=ROOM_ID&password=false&label=CameraOne&api=YOUR_PRIVATE_CAMERA_PAGE_API_ID
+   ```
+
+4. Copy `demos/tally-osc/vrctally.example.json` to `tally-config.json`, set your `apiIds` value and your exact VDO.Ninja display `label`, then run:
+
+   ```sh
+   node demos/tally-osc/bridge.cjs tally-config.json
+   ```
+
+Use `label` **instead of** `streamID`. Matching is exact and case-sensitive. A label binding follows a camera that reconnects with a different stream ID. Missing labels, duplicate active labels, disconnected cameras, and stale/unknown tally produce Error=1; the bridge never silently chooses one of two matching cameras. Historical stream names in `list` do not keep a disconnected camera active.
+
+The `vrctally` profile sends the supplied OSC contract as integer `0`/`1` values to UDP `127.0.0.1:9000`:
+
+| Parameter under `/avatar/parameters/` | Value |
+| --- | --- |
+| `VRCTally_Program`, `VRCLLime_Program_Active` | Program |
+| `VRCTally_Preview`, `VRCLLime_Preview_Active` | Preview, with Program taking priority |
+| `VRCTally_Standby` | Neither Program nor Preview |
+| `VRCTally_Error` | No unambiguous, connected, fresh tally for the selection |
+| `VRCTally_Heartbeat` | Toggles every 500 ms independently of tally polling |
+
+The example polls each second and expires missing responses after five seconds. Socket closure clears its tally immediately. Heartbeat continues while the bridge runs, including while Error=1; it measures bridge liveness, not camera connectivity. On quit, Program/Preview clear, Error becomes 1, and heartbeat stops. Standby can be 1 alongside Error, matching the supplied `!(program || preview)` formula.
+
+This profile implements the integer contract supplied for this integration. The upstream project's current C# sender uses OSC boolean tags; the original generic profile remains available with `T`/`F` tags. The avatar's rendering must still be checked in VRChat. OSCQuery auto-discovery and OBS recording-status mapping are not included; use the configured UDP port and this profile for camera tally.
 
 ## VRChat and a local test receiver
 
@@ -149,7 +187,7 @@ Switch OBS scenes and watch the printed booleans. Restore port 9000 for VRChat.
 
 Tested against deployed `https://vdo.ninja/alpha/` on September 5, 2026, with actual OBS Studio 32.2.2 Browser Sources, OBS WebSocket 5.7.4, Node 22.14.0, and `@roamhq/wrtc` 0.10.0. Separate runs used browser camera publishing and browser `getDisplayMedia` screen publishing with Chromium's synthetic capture devices. The live harness uses an isolated OBS profile. It does not simulate OBS's visibility/activity callbacks.
 
-The checked cases include correct SDK peer labels, OBS-side and publisher-side API program/preview, inactive state, API-only late subscription, publisher disconnect cleanup, real UDP OSC packets, and SDK-only data-marker program/preview. See the [camera validation](validation/tally-alpha-validation.json) and [screen validation](validation/tally-alpha-screen-validation.json) for completed run results. VRChat avatar rendering itself was not tested. Attached `:s` screen sharing and every director scene layout have not been live-tested by this harness.
+The checked cases include correct SDK peer labels, OBS-side and publisher-side API program/preview, inactive state, API-only late subscription, publisher disconnect cleanup, real UDP OSC packets, and SDK-only data-marker program/preview. See the [camera validation](validation/tally-alpha-validation.json), [screen validation](validation/tally-alpha-screen-validation.json), and [VRCTally label/profile validation](validation/vrctally-alpha-validation.json) for completed run results. The VRCTally run used a real OBS Browser Source and alpha publishing page to check label matching, integer Program/Preview output, aliases, heartbeat transitions, and loss of the publisher. VRChat avatar rendering itself was not tested. Attached `:s` screen sharing and every director scene layout have not been live-tested by this harness.
 
 Local automated checks:
 

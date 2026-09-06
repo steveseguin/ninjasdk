@@ -30,12 +30,14 @@
     "./whep": "./whep-client.js"
   },
   "scripts": {
-    "build": "npm run minify",
+    "build": "npm run minify && npm run docs:build",
+    "docs:build": "node scripts/build-docs.cjs",
+    "test:docs": "node --test tests/docs.test.cjs",
     "minify": "terser vdoninja-sdk.js -o vdoninja-sdk.min.js --compress --mangle --comments \"/VDO.Ninja SDK v/\"",
     "watch": "chokidar \"vdoninja-sdk.js\" -c \"npm run build\"",
     "test": "node run-all-tests.js",
     "test:types": "tsc --noEmit --strict --lib es2020 --module node16 --moduleResolution node16 tests/types/consumer.ts tests/types/node-consumer.ts",
-    "test:reliability": "node --test tests/sdk-reliability.test.js",
+    "test:reliability": "node --test tests/sdk-reliability.test.js tests/sdk-review.test.js",
     "test:node": "node demos/node-example.js",
     "test:all": "node run-all-tests.js",
     "check:webrtc": "node -e \"console.log(require('./vdoninja-sdk-node.js').checkWebRTCSupport())\"",
@@ -71,6 +73,7 @@
   "homepage": "https://github.com/steveseguin/ninjasdk#readme",
   "devDependencies": {
     "chokidar-cli": "^3.0.0",
+    "markdown-it": "^14.3.1",
     "terser": "^5.31.0",
     "typescript": "^5.4.0"
   },

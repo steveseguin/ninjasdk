@@ -5,9 +5,11 @@
 [![npm downloads](https://img.shields.io/npm/dm/@vdoninja/sdk.svg)](https://www.npmjs.com/package/@vdoninja/sdk)
 [![License: MPL-2.0](https://img.shields.io/badge/License-MPL--2.0-brightgreen.svg)](LICENSE)
 
-AI-friendly P2P communication SDK for audio, video, and data streaming. Build peer-to-peer applications without servers, user accounts, or complex infrastructure.
+JavaScript SDK for VDO.Ninja-compatible audio, video, and data in browsers and Node.js. Build custom broadcast tools, remote camera viewers, P2P messaging, and agent integrations using hosted signaling and WebRTC. Connections use TURN relay servers when a direct route is unavailable.
 
 ## Choose Your Starting Point
+
+Browse the [guide chooser](docs/guides.md) for a comparison of SDK, iframe, page API, MCP, and WHIP/WHEP options. The website offers the same guides as readable static pages.
 
 | What you want to build | Start here |
 | --- | --- |
@@ -15,6 +17,10 @@ AI-friendly P2P communication SDK for audio, video, and data streaming. Build pe
 | Record incoming media | [Recording guide](docs/recording.md) |
 | Show OBS camera/screen tally in VRChat | [Tally guide and runnable samples](demos/tally-osc/README.md) |
 | Add P2P messaging to an application | [Basic data channel example](#basic-data-channel-example) |
+| Transfer files or large results | [File transfer guide](docs/file-transfer.md) |
+| Build status dashboards or shared interfaces | [Data messaging guide](docs/data-messaging.md) |
+| Build a remote control panel | [Remote control options](docs/remote-control.md) |
+| Publish to or watch a media service | [WHIP/WHEP guide](docs/streaming.md) |
 | Let AI agents communicate in rooms | [Agent network guide](docs/agent-network.md) |
 | Understand reconnect and ICE recovery | [Reliability and recovery](docs/reliability-and-recovery.md) |
 | Upgrade without breaking an integration | [Compatibility contract](docs/compatibility.md) |
@@ -72,28 +78,12 @@ const vdo = new VDONinjaSDK();
 
 ### Node.js - Simple Setup
 ```javascript
-// Method 1: Auto-detect WebRTC implementation (uses included adapter)
+// Auto-detect an installed WebRTC implementation (uses included adapter)
 const VDONinjaSDK = require('@vdoninja/sdk/node');
 const vdo = new VDONinjaSDK();
-
-// Method 2: Manual setup (user's simpler approach)
-const wrtc = require('@roamhq/wrtc');
-const VDONinjaSDK = require('@vdoninja/sdk');
-
-// Required polyfills when using the browser build in Node.js
-global.WebSocket = require('ws');
-global.crypto = require('crypto').webcrypto || require('crypto');
-
-// Set global WebRTC objects
-global.RTCPeerConnection = wrtc.RTCPeerConnection;
-global.RTCIceCandidate = wrtc.RTCIceCandidate;
-global.RTCSessionDescription = wrtc.RTCSessionDescription;
-global.document = {
-    createElement: () => ({ innerText: '', textContent: '' })
-};
-
-const vdo = new VDONinjaSDK();
 ```
+
+Install a supported WebRTC implementation such as `@roamhq/wrtc` first. The package root also selects the Node adapter under Node's package export conditions. Use `@vdoninja/sdk/browser` only when intentionally providing your own runtime globals.
 
 See [README-NODE.md](README-NODE.md) for detailed Node.js setup with full adapter support.
 
@@ -107,26 +97,22 @@ vdo.addEventListener('dataReceived', (event) => {
     console.log(`Received from ${event.detail.uuid}:`, event.detail.data);
 });
 
-// Connect and join room (use unique room names to avoid collisions)
-await vdo.connect();
-const roomId = 'room_' + Math.random().toString(36).substr(2, 9); // use _ (hyphens get sanitized)
-await vdo.joinRoom({ room: roomId });
+// Choose a unique room name and use this same value in both peers.
+const roomId = 'replace_with_your_shared_unique_room';
 
-// Announce as data-only publisher
-const streamId = 'stream_' + Math.random().toString(36).substr(2, 9); // use _ (hyphens get sanitized)
-await vdo.announce({ streamID: streamId });
-
-// Send data to all connected peers
-vdo.sendData({ message: "Hello P2P!" });
+// In both peers, use the SAME roomId. Each peer gets its own stream ID.
+// Register before autoConnect: sends require an open data channel.
+vdo.addEventListener('dataChannelOpen', () => {
+    vdo.sendData({ message: "Hello P2P!" });
+});
+await vdo.autoConnect({ room: roomId });
 ```
 
 Note: Stream and room IDs accept alphanumeric and underscore. Any hyphens or non‑word characters are automatically sanitized to `_`.
 
 ### Audio/Video Example
 ```javascript
-const vdo = new VDONinjaSDK({
-    salt: "vdo.ninja"  // Required for streams to be viewable on https://vdo.ninja
-});
+const vdo = new VDONinjaSDK({ salt: "vdo.ninja", host: "wss://apibackup.vdo.ninja" });
 
 // Handle incoming tracks
 vdo.addEventListener('track', (event) => {
@@ -146,10 +132,13 @@ const stream = await navigator.mediaDevices.getUserMedia({
 // Connect, join room, and publish
 await vdo.connect();
 await vdo.joinRoom({ room: "videoroom" });
-await vdo.publish(stream, { room: "videoroom" });
+await vdo.publish(stream, { streamID: "my_camera" });
 
-// Your stream will be viewable at: https://vdo.ninja/?view=YOUR_STREAM_ID
+// Open in another browser (same room, salt, password, and signaling host):
+// https://vdo.ninja/alpha/?view=my_camera&room=videoroom&scene&wss2=apibackup.vdo.ninja
 ```
+
+Use this [VDO.Ninja viewer link](https://vdo.ninja/alpha/?view=my_camera&room=videoroom&scene&wss2=apibackup.vdo.ninja), with a unique room and stream ID for your application. A room-scoped publisher needs a room-scoped viewer. Pass original password text to SDK options; the [connection guide](docs/connecting.md) shows how to encode passwords for VDO.Ninja viewer URLs, including literal percent characters. Browser capture needs HTTPS or localhost and user permission.
 
 ## Features
 

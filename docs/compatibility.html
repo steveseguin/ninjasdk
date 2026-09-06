@@ -1,0 +1,197 @@
+<!doctype html>
+<!-- Generated from compatibility.md by npm run docs:build. Edit the Markdown source. -->
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SDK Compatibility Contract | VDO.Ninja SDK</title><meta name="description" content="SDK Compatibility Contract. VDO.Ninja SDK options, practical examples, requirements, and validation limits.">
+<link rel="canonical" href="https://sdk.vdo.ninja/docs/compatibility.html">
+<meta property="og:title" content="SDK Compatibility Contract"><meta property="og:description" content="SDK Compatibility Contract. VDO.Ninja SDK options, practical examples, requirements, and validation limits.">
+<meta property="og:type" content="article"><meta property="og:url" content="https://sdk.vdo.ninja/docs/compatibility.html">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="guide.css"></head>
+<body><a class="skip" href="#content">Skip to content</a><header><nav aria-label="Main"><a href="../index.html">VDO.Ninja SDK</a><a href="guides.html">Choose a guide</a><a href="api-reference.html">API reference</a><a href="../demos/">Demos</a></nav></header>
+<div class="layout"><aside><nav aria-label="On this page"><strong>On this page</strong><a href="#1-websocket-wire-compatibility">1. WebSocket wire compatibility</a><a href="#2-webrtc-and-data-channel-compatibility">2. WebRTC and data-channel compatibility</a><a href="#3-sdk-local-api-compatibility">3. SDK-local API compatibility</a><a href="#known-consumers">Known consumers</a></nav></aside>
+<main id="content"><h1 id="sdk-compatibility-contract">SDK Compatibility Contract</h1>
+<p>The SDK is intended to remain compatible with earlier SDK releases and with VDO.Ninja peers. Compatibility has three separate boundaries.</p>
+<h2 id="1-websocket-wire-compatibility">1. WebSocket wire compatibility</h2>
+<p>The signaling server sees the same messages used by VDO.Ninja, including <code>joinroom</code>, <code>listing</code>, <code>seed</code>, <code>play</code>, <code>offerSDP</code>, <code>videoaddedtoroom</code>, SDP descriptions, ICE candidates, <code>bye</code>, and <code>hangup</code>.</p>
+<p>Reliability changes must not introduce SDK-specific WebSocket request types. Reconnection restores application intent by replaying the existing room, seed, and play operations.</p>
+<h2 id="2-webrtc-and-data-channel-compatibility">2. WebRTC and data-channel compatibility</h2>
+<ul>
+<li>The publisher creates the <code>sendChannel</code> data channel and owns SDP offers.</li>
+<li>The viewer answers offers.</li>
+<li>ICE candidate <code>type</code> routing remains compatible with VDO.Ninja's publisher/viewer directions.</li>
+<li>Password hashing, salt behavior, and encrypted SDP/ICE formats match VDO.Ninja. Pass original password text to SDK options; the SDK URL-encodes it once before hashing and encryption.</li>
+</ul>
+<p>Password correction: constructor passwords containing special characters previously became encoded again on room join and reconnect. The SDK now preserves the sanitized value internally and refreshes the stream hash when the room password changes. Integrations relying on the old double encoding should use the original password on both peers. No wire fields or cryptographic algorithms changed.</p>
+<p>When password encryption is enabled, an encryption failure stops that SDP/ICE message instead of silently sending it as plaintext. Applications that explicitly disable password encryption keep their existing behavior.</p>
+<h3 id="channel-labels">Channel labels</h3>
+<p>VDO.Ninja opens up to four kinds of data channel per peer and dispatches incoming
+channels <strong>by label</strong>. The SDK matches that dispatch exactly.</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Comparison table"><table>
+<thead>
+<tr>
+<th>Label</th>
+<th>Options</th>
+<th>Carries</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>sendChannel</code></td>
+<td>ordered</td>
+<td>JSON control protocol</td>
+</tr>
+<tr>
+<td><code>chunked</code></td>
+<td><code>{ordered:true}</code>, arraybuffer</td>
+<td>Chunked media transport</td>
+</tr>
+<tr>
+<td><code>resources</code></td>
+<td><code>{ordered:true, maxRetransmits:30}</code></td>
+<td>Resource/template sync</td>
+</tr>
+<tr>
+<td><code>x-*</code></td>
+<td>caller's choice</td>
+<td><strong>Reserved.</strong> Third-party SDK channels; never interpreted</td>
+</tr>
+<tr>
+<td>anything else</td>
+<td>arraybuffer</td>
+<td>File transfer; the label is the file ID</td>
+</tr>
+</tbody>
+</table></div>
+<p>A falsy label is treated as the control channel, matching VDO.Ninja.</p>
+<h3 id="the-reserved-x--namespace">The reserved <code>x-</code> namespace</h3>
+<p>VDO.Ninja ignores <code>x-</code> labels in <strong>both</strong> <code>ondatachannel</code> handlers
+(<code>session.isReservedChannelLabel</code>) rather than passing them to its file-transfer receiver.
+The SDK honours the same reservation: an <code>x-</code> channel is surfaced to the application via
+<code>channelOpen</code> and is never treated as a file transfer, and <code>hostFile()</code> refuses a file ID
+using the prefix.</p>
+<p>The prefix is collision-proof by construction: every label either side opens is drawn from
+an alphanumeric charset or is a known literal, so no existing label can begin with <code>x-</code>.
+<strong>If either <code>generateStreamID</code> is ever changed to emit punctuation, this guarantee breaks.</strong></p>
+<p>Without the reservation, a binary frame on an unrecognised label costs VDO.Ninja two errors
+per frame — a <code>JSON.parse</code> SyntaxError on the header retry plus a <code>TypeError</code> from
+<code>transferList[false]</code> — which is a flood on a bulk transfer.</p>
+<p>Verified: 4MB flooded onto an <code>x-bulk</code> channel at a live VDO.Ninja tab produced zero
+console errors, left the control channel open and ICE connected, created no transfer
+entries, and did not touch the image path.</p>
+<h3 id="binary-never-goes-on-the-control-channel">Binary never goes on the control channel</h3>
+<p>VDO.Ninja's control-channel handler treats <strong>any</strong> object payload as a WebP image frame:
+it builds an <code>&lt;img&gt;</code>, sets <code>src</code> to a blob URL of the bytes, and swaps it into the view
+(<code>webrtc.js:21219</code>). Raw bytes sent there would visibly corrupt a viewer rather than being
+ignored.</p>
+<p>So binary belongs only on reserved channels. <code>sendBinary()</code> uses a dedicated <code>x-bin</code> lane
+for exactly this reason. A VDO.Ninja peer ignores that lane — it receives nothing, which is
+correct, since it has no generic binary sink.</p>
+<p>Only the control channel carries the JSON control protocol: SDP, ICE, ping/pong,
+publisher info, viewer media preferences, generic <code>pipe</code> data, <code>fileList</code>,
+<code>requestFile</code>, and <code>iceRestartRequest</code>. The other labels are binary side-channels.</p>
+<p><strong>An auxiliary channel must never be adopted as the connection's control channel.</strong>
+Doing so re-sends publisher info, starts a duplicate ping monitor, emits a spurious
+<code>dataChannelOpen</code>, and attempts to <code>JSON.parse</code> binary frames. <code>connection.dataChannel</code>
+always means the control channel; <code>connection.channels</code> is the label-keyed registry of
+all channels on that peer.</p>
+<h3 id="file-transfer">File transfer</h3>
+<ol>
+<li>Host advertises <code>{fileList:[{id,name,size}]}</code> on the control channel</li>
+<li>Peer requests <code>{requestFile:&lt;id&gt;}</code> on the control channel</li>
+<li>Host opens a data channel labelled <code>&lt;id&gt;</code></li>
+<li>Host sends <code>{type:&quot;filetransfer&quot;,size,filename,id}</code></li>
+<li>Host sends 16384-byte binary chunks</li>
+<li>Host sends <code>EOF1</code> (complete) or <code>EOF2</code> (cancelled)</li>
+</ol>
+<p>The SDK's sender waits for <code>bufferedAmount</code> to drain between chunks and before <code>EOF1</code>,
+allows the native adapter a transport turn, then treats the receiver's post-<code>EOF1</code>
+channel close as the delivery acknowledgement. VDO.Ninja's sender does none of these.
+This is deliberate and invisible to the receiver: framing and chunk size are unchanged,
+so it stays wire-compatible while avoiding SCTP overrun, terminator races, and premature
+close on native adapters.</p>
+<h3 id="resources">Resources</h3>
+<p>Channel <code>resources</code>, opened only toward a peer that advertised <code>allowresources</code>. A JSON
+metadata frame carrying at least <code>templateName</code> and <code>size</code>, then 16384-byte binary
+chunks until <code>size</code> bytes have arrived. The SDK refuses an unsolicited resources
+channel, as VDO.Ninja does.</p>
+<h3 id="capability-negotiation">Capability negotiation</h3>
+<p>Capabilities travel <strong>viewer to publisher</strong>, in the viewer's preferences message — not in
+the publisher's info payload. The publisher then decides what to open
+(<code>webrtc.js:12889-12894</code>):</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Comparison table"><table>
+<thead>
+<tr>
+<th>Viewer advertises</th>
+<th>Publisher does</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>downloads: true</code></td>
+<td>sends its <code>fileList</code></td>
+</tr>
+<tr>
+<td><code>allowresources: true</code></td>
+<td>opens the <code>resources</code> channel</td>
+</tr>
+<tr>
+<td><code>allowchunked</code> + <code>chunkprotocols</code></td>
+<td>opens the <code>chunked</code> channel</td>
+</tr>
+</tbody>
+</table></div>
+<p>Getting the direction wrong means the capability is simply never acted on. Peers that
+predate a key ignore it, because VDO.Ninja's handlers are independent <code>if (&quot;key&quot; in msg)</code>
+checks rather than an exhaustive switch. New capability keys must preserve that property.</p>
+<h3 id="publisher-meta-must-stay-a-non-null-object">Publisher <code>meta</code> must stay a non-null object</h3>
+<p><code>info.meta</code> is accepted only when it is truthy <strong>and</strong> <code>typeof === &quot;object&quot;</code>; anything else
+makes the receiver set <code>meta = false</code>. Resources are stored into <code>meta[templateName].value</code>,
+so a string-sanitized meta silently disables the entire resources path. Sanitize the values
+inside meta, never the container.</p>
+<p><code>meta: null</code> is the trap: <code>typeof null === &quot;object&quot;</code>, so a naive type check accepts it and
+then throws on first use. VDO.Ninja now guards for truthiness and warns on a truthy
+non-object; the SDK drops the key entirely rather than putting <code>meta: null</code> on the wire.
+Both halves are needed — the guard protects against old SDK builds, and dropping the key
+protects against receivers that predate the guard.</p>
+<h3 id="not-yet-implemented">Not yet implemented</h3>
+<p>The SDK does not speak the chunked media protocol (<code>indexed-v1</code> / <code>positional-v1</code>). It
+accepts and ignores a <code>chunked</code> channel and emits <code>unsupportedChannel</code> rather than
+mis-routing it.</p>
+<p>The MCP package may use its own versioned envelopes inside generic application data. Those envelopes are payloads between MCP peers; they are not signaling-server protocol additions.</p>
+<h2 id="3-sdk-local-api-compatibility">3. SDK-local API compatibility</h2>
+<p>Public methods, options, aliases, event names, and event payloads should remain additive across minor versions. Existing compatibility aliases, including <code>dataRecieved</code>, remain available even when a preferred spelling exists.</p>
+<p>Additive includes giving a previously <code>void</code> method a return value, and adding a <code>detail</code>
+to an event that had none — callers ignoring either are unaffected. <code>disconnect()</code> now
+returns a promise and <code>disconnected</code> now carries <code>{ intentional, reason, willReconnect, phase }</code> on that basis.</p>
+<p>Duplicate-event correction: a deliberate <code>disconnect()</code> now emits <code>disconnected</code> once,
+with <code>phase: 'teardown'</code>. It no longer emits the intermediate socket notification.
+Unexpected socket loss still emits <code>phase: 'socket'</code> immediately; <code>teardownComplete</code>
+remains the separate cleanup signal. Consumers relying on two local notifications
+should use the single teardown notification instead.</p>
+<p>Type definitions in <code>vdoninja-sdk.d.ts</code> are part of this surface. <code>npm run test:types</code>
+typechecks a consumer against them under <code>--strict</code> so they cannot drift from the
+implementation unnoticed.</p>
+<p>SDK events do not need to have the same names as VDO.Ninja internals. Similar naming is useful for applications migrating away from an iframe, but it is not a wire-level requirement.</p>
+<p>Important SDK-local events include:</p>
+<ul>
+<li>Signaling: <code>connected</code>, <code>disconnected</code>, <code>teardownComplete</code>, <code>reconnecting</code>, <code>reconnected</code>, <code>reconnectFailed</code></li>
+<li>Room/discovery: <code>roomJoined</code>, <code>roomLeft</code>, <code>listing</code>, <code>streamAdded</code>, <code>videoaddedtoroom</code></li>
+<li>Peer health: <code>peerConnected</code>, <code>peerDisconnected</code>, <code>connectionRecovering</code>, <code>connectionRecovered</code>, <code>connectionFailed</code>, <code>iceRestart</code></li>
+<li>Data: <code>dataChannelOpen</code>, <code>dataChannelClose</code>, <code>dataReceived</code>, <code>dataRecieved</code>, <code>data</code>, <code>peerInfo</code></li>
+<li>Media: <code>track</code>, <code>publishing</code>, <code>publishingStopped</code>, <code>viewingStopped</code></li>
+<li>File transfer: <code>fileList</code>, <code>fileTransferStart</code>, <code>fileTransferProgress</code>, <code>fileChunk</code>, <code>fileTransferComplete</code>, <code>fileTransferCancelled</code>, <code>fileTransferError</code></li>
+<li>Resources: <code>resourceReceived</code></li>
+<li>Diagnostics: <code>unsupportedChannel</code></li>
+</ul>
+<h2 id="known-consumers">Known consumers</h2>
+<p>Compatibility checks should cover at least:</p>
+<ul>
+<li>Browser CDN/global usage</li>
+<li>The Node adapter</li>
+<li>Social Stream's P2P data bridge</li>
+<li>The VDO.Ninja Video Capture extension's embedded SDK build</li>
+<li>The MCP bridge</li>
+<li>VDO.Ninja browser peers</li>
+</ul>
+<p>An embedded SDK consumer may not receive fixes until its vendored file is refreshed. Changes should therefore tolerate mixed SDK versions in the same room.</p>
+</main></div>
+<footer><a href="compatibility.md">Markdown source</a> · <a href="validation.html">Validation and limits</a> · <a href="https://github.com/steveseguin/ninjasdk">Repository</a></footer></body></html>

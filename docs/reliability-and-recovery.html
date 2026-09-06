@@ -1,0 +1,70 @@
+<!doctype html>
+<!-- Generated from reliability-and-recovery.md by npm run docs:build. Edit the Markdown source. -->
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Reliability and Recovery | VDO.Ninja SDK</title><meta name="description" content="Reliability and Recovery. VDO.Ninja SDK options, practical examples, requirements, and validation limits.">
+<link rel="canonical" href="https://sdk.vdo.ninja/docs/reliability-and-recovery.html">
+<meta property="og:title" content="Reliability and Recovery"><meta property="og:description" content="Reliability and Recovery. VDO.Ninja SDK options, practical examples, requirements, and validation limits.">
+<meta property="og:type" content="article"><meta property="og:url" content="https://sdk.vdo.ninja/docs/reliability-and-recovery.html">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="guide.css"></head>
+<body><a class="skip" href="#content">Skip to content</a><header><nav aria-label="Main"><a href="../index.html">VDO.Ninja SDK</a><a href="guides.html">Choose a guide</a><a href="api-reference.html">API reference</a><a href="../demos/">Demos</a></nav></header>
+<div class="layout"><aside><nav aria-label="On this page"><strong>On this page</strong><a href="#connection-intent">Connection intent</a><a href="#directional-peer-recovery">Directional peer recovery</a><a href="#options">Options</a><a href="#observability-events">Observability events</a><a href="#failure-testing">Failure testing</a></nav></aside>
+<main id="content"><h1 id="reliability-and-recovery">Reliability and Recovery</h1>
+<p>The SDK treats signaling, each directional peer connection, the data channel, and media tracks as related but distinct state.</p>
+<h2 id="connection-intent">Connection intent</h2>
+<p>Room membership, publishing, and requested views are stored separately from the current WebSocket state. If signaling reconnects, the SDK obtains a new signaling generation and restores intent in this order:</p>
+<ol>
+<li>Join the room with the existing <code>joinroom</code> message.</li>
+<li>Reannounce the publisher with the existing <code>seed</code> message.</li>
+<li>Rediscover/re-request active views with the existing <code>play</code> message.</li>
+</ol>
+<p>An explicit <code>disconnect()</code>, <code>leaveRoom()</code>, <code>stopPublishing()</code>, or <code>stopViewing()</code> removes the corresponding intent and prevents automatic restoration.</p>
+<p>Like VDO.Ninja, the SDK retains only the newest 30 signaling messages while the socket is unavailable and replays them when it opens. This queue carries the original <code>joinroom</code>, <code>seed</code>, <code>play</code>, SDP, ICE, and generic relay shapes; the SDK does not add private handshake-server commands.</p>
+<p>ICE candidates that arrive before their directional peer or remote description are held for up to 15 seconds. Queues are bounded to 100 candidates per UUID/direction and 500 keys, session-checked, and drained after the matching remote description is accepted.</p>
+<h2 id="directional-peer-recovery">Directional peer recovery</h2>
+<p>Publishing to a peer and viewing that peer are separate <code>RTCPeerConnection</code> directions. Recovery affects only the failed direction.</p>
+<p>The default sequence is:</p>
+<ol>
+<li>Allow a short grace period for a temporary ICE <code>disconnected</code> state.</li>
+<li>Request one direct ICE restart.</li>
+<li>When TURN is available, temporarily rotate ICE servers and select relay-only candidates.</li>
+<li>Request one relay-eligible ICE restart.</li>
+<li>Close the failed direction after the bounded recovery sequence.</li>
+<li>For an active viewer intent, issue a fresh <code>play</code> request and wait for a genuinely connected replacement.</li>
+</ol>
+<p>The publisher remains the SDP offer owner. A viewer requests a restart through the existing data channel first. If that channel is unavailable, it uses VDO.Ninja's existing generic <code>{ UUID, iceRestartRequest: true }</code> WebSocket relay shape; this is not a new handshake-server command.</p>
+<h2 id="options">Options</h2>
+<pre><code class="language-js">const sdk = new VDONinjaSDK({
+  autoRecover: true,            // Disable only when the application owns recovery
+  autoRelay: true,              // Temporarily use TURN after direct recovery fails
+  disconnectGracePeriod: 5000, // Delay before recovering a transient disconnect
+  connectionTimeout: 20000,    // Maximum initial peer-connection wait
+  recoveryTimeout: 12000,      // Wait between bounded recovery phases
+  relayRestoreDelay: 45000,    // Restore the original direct-first ICE policy
+  signalingQueueLimit: 30,     // Newest HSS messages retained while offline
+  pendingIceTTL: 15000,        // Maximum age of pre-PC ICE candidates
+  pendingIceMaxPerPeer: 100,   // Candidate cap per UUID and direction
+  pendingIceMaxKeys: 500       // Global UUID/direction queue cap
+});
+</code></pre>
+<p>Existing <code>forceTURN: true</code> remains authoritative and prevents restoration to a direct-first policy.</p>
+<h2 id="observability-events">Observability events</h2>
+<pre><code class="language-js">sdk.addEventListener('connectionRecovering', event =&gt; {
+  console.log(event.detail.phase, event.detail.reason, event.detail.streamID);
+});
+
+sdk.addEventListener('connectionRecovered', event =&gt; {
+  console.log('Recovered', event.detail.type, event.detail.streamID);
+});
+
+sdk.addEventListener('connectionFailed', event =&gt; {
+  console.log('Recovery exhausted', event.detail.reason);
+});
+</code></pre>
+<p><code>view()</code> resolving means the peer connection was created. Applications that require confirmed connectivity should wait for <code>peerConnected</code>, <code>dataChannelOpen</code>, or <code>track</code>, depending on their use case.</p>
+<h2 id="failure-testing">Failure testing</h2>
+<p>Run deterministic lifecycle tests with:</p>
+<pre><code class="language-bash">npm run test:reliability
+</code></pre>
+<p>Production testing should additionally cover WebSocket loss, one-way ICE failure, TURN-only networks, stale signaling after peer replacement, data-channel closure, and media that connects but stops advancing.</p>
+</main></div>
+<footer><a href="reliability-and-recovery.md">Markdown source</a> · <a href="validation.html">Validation and limits</a> · <a href="https://github.com/steveseguin/ninjasdk">Repository</a></footer></body></html>

@@ -42,11 +42,17 @@ jobs:
         cp vdoninja-sdk.js dist/
         cp vdoninja-sdk-node.js dist/
         cp webrtc-adapter.js dist/
+        cp whip-client.js whep-client.js dist/
+        cp favicon.svg robots.txt sitemap.xml llms.txt CNAME dist/
+        cp LICENSE LICENSE-MIT LICENSE-DEMOS LICENSING.md dist/
         cp index.html dist/
         cp style.css dist/
         cp -r demos/*.html dist/demos/
         cp -r demos/*.js dist/demos/
+        cp -r demos/*.cjs dist/demos/
         cp -r demos/*.md dist/demos/
+        cp -r demos/tally-osc dist/demos/
+        cp -r docs dist/
         cp README.md dist/
         cp README-NODE.md dist/
         cp AI-INTEGRATION.md dist/

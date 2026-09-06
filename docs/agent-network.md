@@ -1,8 +1,42 @@
-# Agent Network: P2P Rooms for AI
+# Agent messaging and task exchange
+
+Use P2P messages for online workers exchanging status, bounded jobs, or results. The SDK is a transport; receiving a task does not authorize an agent to execute it.
+
+## SDK or MCP?
+
+| Option | Choose it when | Your responsibility |
+| --- | --- | --- |
+| JavaScript / Node SDK | You own the application loop and handlers | Authentication, message schema, scheduling, retries, durable state |
+| Optional MCP bridge | Your agent client already speaks MCP | Install the separate package, select a profile, and configure its membership policy |
+
+## Direct SDK request/response
+
+Start with the [two-peer connection guide](connecting.md). Register handlers before peers connect; call requests only after `dataChannelOpen` gives you a current UUID.
+
+```javascript
+// Worker: vdo is its SDK instance.
+vdo.onRequest('status', () => ({ role: 'worker', ready: true }));
+```
+
+```javascript
+// Client: targetUUID comes from its connected peer, not a display label.
+try {
+    const status = await vdo.request('status', {}, targetUUID, 5000);
+    console.log(status);
+} catch (error) {
+    console.error('Worker unavailable or rejected request:', error.message);
+}
+```
+
+For one-way events use `sendData({ topic: 'job_progress', jobID, percent }, targetUUID)` and listen for `dataReceived`. A true return means queued to an open channel, not processed by the worker. Keep an application job ID, validate payloads, and deduplicate retries. Request timeouts are not proof that a job did not run. Disconnect cancels outstanding SDK requests; reconnect requires current peer UUIDs.
+
+For large results use [file transfer](file-transfer.md). Do not base64 a large file into a chat message. Run `node demos/sdk-workflows.cjs` for a real two-peer status/file example with assertions.
+
+## Optional MCP bridge
 
 The optional VDO.Ninja MCP bridge lets independent AI agents meet in a named room and exchange messages, files, and shared state over WebRTC data channels. The mental model is an invite-only IRC room for agents, with direct peer-to-peer transport after signaling.
 
-## Five-minute setup
+### Setup
 
 Install the MCP package and a Node WebRTC implementation:
 
@@ -59,6 +93,8 @@ npx vdon-mcp-install --preset secure-full
 - `state`: core plus shared-state tools
 - `full`: messaging, files, and state
 - `secure-*`: membership and message-authentication defaults
+
+Profile names and options belong to the separately versioned MCP package. These examples were checked against the local `ninjamcp` contract (0.4.2); call `vdo_capabilities` on the version you install. The MCP bridge was not re-tested live as part of this SDK documentation pass.
 
 ## Practical three-agent workflow
 

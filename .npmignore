@@ -9,12 +9,14 @@ test-*.js
 *.spec.js
 
 # Build tools
+scripts/
 run-in-windows.sh
 .github/
 
 # Documentation files not needed in package
 CNAME
 robots.txt
+sitemap.xml
 index.html
 style.css
 
@@ -42,6 +44,7 @@ Thumbs.db
 npm-debug.log*
 
 # Build artifacts not needed
+dist/
 *.map
 *.tgz
 ffmpeg.exe

@@ -1111,7 +1111,7 @@ async function test() {
 
     const metaConn = fakeConnection();
     metaConn.type = 'publisher';
-    metaConn.info = { label: 'x', meta: ['not', 'an', 'object'] };
+    metaConn.localInfo = { label: 'x', meta: ['not', 'an', 'object'] };
     const sent = [];
     const metaChan = fakeChannel('sendChannel');
     metaChan.send = (d) => sent.push(d);

@@ -12,22 +12,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VDO.Ninja SDK - P2P WebRTC SDK for Web, Node.js, Python & Mobile</title>
-    <meta name="description" content="VDO.Ninja SDK - Cross-platform P2P WebRTC SDK for browsers, Node.js, Python, and mobile apps. Build serverless audio, video, and data applications. AI-friendly, no accounts required, free and open source.">
+    <title>VDO.Ninja SDK | JavaScript WebRTC for Video, Audio &amp; Data</title>
+    <meta name="description" content="Build VDO.Ninja-compatible video tools, remote camera viewers, and peer-to-peer messaging in JavaScript and Node.js. Explore working demos, setup guides, and API documentation.">
     
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://sdk.vdo.ninja/">
-    <meta property="og:title" content="VDO.Ninja SDK - WebRTC SDK for Web, Node.js, Python & Mobile">
-    <meta property="og:description" content="Cross-platform WebRTC SDK supporting browsers, Node.js, Python (Raspberry.Ninja), and Flutter mobile apps. Build serverless P2P apps with audio, video, and data channels.">
-    <meta property="og:image" content="https://sdk.vdo.ninja/og-image.png">
+    <meta property="og:title" content="VDO.Ninja SDK | JavaScript WebRTC for Video, Audio &amp; Data">
+    <meta property="og:description" content="Build custom video tools and P2P messaging in browsers and Node.js. Working demos, setup guides, and API documentation.">
     
     <!-- Twitter -->
-    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:card" content="summary">
     <meta property="twitter:url" content="https://sdk.vdo.ninja/">
-    <meta property="twitter:title" content="VDO.Ninja SDK - WebRTC SDK for Web, Node.js, Python & Mobile">
-    <meta property="twitter:description" content="Cross-platform WebRTC SDK for browsers, Node.js, Python, and mobile. Build serverless P2P apps with no infrastructure.">
-    <meta property="twitter:image" content="https://sdk.vdo.ninja/og-image.png">
+    <meta property="twitter:title" content="VDO.Ninja SDK | JavaScript WebRTC for Video, Audio &amp; Data">
+    <meta property="twitter:description" content="JavaScript and Node.js tools for VDO.Ninja-compatible media and peer-to-peer data, with working demos and guides.">
     
     <!-- Additional SEO -->
     <meta name="keywords" content="webrtc, p2p, peer-to-peer, sdk, nodejs, npm, python, flutter, mobile, cross-platform, video streaming, audio streaming, data channels, ai friendly, no server, free, open source, vdo.ninja, social stream ninja, raspberry ninja, whip, whep, twitch, meshcast, cloudflare stream, webrtc-http">
@@ -46,31 +44,21 @@
         "@type": "SoftwareApplication",
         "name": "VDO.Ninja SDK",
         "applicationCategory": "DeveloperApplication",
-        "description": "Cross-platform P2P WebRTC SDK for browsers, Node.js, Python, and mobile apps",
-        "operatingSystem": ["Web Browser", "Node.js", "Python", "iOS", "Android"],
+        "description": "JavaScript WebRTC SDK for VDO.Ninja-compatible audio, video, and peer-to-peer data",
+        "operatingSystem": ["Web Browser", "Node.js"],
         "offers": {
             "@type": "Offer",
             "price": "0",
             "priceCurrency": "USD"
-        },
-        "aggregateRating": {
-            "@type": "AggregateRating",
-            "ratingValue": "5",
-            "ratingCount": "100"
         },
         "author": {
             "@type": "Person",
             "name": "Steve Seguin"
         },
         "license": "https://github.com/steveseguin/ninjasdk/blob/main/LICENSE",
-        "softwareVersion": "1.1.0",
         "softwareRequirements": [
-            "Chrome 80+",
-            "Firefox 75+",
-            "Safari 14+",
-            "Node.js 18.20+",
-            "Python 3.x with Raspberry.Ninja",
-            "Flutter for mobile"
+            "WebRTC-capable browser; HTTPS or localhost for media capture",
+            "Node.js with @roamhq/wrtc or node-datachannel"
         ],
         "keywords": [
             "WebRTC",
@@ -266,12 +254,12 @@
 
     <header class="hero">
         <div class="container">
-            <h1 class="hero-title">The Web Without Servers</h1>
-            <p class="hero-subtitle">Cross-Platform P2P SDK for Web, Node.js, Python & Mobile. Zero Infrastructure. Unlimited Possibilities.</p>
+            <h1 class="hero-title">Build with VDO.Ninja</h1>
+            <p class="hero-subtitle">JavaScript WebRTC for live video, audio, and peer-to-peer data.</p>
             <p class="hero-description">
-                VDO.Ninja SDK enables websites to talk directly to each other. Stream HD video to friends, 
-                remote control applications from anywhere, build AI bots with live feeds, or create 
-                high-bandwidth apps with <strong>zero server costs</strong>. No accounts. No hosting.
+                Build custom broadcast tools, remote camera viewers, and connected applications
+                in browsers and Node.js. Start with a working demo, then use the SDK to
+                connect your own interface to VDO.Ninja.
             </p>
             <div class="hero-features">
                 <div class="hero-feature">
@@ -307,7 +295,7 @@
                 </span>
             </div>
             <div class="hero-tagline">
-                A revolutionary approach to web development that breaks the server stranglehold
+                Hosted signaling connects peers. Media and data use WebRTC, with TURN relays when needed.
             </div>
         </div>
     </header>
@@ -337,7 +325,7 @@
                         <div class="message-container" id="peer1MessageContainer" style="display: none;">
                             <div class="message-area" id="peer1Messages"></div>
                             <div class="message-controls">
-                                <input type="text" id="peer1Input" placeholder="Type a message..." class="demo-input" disabled>
+                                <input type="text" id="peer1Input" aria-label="Message from Peer 1" placeholder="Type a message..." class="demo-input" disabled>
                                 <button id="peer1SendBtn" class="btn btn-secondary" onclick="sendPeerMessage(1)" disabled>Send</button>
                             </div>
                         </div>
@@ -360,7 +348,7 @@
                         <div class="message-container" id="peer2MessageContainer" style="display: none;">
                             <div class="message-area" id="peer2Messages"></div>
                             <div class="message-controls">
-                                <input type="text" id="peer2Input" placeholder="Type a message..." class="demo-input" disabled>
+                                <input type="text" id="peer2Input" aria-label="Message from Peer 2" placeholder="Type a message..." class="demo-input" disabled>
                                 <button id="peer2SendBtn" class="btn btn-secondary" onclick="sendPeerMessage(2)" disabled>Send</button>
                             </div>
                         </div>
@@ -650,9 +638,9 @@ function handleCustomData(data) {
                 <pre><code class="language-html">&lt;script src="https://cdn.jsdelivr.net/gh/steveseguin/ninjasdk@latest/vdoninja-sdk.min.js"&gt;&lt;/script&gt;</code></pre>
                 
                 <p><strong>For Node.js:</strong></p>
-                <pre><code class="language-bash">npm install ws @roamhq/wrtc  # or node-datachannel
+                <pre><code class="language-bash">npm install @vdoninja/sdk @roamhq/wrtc
 # Then in your code:
-const VDONinjaSDK = require('./vdoninja-sdk-node.js');</code></pre>
+const VDONinjaSDK = require('@vdoninja/sdk/node');</code></pre>
                 <p>See <a href="README-NODE.md">README-NODE.md</a> for detailed Node.js setup instructions.</p>
                 
                 <h3>2. Basic Data Channel Example</h3>
@@ -660,25 +648,22 @@ const VDONinjaSDK = require('./vdoninja-sdk-node.js');</code></pre>
 const vdo = new VDONinjaSDK();
 
 // Set up data channel handling
-vdo.addEventListener('data', (event) => {
+vdo.addEventListener('dataReceived', (event) => {
     const { data, uuid } = event.detail;
     console.log(`Received from ${uuid}:`, data);
 });
 
-// Connect, join room, and announce
-await vdo.connect();
-await vdo.joinRoom({ room: "myroom" });
-await vdo.announce({ streamID: "ai-bot-1" });
-
-// Send data to all peers
-vdo.sendData({
-    type: "chat",
-    message: "Hello from AI bot!"
-});</code></pre>
+// Run in two tabs with the same private room name.
+// Wait for a peer's data channel before sending.
+vdo.addEventListener('dataChannelOpen', () => {
+    vdo.sendData({ message: "Hello from this peer!" });
+});
+await vdo.autoConnect({ room: "replace_with_your_unique_room" });</code></pre>
+                <p><a href="docs/connecting.md">Connection guide: complete examples and troubleshooting</a></p>
 
                 <h3>3. Audio/Video Example</h3>
                 <pre><code class="language-javascript">// Create instance for audio/video
-const vdo = new VDONinjaSDK();
+const vdo = new VDONinjaSDK({ salt: "vdo.ninja", host: "wss://apibackup.vdo.ninja" });
 
 // Set up track handling
 vdo.addEventListener('track', (event) => {
@@ -699,7 +684,9 @@ const stream = await navigator.mediaDevices.getUserMedia({
 // Connect, join room, and publish
 await vdo.connect();
 await vdo.joinRoom({ room: "videoroom" });
-await vdo.publish(stream, { room: "videoroom" });</code></pre>
+await vdo.publish(stream, { streamID: "my_camera" });
+
+// Viewer: https://vdo.ninja/alpha/?view=my_camera&amp;room=videoroom&amp;scene&amp;wss2=apibackup.vdo.ninja</code></pre>
                 </div>
             </div>
             </div>
@@ -890,16 +877,41 @@ await vdo.connect({
     <section id="guides" class="section">
         <div class="container">
             <h2 class="section-title">Guides</h2>
+            <p class="section-description"><a href="docs/guides.html">Choose the right integration</a>: compare SDK, iframe, page API, MCP, and WHIP/WHEP, including which IDs and credentials each needs.</p>
             <div class="examples-grid">
+                <a href="docs/connecting.html" class="example-card">
+                    <h3>Connect and Publish</h3>
+                    <p>Match rooms, streams, passwords, and signaling hosts. Start with two peers or a custom video publisher.</p>
+                </a>
+                <a href="docs/file-transfer.html" class="example-card">
+                    <h3>File Transfer</h3>
+                    <p>Offer and download files, choose native transfer versus binary channels, and handle memory and completion correctly.</p>
+                </a>
+                <a href="docs/data-messaging.html" class="example-card">
+                    <h3>Status and Shared Interfaces</h3>
+                    <p>Build dashboards, sensor feeds, or collaborative controls. Understand routing, acknowledgements, and stale state.</p>
+                </a>
+                <a href="docs/agent-network.html" class="example-card">
+                    <h3>Agent Messaging</h3>
+                    <p>Exchange status, jobs, and results using SDK requests or the optional MCP bridge. Understand delivery and authorization limits.</p>
+                </a>
+                <a href="docs/remote-control.html" class="example-card">
+                    <h3>Remote Control</h3>
+                    <p>Choose custom SDK commands, iframe controls, or a private page API. Keep credentials and command permissions scoped.</p>
+                </a>
                 <a href="docs/tally.html" class="example-card">
                     <h3>OBS Tally and VRChat OSC</h3>
                     <p>Keep camera operators in their browsers. Discover streams with the SDK, collect alpha API tally, and forward program/preview to OSC. Follow the tested setup and download the sample code.</p>
                 </a>
-                <a href="https://github.com/steveseguin/ninjasdk/blob/main/docs/recording.md" class="example-card">
+                <a href="docs/recording.html" class="example-card">
                     <h3>Recording Media</h3>
                     <p>Record incoming tracks in a browser or Node application.</p>
                 </a>
-                <a href="https://github.com/steveseguin/ninjasdk/blob/main/docs/reliability-and-recovery.md" class="example-card">
+                <a href="docs/streaming.html" class="example-card">
+                    <h3>WHIP and WHEP</h3>
+                    <p>Publish to or view a media service using its HTTP endpoint. Understand tokens, codecs, and how this differs from rooms.</p>
+                </a>
+                <a href="docs/reliability-and-recovery.html" class="example-card">
                     <h3>Connections and Recovery</h3>
                     <p>Understand reconnects, ICE recovery, and connection lifecycle events.</p>
                 </a>

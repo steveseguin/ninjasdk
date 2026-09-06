@@ -13,7 +13,11 @@ Reliability changes must not introduce SDK-specific WebSocket request types. Rec
 - The publisher creates the `sendChannel` data channel and owns SDP offers.
 - The viewer answers offers.
 - ICE candidate `type` routing remains compatible with VDO.Ninja's publisher/viewer directions.
-- Password hashing, salt behavior, and encrypted SDP/ICE formats remain unchanged.
+- Password hashing, salt behavior, and encrypted SDP/ICE formats match VDO.Ninja. Pass original password text to SDK options; the SDK URL-encodes it once before hashing and encryption.
+
+Password correction: constructor passwords containing special characters previously became encoded again on room join and reconnect. The SDK now preserves the sanitized value internally and refreshes the stream hash when the room password changes. Integrations relying on the old double encoding should use the original password on both peers. No wire fields or cryptographic algorithms changed.
+
+When password encryption is enabled, an encryption failure stops that SDP/ICE message instead of silently sending it as plaintext. Applications that explicitly disable password encryption keep their existing behavior.
 
 ### Channel labels
 
@@ -139,6 +143,12 @@ Additive includes giving a previously `void` method a return value, and adding a
 to an event that had none — callers ignoring either are unaffected. `disconnect()` now
 returns a promise and `disconnected` now carries `{ intentional, reason, willReconnect,
 phase }` on that basis.
+
+Duplicate-event correction: a deliberate `disconnect()` now emits `disconnected` once,
+with `phase: 'teardown'`. It no longer emits the intermediate socket notification.
+Unexpected socket loss still emits `phase: 'socket'` immediately; `teardownComplete`
+remains the separate cleanup signal. Consumers relying on two local notifications
+should use the single teardown notification instead.
 
 Type definitions in `vdoninja-sdk.d.ts` are part of this surface. `npm run test:types`
 typechecks a consumer against them under `--strict` so they cannot drift from the

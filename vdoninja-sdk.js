@@ -965,10 +965,9 @@ const VDON_RESOURCE_CHUNK_SIZE = 16384;
                         const willReconnect = !intentional &&
                             this._reconnectAttempts < this._maxReconnectAttempts;
 
-                        // This fires when the socket closes, which is not the same thing
-                        // as teardown being finished. Listeners that need "cleanup is
-                        // done" should use 'teardownComplete' instead.
-                        this._emit('disconnected', {
+                        // Local disconnect owns its notification after teardown. A socket
+                        // close during that operation must not notify callers twice.
+                        if (!intentional) this._emit('disconnected', {
                             intentional: intentional,
                             reason: intentional ? 'local-disconnect' : 'socket-closed',
                             willReconnect: willReconnect,
@@ -996,9 +995,9 @@ const VDON_RESOURCE_CHUNK_SIZE = 16384;
          * the process before that resolves can crash the native WebRTC module mid-teardown.
          *
          * The returned promise is new in v1.5. Callers that ignore it behave exactly as
-         * before. The `disconnected` event is not a completion signal — it also fires when
-         * the socket closes, which happens partway through. Use the resolved promise or
-         * the `teardownComplete` event.
+         * before. Local disconnect emits `disconnected` once, after teardown. Unexpected
+         * socket loss emits it immediately with phase 'socket'. Use the resolved promise
+         * or `teardownComplete` when waiting specifically for local cleanup.
          *
          * @returns {Promise<void>} Resolves once teardown is complete
          */
@@ -1009,6 +1008,14 @@ const VDON_RESOURCE_CHUNK_SIZE = 16384;
             if (this._teardownPromise) return this._teardownPromise;
 
             this._intentionalDisconnect = true;
+
+            if (this._pendingRequests) {
+                for (const pending of Object.values(this._pendingRequests)) {
+                    clearTimeout(pending.timeoutId);
+                    pending.reject(new Error('Disconnected before request completed'));
+                }
+                this._pendingRequests = Object.create(null);
+            }
 
             // disconnect() has always represented a full local teardown. Do not
             // restore room/publish/view intent after a later explicit connect().
@@ -1108,7 +1115,7 @@ const VDON_RESOURCE_CHUNK_SIZE = 16384;
                 this._viewRetryTimers.clear();
 
                 // WebSocket.close() is asynchronous. Keep this generation current until
-                // its close handler has run so the socket-phase event precedes teardown.
+                // its close handler has run before completing local teardown.
                 await this._closeSignalingSocket(signalingToClose);
                 if (this.signaling === signalingToClose) {
                     this.signaling = null;
@@ -1298,7 +1305,9 @@ const VDON_RESOURCE_CHUNK_SIZE = 16384;
                     await this.joinRoom({
                         ...intent.room.options,
                         room: intent.room.room,
-                        password: intent.room.password
+                        // Room intent stores the already-sanitized password.
+                        password: typeof intent.room.password === 'string'
+                            ? decodeURIComponent(intent.room.password) : intent.room.password
                     });
                 }
 
@@ -1407,7 +1416,10 @@ const VDON_RESOURCE_CHUNK_SIZE = 16384;
             }
 
             const room = this._sanitizeRoomName(options.room || this.room);
-            const password = this._sanitizePassword(options.password !== undefined ? options.password : this.password);
+            // Only caller-supplied passwords are raw. The instance value has already
+            // passed through VDO.Ninja's encodeURIComponent sanitization.
+            const password = options.password !== undefined
+                ? this._sanitizePassword(options.password) : this.password;
             
             if (!room) {
                 throw new Error('Room name is required');
@@ -1425,6 +1437,8 @@ const VDON_RESOURCE_CHUNK_SIZE = 16384;
             } else {
                 this.password = password;
             }
+
+            await this._ensurePasswordHash();
 
             // Hash room name if password is not explicitly false
             let hashedRoom = room;
@@ -1565,7 +1579,7 @@ const VDON_RESOURCE_CHUNK_SIZE = 16384;
             if (!this.state.roomJoined && options.room) {
                 await this.joinRoom({ 
                     room: options.room, 
-                    password: options.password !== undefined ? options.password : this.password 
+                    password: options.password
                 });
             }
 
@@ -1678,7 +1692,7 @@ const VDON_RESOURCE_CHUNK_SIZE = 16384;
             if (!this.state.roomJoined && options.room) {
                 await this.joinRoom({ 
                     room: options.room, 
-                    password: options.password !== undefined ? options.password : this.password 
+                    password: options.password
                 });
             }
 
@@ -5176,8 +5190,8 @@ const VDON_RESOURCE_CHUNK_SIZE = 16384;
                             msg.candidates = encrypted;
                             msg.vector = vector;
                         } catch (e) {
-                            // Fall back to plaintext if encryption fails
-                            msg.candidates = candidatesArr;
+                            // Never downgrade password-protected signaling to plaintext.
+                            throw e;
                         }
                     } else {
                         msg.candidates = candidatesArr;
@@ -5233,7 +5247,8 @@ const VDON_RESOURCE_CHUNK_SIZE = 16384;
                         this._log('Encrypted ICE candidates bundle');
                     } catch (error) {
                         this._log('Failed to encrypt ICE candidates:', error);
-                        bundleMsg.candidates = candidates;
+                        this._emit('error', { error: 'Failed to encrypt ICE candidates', details: error.message, uuid: connection.uuid });
+                        return;
                     }
                 }
 
@@ -5822,7 +5837,7 @@ const VDON_RESOURCE_CHUNK_SIZE = 16384;
                         this._log('Encrypted answer SDP');
                     } catch (error) {
                         this._log('Failed to encrypt answer:', error);
-                        answerMsg.description = answer;
+                        throw error;
                     }
                 } else {
                     answerMsg.description = answer;
@@ -6208,7 +6223,7 @@ const VDON_RESOURCE_CHUNK_SIZE = 16384;
                         this._log('Encrypted offer SDP');
                     } catch (error) {
                         this._log('Failed to encrypt offer:', error);
-                        offerMsg.description = offer;
+                        throw error;
                     }
                 } else {
                     offerMsg.description = offer;
@@ -6291,7 +6306,7 @@ const VDON_RESOURCE_CHUNK_SIZE = 16384;
                         this._log('Encrypted offer SDP');
                     } catch (error) {
                         this._log('Failed to encrypt offer:', error);
-                        offerMsg.description = offer;
+                        throw error;
                     }
                 } else {
                     offerMsg.description = offer;
@@ -6710,7 +6725,7 @@ const VDON_RESOURCE_CHUNK_SIZE = 16384;
                         this._log('Encrypted offer SDP');
                     } catch (error) {
                         this._log('Failed to encrypt offer:', error);
-                        offerMsg.description = offer;
+                        throw error;
                     }
                 } else {
                     offerMsg.description = offer;
@@ -7710,7 +7725,7 @@ const VDON_RESOURCE_CHUNK_SIZE = 16384;
                                 offerMsg.vector = vector;
                             } catch (error) {
                                 this._log('Failed to encrypt offer:', error);
-                                offerMsg.description = offer;
+                                throw error;
                             }
                         } else {
                             offerMsg.description = offer;
@@ -7782,7 +7797,7 @@ const VDON_RESOURCE_CHUNK_SIZE = 16384;
                                     offerMsg.vector = vector;
                                 } catch (error) {
                                     this._log('Failed to encrypt offer:', error);
-                                    offerMsg.description = offer;
+                                    throw error;
                                 }
                             } else {
                                 offerMsg.description = offer;
@@ -7934,15 +7949,16 @@ const VDON_RESOURCE_CHUNK_SIZE = 16384;
         async getStats(uuid = null) {
             const stats = {};
 
-            const connections = uuid ? 
-                [this.connections.get(uuid)].filter(Boolean) : 
-                Array.from(this.connections.values());
-
-            for (const connection of connections) {
-                if (connection && connection.pc) {
+            const peers = uuid ? [[uuid, this.connections.get(uuid)]] : this.connections.entries();
+            for (const [peerUUID, connections] of peers) {
+                if (!connections) continue;
+                for (const type of ['publisher', 'viewer']) {
+                    const connection = connections[type];
+                    if (!connection || !connection.pc) continue;
                     try {
                         const pcStats = await connection.pc.getStats();
-                        stats[connection.uuid] = Array.from(pcStats.values());
+                        if (!stats[peerUUID]) stats[peerUUID] = [];
+                        stats[peerUUID].push(...Array.from(pcStats.values(), entry => ({ ...entry, connectionType: type })));
                     } catch (error) {
                         this._log('Error getting stats:', error);
                     }
@@ -8461,13 +8477,14 @@ const VDON_RESOURCE_CHUNK_SIZE = 16384;
 
                 // Store pending request
                 if (!this._pendingRequests) {
-                    this._pendingRequests = {};
+                    this._pendingRequests = Object.create(null);
                 }
                 
                 this._pendingRequests[requestId] = {
                     resolve: resolve,
                     reject: reject,
-                    timeoutId: timeoutId
+                    timeoutId: timeoutId,
+                    targetUUID: targetUUID
                 };
 
                 // Send request
@@ -8509,7 +8526,7 @@ const VDON_RESOURCE_CHUNK_SIZE = 16384;
          */
         onRequest(requestType, handler) {
             if (!this._requestHandlers) {
-                this._requestHandlers = {};
+                this._requestHandlers = Object.create(null);
             }
             this._requestHandlers[requestType] = handler;
         }
@@ -8575,11 +8592,11 @@ const VDON_RESOURCE_CHUNK_SIZE = 16384;
 
             // Handle requests
             if (data.type === 'request') {
-                if (this._requestHandlers && this._requestHandlers[data.requestType]) {
+                if (this._requestHandlers && Object.prototype.hasOwnProperty.call(this._requestHandlers, data.requestType)) {
                     const handler = this._requestHandlers[data.requestType];
                     
                     // Execute handler (may be async)
-                    Promise.resolve(handler(data.data, uuid))
+                    Promise.resolve().then(() => handler(data.data, uuid))
                         .then(responseData => {
                             // Send response
                             this.respond(data.requestId, responseData, uuid);
@@ -8587,7 +8604,7 @@ const VDON_RESOURCE_CHUNK_SIZE = 16384;
                         .catch(error => {
                             // Send error response
                             this.respond(data.requestId, {
-                                error: error.message || 'Request handler error'
+                                error: (error && error.message) || 'Request handler error'
                             }, uuid);
                         });
                 }
@@ -8596,8 +8613,9 @@ const VDON_RESOURCE_CHUNK_SIZE = 16384;
 
             // Handle responses
             if (data.type === 'response') {
-                if (this._pendingRequests && this._pendingRequests[data.requestId]) {
+                if (this._pendingRequests && Object.prototype.hasOwnProperty.call(this._pendingRequests, data.requestId)) {
                     const pending = this._pendingRequests[data.requestId];
+                    if (pending.targetUUID && pending.targetUUID !== uuid) return;
                     clearTimeout(pending.timeoutId);
                     
                     if (data.data && data.data.error) {
@@ -8740,7 +8758,7 @@ const VDON_RESOURCE_CHUNK_SIZE = 16384;
                         offerMsg.vector = vector;
                     } catch (error) {
                         this._log('Failed to encrypt ICE restart offer:', error);
-                        offerMsg.description = offer;
+                        throw error;
                     }
                 } else {
                     offerMsg.description = offer;
@@ -8894,7 +8912,7 @@ const VDON_RESOURCE_CHUNK_SIZE = 16384;
 
                 // User-provided filter
                 if (typeof userFilter === 'function') {
-                    try { if (!userFilter(norm)) return false; } catch (e) { /* ignore */ }
+                    try { if (!userFilter(norm)) return false; } catch (e) { return false; }
                 } else if (userFilter instanceof RegExp) {
                     if (!userFilter.test(norm.streamID)) return false;
                 } else if (typeof userFilter === 'string') {

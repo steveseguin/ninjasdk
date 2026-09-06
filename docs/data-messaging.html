@@ -1,0 +1,84 @@
+<!doctype html>
+<!-- Generated from data-messaging.md by npm run docs:build. Edit the Markdown source. -->
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Build a status dashboard or shared control surface | VDO.Ninja SDK</title><meta name="description" content="Build a status dashboard or shared control surface. VDO.Ninja SDK options, practical examples, requirements, and validation limits.">
+<link rel="canonical" href="https://sdk.vdo.ninja/docs/data-messaging.html">
+<meta property="og:title" content="Build a status dashboard or shared control surface"><meta property="og:description" content="Build a status dashboard or shared control surface. VDO.Ninja SDK options, practical examples, requirements, and validation limits.">
+<meta property="og:type" content="article"><meta property="og:url" content="https://sdk.vdo.ninja/docs/data-messaging.html">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="guide.css"></head>
+<body><a class="skip" href="#content">Skip to content</a><header><nav aria-label="Main"><a href="../index.html">VDO.Ninja SDK</a><a href="guides.html">Choose a guide</a><a href="api-reference.html">API reference</a><a href="../demos/">Demos</a></nav></header>
+<div class="layout"><aside><nav aria-label="On this page"><strong>On this page</strong><a href="#choose-a-delivery-pattern">Choose a delivery pattern</a><a href="#exchange-a-current-state-snapshot">Exchange a current-state snapshot</a><a href="#routing-and-delivery-limits">Routing and delivery limits</a></nav></aside>
+<main id="content"><h1 id="build-a-status-dashboard-or-shared-control-surface">Build a status dashboard or shared control surface</h1>
+<p>Use small SDK messages for camera status, sensor readings, chat, collaborative cursors, or progress from a worker. Both ends run your application and agree on a message schema. Native VDO.Ninja transports the generic <code>pipe</code> payload, but does not implement your custom dashboard actions.</p>
+<h2 id="choose-a-delivery-pattern">Choose a delivery pattern</h2>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Comparison table"><table>
+<thead>
+<tr>
+<th>Need</th>
+<th>SDK option</th>
+<th>Application responsibility</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Latest status, pointer, or meter reading</td>
+<td><code>sendData(payload, uuid)</code></td>
+<td>Validate fields, limit update rate, and replace stale values</td>
+</tr>
+<tr>
+<td>Notify every connected peer</td>
+<td><code>sendData(payload)</code></td>
+<td>A <code>true</code> return means at least one route accepted it, not that every peer received it</td>
+</tr>
+<tr>
+<td>A command or query with a result</td>
+<td><code>request</code> and <code>onRequest</code></td>
+<td>Authorize the sender, validate arguments, and handle timeout; see <a href="remote-control.html">remote control</a></td>
+</tr>
+<tr>
+<td>Bytes or file contents</td>
+<td>Binary channels or native file transfer</td>
+<td>Choose framing, limits, and completion handling in the <a href="file-transfer.html">file guide</a></td>
+</tr>
+<tr>
+<td>Updates while a peer is offline</td>
+<td>Your storage/queue layer</td>
+<td>The SDK does not persist application messages or replay missed status</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="exchange-a-current-state-snapshot">Exchange a current-state snapshot</h2>
+<p>Load the SDK browser script and run this in two pages with the same unique room. In Node, import <code>@vdoninja/sdk/node</code> instead. This example sends a snapshot when a channel opens and a new one every second; its receiver accepts only the schema shown here.</p>
+<pre><code class="language-javascript">const sdk = new VDONinjaSDK({ salt: 'vdo.ninja' });
+const snapshot = () =&gt; ({
+    app: 'status-demo', version: 1,
+    kind: 'snapshot', state: 'ready'
+});
+sdk.addEventListener('dataReceived', ({ detail }) =&gt; {
+    const message = detail.data;
+    if (!message || message.app !== 'status-demo' || message.version !== 1 ||
+        message.kind !== 'snapshot' || message.state !== 'ready') return;
+    // Use textContent when rendering received text in an HTML interface.
+    console.log('Current state from', detail.uuid, message.state);
+});
+sdk.addEventListener('dataChannelOpen', ({ detail }) =&gt; {
+    sdk.sendData(snapshot(), detail.uuid);
+});
+const discovery = await sdk.autoConnect({ room: 'replace_with_a_shared_unique_room' });
+const timer = setInterval(() =&gt; { sdk.sendData(snapshot()); }, 1000);
+
+async function stopDashboard() {
+    clearInterval(timer);
+    discovery.stop();
+    await sdk.disconnect();
+}
+// Call stopDashboard() from your application's shutdown action.
+</code></pre>
+<p>This is a transport example, not an authenticated status feed. For operational dashboards, authorize the peer before using its readings, record the local receive time, and show a stale/offline state after a bounded interval without a valid update. A connection being open does not prove its application is healthy. On reconnect, obtain a fresh snapshot rather than assuming every intervening update arrived.</p>
+<h2 id="routing-and-delivery-limits">Routing and delivery limits</h2>
+<p>The default route uses an open publisher data channel, falling back to the viewer data channel for that peer. WebRTC data channels carry traffic both ways regardless of the media direction. <code>preference: 'all'</code> intentionally sends on both available directions and can duplicate messages; avoid it for commands unless your application deduplicates them.</p>
+<p><code>sendData</code> returns immediately. Success reports local sending, not remote processing or persistence. Use application acknowledgements or RPC for a confirmed result, and give retried actions stable IDs if running them twice would matter. Keep update payloads small and bounded; coalesce frequent changes into the newest state instead of accumulating an unbounded queue. For bulk bytes, use the file/binary facilities and their backpressure controls.</p>
+<p><code>allowFallback: true</code> explicitly permits generic signaling relay when a data route is unavailable. That changes the transport and its privacy assumptions; leave it off for data-channel-only applications. It is not durable offline delivery. Custom messages should use your own application namespace and avoid the SDK's reserved request/response types.</p>
+<p>See <a href="connecting.html">connection options</a>, <a href="agent-network.html">agent messaging</a>, and <a href="validation.html">validation notes</a>. The executable <a href="../demos/sdk-workflows.cjs">workflow sample</a> checks real peer RPC and file delivery; the SDK live suite also checks generic data-channel messages.</p>
+</main></div>
+<footer><a href="data-messaging.md">Markdown source</a> · <a href="validation.html">Validation and limits</a> · <a href="https://github.com/steveseguin/ninjasdk">Repository</a></footer></body></html>

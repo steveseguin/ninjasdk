@@ -4,6 +4,8 @@ This file helps AI coding assistants (Claude, Codex, Gemini, etc.) understand an
 
 ## Canonical Documentation Order
 
+Start with `docs/guides.md` to choose an integration. Task guides: `docs/connecting.md`, `docs/file-transfer.md`, `docs/agent-network.md`, `docs/remote-control.md`, `docs/recording.md`, and `docs/streaming.md`. `docs/validation.md` records validation scope and limits.
+
 1. `AI-INTEGRATION.md` - Complete SDK knowledge for AI systems (read first)
 2. `docs/api-reference.md` - Method signatures and events
 3. `README.md` - Installation, quick start, and feature overview
@@ -29,7 +31,7 @@ npm run test:node # Run Node.js example
 
 ## Hard Constraints
 
-- Do NOT access the WebSocket API directly; always use this SDK
+- Use the SDK for handshake-server signaling. The documented `&api` page-control WebSocket is separate and supported; see `docs/remote-control.md`.
 - Do NOT edit `vdoninja-sdk.min.js`; it is a build artifact
 - License: SDK core is MPL-2.0; wrappers and MCP are MIT (see LICENSING.md)
 
@@ -37,7 +39,7 @@ npm run test:node # Run Node.js example
 
 ## Password Semantics (Critical - Do Not Guess)
 
-The SDK and vdo.ninja use passwords for end-to-end encryption. Misunderstanding these states causes broken links and failed connections.
+The SDK and vdo.ninja use matching passwords/salts to encrypt signaling and hash IDs. WebRTC encrypts media and data independently. Disabling password-based signaling encryption does not make WebRTC media plaintext.
 
 ### SDK Password States (Truth Table)
 
@@ -45,9 +47,11 @@ The SDK and vdo.ninja use passwords for end-to-end encryption. Misunderstanding 
 |----------------------------|--------------------------------------------|
 | `undefined` / `null` / `""`| Uses default: `"someEncryptionKey123"`     |
 | `"mypassword"`             | Uses `"mypassword"` (encrypted)            |
-| `false`                    | Encryption **disabled** (plaintext)        |
+| `false`                    | Password-based signaling encryption disabled |
 
 Source of truth: `vdoninja-sdk.js` functions `_sanitizePassword()` and `_getEffectivePassword()`.
+
+This table describes constructor/connect options. Legacy `joinRoom({password:null})` disables password encryption; use `false` explicitly instead. For special-character passwords, keep original text in SDK options and follow the viewer URL encoding in `docs/connecting.md`.
 
 ### Generating vdo.ninja Viewer Links
 
@@ -74,7 +78,7 @@ await sdk.joinRoom({ room: "myroom" });
 await sdk.announce({ streamID: "mystream" });
 
 // Correct viewer link when password is disabled:
-// https://vdo.ninja/?view=mystream&room=myroom&password=false
+// https://vdo.ninja/alpha/?view=mystream&room=myroom&scene&password=false&wss2=wss.vdo.ninja
 ```
 
 ---

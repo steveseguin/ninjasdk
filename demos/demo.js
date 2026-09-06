@@ -90,11 +90,13 @@ async function connectPeer(peerId) {
         
         peer.vdo.addEventListener('dataChannelOpen', (event) => {
             const { uuid } = event.detail;
+            updatePeerStatus(peerId, peer.isConnected);
             displayPeerMessage(peerId, { message: `✅ Data channel opened with: ${uuid.substring(0, 8)}` }, 'System', 'success');
         });
         
         peer.vdo.addEventListener('dataChannelClose', (event) => {
             const { uuid } = event.detail;
+            updatePeerStatus(peerId, peer.isConnected);
             displayPeerMessage(peerId, { message: `❌ Data channel closed with: ${uuid.substring(0, 8)}` }, 'System', 'error');
         });
 
@@ -200,12 +202,15 @@ function updatePeerStatus(peerId, connected) {
     if (connected) {
         statusEl.classList.remove('connecting');
         statusEl.classList.add('connected');
-        textEl.textContent = 'Connected';
+        const ready = Array.from(peers[peerId].vdo.connections.values()).some(connections =>
+            ['publisher', 'viewer'].some(role => connections[role]?.dataChannel?.readyState === 'open')
+        );
+        textEl.textContent = ready ? 'Ready to chat' : 'Waiting for peer';
         connectBtn.textContent = 'Disconnect';
         connectBtn.classList.remove('btn-primary');
         connectBtn.classList.add('btn-secondary');
-        messageInput.disabled = false;
-        sendBtn.disabled = false;
+        messageInput.disabled = !ready;
+        sendBtn.disabled = !ready;
         messageContainer.style.display = 'block';
     } else {
         statusEl.classList.remove('connecting', 'connected');
@@ -230,11 +235,16 @@ function sendPeerMessage(peerId) {
     if (!message || !peer.vdo || !peer.isConnected) return;
 
     // Send the message
-    peer.vdo.sendData({ 
+    const sent = peer.vdo.sendData({
         message: message, 
         from: `Peer ${peerId}`,
         timestamp: Date.now() 
     });
+
+    if (!sent) {
+        displayPeerMessage(peerId, { error: 'Message not sent. Wait for a peer connection and try again.' }, 'System', 'error');
+        return;
+    }
     
     // Display it locally
     displayPeerMessage(peerId, { message: message }, 'You', 'sent');
@@ -267,13 +277,20 @@ function displayPeerMessage(peerId, data, sender, type = 'received') {
         content = JSON.stringify(data);
     }
     
-    messageEl.innerHTML = `
-        <div class="message-header">
-            <span class="message-sender">${sender}</span>
-            <span class="message-time">${time}</span>
-        </div>
-        <div class="message-content">${content}</div>
-    `;
+    // Both message content and sender names can come from an untrusted peer.
+    const header = document.createElement('div');
+    header.className = 'message-header';
+    const senderEl = document.createElement('span');
+    senderEl.className = 'message-sender';
+    senderEl.textContent = sender;
+    const timeEl = document.createElement('span');
+    timeEl.className = 'message-time';
+    timeEl.textContent = time;
+    header.append(senderEl, timeEl);
+    const contentEl = document.createElement('div');
+    contentEl.className = 'message-content';
+    contentEl.textContent = content;
+    messageEl.append(header, contentEl);
     
     messageArea.appendChild(messageEl);
     messageArea.scrollTop = messageArea.scrollHeight;

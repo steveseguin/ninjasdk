@@ -1,0 +1,11 @@
+{
+  "apiIds": ["YOUR_PRIVATE_CAMERA_PAGE_API_ID"],
+  "label": "CameraOne",
+  "pollMs": 1000,
+  "staleAfterMs": 5000,
+  "osc": {
+    "profile": "vrctally",
+    "host": "127.0.0.1",
+    "port": 9000
+  }
+}

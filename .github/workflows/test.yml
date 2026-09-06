@@ -41,6 +41,9 @@ jobs:
 
     - name: Verify TypeScript entry points
       run: npm run test:types
+
+    - name: Check generated guides and local links
+      run: npm run test:docs
     
     - name: Run basic connectivity test
       run: |

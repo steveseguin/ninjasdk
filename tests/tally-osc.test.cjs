@@ -3,7 +3,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const dgram = require('node:dgram');
 const { WebSocketServer } = require('ws');
-const { TallyBridge, classify, oscBoolean } = require('../demos/tally-osc/bridge.cjs');
+const { TallyBridge, classify, oscBoolean, oscInteger } = require('../demos/tally-osc/bridge.cjs');
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 const entry = (state, extra = {}) => ({ source: 'local', UUID: 'camera-peer', streamID: 'camera', connected: true, obsState: state, sceneDisplay: null, ...extra });
 
@@ -67,4 +67,59 @@ test('snapshots replace vanished entries, disconnects remove them and duplicate 
     assert.throws(() => bridge.select('Same'), /unique/);
     assert.equal(bridge.select('two'), 'two');
   } finally { await bridge.close(); }
+});
+
+test('VRCTally label binding follows fresh stream IDs and fails closed on missing or duplicate labels', async () => {
+  const bridge = new TallyBridge({ label: 'Camera one', staleAfterMs: 100, osc: { profile: 'vrctally', port: 49001 } });
+  bridge.endpoints.set('test', { entries: new Map(), seen: 0 });
+  const snapshot = (items) => bridge.ingest('test', { callback: { cib: 'tally-snapshot', result: items } });
+  const camera = (id, state) => ({ streamID: id, label: 'Camera one', tally: [entry(state, { streamID: id })] });
+  try {
+    assert.equal(bridge.currentState().error, true);
+    snapshot({ first: camera('first', { visibility: true, sourceActive: true }) });
+    assert.equal(bridge.currentState().streamID, 'first');
+    assert.equal(bridge.currentState().program, true);
+    assert.equal(bridge.currentState().error, false);
+    snapshot({ second: camera('second', { visibility: true, sourceActive: false }) });
+    assert.equal(bridge.currentState().streamID, 'second');
+    assert.equal(bridge.currentState().preview, true);
+    snapshot({ first: camera('first', { visibility: true, sourceActive: true }), second: camera('second', { visibility: true, sourceActive: false }) });
+    assert.equal(bridge.currentState().error, true);
+    assert.equal(bridge.currentState().program, false);
+    snapshot({ second: camera('second', { visibility: false, sourceActive: false }) });
+    assert.equal(bridge.currentState().standby, true);
+    assert.equal(bridge.currentState().error, false);
+    bridge.endpoints.get('test').seen = Date.now() - 200;
+    assert.equal(bridge.currentState().error, true);
+    snapshot({});
+    assert.equal(bridge.currentState().error, true);
+  } finally { await bridge.close(); }
+});
+
+test('VRCTally emits real integer UDP packets, aliases, a 500ms heartbeat, and shutdown error', async () => {
+  const udp = dgram.createSocket('udp4');
+  await new Promise(resolve => udp.bind(0, '127.0.0.1', resolve));
+  const packets = [];
+  udp.on('message', data => packets.push({ data, at: Date.now() }));
+  const bridge = new TallyBridge({ label: 'Camera one', osc: { profile: 'vrctally', port: udp.address().port } });
+  try {
+    assert.deepEqual(oscInteger('/tally', true), Buffer.from('/tally\0\0,i\0\0\0\0\0\x01'));
+    await bridge.start();
+    bridge.endpoints.set('test', { entries: new Map(), seen: 0 });
+    bridge.ingest('test', { callback: { cib: 'tally-snapshot', result: { camera: { streamID: 'camera', label: 'Camera one', tally: [entry({ visibility: true, sourceActive: true })] } } } });
+    await sleep(1150);
+    for (const name of ['VRCTally_Program', 'VRCLLime_Program_Active']) assert(packets.some(p => p.data.equals(oscInteger('/avatar/parameters/' + name, true))));
+    for (const name of ['VRCTally_Preview', 'VRCLLime_Preview_Active', 'VRCTally_Standby', 'VRCTally_Error']) assert(packets.some(p => p.data.equals(oscInteger('/avatar/parameters/' + name, false))));
+    const heartbeats = packets.filter(p => p.data.toString().startsWith('/avatar/parameters/VRCTally_Heartbeat\0'));
+    assert(heartbeats.length >= 2);
+    assert.equal(heartbeats[0].data.readInt32BE(heartbeats[0].data.length - 4), 1);
+    assert.equal(heartbeats[1].data.readInt32BE(heartbeats[1].data.length - 4), 0);
+    assert(heartbeats[1].at - heartbeats[0].at >= 400);
+    const closeStart = packets.length;
+    await bridge.close();
+    assert(packets.slice(closeStart).some(p => p.data.equals(oscInteger('/avatar/parameters/VRCTally_Error', true))));
+    const count = packets.length;
+    await sleep(550);
+    assert.equal(packets.length, count, 'shutdown stops heartbeat');
+  } finally { await bridge.close(); udp.close(); }
 });

@@ -33,6 +33,11 @@ async function main() {
 
     // Diagnostics
     const q: PeerQuality | null = await vdo.getPeerQuality('peer-uuid');
+    const reports = await vdo.getStats('peer-uuid');
+    for (const report of reports['peer-uuid'] || []) {
+        const direction: 'publisher' | 'viewer' = report.connectionType;
+        void direction;
+    }
     if (q && q.rttMs !== null) { const ms: number = q.rttMs; void ms; }
 
     // Lifecycle

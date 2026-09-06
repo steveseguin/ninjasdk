@@ -6,6 +6,20 @@ wire compatibility with VDO.Ninja itself.
 
 ## Running
 
+For an automated encrypted media/data check against current alpha:
+
+```bash
+node tests/interop/serve.js
+# In another terminal, with Playwright installed:
+node tests/interop/password-media-live.cjs
+```
+
+`VDO_TEST_URL=http://localhost:8099/vdoninja/` runs against the local source instead. `PLAYWRIGHT_MODULE` can point to an existing Playwright installation; `BROWSER_CHANNEL=chrome` uses installed Chrome. The test creates unique rooms and streams, compares sanitized passwords, requires decoded video frames, and checks native VDO.Ninja data delivery to the SDK. It closes its browser on success or failure.
+
+`node tests/interop/site-live.cjs` checks the website's local assets, safe rendering of peer messages, actual two-peer messaging, and mobile control bounds. Set `SDK_TEST_ORIGIN` to the assembled website URL to check deployment output. Screenshots are written to the OS temporary directory as `ninjasdk-desktop.png` and `ninjasdk-mobile.png`.
+
+`node tests/interop/guides-live.cjs` executes the recording and remote-control guide examples in real Chrome, checks alpha iframe/page API behavior, and inspects the static guide layouts. It creates its own unique stream/API IDs and closes its test pages. `node demos/sdk-workflows.cjs` checks the Node agent, custom-command, and native-file examples over real WebRTC.
+
 ```bash
 node tests/interop/serve.js                        # expects ../vdoninja alongside this repo
 node tests/interop/serve.js --vdoninja /path/to/vdoninja --port 8099

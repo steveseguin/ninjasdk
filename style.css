@@ -851,6 +851,7 @@ pre code {
 }
 
 .demo-panel {
+    min-width: 0;
     background: var(--card-bg);
     border: 1px solid var(--border-color);
     border-radius: 0.75rem;
@@ -899,6 +900,7 @@ pre code {
 
 .demo-input {
     flex: 1;
+    min-width: 0;
     padding: 0.5rem 1rem;
     background: var(--bg-dark);
     border: 1px solid var(--border-color);
@@ -973,6 +975,7 @@ pre code {
 }
 
 .message-sender {
+    overflow-wrap: anywhere;
     color: var(--primary-color);
     font-weight: 500;
 }
@@ -982,6 +985,8 @@ pre code {
 }
 
 .message-content {
+    max-width: 100%;
+    overflow-wrap: anywhere;
     background: var(--card-bg);
     padding: 0.5rem 0.75rem;
     border-radius: 0.5rem;

@@ -1,0 +1,148 @@
+<!doctype html>
+<!-- Generated from connecting.md by npm run docs:build. Edit the Markdown source. -->
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Connect your application to VDO.Ninja | VDO.Ninja SDK</title><meta name="description" content="Connect your application to VDO.Ninja. VDO.Ninja SDK options, practical examples, requirements, and validation limits.">
+<link rel="canonical" href="https://sdk.vdo.ninja/docs/connecting.html">
+<meta property="og:title" content="Connect your application to VDO.Ninja"><meta property="og:description" content="Connect your application to VDO.Ninja. VDO.Ninja SDK options, practical examples, requirements, and validation limits.">
+<meta property="og:type" content="article"><meta property="og:url" content="https://sdk.vdo.ninja/docs/connecting.html">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="guide.css"></head>
+<body><a class="skip" href="#content">Skip to content</a><header><nav aria-label="Main"><a href="../index.html">VDO.Ninja SDK</a><a href="guides.html">Choose a guide</a><a href="api-reference.html">API reference</a><a href="../demos/">Demos</a></nav></header>
+<div class="layout"><aside><nav aria-label="On this page"><strong>On this page</strong><a href="#two-peers-exchanging-data">Two peers exchanging data</a><a href="#choose-discovery-and-network-options">Choose discovery and network options</a><a href="#publish-video-to-a-vdoninja-viewer">Publish video to a VDO.Ninja viewer</a><a href="#requests-and-responses">Requests and responses</a><a href="#troubleshooting">Troubleshooting</a></nav></aside>
+<main id="content"><h1 id="connect-your-application-to-vdoninja">Connect your application to VDO.Ninja</h1>
+<p>Use the JavaScript SDK for a custom camera viewer, broadcast control panel, browser-to-browser messaging, or Node.js media automation. Use VDO.Ninja's iframe API when you want to embed and control its existing interface. Python and Flutter integrations are separate projects; they are not runtimes of this npm package.</p>
+<h2 id="two-peers-exchanging-data">Two peers exchanging data</h2>
+<p>Load <code>vdoninja-sdk.js</code> in each browser page. For Node.js, install <code>@vdoninja/sdk</code> and a WebRTC implementation such as <code>@roamhq/wrtc</code>, then import <code>require('@vdoninja/sdk/node')</code>.</p>
+<p>Run the following in two peers, using the <strong>same unique room name</strong>. <code>autoConnect</code> connects signaling, joins the room, announces each peer with its own stream ID, and establishes data connections.</p>
+<pre><code class="language-javascript">const vdo = new VDONinjaSDK({ salt: 'vdo.ninja' });
+vdo.addEventListener('dataReceived', ({ detail }) =&gt; {
+    console.log(detail.uuid, detail.data);
+});
+vdo.addEventListener('dataChannelOpen', ({ detail }) =&gt; {
+    vdo.sendData({ message: 'Hello!' }, detail.uuid);
+});
+await vdo.autoConnect({ room: 'replace_with_a_shared_unique_room' });
+// When finished: await vdo.disconnect();
+</code></pre>
+<p><code>connect()</code> means signaling is open. <code>joinRoom()</code> means the room was joined. Neither means a peer can receive application data yet. Wait for <code>dataChannelOpen</code> and check the boolean returned by <code>sendData</code>. Application data is not queued for offline peers or stored by the signaling service.</p>
+<h2 id="choose-discovery-and-network-options">Choose discovery and network options</h2>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Comparison table"><table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Default</th>
+<th>When to change it</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Constructor <code>host</code></td>
+<td><code>wss://wss.vdo.ninja</code></td>
+<td>Match a specific signaling service on both ends; this is separate from a page's <code>&amp;api</code> control socket</td>
+</tr>
+<tr>
+<td>Constructor <code>salt</code></td>
+<td>Derived from browser hostname; <code>vdo.ninja</code> in Node</td>
+<td>Set <code>vdo.ninja</code> explicitly for native VDO.Ninja interoperability from your own website</td>
+</tr>
+<tr>
+<td>Constructor <code>password</code></td>
+<td>Shared <code>someEncryptionKey123</code></td>
+<td>Choose the same private password on both ends; <code>false</code> disables password encryption</td>
+</tr>
+<tr>
+<td>Constructor <code>turnServers</code></td>
+<td><code>null</code>: fetch TURN configuration automatically</td>
+<td>Supply an array of your own ICE server credentials, or <code>false</code> to disable TURN; disabling it can prevent cross-network connections</td>
+</tr>
+<tr>
+<td>Constructor <code>forceTURN</code></td>
+<td><code>false</code></td>
+<td>Require relay candidates; working TURN service is then necessary</td>
+</tr>
+<tr>
+<td>Constructor <code>debug</code></td>
+<td><code>false</code></td>
+<td>Enable during diagnosis; inspect logs for private connection details before sharing them</td>
+</tr>
+<tr>
+<td><code>autoConnect</code> <code>mode</code></td>
+<td><code>half</code></td>
+<td>Use <code>full</code> when each peer needs to view every other peer's media; it creates more connections</td>
+</tr>
+<tr>
+<td><code>autoConnect</code> <code>view</code></td>
+<td>Audio/video off in <code>half</code>, on in <code>full</code></td>
+<td>Override requested incoming tracks, for example <code>{ audio: true, video: false }</code>; this does not capture or publish local media</td>
+</tr>
+<tr>
+<td><code>autoConnect</code> <code>filter</code></td>
+<td>All eligible discovered streams</td>
+<td>Limit outgoing discovery by stream ID string, regular expression, synchronous predicate, or <code>{ include, exclude, prefix }</code></td>
+</tr>
+</tbody>
+</table></div>
+<p><code>half</code> chooses which peer initiates each pair by comparing stream IDs, giving one bidirectional data connection per pair when both peers use compatible settings. Asymmetric filters can prevent that pair from connecting: for a selective viewer, use explicit <code>view()</code> or <code>mode: 'full'</code> with the desired filter. Avoid global/sticky regular expressions because their mutable <code>lastIndex</code> affects repeated matching.</p>
+<p>A predicate receives <code>{ streamID, uuid, label }</code>, but UUID/label can be missing in discovery events. Return a boolean synchronously; a thrown predicate skips that peer. A discovery filter controls outgoing connection attempts, <strong>not incoming access or command authorization</strong>. Authenticate and authorize application messages separately.</p>
+<p>Keep the controller returned by <code>autoConnect</code> and call <code>controller.stop()</code> to remove its discovery listeners before replacing it. That method leaves current connections open. Call <code>await vdo.disconnect()</code> to tear down the SDK; stop captured media tracks separately when finished. See <a href="reliability-and-recovery.html">recovery options</a> for retry timing and lifecycle events.</p>
+<h2 id="publish-video-to-a-vdoninja-viewer">Publish video to a VDO.Ninja viewer</h2>
+<p>Run capture in a browser on HTTPS or localhost, with user permission:</p>
+<pre><code class="language-javascript">const room = 'replace_with_your_unique_room';
+const streamID = 'my_camera';
+const password = 'your own shared password'; // Original text, not URL-encoded
+const vdo = new VDONinjaSDK({ password, salt: 'vdo.ninja', host: 'wss://apibackup.vdo.ninja' });
+const media = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+await vdo.connect();
+await vdo.publish(media, { room, streamID });
+
+const viewer = new URL('https://vdo.ninja/alpha/');
+viewer.search = new URLSearchParams({
+    view: streamID, room, password: encodeURIComponent(password),
+    scene: '0', wss2: 'apibackup.vdo.ninja'
+}).toString();
+console.log('Open in the viewer browser:', viewer.href);
+
+// When finished:
+// media.getTracks().forEach(track =&gt; track.stop());
+// await vdo.disconnect();
+</code></pre>
+<p>Both ends must agree on room, stream ID, password, salt, and signaling host. The SDK sanitizes room and stream IDs, replacing punctuation such as hyphens with underscores; use letters, numbers, and underscores to keep URLs predictable. A publisher that joined a room needs that room in its viewer URL. Use <code>wss2</code> to select the matching VDO.Ninja signaling host.</p>
+<p>VDO.Ninja decodes its password query value an extra time after parsing the URL. The <code>encodeURIComponent(password)</code> inside <code>URLSearchParams</code> above preserves literal sequences such as <code>%20</code>. That extra encoding is only for the viewer URL: always give the SDK the original password text.</p>
+<p>Set <code>salt: 'vdo.ninja'</code> explicitly when hosting the SDK on your own domain and connecting to vdo.ninja. Without an explicit salt, the SDK derives it from the browser hostname. Omit the viewer's password parameter for the SDK's default password; use <code>password: false</code> and <code>password=false</code> together to disable signaling password encryption. A default password is shared, so choose your own for private applications.</p>
+<p>Constructor and <code>connect</code> options treat <code>null</code> or an empty string as the shared default. The older <code>joinRoom({ password: null })</code> behavior disables password hashing/encryption; use explicit <code>false</code> for that purpose and avoid passing <code>null</code> between APIs. Password encryption covers signaling metadata; WebRTC still encrypts media and data even when password encryption is disabled.</p>
+<h2 id="requests-and-responses">Requests and responses</h2>
+<p><code>request</code>, <code>respond</code>, and <code>onRequest</code> are SDK application messages, not native VDO.Ninja remote-control commands. The responding peer must implement the SDK request handler. A request resolves only for a reply from its target UUID; handler errors reject it. Disconnecting cancels outstanding requests. Use the iframe API or documented remote-control API to control a VDO.Ninja page.</p>
+<h2 id="troubleshooting">Troubleshooting</h2>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Comparison table"><table>
+<thead>
+<tr>
+<th>Symptom</th>
+<th>Check</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Signaling connects but no peer appears</td>
+<td>Same room and signaling host; both peers announced or used <code>autoConnect</code></td>
+</tr>
+<tr>
+<td>Custom-password peer never connects</td>
+<td>Same original password and explicit salt; do not pass an already encoded password to SDK options</td>
+</tr>
+<tr>
+<td>Video viewer stays blank</td>
+<td>Include the room and scene in its URL; confirm camera permission, incoming tracks, and playback permission</td>
+</tr>
+<tr>
+<td><code>sendData</code> returns false</td>
+<td>Wait for <code>dataChannelOpen</code>; ensure the target UUID is current</td>
+</tr>
+<tr>
+<td>Works on one network but not another</td>
+<td>ICE/TURN availability; see <a href="reliability-and-recovery.html">recovery diagnostics</a></td>
+</tr>
+</tbody>
+</table></div>
+<p>Hosted signaling coordinates connections. WebRTC encrypts media and data in transit; a TURN server may relay that encrypted traffic when direct connectivity fails. Peer bandwidth and room/service limits still apply. Large rooms and durable message history need application-level design beyond this SDK.</p>
+<p>See the <a href="api-reference.html">API reference</a>, <a href="compatibility.html">compatibility contract</a>, and <a href="https://github.com/steveseguin/ninjasdk/blob/main/tests/interop/README.md">live interop tests</a>.</p>
+</main></div>
+<footer><a href="connecting.md">Markdown source</a> · <a href="validation.html">Validation and limits</a> · <a href="https://github.com/steveseguin/ninjasdk">Repository</a></footer></body></html>

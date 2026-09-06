@@ -1,0 +1,102 @@
+<!doctype html>
+<!-- Generated from remote-control.md by npm run docs:build. Edit the Markdown source. -->
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Remote control: choose the right interface | VDO.Ninja SDK</title><meta name="description" content="Remote control: choose the right interface. VDO.Ninja SDK options, practical examples, requirements, and validation limits.">
+<link rel="canonical" href="https://sdk.vdo.ninja/docs/remote-control.html">
+<meta property="og:title" content="Remote control: choose the right interface"><meta property="og:description" content="Remote control: choose the right interface. VDO.Ninja SDK options, practical examples, requirements, and validation limits.">
+<meta property="og:type" content="article"><meta property="og:url" content="https://sdk.vdo.ninja/docs/remote-control.html">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="guide.css"></head>
+<body><a class="skip" href="#content">Skip to content</a><header><nav aria-label="Main"><a href="../index.html">VDO.Ninja SDK</a><a href="guides.html">Choose a guide</a><a href="api-reference.html">API reference</a><a href="../demos/">Demos</a></nav></header>
+<div class="layout"><aside><nav aria-label="On this page"><strong>On this page</strong><a href="#control-your-own-application-with-sdk-rpc">Control your own application with SDK RPC</a><a href="#control-an-embedded-vdoninja-page">Control an embedded VDO.Ninja page</a><a href="#control-a-separate-page-with-api">Control a separate page with &amp;api</a></nav></aside>
+<main id="content"><h1 id="remote-control-choose-the-right-interface">Remote control: choose the right interface</h1>
+<p>An SDK message does not automatically become a VDO.Ninja command or an operating-system action. Choose the interface for the application you own and intend to control.</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Comparison table"><table>
+<thead>
+<tr>
+<th>Target</th>
+<th>Interface</th>
+<th>Authority required</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Your own app or local device bridge</td>
+<td>SDK <code>request</code> / <code>onRequest</code></td>
+<td>Your application authorizes peers and implements a small command set</td>
+</tr>
+<tr>
+<td>VDO.Ninja embedded in your webpage</td>
+<td>Iframe <code>postMessage</code></td>
+<td>Access to that iframe window; validate replies by origin and source</td>
+</tr>
+<tr>
+<td>Separate VDO.Ninja page</td>
+<td>Documented <code>&amp;api</code> WebSocket</td>
+<td>Private control ID enabled on that target page</td>
+</tr>
+<tr>
+<td>OBS itself</td>
+<td>OBS WebSocket</td>
+<td>OBS connection credentials and supported OBS commands; a separate API</td>
+</tr>
+<tr>
+<td>VRChat avatar tally</td>
+<td>Local OSC bridge</td>
+<td>Local UDP destination and avatar parameters; see <a href="tally.html">tally</a></td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="control-your-own-application-with-sdk-rpc">Control your own application with SDK RPC</h2>
+<p>Both peers use the SDK. On the controlled app, register only the commands you intend to expose. <code>isAuthorizedPeer</code> below is your application's authorization check; a stream ID or display label alone is not proof of identity.</p>
+<pre><code class="language-javascript">// Controlled application; vdo and isAuthorizedPeer are supplied by your app.
+let indicator = false;
+vdo.onRequest('indicator.set', (data, uuid) =&gt; {
+    if (!isAuthorizedPeer(uuid)) throw new Error('Unauthorized peer');
+    if (!data || typeof data.on !== 'boolean') throw new Error('on must be boolean');
+    indicator = data.on; // Replace with your explicitly allowed application action.
+    return { on: indicator };
+});
+</code></pre>
+<p>On the controller, after its <code>dataChannelOpen</code> event supplies the target UUID:</p>
+<pre><code class="language-javascript">const result = await vdo.request('indicator.set', { on: true }, targetUUID, 5000);
+console.log('Confirmed state:', result.on);
+</code></pre>
+<p>Use desired-state commands such as <code>{on:true}</code> when retrying. A timeout does not prove the remote action was never performed; toggles or non-idempotent actions can run twice if retried. Add application request IDs and deduplication where needed. The SDK matches responses to their target UUID and propagates handler errors, but it does not provide durable exactly-once execution.</p>
+<p>Never expose arbitrary shell commands, JavaScript evaluation, or filesystem paths just because a peer can connect. See the tested indicator example in <a href="../demos/sdk-workflows.cjs">sdk-workflows.cjs</a>.</p>
+<h2 id="control-an-embedded-vdoninja-page">Control an embedded VDO.Ninja page</h2>
+<p>Use an iframe when you want VDO.Ninja's existing interface, capture flow, and controls inside your page. Run on HTTPS or localhost. Replace the push ID with one unique to your test.</p>
+<pre><code class="language-html">&lt;iframe id=&quot;camera&quot; src=&quot;https://vdo.ninja/alpha/?push=YOUR_UNIQUE_CAMERA_ID&quot;
+  allow=&quot;camera; microphone; autoplay; display-capture; fullscreen&quot;&gt;&lt;/iframe&gt;
+&lt;button id=&quot;mute&quot;&gt;Mute microphone&lt;/button&gt;
+&lt;script&gt;
+const frame = document.getElementById('camera');
+document.getElementById('mute').onclick = () =&gt; {
+    frame.contentWindow.postMessage({ mic: false }, 'https://vdo.ninja');
+};
+window.addEventListener('message', event =&gt; {
+    if (event.origin !== 'https://vdo.ninja' || event.source !== frame.contentWindow) return;
+    console.log('VDO.Ninja event:', event.data);
+});
+&lt;/script&gt;
+</code></pre>
+<p>Wait for the embedded application to load and the operator to join before using controls. <code>mic:false</code> mutes; <code>mic:true</code> unmutes; <code>'toggle'</code> toggles. These are VDO.Ninja iframe commands, not <code>sendData</code> payloads. No <code>&amp;api</code> ID is needed for the parent-to-iframe route. See the <a href="https://vdo.ninja/iframe">official iframe examples</a> or the <a href="https://docs.vdo.ninja/guides/iframe-api-documentation">official iframe guide</a>.</p>
+<h2 id="control-a-separate-page-with-api">Control a separate page with &amp;api</h2>
+<p>Add <code>&amp;api=YOUR_PRIVATE_ID</code> to the target alpha page. Give each reporting page a different ID. Possession allows page control; this is a shared capability, not an account API key or a read-only subscription.</p>
+<pre><code class="language-javascript">// Browser code. In Node: const WebSocket = require('ws');
+const socket = new WebSocket('wss://api.vdo.ninja');
+socket.onopen = () =&gt; {
+    socket.send(JSON.stringify({ join: 'YOUR_PRIVATE_ID' }));
+    socket.send(JSON.stringify({ action: 'getDetails', cib: 'initial_details' }));
+};
+socket.onmessage = ({ data }) =&gt; {
+    const message = JSON.parse(data);
+    if (message.callback?.cib === 'initial_details') console.log(message.callback.result);
+};
+// Once connected, mute the target page:
+// socket.send(JSON.stringify({ action: 'mic', value: false, cib: 'mute_request' }));
+// When finished: socket.close();
+</code></pre>
+<p>The socket being open only proves connection to the control service, not that the target page is online. Correlate callbacks using <code>cib</code>, set application timeouts, and reconnect/refresh state when appropriate. The <a href="../demos/tally-osc/README.md">tally bridge</a> implements snapshots, polling, and stale-state handling.</p>
+<p>This documented control service is separate from the handshake/signaling server. Use the SDK for handshakes; do not implement a parallel handshake client. For camera-operator tally, bind to each operator's own publishing page so no shared OBS/director control ID is distributed.</p>
+</main></div>
+<footer><a href="remote-control.md">Markdown source</a> · <a href="validation.html">Validation and limits</a> · <a href="https://github.com/steveseguin/ninjasdk">Repository</a></footer></body></html>

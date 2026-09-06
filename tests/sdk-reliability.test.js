@@ -656,7 +656,9 @@ test('disconnect waits for the signaling close event before teardown completes',
     await teardown;
     assert.equal(socket.closeEventFired, true);
     assert.equal(sdk.signaling, null);
-    assert.deepEqual(phases, ['socket', 'teardown', 'complete']);
+    assert.deepEqual(phases, ['teardown', 'complete']);
+    await sdk.disconnect();
+    assert.deepEqual(phases, ['teardown', 'complete']);
 
     // A fresh generation remains connected; no late close from the prior socket can
     // overwrite its state.

@@ -6,7 +6,7 @@ const assert = require('node:assert/strict');
 const dgram = require('node:dgram');
 const { connectOBS } = require('./obs-websocket-client.cjs');
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
-const { TallyBridge, oscBoolean } = require('../../demos/tally-osc/bridge.cjs');
+const { TallyBridge, oscBoolean, oscInteger } = require('../../demos/tally-osc/bridge.cjs');
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 async function waitFor(fn, label, ms = 30000) {
   const start = Date.now();
@@ -34,7 +34,7 @@ async function main() {
   }
   function pass(name) { results.push(name); console.log('PASS', name); }
   const screenTest = process.env.TALLY_SCREEN === '1';
-  const browser = await chromium.launch({ headless: true, args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream', '--autoplay-policy=no-user-gesture-required', '--auto-select-tab-capture-source=Tally Test Card', '--allow-http-screen-capture'] });
+  const browser = await chromium.launch({ headless: true, channel: process.env.BROWSER_CHANNEL || undefined, args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream', '--autoplay-policy=no-user-gesture-required', '--auto-select-tab-capture-source=Tally Test Card', '--allow-http-screen-capture'] });
   const context = await browser.newContext({ permissions: ['camera', 'microphone'] });
   if (screenTest) {
     const card = await context.newPage();
@@ -72,6 +72,8 @@ async function main() {
     pass('SDK discovers browser camera and its correct label');
     const guest = bridge({ apiIds: [guestApiId], streamID: camera });
     await guest.start();
+    const vrctally = bridge({ apiIds: [guestApiId], label: 'TallyTestCamera', osc: { ...osc, profile: 'vrctally' } });
+    await vrctally.start();
     await source(token, `https://vdo.ninja/alpha/?scene=0&room=${room}&view=${camera}&password=false&api=${apiId}`);
     await obs.request('SetStudioModeEnabled', { studioModeEnabled: true });
     await obs.request('SetCurrentPreviewScene', { sceneName: token });
@@ -80,6 +82,9 @@ async function main() {
     await obs.request('TriggerStudioModeTransition');
     await waitFor(() => hybrid.currentState().program && guest.currentState().program, 'program on both API paths');
     pass('Program reaches OBS-side API and guest-side API');
+    await waitFor(() => vrctally.currentState().program && !vrctally.currentState().error, 'VRCTally publisher label program');
+    await waitFor(() => packets.some(p => p.equals(oscInteger('/avatar/parameters/VRCTally_Program', true))), 'VRCTally program UDP');
+    pass('VRCTally matches the publishing page display label and sends integer Program over UDP');
     const shot = await obs.request('GetSourceScreenshot', { sourceName: token + '_source', imageFormat: 'png', imageWidth: 640 });
     fs.writeFileSync(path.join(process.env.TEMP, 'tally-alpha-obs.png'), Buffer.from(shot.imageData.split(',')[1], 'base64'));
     const late = bridge({ apiIds: [apiId], streamID: camera });
@@ -91,6 +96,8 @@ async function main() {
     await obs.request('SetCurrentPreviewScene', { sceneName: token });
     await waitFor(() => hybrid.currentState().preview && guest.currentState().preview, 'preview on both API paths');
     pass('Preview reaches both API paths');
+    await waitFor(() => vrctally.currentState().preview, 'VRCTally preview');
+    await waitFor(() => packets.some(p => p.equals(oscInteger('/avatar/parameters/VRCLLime_Preview_Active', true))), 'VRCTally preview alias UDP');
     await obs.request('SetCurrentPreviewScene', { sceneName: 'Scene' });
     await waitFor(() => hybrid.currentState().known && !hybrid.currentState().program && !hybrid.currentState().preview, 'inactive');
     pass('Inactive clears program and preview');
@@ -102,6 +109,10 @@ async function main() {
     await page.close();
     await waitFor(() => !hybrid.currentState().known, 'publisher disconnect clears tally');
     pass('Browser publisher disconnect removes stale tally');
+    await waitFor(() => vrctally.currentState().error, 'VRCTally missing publisher error');
+    assert(packets.some(p => p.equals(oscInteger('/avatar/parameters/VRCTally_Heartbeat', true))));
+    assert(packets.some(p => p.equals(oscInteger('/avatar/parameters/VRCTally_Heartbeat', false))));
+    pass('VRCTally sends Preview alias, heartbeat transitions, and errors when its publisher disappears');
     const markerID = token + '_marker';
     const marker = bridge({ sdkPublishID: markerID });
     await marker.start();

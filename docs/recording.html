@@ -1,0 +1,114 @@
+<!doctype html>
+<!-- Generated from recording.md by npm run docs:build. Edit the Markdown source. -->
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Recording Audio and Video | VDO.Ninja SDK</title><meta name="description" content="Recording Audio and Video. VDO.Ninja SDK options, practical examples, requirements, and validation limits.">
+<link rel="canonical" href="https://sdk.vdo.ninja/docs/recording.html">
+<meta property="og:title" content="Recording Audio and Video"><meta property="og:description" content="Recording Audio and Video. VDO.Ninja SDK options, practical examples, requirements, and validation limits.">
+<meta property="og:type" content="article"><meta property="og:url" content="https://sdk.vdo.ninja/docs/recording.html">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="guide.css"></head>
+<body><a class="skip" href="#content">Skip to content</a><header><nav aria-label="Main"><a href="../index.html">VDO.Ninja SDK</a><a href="guides.html">Choose a guide</a><a href="api-reference.html">API reference</a><a href="../demos/">Demos</a></nav></header>
+<div class="layout"><aside><nav aria-label="On this page"><strong>On this page</strong><a href="#browser-recording">Browser recording</a><a href="#node-recording">Node recording</a><a href="#browser-extension-capture">Browser-extension capture</a><a href="#operational-guidance">Operational guidance</a></nav></aside>
+<main id="content"><h1 id="recording-audio-and-video">Recording Audio and Video</h1>
+<p>The SDK publishes and receives <code>MediaStreamTrack</code> objects. Recording is intentionally performed by the runtime's recording facilities rather than by the signaling core.</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Comparison table"><table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Use it for</th>
+<th>Requirements</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Browser MediaRecorder</td>
+<td>User-started local recording</td>
+<td>Supported container, incoming tracks, storage handling</td>
+</tr>
+<tr>
+<td>Node audio recorder</td>
+<td>Automated audio collection</td>
+<td>Media-capable WebRTC with audio sinks</td>
+</tr>
+<tr>
+<td>Node audio/video recorder</td>
+<td>Automated room recording</td>
+<td>Media sinks, FFmpeg, adequate disk and CPU</td>
+</tr>
+<tr>
+<td>Capture then publish</td>
+<td>Share a tab, camera, or screen</td>
+<td>Capture permission; publishing alone does not record</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="browser-recording">Browser recording</h2>
+<p><code>await sdk.view()</code> does not guarantee tracks have arrived. This example expects audio and video from one publisher. Register the listener before viewing, then start only after both arrive; use matching expected kinds and view options for an audio-only source.</p>
+<pre><code class="language-js">const sdk = new VDONinjaSDK({ salt: 'vdo.ninja' });
+const incoming = new MediaStream();
+
+await sdk.connect();
+// Join the publisher's room first if it uses one.
+const expected = new Set(['audio', 'video']);
+const tracksReady = new Promise((resolve, reject) =&gt; {
+  const timer = setTimeout(() =&gt; {
+    sdk.removeEventListener('track', onTrack);
+    reject(new Error('Expected media tracks did not arrive'));
+  }, 15000);
+  function onTrack({ detail }) {
+    if (!expected.has(detail.track.kind)) return;
+    incoming.addTrack(detail.track);
+    expected.delete(detail.track.kind);
+    if (!expected.size) {
+      clearTimeout(timer);
+      sdk.removeEventListener('track', onTrack);
+      resolve();
+    }
+  }
+  sdk.addEventListener('track', onTrack);
+});
+await Promise.all([sdk.view('guest_stream'), tracksReady]);
+
+// Keep browser playout active. A muted preview avoids local audio feedback.
+const preview = document.createElement('video');
+preview.muted = true;
+preview.controls = true;
+preview.srcObject = incoming;
+document.body.append(preview);
+await preview.play(); // If blocked, ask the user to press Play before recording.
+
+const chunks = [];
+const mimeType = ['video/webm;codecs=vp8,opus', 'video/webm', 'video/mp4']
+  .find(type =&gt; MediaRecorder.isTypeSupported(type));
+const recorder = new MediaRecorder(incoming, mimeType ? { mimeType } : {});
+recorder.ondataavailable = event =&gt; {
+  if (event.data.size) chunks.push(event.data);
+};
+recorder.onstop = () =&gt; {
+  const recording = new Blob(chunks, { type: recorder.mimeType });
+  // Store or upload `recording` according to the application's policy.
+};
+recorder.start(1000);
+// On your Stop button: recorder.stop();
+// After the stop event: stop incoming tracks, remove preview, and await sdk.disconnect().
+</code></pre>
+<p>This records a fixed track set. Adding/removing tracks after recording starts can stop the recorder with an error; finish the current segment and start another when tracks change. Handle <code>recorder.onerror</code> and mark partial output as incomplete. On setup failure, disconnect and stop any received tracks.</p>
+<p>In the tested Chrome flow, recording remote tracks without an active playback element produced an empty result. The playing preview above produced a nonempty audio/video recording. Keep that preview/playout step, and provide a user-initiated Play action if autoplay is blocked.</p>
+<p>The example keeps chunks in memory; a one-second timeslice does not bound memory. Long recordings need a bounded disk/upload queue with error handling. Use the actual recorder MIME type to choose the output extension.</p>
+<h2 id="node-recording">Node recording</h2>
+<p>Node requires a WebRTC implementation with media sink support. The complete room recorder demonstrates audio/video sinks, FFmpeg output, track deduplication, auto-stop, and cleanup:</p>
+<pre><code class="language-bash">node demos/node-room-media-recorder.js ROOM_NAME
+</code></pre>
+<p>See the <a href="../demos/node-room-media-recorder.js">media recorder source</a> and <a href="../demos/node-room-audio-recorder.js">audio recorder source</a>. <code>node-datachannel</code> does not supply the media sinks these examples require. Read the samples' usage options and verify FFmpeg/output paths before running them.</p>
+<h2 id="browser-extension-capture">Browser-extension capture</h2>
+<p>A browser extension can obtain a <code>MediaStream</code> from <code>tabCapture</code>, <code>getDisplayMedia()</code>, or an element's <code>captureStream()</code>, then publish it with <code>sdk.publish(stream, options)</code>. Capturing a source and recording a received stream are separate operations.</p>
+<h2 id="operational-guidance">Operational guidance</h2>
+<p>For completed recordings, see <a href="file-transfer.html">file transfer</a>. For ongoing media delivery to a service, see <a href="streaming.html">WHIP/WHEP</a>.</p>
+<ul>
+<li>Wait for actual tracks, not only signaling connection.</li>
+<li>Observe <code>track.ended</code>, mute state, and replacement tracks.</li>
+<li>Stop and finalize recorders before stopping their source tracks.</li>
+<li>Treat local disk/upload failures separately from WebRTC recovery.</li>
+<li>Obtain consent and follow applicable recording laws and platform policies.</li>
+</ul>
+</main></div>
+<footer><a href="recording.md">Markdown source</a> · <a href="validation.html">Validation and limits</a> · <a href="https://github.com/steveseguin/ninjasdk">Repository</a></footer></body></html>

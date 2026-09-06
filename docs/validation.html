@@ -1,0 +1,87 @@
+<!doctype html>
+<!-- Generated from validation.md by npm run docs:build. Edit the Markdown source. -->
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Guide validation and limits | VDO.Ninja SDK</title><meta name="description" content="Guide validation and limits. VDO.Ninja SDK options, practical examples, requirements, and validation limits.">
+<link rel="canonical" href="https://sdk.vdo.ninja/docs/validation.html">
+<meta property="og:title" content="Guide validation and limits"><meta property="og:description" content="Guide validation and limits. VDO.Ninja SDK options, practical examples, requirements, and validation limits.">
+<meta property="og:type" content="article"><meta property="og:url" content="https://sdk.vdo.ninja/docs/validation.html">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="guide.css"></head>
+<body><a class="skip" href="#content">Skip to content</a><header><nav aria-label="Main"><a href="../index.html">VDO.Ninja SDK</a><a href="guides.html">Choose a guide</a><a href="api-reference.html">API reference</a><a href="../demos/">Demos</a></nav></header>
+<div class="layout"><aside><nav aria-label="On this page"><strong>On this page</strong><a href="#reproduce">Reproduce</a></nav></aside>
+<main id="content"><h1 id="guide-validation-and-limits">Guide validation and limits</h1>
+<p>These guides describe the repository checkout, including unreleased fixes. Published package versions can lag the checkout.</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Comparison table"><table>
+<thead>
+<tr>
+<th>Area</th>
+<th>Evidence</th>
+<th>Limits</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>SDK connection / password handling</td>
+<td>Regression tests and live alpha/local VDO.Ninja video/data interop</td>
+<td>Chrome and <code>@roamhq/wrtc</code>; not every browser/network</td>
+</tr>
+<tr>
+<td>SDK file, agent RPC, custom control examples</td>
+<td><code>node demos/sdk-workflows.cjs</code>: real peer connections, byte comparison, RPC result, rejected invalid command</td>
+<td>In-memory local example; no device actuation or durable job store</td>
+</tr>
+<tr>
+<td>Status dashboard</td>
+<td>Exact guide snippet in two real Chrome peers; repeated snapshots verified in both directions, then cleanup</td>
+<td>Synthetic status; no sensor hardware or offline persistence</td>
+</tr>
+<tr>
+<td>Native VDO.Ninja file transfer</td>
+<td>Existing browser interop harness and SDK live suite</td>
+<td>Historical file-transfer flakiness is documented in the interop notes</td>
+</tr>
+<tr>
+<td>Remote VDO.Ninja commands</td>
+<td>Checked against local <code>lib.js</code> / <code>iframe.html</code>; exact iframe mute example and page API details/mute tested against alpha</td>
+<td>A page control ID grants control, not read-only access</td>
+</tr>
+<tr>
+<td>Tally / VRCTally</td>
+<td>Real isolated OBS Browser Sources, alpha publishers, labels, UDP packets, heartbeat and loss handling</td>
+<td>Avatar rendering and OSCQuery discovery not tested</td>
+</tr>
+<tr>
+<td>MCP examples</td>
+<td>Checked against local <code>ninjamcp</code> 0.4.2 tool contract</td>
+<td>MCP is separately versioned; no new live MCP run in this documentation pass</td>
+</tr>
+<tr>
+<td>Recording</td>
+<td>Corrected track-readiness flow and checked recorder sample code</td>
+<td>Browser recorder check uses synthetic media; no long-duration or every-codec coverage</td>
+</tr>
+<tr>
+<td>WHIP/WHEP</td>
+<td>Client signatures and bundled examples inspected</td>
+<td>No external ingest service exercised in this pass</td>
+</tr>
+<tr>
+<td>Website guides</td>
+<td>Static HTML built from Markdown, link/anchor checks, browser layout inspection</td>
+<td>External links and services can change</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="reproduce">Reproduce</h2>
+<p>Discovery review reproduced a throwing <code>autoConnect</code> filter allowing a peer through. A regression test failed before the fix and now confirms that the peer is skipped while discovery continues. This is SDK-side selection logic; VDO.Ninja signaling message shapes are unchanged.</p>
+<pre><code class="language-sh">npm run build
+npm run test:docs
+npm run test:reliability
+npm run test:types
+node --test tests/tally-osc.test.cjs tests/social-stream-compatibility.test.js
+node demos/sdk-workflows.cjs
+</code></pre>
+<p><code>node tests/interop/guides-live.cjs</code> runs the dashboard snippet in two peers, the recording-guide snippet with real incoming synthetic audio/video, the iframe and page-control examples against alpha, and guide layout checks. Start <code>node tests/interop/serve.js</code> first. Supply <code>PLAYWRIGHT_MODULE</code> if Playwright is installed elsewhere and <code>BROWSER_CHANNEL=chrome</code> to use installed Chrome.</p>
+<p>Reviewing the diagnostic examples also exposed an SDK bug: <code>getStats()</code> traversed the previous connection layout and returned empty results. It now returns reports from both current peer directions, with <code>connectionType</code> identifying their source; a regression test covers all-peer and single-UUID queries.</p>
+<p>Live SDK tests (<code>npm test</code>) require a native WebRTC dependency and network access. Browser/OBS tests are opt-in; see the <a href="https://github.com/steveseguin/ninjasdk/blob/main/tests/interop/README.md">interop instructions</a> and <a href="../demos/tally-osc/README.md#validation-and-limits">tally validation</a>. Never run the OBS harness against an on-air instance.</p>
+</main></div>
+<footer><a href="validation.md">Markdown source</a> · <a href="validation.html">Validation and limits</a> · <a href="https://github.com/steveseguin/ninjasdk">Repository</a></footer></body></html>

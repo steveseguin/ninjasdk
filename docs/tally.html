@@ -115,7 +115,13 @@ ws.on('message', raw =&gt; {
     <p>Use the marker config with a unique <code>sdkPublishID</code> and <code>password:false</code>. The same bridge calls <code>announce()</code> to publish a data-only marker and listens for <code>obsState</code>. Add an enabled Browser Source in the OBS scene:</p>
     <pre><code>https://vdo.ninja/alpha/?view=YOUR_UNIQUE_MARKER_STREAM_ID&amp;password=false</code></pre>
     <p>No camera, screen capture, or <code>&amp;api</code> is needed. It tracks that marker's presence in OBS, not another camera's inclusion within a VDO scene. For independent markers, use distinct IDs and bridge configurations.</p>
-    <p>SDK <code>disconnected</code> has socket and teardown phases. Await <code>sdk.disconnect()</code> or listen for the separate <code>teardownComplete</code> event for final cleanup.</p>
+    <p>SDK <code>disconnect()</code> emits <code>disconnected</code> once after cleanup. Unexpected socket loss emits it immediately with <code>phase: 'socket'</code>. Await <code>sdk.disconnect()</code> or <code>teardownComplete</code> for final cleanup.</p>
+
+    <h2 id="vrctally">VRCTally for each camera operator</h2>
+    <p>Use the <a href="https://github.com/Happyrobot33/VRCTally/">Happyrobot33/VRCTally avatar project</a> with the <a href="../demos/tally-osc/vrctally.example.json">VRCTally example config</a>. Set <code>label</code> to your exact VDO.Ninja display label and <code>apiIds</code> to a private ID on <strong>your own publishing page</strong>. Your page receives its OBS viewers' tally; operators do not need a shared OBS or director API ID.</p>
+    <p>This ID is not an account API key and requires no registration. It does allow control of its page, so keep it private and share viewer links without it. This is not a read-only tally endpoint.</p>
+    <p>The profile sends integer Program/Preview values to both the <code>VRCTally_*</code> and <code>VRCLLime_*_Active</code> paths, plus Standby, Error, and a heartbeat toggling every 500 ms. Missing, duplicate, disconnected, or stale label matches produce Error. Label binding follows a camera's new stream ID on reconnect.</p>
+    <p>See the <a href="../demos/tally-osc/README.md#vrctally-per-camera-operator">complete per-operator setup and OSC paths</a>. VRChat avatar rendering and OSCQuery discovery are not covered by this sample.</p>
 
     <h2 id="osc">VRChat and testing OSC</h2>
     <p>Enable <strong>OSC &gt; Enabled</strong> in VRChat's Action Menu. Its default receiving port is UDP 9000. Configure avatar boolean parameters <code>TallyProgram</code>, <code>TallyPreview</code>, and <code>TallyKnown</code> to drive your lights. Default addresses are <code>/avatar/parameters/NAME</code>; all three are configurable in the bridge. See the official <a href="https://docs.vrchat.com/docs/osc-overview">OSC overview</a> and <a href="https://docs.vrchat.com/docs/osc-avatar-parameters">avatar parameter guide</a>.</p>

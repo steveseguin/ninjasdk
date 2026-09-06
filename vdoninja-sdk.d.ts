@@ -217,7 +217,7 @@ export interface DisconnectedDetail {
     intentional: boolean;
     reason: 'local-disconnect' | 'socket-closed' | 'teardown-complete' | string;
     willReconnect: boolean;
-    /** 'socket' fires when the socket closes; 'teardown' when cleanup is finished. */
+    /** 'socket' for unexpected socket loss; local disconnect emits once with 'teardown'. */
     phase: 'socket' | 'teardown';
 }
 
@@ -417,7 +417,7 @@ export declare class VDONinja extends EventTarget {
     getMaxMessageSize(uuid: string): number | null;
 
     // -- Diagnostics --------------------------------------------------------
-    getStats(uuid?: string): Promise<Record<string, unknown>>;
+    getStats(uuid?: string): Promise<Record<string, Array<Record<string, unknown> & { connectionType: 'publisher' | 'viewer' }>>>;
     /** Digested per-peer quality. Null if the peer is unknown. */
     getPeerQuality(uuid: string): Promise<PeerQuality | null>;
     getStreams(): unknown[];
