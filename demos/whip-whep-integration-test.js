@@ -35,15 +35,17 @@ global.MediaStreamTrack = wrtc.MediaStreamTrack;
 
 // Generate unique stream ID
 const streamId = 'sdk-test-' + Math.random().toString(36).substring(2, 10) + '-' + Date.now();
-const WHIP_URL = `https://cae1.meshcast.io/whip/${streamId}`;
-const WHEP_URL = `https://cae1.meshcast.io/whep/${streamId}`;
+// Support both legacy /whip/id and MediaMTX /id/whip routing.
+const endpoint = (template, fallback) => (template || fallback).replaceAll('{streamId}', streamId);
+const WHIP_URL = endpoint(process.env.WHIP_URL_TEMPLATE, 'http://127.0.0.1:8889/{streamId}/whip');
+const WHEP_URL = endpoint(process.env.WHEP_URL_TEMPLATE, 'http://127.0.0.1:8889/{streamId}/whep');
 
 console.log('');
 console.log('🧪 WHIP/WHEP Integration Test');
 console.log('═'.repeat(50));
 console.log(`Stream ID: ${streamId}`);
-console.log(`WHIP URL:  ${WHIP_URL}`);
-console.log(`WHEP URL:  ${WHEP_URL}`);
+console.log(`WHIP server: ${new URL(WHIP_URL).origin}`);
+console.log(`WHEP server: ${new URL(WHEP_URL).origin}`);
 console.log('═'.repeat(50));
 console.log('');
 
@@ -197,6 +199,7 @@ async function runTest() {
 
         whipClient = new WHIPClient(WHIP_URL, {
             debug: false,
+            authToken: process.env.MESHCAST_TOKEN || null,
             trickleIce: false, // Wait for all candidates
             videoCodec: 'vp8'  // Use VP8 for better compatibility
         });
@@ -223,6 +226,7 @@ async function runTest() {
 
         whepClient = new WHEPClient(WHEP_URL, {
             debug: false,
+            authToken: process.env.MESHCAST_TOKEN || null,
             trickleIce: false,
             audio: !!audioSource,
             video: !!videoSource

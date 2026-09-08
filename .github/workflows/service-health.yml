@@ -1,0 +1,375 @@
+name: Live service health
+on:
+  schedule:
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  meshcast:
+    name: Live Meshcast WHIP/WHEP
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+    - name: Check live endpoint configuration
+      id: endpoint
+      env:
+        WHIP_URL_TEMPLATE: ${{ secrets.WHIP_URL_TEMPLATE }}
+        WHEP_URL_TEMPLATE: ${{ secrets.WHEP_URL_TEMPLATE }}
+      run: |
+        if [ -n "$WHIP_URL_TEMPLATE" ] && [ -n "$WHEP_URL_TEMPLATE" ]; then
+          echo "enabled=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "::warning::Live Meshcast probe is not configured; local protocol coverage runs in SDK Tests."
+          echo "Live Meshcast probe was not run. Configure WHIP_URL_TEMPLATE and WHEP_URL_TEMPLATE secrets for an authorized test stream." >> "$GITHUB_STEP_SUMMARY"
+        fi
+    - uses: actions/checkout@v7
+      if: steps.endpoint.outputs.enabled == 'true'
+    - uses: actions/setup-node@v7
+      if: steps.endpoint.outputs.enabled == 'true'
+      with:
+        node-version: 22
+    - run: npm install && npm install @roamhq/wrtc
+      if: steps.endpoint.outputs.enabled == 'true'
+    - name: Test configured Meshcast stream
+      if: steps.endpoint.outputs.enabled == 'true'
+      env:
+        WHIP_URL_TEMPLATE: ${{ secrets.WHIP_URL_TEMPLATE }}
+        WHEP_URL_TEMPLATE: ${{ secrets.WHEP_URL_TEMPLATE }}
+        MESHCAST_TOKEN: ${{ secrets.MESHCAST_TOKEN }}
+      run: timeout 120s node demos/whip-whep-integration-test.js
+  signaling:
+    name: Live signaling and P2P
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+    - uses: actions/checkout@v7
+    - uses: actions/setup-node@v7
+      with:
+        node-version: 22
+    - run: npm install && npm install @roamhq/wrtc
+    - name: Run basic connectivity test
+      run: |
+        cat > test-connectivity.js << 'EOF'
+        const VDONinjaSDK = require('./vdoninja-sdk-node.js');
+
+        const WSS = process.env.WSS_URL || 'wss://apibackup.vdo.ninja';
+
+        async function test() {
+            const vdo = new VDONinjaSDK({ host: WSS });
+            try {
+                await vdo.connect();
+                console.log('✅ Connected to signaling server');
+
+                const roomId = 'ci-' + Math.random().toString(36).substr(2, 9) + '-' + Date.now();
+                await vdo.joinRoom({ room: roomId });
+                console.log('✅ Joined room');
+
+                await vdo.announce({ streamID: "stream-" + Math.random().toString(36).substr(2, 9) });
+                console.log('✅ Announced stream');
+
+                await vdo.disconnect();
+                console.log('✅ Disconnected cleanly');
+                process.exit(0);
+            } catch (error) {
+                console.error('❌ Test failed:', error);
+                process.exit(1);
+            }
+        }
+        test();
+        EOF
+        timeout 30s node test-connectivity.js
+
+    - name: Run P2P data channel test
+      run: |
+        cat > test-p2p-datachannel.js << 'EOF'
+        const VDONinjaSDK = require('./vdoninja-sdk-node.js');
+
+        const WSS = process.env.WSS_URL || 'wss://apibackup.vdo.ninja';
+        const TEST_ROOM = 'ci-p2p-' + Math.random().toString(36).substr(2, 9) + '-' + Date.now();
+        const PUBLISHER_STREAM = 'pub-' + Math.random().toString(36).substr(2, 9);
+        let messageReceived = false;
+
+        async function createPublisher() {
+            const publisher = new VDONinjaSDK({ host: WSS });
+
+            publisher.addEventListener('peerConnected', async (event) => {
+                console.log('[Publisher] Peer connected');
+                setTimeout(() => {
+                    publisher.sendData({ test: 'message', timestamp: Date.now() });
+                    console.log('[Publisher] Sent test message');
+                }, 1000);
+            });
+
+            await publisher.connect();
+            await publisher.joinRoom({ room: TEST_ROOM });
+            await publisher.announce({ streamID: PUBLISHER_STREAM });
+            console.log('[Publisher] Ready');
+            return publisher;
+        }
+
+        async function createViewer() {
+            const viewer = new VDONinjaSDK({ host: WSS });
+
+            viewer.addEventListener('dataReceived', (event) => {
+                console.log('[Viewer] Received:', event.detail.data);
+                messageReceived = true;
+            });
+
+            await viewer.connect();
+            await viewer.joinRoom({ room: TEST_ROOM });
+            await viewer.view(PUBLISHER_STREAM);
+            console.log('[Viewer] Connected to publisher');
+            return viewer;
+        }
+
+        async function test() {
+            try {
+                const publisher = await createPublisher();
+                await new Promise(r => setTimeout(r, 1000));
+                const viewer = await createViewer();
+
+                // Wait for message exchange
+                await new Promise(r => setTimeout(r, 5000));
+
+                if (messageReceived) {
+                    console.log('✅ P2P data channel test passed');
+                    publisher.disconnect();
+                    viewer.disconnect();
+                    process.exit(0);
+                } else {
+                    throw new Error('No message received');
+                }
+            } catch (error) {
+                console.error('❌ P2P test failed:', error);
+                process.exit(1);
+            }
+        }
+        test();
+        EOF
+        timeout 30s node test-p2p-datachannel.js
+
+    - name: Run bidirectional communication test
+      run: |
+        cat > test-bidirectional.js << 'EOF'
+        const VDONinjaSDK = require('./vdoninja-sdk-node.js');
+
+        const WSS = process.env.WSS_URL || 'wss://apibackup.vdo.ninja';
+        const TEST_ROOM = 'ci-bidir-' + Math.random().toString(36).substr(2, 9) + '-' + Date.now();
+        const PUB_STREAM = 'pub-' + Math.random().toString(36).substr(2, 9);
+        let pubRecv = false, viewRecv = false;
+
+        async function test() {
+            try {
+                const publisher = new VDONinjaSDK({ host: WSS });
+                const viewer = new VDONinjaSDK({ host: WSS });
+
+                publisher.addEventListener('dataReceived', (e) => {
+                    console.log('[Publisher] Received:', e.detail.data);
+                    pubRecv = true;
+                });
+
+                viewer.addEventListener('dataReceived', (e) => {
+                    console.log('[Viewer] Received:', e.detail.data);
+                    viewRecv = true;
+                });
+
+                await publisher.connect();
+                await publisher.joinRoom({ room: TEST_ROOM });
+                await publisher.announce({ streamID: PUB_STREAM });
+
+                await viewer.connect();
+                await viewer.joinRoom({ room: TEST_ROOM });
+                await viewer.view(PUB_STREAM);
+
+                await new Promise(r => setTimeout(r, 5000));
+
+                // Test bidirectional
+                publisher.sendData({ from: 'publisher', test: 1 });
+                viewer.sendData({ from: 'viewer', test: 2 });
+
+                await new Promise(r => setTimeout(r, 3000));
+
+                if (pubRecv && viewRecv) {
+                    console.log('✅ Bidirectional communication works');
+                    publisher.disconnect();
+                    viewer.disconnect();
+                    process.exit(0);
+                } else {
+                    throw new Error(`Bidirectional failed: pub=${pubRecv}, view=${viewRecv}`);
+                }
+            } catch (error) {
+                console.error('❌ Bidirectional test failed:', error);
+                process.exit(1);
+            }
+        }
+        test();
+        EOF
+        timeout 30s node test-bidirectional.js
+
+    - name: Run duplicate prevention test
+      run: |
+        cat > test-no-duplicates.js << 'EOF'
+        const VDONinjaSDK = require('./vdoninja-sdk-node.js');
+
+        const WSS = process.env.WSS_URL || 'wss://apibackup.vdo.ninja';
+        const TEST_ROOM = 'ci-dup-' + Math.random().toString(36).substr(2, 9) + '-' + Date.now();
+        const PEER1_STREAM = 'p1-' + Math.random().toString(36).substr(2, 9);
+        const PEER2_STREAM = 'p2-' + Math.random().toString(36).substr(2, 9);
+        let messagesReceived = [];
+        let PEER2_UUID = null;
+        const DP_DEBUG = !!process.env.DP_DEBUG && process.env.DP_DEBUG !== '0';
+        const dp = (...args) => { if (DP_DEBUG) console.log(...args); };
+
+        function logConnections(sdk, label) {
+          try {
+            const list = [];
+            for (const [uuid, conns] of sdk.connections || []) {
+              for (const t of ['publisher','viewer']) {
+                const c = conns[t];
+                if (c) list.push({ uuid: c.uuid, type: c.type, streamID: c.streamID, dc: c.dataChannel?.readyState, ice: c.pc?.iceConnectionState });
+              }
+            }
+            dp('[DP]', label, 'connections:', list);
+          } catch (e) {}
+        }
+
+        async function test() {
+            try {
+                const peer1 = new VDONinjaSDK({ host: WSS });
+                const peer2 = new VDONinjaSDK({ host: WSS });
+                dp('[DP] WSS:', WSS);
+                dp('[DP] ROOM:', TEST_ROOM, 'P1:', PEER1_STREAM, 'P2:', PEER2_STREAM);
+
+                // Capture peer2's UUID from peer1's perspective
+                peer1.addEventListener('peerConnected', (e) => {
+                  dp('[DP] peer1 peerConnected:', e.detail?.uuid, e.detail?.connection?.type);
+                  if (!PEER2_UUID && e?.detail?.uuid) { PEER2_UUID = e.detail.uuid; }
+                });
+                peer2.addEventListener('peerConnected', (e) => {
+                  dp('[DP] peer2 peerConnected:', e.detail?.uuid, e.detail?.connection?.type);
+                });
+
+                for (const sdk of [peer1, peer2]) {
+                  sdk.addEventListener('dataChannelOpen', (e) => dp('[DP] dataChannelOpen', sdk===peer1?'peer1':'peer2', e.detail));
+                  sdk.addEventListener('listing', (e) => dp('[DP] listing', sdk===peer1?'peer1':'peer2', e.detail?.streamID || '(list)'));
+                  sdk.addEventListener('videoaddedtoroom', (e) => dp('[DP] videoadded', sdk===peer1?'peer1':'peer2', e.detail.streamID, e.detail.uuid));
+                  sdk.addEventListener('streamAdded', (e) => dp('[DP] streamAdded', sdk===peer1?'peer1':'peer2', e.detail.streamID, e.detail.uuid));
+                  sdk.addEventListener('error', (e) => dp('[DP] error', sdk===peer1?'peer1':'peer2', e.detail));
+                  sdk.addEventListener('alert', (e) => dp('[DP] alert', sdk===peer1?'peer1':'peer2', e.detail));
+                }
+
+                peer2.addEventListener('dataReceived', (e) => {
+                    const d = e.detail?.data;
+                    if (d && d.test === 'no-duplicate' && d.id === 1) {
+                        console.log('[Peer2] Received (counted):', d);
+                        messagesReceived.push(d);
+                    } else {
+                        console.log('[Peer2] Received (ignored):', d);
+                    }
+                });
+
+                // Both announce and view each other (dual connection)
+                dp('[DP] peer1.connect');
+                await peer1.connect();
+                dp('[DP] peer1.joinRoom');
+                await peer1.joinRoom({ room: TEST_ROOM });
+                dp('[DP] peer1.announce');
+                await peer1.announce({ streamID: PEER1_STREAM });
+
+                dp('[DP] peer2.connect');
+                await peer2.connect();
+                dp('[DP] peer2.joinRoom');
+                await peer2.joinRoom({ room: TEST_ROOM });
+                dp('[DP] peer2.announce');
+                await peer2.announce({ streamID: PEER2_STREAM });
+                logConnections(peer1, 'after announce peer1');
+                logConnections(peer2, 'after announce peer2');
+
+                await new Promise(r => setTimeout(r, 1000));
+
+                dp('[DP] peer1.view(PEER2_STREAM)');
+                await peer1.view(PEER2_STREAM);
+                dp('[DP] peer2.view(PEER1_STREAM)');
+                await peer2.view(PEER1_STREAM);
+
+                // Helper: wait until a data channel is open between peers
+                async function waitForOpenDC(sdk, uuid, timeoutMs = 15000) {
+                  const start = Date.now();
+                  return new Promise((resolve) => {
+                    const check = () => {
+                      try {
+                        for (const [id, conns] of sdk.connections || []) {
+                          if (uuid && id !== uuid) continue;
+                          for (const t of ['publisher','viewer']) {
+                            const c = conns[t];
+                            if (c && c.dataChannel && c.dataChannel.readyState === 'open') {
+                              return resolve(true);
+                            }
+                          }
+                        }
+                      } catch (e) {}
+                      if (Date.now() - start >= timeoutMs) return resolve(false);
+                      setTimeout(check, 200);
+                    };
+                    const onOpen = (e) => {
+                      if (!uuid || e.detail?.uuid === uuid) {
+                        resolve(true);
+                      }
+                    };
+                    try { sdk.addEventListener('dataChannelOpen', onOpen); } catch (e) {}
+                    check();
+                  });
+                }
+
+                // If we know peer2's UUID, wait for DC to open before sending (more reliable on Node 18)
+                if (PEER2_UUID) {
+                  const ok = await waitForOpenDC(peer1, PEER2_UUID, 15000);
+                  dp('[DP] waitForOpenDC result:', ok);
+                }
+
+                // Retry sending until the SDK confirms sent (up to 20s)
+                const payload = { test: 'no-duplicate', id: 1 };
+                let sent = false;
+                let attempts = 0;
+                const deadline = Date.now() + 20000;
+                while (!sent && Date.now() < deadline) {
+                  attempts++;
+                  if (PEER2_UUID) {
+                    sent = peer1.sendData(payload, PEER2_UUID);
+                    dp('[DP] send attempt', attempts, '(uuid)', PEER2_UUID, 'sent=', sent);
+                  } else {
+                    sent = peer1.sendData(payload, { streamID: PEER2_STREAM, type: 'viewer' });
+                    dp('[DP] send attempt', attempts, '(streamID viewer)', PEER2_STREAM, 'sent=', sent);
+                  }
+                  if (!sent) {
+                    logConnections(peer1, 'peer1 pre-wait');
+                    logConnections(peer2, 'peer2 pre-wait');
+                    await new Promise(r => setTimeout(r, 300));
+                  }
+                }
+                dp('[DP] after send attempts, sent=', sent);
+                if (!sent) {
+                  dp('[DP] state: p1.connected=', peer1.state.connected, 'p2.connected=', peer2.state.connected);
+                  throw new Error('Failed to send test message after retries');
+                }
+
+                await new Promise(r => setTimeout(r, 5000));
+
+                if (messagesReceived.length === 1) {
+                    console.log('✅ No duplicates with dual connections');
+                    peer1.disconnect();
+                    peer2.disconnect();
+                    process.exit(0);
+                } else {
+                    throw new Error(`Expected 1 message, got ${messagesReceived.length}`);
+                }
+            } catch (error) {
+                console.error('❌ Duplicate prevention test failed:', error);
+                process.exit(1);
+            }
+        }
+        test();
+        EOF
+        timeout 45s node test-no-duplicates.js
+
