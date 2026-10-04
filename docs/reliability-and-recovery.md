@@ -12,6 +12,8 @@ Room membership, publishing, and requested views are stored separately from the 
 
 An explicit `disconnect()`, `leaveRoom()`, `stopPublishing()`, or `stopViewing()` removes the corresponding intent and prevents automatic restoration.
 
+`disconnect()` also cancels pending connection, room-confirmation, and view waits, clearing their timers. Their promises reject with a cancellation error. Publishing or room/view setup already awaiting hashing or media configuration rejects when that step finishes; it cannot restore intent, send its request, or schedule a retry in a later session. Handle these rejections when disconnecting while an operation is pending. Native hashing and media-constraint work already submitted to the browser may still finish.
+
 Like VDO.Ninja, the SDK retains only the newest 30 signaling messages while the socket is unavailable and replays them when it opens. This queue carries the original `joinroom`, `seed`, `play`, SDP, ICE, and generic relay shapes; the SDK does not add private handshake-server commands.
 
 ICE candidates that arrive before their directional peer or remote description are held for up to 15 seconds. Queues are bounded to 100 candidates per UUID/direction and 500 keys, session-checked, and drained after the matching remote description is accepted.

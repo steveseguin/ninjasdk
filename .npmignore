@@ -1,4 +1,5 @@
 # Development files
+.cache/
 demos/
 MCP/
 tests/
