@@ -1,0 +1,4 @@
+# The integration tests each open several ICE sockets; running test binaries one test at a
+# time keeps Windows runners from exhausting socket buffers (WSAENOBUFS) mid-run.
+[env]
+RUST_TEST_THREADS = "1"

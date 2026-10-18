@@ -342,6 +342,11 @@ impl SignalServer {
 impl Drop for SignalServer {
     fn drop(&mut self) {
         self.task.abort();
+        // Dropping the senders ends every client's writer, which closes its
+        // socket so connected clients see a close instead of a silent stall.
+        if let Ok(mut st) = self.state.lock() {
+            st.clients.clear();
+        }
     }
 }
 
@@ -359,6 +364,7 @@ async fn handle_client(state: Arc<Mutex<State>>, stream: TcpStream) {
                 break;
             }
         }
+        let _ = sink.close().await;
     });
     while let Some(Ok(msg)) = source.next().await {
         if let Message::Text(text) = msg {

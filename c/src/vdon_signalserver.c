@@ -422,9 +422,26 @@ vdon_signal_server *vdon_signal_server_create(uint16_t port) {
 int vdon_signal_server_port(vdon_signal_server *s) { return s ? rtcGetWebSocketServerPort(s->server) : VDON_ERR_INVALID; }
 
 void vdon_signal_server_destroy(vdon_signal_server *s) {
+    ss_client *c;
+    int *socks, n = 0, i;
     if (!s)
         return;
     rtcDeleteWebSocketServer(s->server);
+    /* Accepted sockets outlive the server object: detach their callbacks from the client records
+     * before freeing those, then close them (outside the lock) so clients see a close. */
+    pthread_mutex_lock(&s->lock);
+    for (c = s->clients; c; c = c->next)
+        n++;
+    socks = (int *)calloc((size_t)n + 1, sizeof(*socks));
+    n = 0;
+    for (c = s->clients; c; c = c->next) {
+        socks[n++] = c->ws;
+        rtcSetUserPointer(c->ws, NULL);
+    }
+    pthread_mutex_unlock(&s->lock);
+    for (i = 0; i < n; i++)
+        rtcDelete(socks[i]);
+    free(socks);
     pthread_mutex_lock(&s->lock);
     while (s->clients)
         ss_remove(s, s->clients);

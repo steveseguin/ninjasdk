@@ -151,6 +151,8 @@ struct State {
     intentional: bool,
     generation: u64,
     reconnects: u32,
+    /// A reconnect cycle is in progress (kept apart from the attempt counter).
+    reconnecting: bool,
     queue: Vec<String>,
     password: String,
     no_password: bool,
@@ -234,6 +236,8 @@ struct ConnState {
     recovering: bool,
     disconnect_timer: Option<JoinHandle<()>>,
     connect_timer: Option<JoinHandle<()>>,
+    /// Bounded wait after a failure-triggered ICE restart.
+    recovery_timer: Option<JoinHandle<()>>,
     ping_task: Option<JoinHandle<()>>,
     advertised: HashSet<String>,
     tasks: Vec<JoinHandle<()>>,
@@ -302,6 +306,7 @@ impl Connection {
             let mut h = std::mem::take(&mut cs.tasks);
             h.extend(cs.disconnect_timer.take());
             h.extend(cs.connect_timer.take());
+            h.extend(cs.recovery_timer.take());
             h.extend(cs.ping_task.take());
             h
         };
@@ -435,6 +440,7 @@ impl VdoNinja {
                 intentional: false,
                 generation: 0,
                 reconnects: 0,
+                reconnecting: false,
                 queue: vec![],
                 password,
                 no_password,
@@ -1247,6 +1253,9 @@ impl Inner {
                 return Err(Error::Cancelled);
             }
             st.connected = true;
+            if !st.reconnecting {
+                st.reconnects = 0;
+            }
             std::mem::take(&mut st.queue)
         };
         *self.ws_tx.lock().unwrap() = Some(tx.clone());
@@ -1321,13 +1330,19 @@ impl Inner {
                 let attempt = {
                     let mut st = self.st.lock().unwrap();
                     if st.intentional || generation != st.generation || st.connected {
+                        if st.connected {
+                            st.reconnects = 0;
+                        }
+                        st.reconnecting = false;
                         return;
                     }
                     if st.reconnects >= self.opts.max_reconnect_attempts {
+                        st.reconnecting = false;
                         drop(st);
                         self.emit(Event::ReconnectFailed);
                         return;
                     }
+                    st.reconnecting = true;
                     st.reconnects += 1;
                     st.reconnects
                 };
@@ -1340,7 +1355,11 @@ impl Inner {
                     _ => continue,
                 }
                 self.clone().restore_intent().await;
-                self.st.lock().unwrap().reconnects = 0;
+                {
+                    let mut st = self.st.lock().unwrap();
+                    st.reconnects = 0;
+                    st.reconnecting = false;
+                }
                 self.emit(Event::Reconnected);
                 return;
             }
@@ -1393,13 +1412,22 @@ impl Inner {
     }
 
     async fn disconnect(self: Arc<Self>) {
-        let (conns, pending, tasks) = {
+        let (conns, pending, inbound, tasks) = {
             let mut st = self.st.lock().unwrap();
             st.intentional = true;
             st.generation += 1;
             st.connected = false;
             st.room_joined = false;
             st.publishing = false;
+            // A full local teardown: a later connect() must not replay this state.
+            st.intent_room = None;
+            st.stream_id = None;
+            st.data_only = false;
+            st.local_tracks.clear();
+            st.view_intent.clear();
+            st.stopped_views.clear();
+            st.reconnects = 0;
+            st.reconnecting = false;
             st.queue.clear();
             for (_, t) in st.view_retry.drain() {
                 t.abort();
@@ -1412,6 +1440,7 @@ impl Inner {
             st.room_waiters.clear();
             st.view_waiters.clear();
             let pending: Vec<_> = st.pending_requests.drain().map(|(_, (_, tx))| tx).collect();
+            let inbound: Vec<Arc<InboundTransfer>> = st.inbound.drain().map(|(_, t)| t).collect();
             let tasks = std::mem::take(&mut st.tasks);
             let conns: Vec<Arc<Connection>> = self
                 .conns
@@ -1421,15 +1450,20 @@ impl Inner {
                 .flat_map(|(_, p)| [p.publisher, p.viewer])
                 .flatten()
                 .collect();
-            (conns, pending, tasks)
+            (conns, pending, inbound, tasks)
         };
         for tx in pending {
             let _ = tx.send(Err(Error::Cancelled));
         }
+        for t in inbound {
+            if let Some(done) = t.state.lock().unwrap().done.take() {
+                let _ = done.send(Err(Error::Cancelled));
+            }
+        }
         for c in &conns {
             c.send_control(&json!({"bye": true})).await;
         }
-        tokio::time::sleep(Duration::from_millis(50)).await;
+        flush_byes(&conns).await;
         for c in &conns {
             c.close().await;
         }
@@ -1476,13 +1510,10 @@ impl Inner {
         password: Option<&str>,
         claim: bool,
     ) -> Result<()> {
-        let (hashed, room, rx, generation) = {
+        let (hashed, room, rx, generation, leave) = {
             let mut st = self.st.lock().unwrap();
             if !st.connected {
                 return Err(Error::NotConnected);
-            }
-            if st.room_joined {
-                return Ok(());
             }
             let mut r = sanitize_room(room);
             if r.is_empty() {
@@ -1490,6 +1521,15 @@ impl Inner {
             }
             if r.is_empty() {
                 return Err(Error::RoomRequired);
+            }
+            let mut leave = false;
+            if st.room_joined {
+                if st.room == r {
+                    return Ok(());
+                }
+                // Another room: leave the current one and join afresh (one room per socket).
+                leave = true;
+                st.room_joined = false;
             }
             if let Some(pw) = password {
                 if !pw.is_empty() {
@@ -1515,8 +1555,11 @@ impl Inner {
             };
             let (tx, rx) = oneshot::channel();
             st.room_waiters.push(tx);
-            (hashed, r, rx, st.generation)
+            (hashed, r, rx, st.generation, leave)
         };
+        if leave {
+            self.send_ws(json!({"leave": true}));
+        }
         let mut msg = json!({"request": "joinroom", "roomid": hashed});
         if claim {
             msg["claim"] = json!(true);
@@ -1627,9 +1670,7 @@ impl Inner {
         for c in &closing {
             c.send_control(&json!({"bye": true})).await;
         }
-        if !closing.is_empty() {
-            tokio::time::sleep(Duration::from_millis(50)).await;
-        }
+        flush_byes(&closing).await;
         for c in closing {
             c.close().await;
         }
@@ -1786,10 +1827,7 @@ impl Inner {
         for c in &closing {
             c.send_control(&json!({"bye": true})).await;
         }
-        if !closing.is_empty() {
-            // Let the bye leave the SCTP queue before tearing the transport down.
-            tokio::time::sleep(Duration::from_millis(50)).await;
-        }
+        flush_byes(&closing).await;
         for c in closing {
             c.close().await;
         }
@@ -1837,7 +1875,7 @@ impl Inner {
             self.handle_candidates(&msg, None, false).await;
         } else if msg.get("iceRestartRequest").is_some() && uuid.is_some() {
             if let Some(c) = self.find_connection(uuid.as_deref().unwrap(), Some("publisher")) {
-                self.restart_ice(&c, "remote_request").await;
+                self.restart_ice(&c, "remote_request", true).await;
             }
         } else if let Some(request) = jstr(&msg, "request") {
             match request.as_str() {
@@ -2061,7 +2099,7 @@ impl Inner {
             cs.session = Some(session.unwrap_or_else(generate_session));
         }
         match self.create_offer(&conn, false).await {
-            Ok(offer) => self.send_description(&conn, &offer, true).await,
+            Ok(offer) => self.send_description(&conn, &offer, true, true).await,
             Err(e) => {
                 log::debug!("create offer for {uuid} failed: {e}");
                 self.emit(Event::Error {
@@ -2083,7 +2121,8 @@ impl Inner {
         let mut retry = None;
         let mut closing = vec![];
         if let Some(p) = pair {
-            if let Some(v) = &p.viewer {
+            // Only bye re-requests the stream (JS _handleBye); hangup does not.
+            if let (Some(v), "bye") = (&p.viewer, kind) {
                 if let Some(sid) = v.stream_id() {
                     let st = self.st.lock().unwrap();
                     if !st.intentional && !st.stopped_views.contains(&sid) {
@@ -2218,6 +2257,7 @@ impl Inner {
                 recovering: false,
                 disconnect_timer: None,
                 connect_timer: None,
+                recovery_timer: None,
                 ping_task: None,
                 advertised: HashSet::new(),
                 tasks: vec![],
@@ -2259,18 +2299,11 @@ impl Inner {
         let timeout = self.opts.connection_timeout;
         let timer = tokio::spawn(async move {
             tokio::time::sleep(timeout).await;
+            c2.cs.lock().unwrap().connect_timer = None;
             if !me.is_current(&c2) {
                 return;
             }
-            let connected = {
-                let cs = c2.cs.lock().unwrap();
-                cs.peer_state == RTCPeerConnectionState::Connected
-                    || matches!(
-                        cs.ice_state,
-                        RTCIceConnectionState::Connected | RTCIceConnectionState::Completed
-                    )
-            };
-            if !connected {
+            if !is_transport_connected(&c2) {
                 me.recover(&c2, "connect-timeout").await;
             }
         });
@@ -2310,11 +2343,14 @@ impl Inner {
         Ok(offer)
     }
 
+    /// `allow_dc`: send over the control channel when it is open (renegotiation);
+    /// a failure-triggered ICE restart passes `false` since that channel may be dead.
     async fn send_description(
         &self,
         conn: &Arc<Connection>,
         desc: &RTCSessionDescription,
         include_stream_id: bool,
+        allow_dc: bool,
     ) {
         let wire = SessionDescription {
             kind: desc.sdp_type.to_string(),
@@ -2343,7 +2379,7 @@ impl Inner {
         } else {
             msg["description"] = serde_json::to_value(&wire).unwrap();
         }
-        if conn.is_control_open() {
+        if allow_dc && conn.is_control_open() {
             let mut dc_msg = json!({"description": msg["description"], "session": msg["session"]});
             if let Some(v) = msg.get("vector") {
                 dc_msg["vector"] = v.clone();
@@ -2583,7 +2619,12 @@ impl Inner {
         }
     }
 
-    async fn renegotiate(&self, conn: &Arc<Connection>, ice_restart: bool) -> Result<()> {
+    async fn renegotiate(
+        &self,
+        conn: &Arc<Connection>,
+        ice_restart: bool,
+        allow_dc: bool,
+    ) -> Result<()> {
         let options = if ice_restart {
             Some(RTCOfferOptions { ice_restart: true })
         } else {
@@ -2591,26 +2632,40 @@ impl Inner {
         };
         let offer = conn.pc.create_offer(options).await?;
         conn.pc.set_local_description(offer.clone()).await?;
-        self.send_description(conn, &offer, false).await;
+        self.send_description(conn, &offer, !allow_dc, allow_dc)
+            .await;
         Ok(())
     }
 
-    async fn restart_ice(&self, conn: &Arc<Connection>, reason: &str) {
+    /// Starts an ICE restart; returns whether it was initiated. `allow_dc` is
+    /// true only when answering a remote `iceRestartRequest`: a restart after a
+    /// failure goes over the signaling socket because the channel may be dead.
+    async fn restart_ice(&self, conn: &Arc<Connection>, reason: &str, allow_dc: bool) -> bool {
         if conn.kind == "viewer" {
-            if conn.send_control(&json!({"iceRestartRequest": true})).await {
+            // The publisher owns the offer: ask it, over the control channel
+            // when open, otherwise through signaling (JS _requestConnectionICERestart).
+            let sent = conn.send_control(&json!({"iceRestartRequest": true})).await
+                || self.send_ws(json!({"UUID": conn.uuid, "iceRestartRequest": true}));
+            if sent {
                 self.emit(Event::IceRestart {
                     uuid: conn.uuid.clone(),
                     reason: reason.into(),
                 });
             }
-            return;
+            return sent;
         }
-        match self.renegotiate(conn, true).await {
-            Ok(()) => self.emit(Event::IceRestart {
-                uuid: conn.uuid.clone(),
-                reason: reason.into(),
-            }),
-            Err(e) => log::debug!("ICE restart failed for {}: {e}", conn.uuid),
+        match self.renegotiate(conn, true, allow_dc).await {
+            Ok(()) => {
+                self.emit(Event::IceRestart {
+                    uuid: conn.uuid.clone(),
+                    reason: reason.into(),
+                });
+                true
+            }
+            Err(e) => {
+                log::debug!("ICE restart failed for {}: {e}", conn.uuid);
+                false
+            }
         }
     }
 
@@ -2834,6 +2889,9 @@ impl Inner {
                     if let Some(t) = cs.connect_timer.take() {
                         t.abort();
                     }
+                    if let Some(t) = cs.recovery_timer.take() {
+                        t.abort();
+                    }
                     if let Some(t) = cs.disconnect_timer.take() {
                         t.abort();
                     }
@@ -2860,17 +2918,8 @@ impl Inner {
                     let grace = self.opts.disconnect_grace_period;
                     let t = tokio::spawn(async move {
                         tokio::time::sleep(grace).await;
-                        let still_down = {
-                            let mut cs = c2.cs.lock().unwrap();
-                            cs.disconnect_timer = None;
-                            cs.peer_state != RTCPeerConnectionState::Connected
-                                && !matches!(
-                                    cs.ice_state,
-                                    RTCIceConnectionState::Connected
-                                        | RTCIceConnectionState::Completed
-                                )
-                        };
-                        if still_down && me.is_current(&c2) {
+                        c2.cs.lock().unwrap().disconnect_timer = None;
+                        if !is_transport_connected(&c2) && me.is_current(&c2) {
                             me.recover(&c2, "disconnected").await;
                         }
                     });
@@ -2881,9 +2930,9 @@ impl Inner {
                 self.set_stream_state(conn.stream_id().as_deref(), "failed");
                 self.recover(&conn, "failed").await;
             }
-            _ => self.emit(Event::PeerDisconnected {
-                uuid: conn.uuid.clone(),
-            }),
+            // Closed by the engine, not by us (we remove a connection from the
+            // table before closing it, and `is_current` held above).
+            _ => self.fail_connection(&conn, "closed").await,
         }
     }
 
@@ -2895,52 +2944,25 @@ impl Inner {
         }
     }
 
-    async fn drop_viewer(&self, conn: &Arc<Connection>) {
-        {
-            let mut conns = self.conns.lock().unwrap();
-            if let Some(p) = conns.get_mut(&conn.uuid) {
-                if p.viewer
-                    .as_ref()
-                    .map(|x| Arc::ptr_eq(x, conn))
-                    .unwrap_or(false)
-                {
-                    p.viewer = None;
-                }
-                if p.is_empty() {
-                    conns.remove(&conn.uuid);
-                }
-            }
-        }
-        conn.close().await;
-    }
-
+    /// Bounded recovery, as in the JavaScript SDK: the first failure triggers
+    /// an ICE restart and arms a timer; a failure while already recovering (or
+    /// the timer expiring unconnected) tears the connection down. Only the
+    /// teardown emits `ConnectionFailed`, right after `PeerDisconnected`.
     async fn recover(self: &Arc<Self>, conn: &Arc<Connection>, reason: &str) {
         if !self.is_current(conn) {
             return;
         }
         let already = {
             let mut cs = conn.cs.lock().unwrap();
+            if cs.finalized {
+                return;
+            }
             let a = cs.recovering;
             cs.recovering = true;
             a
         };
         if already {
-            self.emit(Event::ConnectionFailed {
-                uuid: conn.uuid.clone(),
-                stream_id: conn.stream_id(),
-                connection_type: conn.kind.into(),
-                reason: reason.into(),
-            });
-            if conn.kind == "viewer" {
-                if let Some(sid) = conn.stream_id() {
-                    let opts = conn.cs.lock().unwrap().view_options.clone();
-                    self.drop_viewer(conn).await;
-                    let stopped = self.st.lock().unwrap().stopped_views.contains(&sid);
-                    if !stopped {
-                        self.schedule_view_retry(&sid, opts, Duration::from_secs(2));
-                    }
-                }
-            }
+            self.fail_connection(conn, reason).await;
             return;
         }
         log::debug!(
@@ -2948,17 +2970,81 @@ impl Inner {
             conn.kind,
             conn.uuid
         );
-        if conn.kind == "publisher" || conn.is_control_open() {
-            self.restart_ice(conn, reason).await;
+        if !self.restart_ice(conn, reason, false).await {
+            self.fail_connection(conn, reason).await;
+            return;
+        }
+        let me = self.clone();
+        let c2 = conn.clone();
+        let timeout = self.opts.connection_timeout;
+        let reason = reason.to_string();
+        let timer = tokio::spawn(async move {
+            tokio::time::sleep(timeout).await;
+            c2.cs.lock().unwrap().recovery_timer = None;
+            if !me.is_current(&c2) {
+                return;
+            }
+            if is_transport_connected(&c2) {
+                c2.cs.lock().unwrap().recovering = false;
+            } else {
+                // Still down after the restart: this is the second failure.
+                me.fail_connection(&c2, &format!("{reason}-timeout")).await;
+            }
+        });
+        let mut cs = conn.cs.lock().unwrap();
+        if let Some(t) = cs.recovery_timer.replace(timer) {
+            t.abort();
+        }
+    }
+
+    /// Final teardown of a dead connection: removes it from the table, closes
+    /// it and emits `PeerDisconnected` then `ConnectionFailed`. A viewer whose
+    /// stream is still wanted is re-requested after 2 s.
+    async fn fail_connection(self: &Arc<Self>, conn: &Arc<Connection>, reason: &str) {
+        let removed = {
+            let mut conns = self.conns.lock().unwrap();
+            let mut removed = false;
+            if let Some(p) = conns.get_mut(&conn.uuid) {
+                if p.get(conn.kind)
+                    .map(|x| Arc::ptr_eq(&x, conn))
+                    .unwrap_or(false)
+                {
+                    p.set(conn.kind, None);
+                    removed = true;
+                }
+                if p.is_empty() {
+                    conns.remove(&conn.uuid);
+                }
+            }
+            removed
+        };
+        if !removed {
             return;
         }
         let sid = conn.stream_id();
         let opts = conn.cs.lock().unwrap().view_options.clone();
-        self.drop_viewer(conn).await;
+        conn.close().await;
+        self.emit(Event::PeerDisconnected {
+            uuid: conn.uuid.clone(),
+        });
+        self.emit(Event::ConnectionFailed {
+            uuid: conn.uuid.clone(),
+            stream_id: sid.clone(),
+            connection_type: conn.kind.into(),
+            reason: reason.into(),
+        });
+        if conn.kind != "viewer" {
+            return;
+        }
         if let Some(sid) = sid {
-            let stopped = self.st.lock().unwrap().stopped_views.contains(&sid);
-            if !stopped {
-                self.schedule_view_retry(&sid, opts, Duration::from_secs(1));
+            let wanted = {
+                let st = self.st.lock().unwrap();
+                !st.intentional
+                    && !st.stopped_views.contains(&sid)
+                    && st.view_intent.contains_key(&sid)
+            };
+            if wanted {
+                self.schedule_view_retry(&sid, opts, Duration::from_secs(2));
             }
         }
     }
@@ -3223,7 +3309,7 @@ impl Inner {
                 fallback: false,
             });
         } else if msg.get("iceRestartRequest").is_some() && conn.kind == "publisher" {
-            self.restart_ice(conn, "remote_request").await;
+            self.restart_ice(conn, "remote_request", true).await;
         }
     }
 
@@ -3267,7 +3353,7 @@ impl Inner {
         }
         conn.cs.lock().unwrap().senders = kept;
         if changed {
-            if let Err(e) = self.renegotiate(conn, false).await {
+            if let Err(e) = self.renegotiate(conn, false, true).await {
                 log::debug!("renegotiation after preference change failed: {e}");
             }
         }
@@ -3301,7 +3387,7 @@ impl Inner {
                     };
                     if missed >= 2 {
                         c.cs.lock().unwrap().missed_pings = 0;
-                        me.restart_ice(&c, "missed_pings").await;
+                        me.restart_ice(&c, "missed_pings", false).await;
                         continue;
                     }
                 }
@@ -3774,8 +3860,18 @@ impl Inner {
         let me = self.clone();
         let c = conn.clone();
         let task = tokio::spawn(async move {
-            let mut details: Option<(String, String, u64)> = None; // id, name, size
-            let mut transfer: Option<Arc<InboundTransfer>> = None;
+            // Dropped with the task: when `Connection::close` aborts it
+            // mid-transfer, the guard fails the download so `request_file` returns.
+            let mut guard = InboundGuard {
+                me: me.clone(),
+                c: c.clone(),
+                label: label.clone(),
+                details: None,
+                transfer: None,
+            };
+            let InboundGuard {
+                details, transfer, ..
+            } = &mut guard;
             let mut completed = false;
             while let Some(ev) = dc.poll().await {
                 let m = match ev {
@@ -3803,8 +3899,8 @@ impl Inner {
                     };
                     let name = jstr(&parsed, "filename").unwrap_or_default();
                     let size = parsed.get("size").and_then(|s| s.as_u64()).unwrap_or(0);
-                    details = Some((id.clone(), name.clone(), size));
-                    transfer = {
+                    *details = Some((id.clone(), name.clone(), size));
+                    *transfer = {
                         let st = me.st.lock().unwrap();
                         st.inbound
                             .get(&format!("{}:{}", c.uuid, id))
@@ -3839,7 +3935,7 @@ impl Inner {
                             fail_transfer(
                                 &me,
                                 &c,
-                                &mut transfer,
+                                transfer,
                                 &id,
                                 &name,
                                 size,
@@ -3901,7 +3997,7 @@ impl Inner {
                         fail_transfer(
                             &me,
                             &c,
-                            &mut transfer,
+                            transfer,
                             &id,
                             &name,
                             size,
@@ -3949,7 +4045,7 @@ impl Inner {
                 fail_transfer(
                     &me,
                     &c,
-                    &mut transfer,
+                    transfer,
                     &id,
                     &name,
                     size,
@@ -4091,6 +4187,73 @@ impl Inner {
 /// connection's own tasks (which `close` aborts).
 fn close_later(c: Arc<Connection>) {
     tokio::spawn(async move { c.close().await });
+}
+
+/// Waits (up to 100 ms) until every control channel has delivered its bye, so
+/// the message is not lost when the transport is torn down right after.
+async fn flush_byes(conns: &[Arc<Connection>]) {
+    let deadline = Instant::now() + Duration::from_millis(100);
+    loop {
+        let mut pending = false;
+        for c in conns {
+            if !c.is_control_open() {
+                continue;
+            }
+            let dc = c.cs.lock().unwrap().control.clone();
+            if let Some(dc) = dc {
+                if dc.outstanding_bytes().await.unwrap_or(0) > 0 {
+                    pending = true;
+                    break;
+                }
+            }
+        }
+        if !pending || Instant::now() >= deadline {
+            return;
+        }
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+}
+
+fn is_transport_connected(c: &Arc<Connection>) -> bool {
+    let cs = c.cs.lock().unwrap();
+    cs.peer_state == RTCPeerConnectionState::Connected
+        || matches!(
+            cs.ice_state,
+            RTCIceConnectionState::Connected | RTCIceConnectionState::Completed
+        )
+}
+
+/// Owned by a file receive task; fails the transfer it tracks if the task is
+/// dropped (aborted by `Connection::close`) before the transfer finished.
+struct InboundGuard {
+    me: Arc<Inner>,
+    c: Arc<Connection>,
+    label: String,
+    details: Option<(String, String, u64)>, // id, name, size
+    transfer: Option<Arc<InboundTransfer>>,
+}
+
+impl Drop for InboundGuard {
+    fn drop(&mut self) {
+        if self.transfer.is_none() {
+            return;
+        }
+        let (id, name, size) =
+            self.details
+                .clone()
+                .unwrap_or((self.label.clone(), String::new(), 0));
+        let me = self.me.clone();
+        let c = self.c.clone();
+        fail_transfer(
+            &me,
+            &c,
+            &mut self.transfer,
+            &id,
+            &name,
+            size,
+            "connection closed".into(),
+        );
+    }
 }
 
 fn is_truthy(v: Option<&Value>) -> bool {

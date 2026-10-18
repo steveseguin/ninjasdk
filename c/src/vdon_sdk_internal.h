@@ -30,7 +30,8 @@ enum job_type {
     JOB_CONNECT_TIMEOUT,
     JOB_DISCONNECT_GRACE,
     JOB_DELETE_WS,
-    JOB_CLOSE_DC
+    JOB_CLOSE_DC,
+    JOB_RESTORE_INTENT
 };
 
 typedef struct conn conn_t;
@@ -78,7 +79,7 @@ struct conn {
     char *uuid;
     const char *type; /* "publisher" or "viewer" (static) */
     char *stream_id;
-    char session[9];
+    char session[40];
     int pc;
     int closed;
     int connected_once;
@@ -211,6 +212,7 @@ struct vdon_sdk {
     int ws_failed;
     int intentional;
     int reconnects;
+    int reconnecting; /* a JOB_RECONNECT opened the socket (separate from the attempt counter) */
     int reconnect_delay;
 
     char *password; /* sanitized */

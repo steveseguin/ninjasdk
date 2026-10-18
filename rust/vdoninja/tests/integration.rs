@@ -24,6 +24,25 @@ fn opts(host: &str) -> Options {
     }
 }
 
+/// Binds the test signaling server, retrying transient socket errors: Windows runners can
+/// report WSAENOBUFS while the ICE sockets of a previous test are still being released.
+async fn bind_server() -> SignalServer {
+    let mut delay = Duration::from_millis(100);
+    let mut attempt = 0;
+    loop {
+        match SignalServer::bind("127.0.0.1:0").await {
+            Ok(server) => return server,
+            Err(e) if attempt < 5 => {
+                eprintln!("signal server bind failed ({e}); retrying");
+                tokio::time::sleep(delay).await;
+                delay *= 2;
+                attempt += 1;
+            }
+            Err(e) => panic!("signal server bind failed: {e}"),
+        }
+    }
+}
+
 async fn wait_for<F>(rx: &mut broadcast::Receiver<Event>, timeout: Duration, mut pred: F) -> Event
 where
     F: FnMut(&Event) -> bool,
@@ -47,7 +66,7 @@ where
 #[tokio::test]
 async fn data_round_trip() {
     let _ = env_logger::try_init();
-    let server = SignalServer::bind("127.0.0.1:0").await.unwrap();
+    let server = bind_server().await;
     let host = server.url();
     let pub_sdk = VdoNinja::new(Options {
         label: Some("Rust publisher".into()),
@@ -218,7 +237,7 @@ async fn data_round_trip() {
 #[tokio::test]
 async fn media_publish_view() {
     let _ = env_logger::try_init();
-    let server = SignalServer::bind("127.0.0.1:0").await.unwrap();
+    let server = bind_server().await;
     let host = server.url();
     let pub_sdk = VdoNinja::new(opts(&host));
     let view_sdk = VdoNinja::new(opts(&host));
@@ -297,7 +316,7 @@ async fn media_publish_view() {
 #[tokio::test]
 async fn auto_connect_half_mesh() {
     let _ = env_logger::try_init();
-    let server = SignalServer::bind("127.0.0.1:0").await.unwrap();
+    let server = bind_server().await;
     let host = server.url();
     let a = VdoNinja::new(opts(&host));
     let b = VdoNinja::new(opts(&host));
@@ -348,7 +367,7 @@ async fn auto_connect_half_mesh() {
 #[tokio::test]
 async fn no_password_and_pending_view() {
     let _ = env_logger::try_init();
-    let server = SignalServer::bind("127.0.0.1:0").await.unwrap();
+    let server = bind_server().await;
     let host = server.url();
     let pub_sdk = VdoNinja::new(Options {
         no_password: true,
@@ -390,4 +409,71 @@ async fn no_password_and_pending_view() {
     pub_sdk.disconnect().await;
     view_sdk.disconnect().await;
     let _ = Arc::new(());
+}
+
+#[tokio::test]
+async fn request_file_fails_when_connection_closes() {
+    let _ = env_logger::try_init();
+    let server = bind_server().await;
+    let host = server.url();
+    let pub_sdk = VdoNinja::new(opts(&host));
+    let view_sdk = VdoNinja::new(opts(&host));
+    let mut view_ev = view_sdk.events();
+
+    pub_sdk.connect().await.unwrap();
+    pub_sdk.join_room("rs-file-room").await.unwrap();
+    pub_sdk
+        .announce(PublishOptions {
+            stream_id: Some("rsfile".into()),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    view_sdk.connect().await.unwrap();
+    view_sdk.join_room("rs-file-room").await.unwrap();
+    let conn = view_sdk
+        .view("rsfile", ViewOptions::data_only())
+        .await
+        .unwrap();
+    wait_for(&mut view_ev, Duration::from_secs(10), |e| {
+        matches!(e, Event::DataChannelOpen { .. })
+    })
+    .await;
+
+    // Large enough that the download is still in flight when we close.
+    let payload = Bytes::from(vec![0x5au8; 96 * 1024 * 1024]);
+    let entry = pub_sdk
+        .host_file("big.bin", payload, None, None)
+        .await
+        .unwrap();
+    wait_for(&mut view_ev, Duration::from_secs(10), |e| {
+        matches!(e, Event::FileList { .. })
+    })
+    .await;
+    let viewer = view_sdk.clone();
+    let uuid = conn.uuid.clone();
+    let id = entry.id.clone();
+    let download = tokio::spawn(async move {
+        viewer
+            .request_file(&uuid, &id, false, Duration::from_secs(60))
+            .await
+    });
+    wait_for(&mut view_ev, Duration::from_secs(10), |e| {
+        matches!(e, Event::FileTransferStart { .. })
+    })
+    .await;
+
+    // Closing our own side mid-transfer must fail the download promptly, not hang.
+    view_sdk.stop_viewing("rsfile").await;
+    let result = tokio::time::timeout(Duration::from_secs(10), download)
+        .await
+        .expect("request_file hung after the connection closed")
+        .unwrap();
+    assert!(
+        result.is_err(),
+        "download must fail once the connection is closed"
+    );
+
+    pub_sdk.disconnect().await;
+    view_sdk.disconnect().await;
 }

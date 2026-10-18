@@ -333,11 +333,12 @@ static void job_free(job_t *j) {
     free(j);
 }
 
-static void cancel_jobs_for_conn(vdon_sdk *s, conn_t *c, int keep_type) {
+/* Drops every pending job for a connection (type < 0) or only those of one type. lock held. */
+static void cancel_jobs_for_conn(vdon_sdk *s, conn_t *c, int type) {
     job_t **pp = &s->jobs;
     while (*pp) {
         job_t *j = *pp;
-        if (j->conn == c && j->type != keep_type) {
+        if (j->conn == c && (type < 0 || j->type == type)) {
             *pp = j->next;
             job_free(j);
         } else {
@@ -390,16 +391,20 @@ static void RTC_API on_ws_open(int id, void *ptr) {
     if (!s)
         return;
     pthread_mutex_lock(&s->lock);
-    if (id != s->ws) {
+    if (id != s->ws || s->connected) {
         pthread_mutex_unlock(&s->lock);
         return;
     }
     s->connected = 1;
     s->ever_connected = 1;
     s->ws_failed = 0;
-    was_reconnect = s->reconnects > 0;
+    was_reconnect = s->reconnecting;
+    s->reconnecting = 0;
     s->reconnects = 0;
     s->reconnect_delay = s->o.reconnect_delay_ms;
+    /* Rejoining blocks on the listing reply, which arrives on this very thread: run it on the worker. */
+    if (was_reconnect)
+        vdon__schedule(s, JOB_RESTORE_INTENT, vdon_now_ms(), NULL, NULL, 0);
     pthread_cond_broadcast(&s->cond);
     pthread_mutex_unlock(&s->lock);
     vdon__logf(s, "signaling connected");
@@ -407,8 +412,6 @@ static void RTC_API on_ws_open(int id, void *ptr) {
         EV(ev, was_reconnect ? VDON_EVENT_RECONNECTED : VDON_EVENT_CONNECTED);
         vdon__emit(s, &ev);
     }
-    if (was_reconnect)
-        restore_intent(s);
 }
 
 static void RTC_API on_ws_closed(int id, void *ptr) {
@@ -480,7 +483,7 @@ static void RTC_API on_ws_message(int id, const char *message, int size, void *p
     cJSON_Delete(msg);
 }
 
-/* lock held */
+/* lock held on entry and exit; released while the callbacks are installed. */
 static int ws_open(vdon_sdk *s) {
     rtcWsConfiguration cfg;
     int ws;
@@ -492,15 +495,16 @@ static int ws_open(vdon_sdk *s) {
     s->ws = ws;
     s->ws_failed = 0;
     rtcSetUserPointer(ws, s);
+    /* libdatachannel runs the open (and buffered message) callbacks synchronously from the setter when
+     * the socket is already open (instant on loopback); they take the lock, so it must not be held here. */
+    pthread_mutex_unlock(&s->lock);
     rtcSetOpenCallback(ws, on_ws_open);
     rtcSetClosedCallback(ws, on_ws_closed);
     rtcSetErrorCallback(ws, on_ws_error);
     rtcSetMessageCallback(ws, on_ws_message);
-    if (rtcIsOpen(ws) && !s->connected) {
-        pthread_mutex_unlock(&s->lock);
-        on_ws_open(ws, s);
-        pthread_mutex_lock(&s->lock);
-    }
+    if (rtcIsOpen(ws))
+        on_ws_open(ws, s); /* no-op when the callback already ran */
+    pthread_mutex_lock(&s->lock);
     return VDON_OK;
 }
 
@@ -806,6 +810,32 @@ static void conn_bye(vdon_sdk *s, conn_t *c) {
     cJSON_Delete(m);
 }
 
+/* Sends bye to each connection, then waits (up to 100 ms) for the control channels to drain so the
+ * bye is not lost when the transport is torn down. lock NOT held. */
+static void conn_bye_all(vdon_sdk *s, conn_t **list, int n) {
+    int64_t deadline;
+    int i;
+    if (n <= 0)
+        return;
+    for (i = 0; i < n; i++)
+        conn_bye(s, list[i]);
+    deadline = vdon_now_ms() + 100;
+    for (;;) {
+        int pending = 0;
+        for (i = 0; i < n && !pending; i++) {
+            int dc;
+            pthread_mutex_lock(&s->lock);
+            dc = !list[i]->closed && list[i]->control && list[i]->control->open ? list[i]->control->dc : -1;
+            pthread_mutex_unlock(&s->lock);
+            if (dc >= 0 && rtcGetBufferedAmount(dc) > 0)
+                pending = 1;
+        }
+        if (!pending || vdon_now_ms() >= deadline)
+            return;
+        vdon__sleep_ms(10);
+    }
+}
+
 /* Unlinks a connection and schedules its close. lock held. */
 static void conn_retire(vdon_sdk *s, conn_t *c) {
     conn_t **pp;
@@ -889,7 +919,8 @@ static void schedule_view_retry(vdon_sdk *s, const char *sid, int delay_ms) {
     vdon__schedule(s, JOB_VIEW_RETRY, vdon_now_ms() + delay_ms, NULL, sid, 0);
 }
 
-/* Drops a failed connection; viewers retry from the play request. */
+/* Drops a failed connection (libdatachannel has no ICE restart); viewers retry from the play request.
+ * Emits peerDisconnected immediately followed by connectionFailed, like the JavaScript SDK. */
 static void recover_connection(vdon_sdk *s, conn_t *c, const char *reason) {
     char *sid = NULL;
     const char *type;
@@ -901,11 +932,19 @@ static void recover_connection(vdon_sdk *s, conn_t *c, const char *reason) {
     type = c->type;
     sid = c->stream_id ? vdon_strdup(c->stream_id) : NULL;
     set_stream_state(s, c->stream_id, "failed");
+    c->disc_emitted = 1; /* emitted here, not by the close job */
     conn_retire(s, c);
     if (type == TYPE_VIEWER && sid)
         schedule_view_retry(s, sid, 2000);
     pthread_mutex_unlock(&s->lock);
     vdon__logf(s, "Recovering %s connection to %s (%s)", type, c->uuid, reason);
+    {
+        EV(ev, VDON_EVENT_PEER_DISCONNECTED);
+        ev.uuid = c->uuid;
+        ev.stream_id = sid;
+        ev.connection_type = type;
+        vdon__emit(s, &ev);
+    }
     {
         EV(ev, VDON_EVENT_CONNECTION_FAILED);
         ev.uuid = c->uuid;
@@ -1078,7 +1117,8 @@ static void RTC_API on_state_change(int pc, rtcState state, void *ptr) {
         c->connected_once = 1;
         c->grace_pending = 0;
         set_stream_state(s, c->stream_id, "connected");
-        cancel_jobs_for_conn(s, c, JOB_PING);
+        cancel_jobs_for_conn(s, c, JOB_CONNECT_TIMEOUT);
+        cancel_jobs_for_conn(s, c, JOB_DISCONNECT_GRACE);
         pthread_cond_broadcast(&s->cond);
         pthread_mutex_unlock(&s->lock);
         if (first) {
@@ -1104,7 +1144,9 @@ static void RTC_API on_state_change(int pc, rtcState state, void *ptr) {
         recover_connection(s, c, "failed");
         return;
     case RTC_CLOSED:
+        /* Closed by the engine, not by us (c->closed is checked above): drop it like a failure. */
         pthread_mutex_unlock(&s->lock);
+        recover_connection(s, c, "closed");
         return;
     default:
         pthread_mutex_unlock(&s->lock);
@@ -1218,7 +1260,7 @@ static void RTC_API on_dc_closed(int id, void *ptr) {
         c->control = NULL;
         was_control = !c->closed;
         sid = c->stream_id ? vdon_strdup(c->stream_id) : NULL;
-        cancel_jobs_for_conn(s, c, JOB_CLOSE_CONN);
+        cancel_jobs_for_conn(s, c, JOB_PING);
     }
     pthread_cond_broadcast(&s->cond);
     pthread_mutex_unlock(&s->lock);
@@ -1761,7 +1803,8 @@ static void handle_remote_candidates(vdon_sdk *s, cJSON *msg, conn_t *via, int s
 
 /* ------------------------------------------------------- offer creation */
 
-static void handle_offer_request(vdon_sdk *s, const char *uuid) {
+/* session: the viewer's session ID when the request carried one (joinroom), else generated. */
+static void handle_offer_request(vdon_sdk *s, const char *uuid, const char *session) {
     conn_t *c, *old;
     char *sid;
     int rc;
@@ -1784,6 +1827,8 @@ static void handle_offer_request(vdon_sdk *s, const char *uuid) {
     }
     pthread_mutex_lock(&s->lock);
     c->stream_id = sid;
+    if (session && *session && strlen(session) < sizeof(c->session))
+        snprintf(c->session, sizeof(c->session), "%s", session);
     {
         chan_t *ch;
         int dc = rtcCreateDataChannel(c->pc, VDON_CONTROL_CHANNEL);
@@ -1822,7 +1867,9 @@ static void handle_bye(vdon_sdk *s, const char *uuid, vdon_event_type type, cJSO
         conn_t *next = c->next;
         if (!c->closed && strcmp(c->uuid, uuid) == 0) {
             found = 1;
-            if (c->type == TYPE_VIEWER && c->stream_id && !s->intentional && !strnode_has(s->stopped_views, c->stream_id)) {
+            /* Only bye re-requests the stream (the JavaScript SDK's _handleBye); hangup does not. */
+            if (type == VDON_EVENT_BYE && c->type == TYPE_VIEWER && c->stream_id && !s->intentional &&
+                !strnode_has(s->stopped_views, c->stream_id)) {
                 free(retry);
                 retry = vdon_strdup(c->stream_id);
                 set_stream_state(s, c->stream_id, "disconnected");
@@ -1977,9 +2024,15 @@ static void handle_signal(vdon_sdk *s, cJSON *msg) {
             handle_listing(s, msg);
         else if (strcmp(request, "videoaddedtoroom") == 0)
             handle_video_added(s, msg, VDON_EVENT_VIDEO_ADDED_TO_ROOM);
-        else if (strcmp(request, "someonejoined") == 0 || strcmp(request, "joinroom") == 0)
+        else if (strcmp(request, "someonejoined") == 0)
             handle_video_added(s, msg, VDON_EVENT_SOMEONE_JOINED);
-        else if (strcmp(request, "play") == 0) {
+        else if (strcmp(request, "joinroom") == 0) {
+            /* A server-forwarded join request: offer to the newcomer when publishing (JS _handleJoinRoom). */
+            const char *uuid = jstr(msg, "UUID"), *session = jstr(msg, "session");
+            handle_video_added(s, msg, VDON_EVENT_SOMEONE_JOINED);
+            if (uuid && *uuid)
+                handle_offer_request(s, uuid, session && *session ? session : uuid);
+        } else if (strcmp(request, "play") == 0) {
             char *req;
             int ok;
             pthread_mutex_lock(&s->lock);
@@ -1987,12 +2040,12 @@ static void handle_signal(vdon_sdk *s, cJSON *msg) {
             ok = s->publishing && s->stream_id && strcmp(s->stream_id, req) == 0;
             pthread_mutex_unlock(&s->lock);
             if (ok)
-                handle_offer_request(s, jstr(msg, "UUID"));
+                handle_offer_request(s, jstr(msg, "UUID"), NULL);
             else
                 vdon__logf(s, "Ignoring play request for \"%s\" (not publishing it)", req);
             free(req);
         } else if (strcmp(request, "offerSDP") == 0) {
-            handle_offer_request(s, jstr(msg, "UUID"));
+            handle_offer_request(s, jstr(msg, "UUID"), NULL);
         } else if (strcmp(request, "error") == 0) {
             EV(ev, VDON_EVENT_ERROR);
             ev.message = jstr(msg, "message");
@@ -2255,8 +2308,11 @@ static int do_view(vdon_sdk *s, const char *stream_id, const vdon_view_options *
                 rc = VDON_ERR_CANCELLED;
                 break;
             }
-            if (!vdon__wait_until(s, deadline))
+            if (!vdon__wait_until(s, deadline)) {
+                /* Publisher not online: re-request later (JS _viewRetryInterval). */
+                schedule_view_retry(s, sid, s->o.view_retry_interval_ms);
                 break;
+            }
         }
         pthread_mutex_unlock(&s->lock);
         return rc;
@@ -2303,10 +2359,7 @@ int vdon_stop_viewing(vdon_sdk *s, const char *stream_id) {
         if (!c->closed && c->type == TYPE_VIEWER && c->stream_id && strcmp(c->stream_id, sid) == 0)
             list[n++] = c;
     pthread_mutex_unlock(&s->lock);
-    for (i = 0; i < n; i++)
-        conn_bye(s, list[i]);
-    if (n)
-        vdon__sleep_ms(50);
+    conn_bye_all(s, list, n);
     pthread_mutex_lock(&s->lock);
     for (i = 0; i < n; i++)
         conn_retire(s, list[i]);
@@ -2515,10 +2568,7 @@ int vdon_stop_publishing(vdon_sdk *s) {
         if (!c->closed && c->type == TYPE_PUBLISHER)
             list[n++] = c;
     pthread_mutex_unlock(&s->lock);
-    for (i = 0; i < n; i++)
-        conn_bye(s, list[i]);
-    if (n)
-        vdon__sleep_ms(50);
+    conn_bye_all(s, list, n);
     pthread_mutex_lock(&s->lock);
     for (i = 0; i < n; i++)
         conn_retire(s, list[i]);
@@ -2683,7 +2733,12 @@ static void run_job(vdon_sdk *s, job_t *j) {
         pthread_mutex_unlock(&s->lock);
         if (ok) {
             vdon__logf(s, "Retrying view of %s", j->str);
-            do_view(s, j->str, &vo, 0, 1);
+            if (do_view(s, j->str, &vo, 0, 1) == VDON_ERR_PENDING) {
+                /* Still not online: re-arm (the viewer connection forms on its own if the play is answered). */
+                pthread_mutex_lock(&s->lock);
+                schedule_view_retry(s, j->str, s->o.view_retry_interval_ms);
+                pthread_mutex_unlock(&s->lock);
+            }
         }
         return;
     }
@@ -2695,6 +2750,7 @@ static void run_job(vdon_sdk *s, job_t *j) {
             return;
         }
         attempt = ++s->reconnects;
+        s->reconnecting = 1;
         ws_open(s);
         pthread_mutex_unlock(&s->lock);
         {
@@ -2748,10 +2804,17 @@ static void run_job(vdon_sdk *s, job_t *j) {
     }
     case JOB_CLOSE_CONN: {
         conn_t *c = j->conn;
+        chan_t *ch;
         int emit_disc;
         char *sid;
         conn_close_rtc(s, c);
         pthread_mutex_lock(&s->lock);
+        /* Outbound file channels that never opened still hold their hosted-file reference. */
+        for (ch = c->chans; ch; ch = ch->next)
+            if (ch->out_file && !ch->file_thread_started) {
+                vdon__hosted_unref(s, ch->out_file);
+                ch->out_file = NULL;
+            }
         emit_disc = !c->disc_emitted;
         c->disc_emitted = 1;
         sid = c->stream_id ? vdon_strdup(c->stream_id) : NULL;
@@ -2810,6 +2873,9 @@ static void run_job(vdon_sdk *s, job_t *j) {
     case JOB_CLOSE_DC:
         rtcClose(j->id);
         return;
+    case JOB_RESTORE_INTENT:
+        restore_intent(s);
+        return;
     default:
         return;
     }
@@ -2866,7 +2932,8 @@ static void restore_intent(vdon_sdk *s) {
     }
     pthread_mutex_unlock(&s->lock);
     if (room) {
-        vdon_join_room(s, room, NULL, claim, 10000);
+        /* Non-blocking: handle_listing marks the room joined and emits ROOM_JOINED. */
+        vdon_join_room(s, room, NULL, claim, 0);
         free(room);
     }
     if (publishing) {
@@ -2937,6 +3004,8 @@ vdon_sdk *vdon_create(const vdon_options *opts, vdon_event_callback cb, void *us
         s->o.connection_timeout_ms = 20000;
     if (s->o.auto_ping_interval_ms <= 0)
         s->o.auto_ping_interval_ms = 10000;
+    if (s->o.view_retry_interval_ms <= 0)
+        s->o.view_retry_interval_ms = 900000;
     s->cb = cb;
     s->user = user;
     s->ws = -1;
@@ -3044,17 +3113,15 @@ void vdon_disconnect(vdon_sdk *s) {
     for (c = s->conns; c; c = c->next)
         list[n++] = c;
     pthread_mutex_unlock(&s->lock);
-    for (i = 0; i < n; i++)
-        conn_bye(s, list[i]);
-    if (n)
-        vdon__sleep_ms(50);
+    conn_bye_all(s, list, n);
     pthread_mutex_lock(&s->lock);
     for (i = 0; i < n; i++)
         conn_retire(s, list[i]);
     /* Run the close jobs synchronously so the caller sees a quiet SDK on return. */
     for (pp = &s->jobs; *pp;) {
         job_t *j = *pp;
-        if (j->type == JOB_CLOSE_CONN || j->type == JOB_RECONNECT || j->type == JOB_VIEW_RETRY || j->type == JOB_ICE_FLUSH) {
+        if (j->type == JOB_CLOSE_CONN || j->type == JOB_RECONNECT || j->type == JOB_VIEW_RETRY || j->type == JOB_ICE_FLUSH ||
+            j->type == JOB_RESTORE_INTENT) {
             *pp = j->next;
             if (j->type == JOB_CLOSE_CONN) {
                 pthread_mutex_unlock(&s->lock);
@@ -3078,6 +3145,8 @@ void vdon_disconnect(vdon_sdk *s) {
     free(s->room_intent);
     s->room_intent = NULL;
     s->publishing = 0;
+    s->data_only = 0;
+    s->track_count = 0;
     free(s->stream_id);
     s->stream_id = NULL;
     free_pviews(&s->pending_views);
@@ -3085,6 +3154,9 @@ void vdon_disconnect(vdon_sdk *s) {
     strnode_free(&s->stopped_views);
     while (s->pending_ice)
         drop_pending_ice(s, s->pending_ice->uuid);
+    s->reconnects = 0;
+    s->reconnecting = 0;
+    s->reconnect_delay = s->o.reconnect_delay_ms;
     vdon__fail_all_waiters(s);
     pthread_cond_broadcast(&s->cond);
     pthread_mutex_unlock(&s->lock);
