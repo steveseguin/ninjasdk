@@ -1,0 +1,414 @@
+{
+  "description": "VDO.Ninja SDK protocol conformance vectors, generated from the JavaScript reference SDK.",
+  "generator": "spec/generate-vectors.cjs",
+  "sdkVersion": "1.6.2",
+  "defaults": {
+    "host": "wss://wss.vdo.ninja",
+    "password": "someEncryptionKey123",
+    "salt": "vdo.ninja",
+    "streamHashLength": 6,
+    "roomHashLength": 16,
+    "controlChannelLabel": "sendChannel",
+    "reservedChannelPrefix": "x-",
+    "binaryChannelLabel": "x-bin",
+    "fileChunkSize": 16384,
+    "fileEofComplete": "EOF1",
+    "fileEofCancelled": "EOF2",
+    "turnServersURL": "https://turnservers.vdo.ninja/",
+    "stunServers": [
+      "stun:stun.l.google.com:19302",
+      "stun:stun.cloudflare.com:3478"
+    ]
+  },
+  "hash": [
+    {
+      "input": "someEncryptionKey123vdo.ninja",
+      "length": 6,
+      "expected": "808d64"
+    },
+    {
+      "input": "someEncryptionKey123vdo.ninja",
+      "length": 16,
+      "expected": "808d646f7eb92052"
+    },
+    {
+      "input": "someEncryptionKey123vdo.ninja",
+      "length": 0,
+      "expected": "808d646f7eb92052344e1e668e340c852f8d675754acfae11d8cc49233c36eba"
+    },
+    {
+      "input": "",
+      "length": 6,
+      "expected": "e3b0c4"
+    },
+    {
+      "input": "p%20w%25%26%C3%A9vdo.ninja",
+      "length": 6,
+      "expected": "6b7450"
+    },
+    {
+      "input": "myroomsomeEncryptionKey123vdo.ninja",
+      "length": 16,
+      "expected": "2f1a0139acdd5bdc"
+    },
+    {
+      "input": "日本語テスト",
+      "length": 8,
+      "expected": "4b09dffa"
+    },
+    {
+      "input": "abc",
+      "length": 3,
+      "expected": "ba"
+    },
+    {
+      "input": "abc",
+      "length": 1,
+      "expected": ""
+    }
+  ],
+  "streamHash": [
+    {
+      "rawPassword": "someEncryptionKey123",
+      "sanitizedPassword": "someEncryptionKey123",
+      "salt": "vdo.ninja",
+      "streamID": "mystream",
+      "hashSuffix": "808d64",
+      "hashedStreamID": "mystream808d64"
+    },
+    {
+      "rawPassword": "someEncryptionKey123",
+      "sanitizedPassword": "someEncryptionKey123",
+      "salt": "vdo.ninja",
+      "streamID": "cam_1",
+      "hashSuffix": "808d64",
+      "hashedStreamID": "cam_1808d64"
+    },
+    {
+      "rawPassword": "someEncryptionKey123",
+      "sanitizedPassword": "someEncryptionKey123",
+      "salt": "vdo.ninja",
+      "streamID": "a",
+      "hashSuffix": "808d64",
+      "hashedStreamID": "a808d64"
+    },
+    {
+      "rawPassword": "hunter2",
+      "sanitizedPassword": "hunter2",
+      "salt": "vdo.ninja",
+      "streamID": "mystream",
+      "hashSuffix": "1c2bdc",
+      "hashedStreamID": "mystream1c2bdc"
+    },
+    {
+      "rawPassword": "hunter2",
+      "sanitizedPassword": "hunter2",
+      "salt": "vdo.ninja",
+      "streamID": "cam_1",
+      "hashSuffix": "1c2bdc",
+      "hashedStreamID": "cam_11c2bdc"
+    },
+    {
+      "rawPassword": "hunter2",
+      "sanitizedPassword": "hunter2",
+      "salt": "vdo.ninja",
+      "streamID": "a",
+      "hashSuffix": "1c2bdc",
+      "hashedStreamID": "a1c2bdc"
+    },
+    {
+      "rawPassword": "p w%&é",
+      "sanitizedPassword": "p%20w%25%26%C3%A9",
+      "salt": "vdo.ninja",
+      "streamID": "mystream",
+      "hashSuffix": "6b7450",
+      "hashedStreamID": "mystream6b7450"
+    },
+    {
+      "rawPassword": "p w%&é",
+      "sanitizedPassword": "p%20w%25%26%C3%A9",
+      "salt": "vdo.ninja",
+      "streamID": "cam_1",
+      "hashSuffix": "6b7450",
+      "hashedStreamID": "cam_16b7450"
+    },
+    {
+      "rawPassword": "p w%&é",
+      "sanitizedPassword": "p%20w%25%26%C3%A9",
+      "salt": "vdo.ninja",
+      "streamID": "a",
+      "hashSuffix": "6b7450",
+      "hashedStreamID": "a6b7450"
+    },
+    {
+      "rawPassword": "someEncryptionKey123",
+      "sanitizedPassword": "someEncryptionKey123",
+      "salt": "example.com",
+      "streamID": "mystream",
+      "hashSuffix": "b59479",
+      "hashedStreamID": "mystreamb59479"
+    },
+    {
+      "rawPassword": "someEncryptionKey123",
+      "sanitizedPassword": "someEncryptionKey123",
+      "salt": "example.com",
+      "streamID": "cam_1",
+      "hashSuffix": "b59479",
+      "hashedStreamID": "cam_1b59479"
+    },
+    {
+      "rawPassword": "someEncryptionKey123",
+      "sanitizedPassword": "someEncryptionKey123",
+      "salt": "example.com",
+      "streamID": "a",
+      "hashSuffix": "b59479",
+      "hashedStreamID": "ab59479"
+    },
+    {
+      "rawPassword": "pässwörd",
+      "sanitizedPassword": "p%C3%A4ssw%C3%B6rd",
+      "salt": "rtc.ninja",
+      "streamID": "mystream",
+      "hashSuffix": "982488",
+      "hashedStreamID": "mystream982488"
+    },
+    {
+      "rawPassword": "pässwörd",
+      "sanitizedPassword": "p%C3%A4ssw%C3%B6rd",
+      "salt": "rtc.ninja",
+      "streamID": "cam_1",
+      "hashSuffix": "982488",
+      "hashedStreamID": "cam_1982488"
+    },
+    {
+      "rawPassword": "pässwörd",
+      "sanitizedPassword": "p%C3%A4ssw%C3%B6rd",
+      "salt": "rtc.ninja",
+      "streamID": "a",
+      "hashSuffix": "982488",
+      "hashedStreamID": "a982488"
+    }
+  ],
+  "roomHash": [
+    {
+      "rawPassword": "someEncryptionKey123",
+      "sanitizedPassword": "someEncryptionKey123",
+      "salt": "vdo.ninja",
+      "room": "myroom",
+      "hashedRoom": "2f1a0139acdd5bdc"
+    },
+    {
+      "rawPassword": "someEncryptionKey123",
+      "sanitizedPassword": "someEncryptionKey123",
+      "salt": "vdo.ninja",
+      "room": "Room_42",
+      "hashedRoom": "118a9c297d6c9f56"
+    },
+    {
+      "rawPassword": "hunter2",
+      "sanitizedPassword": "hunter2",
+      "salt": "vdo.ninja",
+      "room": "myroom",
+      "hashedRoom": "449451cf53baed1c"
+    },
+    {
+      "rawPassword": "hunter2",
+      "sanitizedPassword": "hunter2",
+      "salt": "vdo.ninja",
+      "room": "Room_42",
+      "hashedRoom": "b6c7ee9f852e664a"
+    },
+    {
+      "rawPassword": "p w%&é",
+      "sanitizedPassword": "p%20w%25%26%C3%A9",
+      "salt": "vdo.ninja",
+      "room": "myroom",
+      "hashedRoom": "bc1fb650bd6f77de"
+    },
+    {
+      "rawPassword": "p w%&é",
+      "sanitizedPassword": "p%20w%25%26%C3%A9",
+      "salt": "vdo.ninja",
+      "room": "Room_42",
+      "hashedRoom": "47d8499de8d04673"
+    },
+    {
+      "rawPassword": "someEncryptionKey123",
+      "sanitizedPassword": "someEncryptionKey123",
+      "salt": "example.com",
+      "room": "myroom",
+      "hashedRoom": "80eaf23a380de1c4"
+    },
+    {
+      "rawPassword": "someEncryptionKey123",
+      "sanitizedPassword": "someEncryptionKey123",
+      "salt": "example.com",
+      "room": "Room_42",
+      "hashedRoom": "559dc34ac874e90c"
+    },
+    {
+      "rawPassword": "pässwörd",
+      "sanitizedPassword": "p%C3%A4ssw%C3%B6rd",
+      "salt": "rtc.ninja",
+      "room": "myroom",
+      "hashedRoom": "a3418feb6b92fe1e"
+    },
+    {
+      "rawPassword": "pässwörd",
+      "sanitizedPassword": "p%C3%A4ssw%C3%B6rd",
+      "salt": "rtc.ninja",
+      "room": "Room_42",
+      "hashedRoom": "94896de805fe2399"
+    }
+  ],
+  "encryption": [
+    {
+      "rawPassword": "someEncryptionKey123",
+      "sanitizedPassword": "someEncryptionKey123",
+      "salt": "vdo.ninja",
+      "phrase": "someEncryptionKey123vdo.ninja",
+      "keyHex": "808d646f7eb92052344e1e668e340c852f8d675754acfae11d8cc49233c36eba",
+      "ivHex": "000102030405060708090a0b0c0d0e0f",
+      "plaintext": "{\"type\":\"offer\",\"sdp\":\"v=0\\r\\no=- 1 1 IN IP4 127.0.0.1\\r\\n\"}",
+      "ciphertextHex": "e6e3b01add0693c318f82913da88759f8af7530f13a13b75bbd90ff45a7aac3d63cb2df0712929eddb707cf0e2562318a84a437a6797aa0a571da2373ad2ecd2"
+    },
+    {
+      "rawPassword": "hunter2",
+      "sanitizedPassword": "hunter2",
+      "salt": "vdo.ninja",
+      "phrase": "hunter2vdo.ninja",
+      "keyHex": "1c2bdc9c5e5fc3164c7ffdf61d322e78d8980e97690574c63f0914abf8701411",
+      "ivHex": "ffeeddccbbaa99887766554433221100",
+      "plaintext": "[{\"candidate\":\"candidate:1 1 UDP 2122252543 192.168.1.2 51234 typ host\",\"sdpMLineIndex\":0,\"sdpMid\":\"0\"}]",
+      "ciphertextHex": "e76dd295623654cc92b43a212f497f684ba215a6577b7285c05f084257525531fd5eb6de6555aa08c17bee4cce4684b325418e52659aa4625379cff10ef04fd53036b4a60b8fb1b893820f02ef295aa739d7a4c4a37bad7b8a46c13f02ea9c4905c978b17785d8037207b38df5d99375"
+    },
+    {
+      "rawPassword": "p w%&é",
+      "sanitizedPassword": "p%20w%25%26%C3%A9",
+      "salt": "vdo.ninja",
+      "phrase": "p%20w%25%26%C3%A9vdo.ninja",
+      "keyHex": "6b745012eac8fe98f6a29dbee1b1e35f58df2fbc03e2c1ad9e03498b8e304c72",
+      "ivHex": "0123456789abcdef0123456789abcdef",
+      "plaintext": "\"exactly16bytes!!\"",
+      "ciphertextHex": "7885806c346dfef62d2eb9eaab66684d882e596de5e8cc1fabd8b07f8a105596"
+    },
+    {
+      "rawPassword": "someEncryptionKey123",
+      "sanitizedPassword": "someEncryptionKey123",
+      "salt": "vdo.ninja",
+      "phrase": "someEncryptionKey123vdo.ninja",
+      "keyHex": "808d646f7eb92052344e1e668e340c852f8d675754acfae11d8cc49233c36eba",
+      "ivHex": "00000000000000000000000000000000",
+      "plaintext": "",
+      "ciphertextHex": "65f2fd4872b9e760270565efc3955690"
+    }
+  ],
+  "sanitizeStreamID": [
+    {
+      "input": "mystream",
+      "expected": "mystream"
+    },
+    {
+      "input": "my-stream",
+      "expected": "my_stream"
+    },
+    {
+      "input": "my stream!",
+      "expected": "my_stream_"
+    },
+    {
+      "input": "  padded ",
+      "expected": "padded"
+    },
+    {
+      "input": "über-cam",
+      "expected": "_ber_cam"
+    },
+    {
+      "input": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "expected": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+      "input": "cam.1/2",
+      "expected": "cam_1_2"
+    },
+    {
+      "input": "___",
+      "expected": "___"
+    }
+  ],
+  "sanitizeRoom": [
+    {
+      "input": "myroom",
+      "expected": "myroom"
+    },
+    {
+      "input": "my-room",
+      "expected": "my_room"
+    },
+    {
+      "input": "Room 42",
+      "expected": "Room_42"
+    },
+    {
+      "input": "rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr",
+      "expected": "rrrrrrrrrrrrrrrrrrrrrrrrrrrrrr"
+    },
+    {
+      "input": " spaced ",
+      "expected": "spaced"
+    },
+    {
+      "input": "room/with/slashes",
+      "expected": "room_with_slashes"
+    }
+  ],
+  "sanitizePassword": [
+    {
+      "input": "simple",
+      "expected": "simple"
+    },
+    {
+      "input": "p w%&é",
+      "expected": "p%20w%25%26%C3%A9"
+    },
+    {
+      "input": " trimmed ",
+      "expected": "trimmed"
+    },
+    {
+      "input": "!'()*-._~",
+      "expected": "!'()*-._~"
+    },
+    {
+      "input": "a+b=c&d",
+      "expected": "a%2Bb%3Dc%26d"
+    },
+    {
+      "input": "ünïcödé 日本",
+      "expected": "%C3%BCn%C3%AFc%C3%B6d%C3%A9%20%E6%97%A5%E6%9C%AC"
+    },
+    {
+      "input": "%20literal",
+      "expected": "%2520literal"
+    }
+  ],
+  "sanitizeLabel": [
+    {
+      "input": "Main Camera",
+      "expected": "Main Camera"
+    },
+    {
+      "input": "  spaced  ",
+      "expected": "spaced"
+    },
+    {
+      "input": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "expected": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    },
+    {
+      "input": "multi\nline",
+      "expected": "multiline"
+    }
+  ]
+}

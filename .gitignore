@@ -9,7 +9,7 @@ ffmpeg.exe
 dist/
 build/
 referenceonly/
-vdoninja/
+/vdoninja/
 recordings/
 
 # Misc
@@ -81,3 +81,11 @@ Desktop.ini
 ehthumbs.db
 *.swp
 *~
+
+# Native SDK build outputs
+build-interop/
+rust/target/
+c/build/
+python/.venv/
+python/*.egg-info/
+__pycache__/

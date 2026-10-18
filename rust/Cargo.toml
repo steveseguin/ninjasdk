@@ -1,0 +1,12 @@
+[workspace]
+members = ["vdoninja-core", "vdoninja"]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MPL-2.0"
+authors = ["Steve Seguin"]
+repository = "https://github.com/steveseguin/ninjasdk"
+homepage = "https://github.com/steveseguin/ninjasdk/tree/main/rust"
+rust-version = "1.85"
