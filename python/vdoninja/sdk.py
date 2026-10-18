@@ -304,6 +304,7 @@ class VDONinja:
         self._intentional = False
         self._generation = 0
         self._reconnects = 0
+        self._reconnecting = False
         self._queue: List[str] = []
 
         self.room_joined = False
@@ -463,6 +464,8 @@ class VDONinja:
             raise VDONinjaError("operation cancelled by disconnect")
         self._ws = ws
         self._connected = True
+        if not self._reconnecting:
+            self._reconnects = 0
         queued, self._queue = self._queue, []
         for text in queued:
             await ws.send(text)
@@ -502,6 +505,13 @@ class VDONinja:
                 self._reconnect_task = asyncio.ensure_future(self._reconnect(generation))
 
     async def _reconnect(self, generation: int) -> None:
+        self._reconnecting = True
+        try:
+            await self._reconnect_loop(generation)
+        finally:
+            self._reconnecting = False
+
+    async def _reconnect_loop(self, generation: int) -> None:
         while True:
             if self._intentional or generation != self._generation or self._connected:
                 return
@@ -564,6 +574,21 @@ class VDONinja:
         conns, self.connections = self.connections, {}
         self._pending_views = {}
         self._pending_ice = {}
+        # An explicit disconnect drops the connection intent, as the JS SDK does:
+        # a later connect() starts clean, and an unexpected drop after it must
+        # not replay the old room, stream or views.
+        self.stream_id = None
+        self._data_only = False
+        self._local_tracks = []
+        self._intent_room = None
+        self._view_intent = {}
+        self._stopped_views = set()
+        self._reconnects = 0
+        for transfer in self._inbound.values():
+            fut = transfer["future"]
+            if not fut.done():
+                fut.set_exception(VDONinjaError("operation cancelled by disconnect"))
+        self._inbound = {}
         for fut in self._room_waiters:
             if not fut.done():
                 fut.set_exception(VDONinjaError("operation cancelled by disconnect"))
@@ -578,21 +603,28 @@ class VDONinja:
             if not fut.done():
                 fut.set_exception(VDONinjaError("operation cancelled by disconnect"))
         self._pending_requests = {}
-        for pair in conns.values():
-            for conn in (pair.publisher, pair.viewer):
-                if conn:
-                    conn.send_control({"bye": True})
-        await asyncio.sleep(0.05)
-        for pair in conns.values():
-            for conn in (pair.publisher, pair.viewer):
-                if conn:
-                    await conn.close()
+        await self._close_with_bye([c for pair in conns.values() for c in (pair.publisher, pair.viewer) if c])
         if ws is not None:
             try:
                 await ws.close()
             except Exception:  # noqa: BLE001
                 pass
         self._emit(Event("disconnected", intentional=True, reason="local-disconnect"))
+
+    async def _close_with_bye(self, conns: List[Connection]) -> None:
+        """Sends bye, waits briefly (up to 100 ms, like the JS bufferedAmount wait) for it to
+        leave the control channel, then closes the peer connections."""
+        for conn in conns:
+            conn.send_control({"bye": True})
+        if conns:
+            await asyncio.sleep(0.02)
+            deadline = time.time() + 0.08
+            while time.time() < deadline and any(
+                c.control is not None and c.control.readyState == "open" and c.control.bufferedAmount > 0 for c in conns
+            ):
+                await asyncio.sleep(0.01)
+        for conn in conns:
+            await conn.close()
 
     def _send_ws(self, msg: Dict[str, Any]) -> bool:
         if self.client_id:
@@ -713,9 +745,7 @@ class VDONinja:
                 pair.publisher = None
             if pair.empty:
                 del self.connections[uuid]
-        for conn in closing:
-            conn.send_control({"bye": True})
-            await conn.close()
+        await self._close_with_bye(closing)
         self._emit(Event("publishingStopped", stream_id=sid))
 
     async def add_track(self, track: MediaStreamTrack) -> None:
@@ -812,9 +842,7 @@ class VDONinja:
                     del self.connections[uuid]
         if stream_id in self.streams:
             self.streams[stream_id]["state"] = "available"
-        for conn in closing:
-            conn.send_control({"bye": True})
-            await conn.close()
+        await self._close_with_bye(closing)
         self._emit(Event("viewingStopped", stream_id=stream_id))
 
     def peers(self) -> List[str]:
@@ -974,7 +1002,9 @@ class VDONinja:
         self._pending_ice.pop(f"remote:{uuid}", None)
         pair = self.connections.pop(uuid, None)
         retry = None
-        if pair and pair.viewer and pair.viewer.stream_id and not self._intentional and pair.viewer.stream_id not in self._stopped_views:
+        # Only bye (the peer went away) schedules a retry of the view; hangup is the
+        # peer ending the session on purpose, as in the JS SDK.
+        if kind == "bye" and pair and pair.viewer and pair.viewer.stream_id and not self._intentional and pair.viewer.stream_id not in self._stopped_views:
             retry = (pair.viewer.stream_id, pair.viewer.view_options)
             if pair.viewer.stream_id in self.streams:
                 self.streams[pair.viewer.stream_id]["state"] = "disconnected"
@@ -1058,7 +1088,7 @@ class VDONinja:
         await conn.pc.setLocalDescription(offer)
         return conn.pc.localDescription
 
-    def _send_description(self, conn: Connection, desc: RTCSessionDescription, include_stream_id: bool) -> None:
+    def _send_description(self, conn: Connection, desc: RTCSessionDescription, include_stream_id: bool, via_signaling: bool = False) -> None:
         payload = {"type": desc.type, "sdp": desc.sdp}
         msg: Dict[str, Any] = {"UUID": conn.uuid, "session": conn.session}
         if include_stream_id and conn.stream_id:
@@ -1071,7 +1101,7 @@ class VDONinja:
                 return
         else:
             msg["description"] = payload
-        if conn.control_open:
+        if not via_signaling and conn.control_open:
             dc_msg = {"description": msg["description"], "session": msg["session"]}
             if "vector" in msg:
                 dc_msg["vector"] = msg["vector"]
@@ -1174,10 +1204,10 @@ class VDONinja:
         except Exception as exc:  # noqa: BLE001
             self._emit(Event("error", error=exc, uuid=uuid, message="failed to handle answer"))
 
-    async def _renegotiate(self, conn: Connection) -> None:
+    async def _renegotiate(self, conn: Connection, via_signaling: bool = False) -> None:
         offer = await conn.pc.createOffer()
         await conn.pc.setLocalDescription(offer)
-        self._send_description(conn, conn.pc.localDescription, include_stream_id=False)
+        self._send_description(conn, conn.pc.localDescription, include_stream_id=False, via_signaling=via_signaling)
 
     async def _restart_ice(self, conn: Connection, reason: str) -> None:
         if conn.type == "viewer":
@@ -1187,7 +1217,9 @@ class VDONinja:
         # aiortc has no ICE-restart offer option; a fresh offer at least re-syncs
         # the session. Viewers that keep failing re-request the stream instead.
         try:
-            await self._renegotiate(conn)
+            # A restart we initiate because the connection failed travels over signaling:
+            # the data channel it would otherwise use is the thing that is broken.
+            await self._renegotiate(conn, via_signaling=reason != "remote_request")
             self._emit(Event("iceRestart", uuid=conn.uuid, stream_id=conn.stream_id, reason=reason))
         except Exception as exc:  # noqa: BLE001
             log.debug("renegotiation failed for %s: %s", conn.uuid, exc)
@@ -1311,40 +1343,61 @@ class VDONinja:
             self._set_stream_state(conn.stream_id, "failed")
             await self._recover(conn, "failed")
         elif state == "closed":
-            self._emit(Event("peerDisconnected", uuid=conn.uuid, stream_id=conn.stream_id, connection_type=conn.type))
+            # Closed by the remote side; our own close sets finalized first and its
+            # caller reports the disconnect.
+            if not conn.finalized and self._is_current(conn):
+                await self._fail_connection(conn, "closed")
 
     def _set_stream_state(self, stream_id: Optional[str], state: str) -> None:
         if stream_id and stream_id in self.streams:
             self.streams[stream_id]["state"] = state
 
-    async def _drop_viewer(self, conn: Connection) -> None:
-        pair = self.connections.get(conn.uuid)
-        if pair and pair.viewer is conn:
-            pair.viewer = None
-            if pair.empty:
-                del self.connections[conn.uuid]
-        await conn.close()
-
     async def _recover(self, conn: Connection, reason: str) -> None:
         if not self._is_current(conn):
             return
         if conn.recovering:
-            self._emit(Event("connectionFailed", uuid=conn.uuid, stream_id=conn.stream_id, connection_type=conn.type, reason=reason))
-            if conn.type == "viewer" and conn.stream_id:
-                sid, opts = conn.stream_id, conn.view_options
-                await self._drop_viewer(conn)
-                if sid not in self._stopped_views:
-                    self._schedule_view_retry(sid, opts, 2.0)
+            # Second failure: bounded recovery is over, tear the connection down.
+            await self._fail_connection(conn, reason)
             return
         conn.recovering = True
         log.debug("recovering %s connection to %s (%s)", conn.type, conn.uuid, reason)
         if conn.type == "publisher" or conn.control_open:
             await self._restart_ice(conn, reason)
+            self._arm_recovery_timer(conn)
             return
+        # Nothing to talk over: start again from the play request.
+        await self._fail_connection(conn, reason)
+
+    def _arm_recovery_timer(self, conn: Connection) -> None:
+        """Bounds an ICE restart: a connection still down after connection_timeout is given up on."""
+        if conn.connect_task:
+            conn.connect_task.cancel()
+
+        async def restart_timeout() -> None:
+            await asyncio.sleep(self.connection_timeout)
+            if self._is_current(conn) and conn.pc.connectionState != "connected" and conn.pc.iceConnectionState not in ("connected", "completed"):
+                await self._recover(conn, "restart_timeout")
+
+        conn.connect_task = asyncio.ensure_future(restart_timeout())
+
+    async def _fail_connection(self, conn: Connection, reason: str) -> None:
+        """Closes and forgets a connection that could not be recovered, like the JS SDK's
+        _handleConnectionFailed: peerDisconnected, then connectionFailed, then (viewer side)
+        a retry of the view."""
         sid, opts = conn.stream_id, conn.view_options
-        await self._drop_viewer(conn)
-        if sid and sid not in self._stopped_views:
-            self._schedule_view_retry(sid, opts, 1.0)
+        pair = self.connections.get(conn.uuid)
+        if pair:
+            if pair.viewer is conn:
+                pair.viewer = None
+            if pair.publisher is conn:
+                pair.publisher = None
+            if pair.empty:
+                del self.connections[conn.uuid]
+        await conn.close()
+        self._emit(Event("peerDisconnected", uuid=conn.uuid, stream_id=sid, connection_type=conn.type))
+        self._emit(Event("connectionFailed", uuid=conn.uuid, stream_id=sid, connection_type=conn.type, reason=reason))
+        if conn.type == "viewer" and sid and sid not in self._stopped_views:
+            self._schedule_view_retry(sid, opts, 2.0)
 
     # ---------------------------------------------------------- data channels
 

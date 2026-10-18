@@ -52,7 +52,22 @@ the Node build of the JavaScript SDK, against a local signaling server.
 | Statistics | yes | yes | yes | via libdatachannel | yes | via `pc.getStats()` | via `pc.getStats()` | via `pc.statistics()` |
 
 "reconnects" means the engine lacks ICE restart, so a failed connection is torn down and re-requested from the
-publisher instead; the application sees `connectionFailed` followed by a fresh `peerConnected`.
+publisher instead; the application sees `peerDisconnected` and `connectionFailed` followed by a fresh `peerConnected`.
+
+### Connection lifecycle (all SDKs, as in the JavaScript SDK)
+
+* A peer connection that fails or stays disconnected past the grace period gets one bounded recovery attempt
+  (`iceRestart`: the publisher sends an ICE-restart offer over signaling, a viewer asks the publisher with
+  `iceRestartRequest`). If it is still down after the connection timeout the SDK closes it and emits
+  `peerDisconnected` then `connectionFailed`; viewers then re-request the stream after 2 s.
+* `bye` from a peer closes both directions and, on the viewer side, re-requests the stream after 2 s. `hangup`
+  closes without retrying: the peer ended the session on purpose.
+* `view()` of a publisher that is not online yet fails with the SDK's "not yet available" error, keeps the request
+  pending (a `videoaddedtoroom` or `someonejoined` connects it) and re-sends `play` every `viewRetryInterval`
+  (15 minutes by default).
+* `disconnect()` drops the connection intent (room, publish, views): a later `connect()` starts clean and an
+  unexpected socket drop after it replays nothing. An unexpected drop while connected reconnects with exponential
+  backoff and replays room, seed and views; the attempt counter resets on a manual `connect()`.
 
 ### Interoperability
 
@@ -86,7 +101,7 @@ server and to browser peers.
   `{UUID, session (8 chars), streamID (hashed), description, vector}`; answers echo `session` and `streamID`;
   candidates are `{UUID, type: "remote" (viewer → publisher) | "local" (publisher → viewer), candidates, vector,
   session}`, bundled with a 70 ms timer that doubles up to 1 s, and sent over the control channel once it is open.
-  `bye`/`hangup` end a connection.
+  `bye`/`hangup` end a connection (viewers retry the stream after `bye`, not after `hangup`).
 * **Control channel.** The publisher creates `sendChannel`. The viewer sends `{audio, video, downloads,
   info:{label}, allowresources}`; the publisher sends `{info:{label, meta, ...}}`. `ping`/`pong`, `pipe`
   (application data), `bye`, `videoMuted`, `iceRestartRequest`, `fileList`/`requestFile` and `obsState` share the

@@ -92,13 +92,14 @@ type SDK struct {
 
 	mu sync.Mutex
 
-	ws          *websocket.Conn
-	wsMu        sync.Mutex
-	connected   bool
-	intentional bool
-	generation  int
-	reconnects  int
-	queue       [][]byte
+	ws           *websocket.Conn
+	wsMu         sync.Mutex
+	connected    bool
+	intentional  bool
+	generation   int
+	reconnects   int
+	reconnecting bool // a reconnect loop is running
+	queue        [][]byte
 
 	password     string // sanitized (URL-encoded) password, "" when disabled
 	noPassword   bool
@@ -346,7 +347,7 @@ func (s *SDK) connect(ctx context.Context, reconnectGeneration *int) error {
 	return nil
 }
 
-func (s *SDK) isReconnecting() bool { return s.reconnects > 0 }
+func (s *SDK) isReconnecting() bool { return s.reconnecting }
 
 func (s *SDK) readLoop(conn *websocket.Conn, gen int) {
 	for {
@@ -392,6 +393,14 @@ func truncate(s string, n int) string {
 }
 
 func (s *SDK) reconnect(gen int) {
+	s.mu.Lock()
+	s.reconnecting = true
+	s.mu.Unlock()
+	defer func() {
+		s.mu.Lock()
+		s.reconnecting = false
+		s.mu.Unlock()
+	}()
 	for {
 		s.mu.Lock()
 		if s.intentional || gen != s.generation || s.connected {
@@ -494,6 +503,20 @@ func (s *SDK) Disconnect() {
 	s.pendingRequests = map[string]*pendingRequest{}
 	waiters := s.roomWaiters
 	s.roomWaiters = nil
+	// An explicit disconnect drops the connection intent, as the JS SDK does:
+	// a later Connect starts clean, and an unexpected drop after it must not
+	// replay the old room, stream or views.
+	s.streamID = ""
+	s.dataOnly = false
+	s.localTracks = nil
+	s.intentRoom = nil
+	s.viewIntent = map[string]ViewOptions{}
+	s.stoppedViews = map[string]bool{}
+	s.reconnects = 0
+	viewWaiters := s.viewWaiters
+	s.viewWaiters = map[string][]chan *Connection{}
+	inbound := s.inbound
+	s.inbound = map[string]*inboundTransfer{}
 	s.mu.Unlock()
 
 	for _, w := range waiters {
@@ -502,22 +525,61 @@ func (s *SDK) Disconnect() {
 	for _, p := range pending {
 		p.fail(ErrCancelled)
 	}
-	for _, pair := range conns {
-		for _, c := range []*Connection{pair.publisher, pair.viewer} {
-			if c == nil {
-				continue
+	for _, list := range viewWaiters {
+		for _, w := range list {
+			select {
+			case w <- nil: // View returns ErrCancelled
+			default:
 			}
-			c.sendControl(map[string]any{"bye": true})
-			c.close()
 		}
 	}
-	// Give bye messages a moment to flush before tearing down transports.
-	time.Sleep(50 * time.Millisecond)
+	for _, t := range inbound {
+		t.finish(nil, ErrCancelled)
+	}
+	var closing []*Connection
+	for _, pair := range conns {
+		for _, c := range []*Connection{pair.publisher, pair.viewer} {
+			if c != nil {
+				closing = append(closing, c)
+			}
+		}
+	}
+	s.closeWithBye(closing)
 	if ws != nil {
 		_ = ws.WriteControl(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""), time.Now().Add(time.Second))
 		_ = ws.Close()
 	}
 	s.emit(Event{Type: EventDisconnected, Intentional: true, Reason: "local-disconnect"})
+}
+
+// closeWithBye sends bye on each connection's control channel, waits briefly
+// (up to 100 ms, like the JS SDK's bufferedAmount wait) for the bytes to leave,
+// then closes the peer connections, so the bye is not lost to the SCTP abort
+// that Close triggers.
+func (s *SDK) closeWithBye(conns []*Connection) {
+	for _, c := range conns {
+		c.sendControl(map[string]any{"bye": true})
+	}
+	if len(conns) > 0 {
+		time.Sleep(20 * time.Millisecond)
+		deadline := time.Now().Add(80 * time.Millisecond)
+		for time.Now().Before(deadline) {
+			pending := false
+			for _, c := range conns {
+				if c.controlBuffered() > 0 {
+					pending = true
+					break
+				}
+			}
+			if !pending {
+				break
+			}
+			time.Sleep(5 * time.Millisecond)
+		}
+	}
+	for _, c := range conns {
+		c.close()
+	}
 }
 
 // Connected reports whether the signaling socket is open.
@@ -775,10 +837,7 @@ func (s *SDK) StopPublishing() {
 		}
 	}
 	s.mu.Unlock()
-	for _, c := range closing {
-		c.sendControl(map[string]any{"bye": true})
-		c.close()
-	}
+	s.closeWithBye(closing)
 	s.emit(Event{Type: EventPublishingStop, StreamID: streamID})
 }
 
@@ -819,7 +878,7 @@ func (s *SDK) AddTrack(track webrtc.TrackLocal) error {
 		c.senderKinds[sender] = track.Kind()
 		c.mu.Unlock()
 		go s.drainRTCP(sender)
-		if err := s.renegotiate(c, false); err != nil {
+		if err := s.renegotiate(c, false, false); err != nil {
 			s.logf("renegotiate %s failed: %v", c.uuid, err)
 		}
 	}
@@ -966,10 +1025,7 @@ func (s *SDK) StopViewing(streamID string) {
 		info.State = "available"
 	}
 	s.mu.Unlock()
-	for _, c := range closing {
-		c.sendControl(map[string]any{"bye": true})
-		c.close()
-	}
+	s.closeWithBye(closing)
 	s.emit(Event{Type: EventViewingStopped, StreamID: streamID})
 }
 
@@ -1247,7 +1303,7 @@ func (s *SDK) handleOfferRequest(uuid, session string) {
 		s.emit(Event{Type: EventError, Err: err, UUID: uuid})
 		return
 	}
-	s.sendDescription(c, offer, true)
+	s.sendDescription(c, offer, true, false)
 }
 
 func (s *SDK) handleBye(uuid string, typ EventType, msg map[string]any) {
@@ -1261,7 +1317,9 @@ func (s *SDK) handleBye(uuid string, typ EventType, msg map[string]any) {
 	delete(s.connections, uuid)
 	var retryStream string
 	var retryOpts ViewOptions
-	if pair != nil && pair.viewer != nil && pair.viewer.streamID != "" && !s.intentional && !s.stoppedViews[pair.viewer.streamID] {
+	// Only bye (the peer went away) schedules a retry of the view; hangup is
+	// the peer ending the session on purpose, as in the JS SDK.
+	if typ == EventBye && pair != nil && pair.viewer != nil && pair.viewer.streamID != "" && !s.intentional && !s.stoppedViews[pair.viewer.streamID] {
 		retryStream = pair.viewer.streamID
 		retryOpts = pair.viewer.viewOptions
 		if info := s.streams[retryStream]; info != nil {

@@ -194,3 +194,23 @@ async def test_reconnect_restores_publish(signal_host):
     finally:
         await pub.disconnect()
         await view.disconnect()
+
+
+async def test_disconnect_clears_intent(signal_host):
+    sdk = make(signal_host, reconnect_delay=0.1)
+    try:
+        await sdk.connect()
+        await sdk.join_room("old-room")
+        await sdk.announce("stale")
+        await sdk.disconnect()
+        # A fresh session with no room or stream, then an unexpected drop: the old
+        # intent must not be replayed by the reconnect.
+        await sdk.connect()
+        reconnected = asyncio.ensure_future(sdk.wait_for("reconnected", timeout=10))
+        await sdk._ws.close()
+        await reconnected
+        assert not sdk.publishing
+        assert sdk.stream_id is None
+        assert not sdk.room_joined
+    finally:
+        await sdk.disconnect()

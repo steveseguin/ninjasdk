@@ -113,6 +113,17 @@ func (c *Connection) controlOpen() bool {
 	return dc != nil && dc.ReadyState() == webrtc.DataChannelStateOpen
 }
 
+// controlBuffered reports bytes still queued on the control channel.
+func (c *Connection) controlBuffered() uint64 {
+	c.mu.Lock()
+	dc := c.control
+	c.mu.Unlock()
+	if dc == nil || dc.ReadyState() != webrtc.DataChannelStateOpen {
+		return 0
+	}
+	return dc.BufferedAmount()
+}
+
 // sendControl sends a JSON message on the control channel. It returns false
 // when the channel is not open.
 func (c *Connection) sendControl(v any) bool {
@@ -314,8 +325,9 @@ func (s *SDK) drainRTCP(sender *webrtc.RTPSender) {
 
 // sendDescription sends an offer or answer, encrypted when a password is set.
 // Offers also include our hashed stream ID. It uses the control channel when
-// open (renegotiation) and the signaling server otherwise.
-func (s *SDK) sendDescription(c *Connection, desc webrtc.SessionDescription, includeStreamID bool) {
+// open (renegotiation) and the signaling server otherwise; viaSignaling forces
+// the signaling server, for ICE restarts whose data channel may be dead.
+func (s *SDK) sendDescription(c *Connection, desc webrtc.SessionDescription, includeStreamID, viaSignaling bool) {
 	msg := map[string]any{"UUID": c.uuid, "session": c.Session()}
 	if includeStreamID {
 		s.mu.Lock()
@@ -333,7 +345,7 @@ func (s *SDK) sendDescription(c *Connection, desc webrtc.SessionDescription, inc
 	} else {
 		msg["description"] = desc
 	}
-	if c.controlOpen() {
+	if !viaSignaling && c.controlOpen() {
 		dcMsg := map[string]any{"description": msg["description"], "session": msg["session"]}
 		if v, ok := msg["vector"]; ok {
 			dcMsg["vector"] = v
@@ -532,7 +544,7 @@ func (s *SDK) handleAnswer(uuid, session string, desc webrtc.SessionDescription)
 
 // renegotiate creates a new offer on a publisher connection (track changes or
 // ICE restart) and sends it over the control channel or signaling.
-func (s *SDK) renegotiate(c *Connection, iceRestart bool) error {
+func (s *SDK) renegotiate(c *Connection, iceRestart, viaSignaling bool) error {
 	var opts *webrtc.OfferOptions
 	if iceRestart {
 		opts = &webrtc.OfferOptions{ICERestart: true}
@@ -544,7 +556,7 @@ func (s *SDK) renegotiate(c *Connection, iceRestart bool) error {
 	if err := c.pc.SetLocalDescription(offer); err != nil {
 		return err
 	}
-	s.sendDescription(c, offer, false)
+	s.sendDescription(c, offer, false, viaSignaling)
 	return nil
 }
 
@@ -557,7 +569,10 @@ func (s *SDK) restartICE(c *Connection, reason string) {
 		}
 		return
 	}
-	if err := s.renegotiate(c, true); err != nil {
+	// A restart we initiate because the connection failed must travel over
+	// signaling: the data channel it would otherwise use is the thing that is
+	// broken. Only a restart answering the peer's iceRestartRequest uses it.
+	if err := s.renegotiate(c, true, reason != "remote_request"); err != nil {
 		s.logf("ICE restart failed for %s: %v", c.uuid, err)
 		return
 	}
@@ -813,7 +828,14 @@ func (s *SDK) handlePeerState(c *Connection) {
 		s.setStreamState(c.StreamID(), "failed")
 		s.recoverConnection(c, "failed")
 	case "closed":
-		s.emit(Event{Type: EventPeerDisconnected, UUID: c.uuid, StreamID: c.StreamID(), ConnectionType: c.typ})
+		// Closed by the remote side; our own close sets finalized first and
+		// its caller reports the disconnect.
+		c.mu.Lock()
+		finalized := c.finalized
+		c.mu.Unlock()
+		if !finalized && s.isCurrent(c) {
+			s.failConnection(c, "closed")
+		}
 	}
 }
 
@@ -830,7 +852,8 @@ func (s *SDK) setStreamState(streamID, state string) {
 
 // recoverConnection attempts an ICE restart (publisher side), asks the
 // publisher for one (viewer side), or re-requests the stream when nothing is
-// open. It is bounded: a second failure emits connectionFailed.
+// open. Recovery is bounded: a second failure tears the connection down via
+// failConnection, which reports peerDisconnected and connectionFailed.
 func (s *SDK) recoverConnection(c *Connection, reason string) {
 	if !s.isCurrent(c) {
 		return
@@ -838,52 +861,67 @@ func (s *SDK) recoverConnection(c *Connection, reason string) {
 	c.mu.Lock()
 	if c.recovering {
 		c.mu.Unlock()
-		s.emit(Event{Type: EventConnectionFailed, UUID: c.uuid, StreamID: c.streamID, ConnectionType: c.typ, Reason: reason})
-		if c.typ == "viewer" && c.streamID != "" {
-			sid, opts := c.streamID, c.viewOptions
-			s.mu.Lock()
-			if pair := s.connections[c.uuid]; pair != nil && pair.viewer == c {
-				pair.viewer = nil
-				if pair.publisher == nil {
-					delete(s.connections, c.uuid)
-				}
-			}
-			stopped := s.stoppedViews[sid]
-			s.mu.Unlock()
-			c.close()
-			if !stopped {
-				s.scheduleViewRetry(sid, opts, 2*time.Second)
-			}
-		}
+		s.failConnection(c, reason)
 		return
 	}
 	c.recovering = true
 	c.mu.Unlock()
 	s.logf("Recovering %s connection to %s (%s)", c.typ, c.uuid, reason)
-	if c.typ == "publisher" {
+	if c.typ == "publisher" || c.controlOpen() {
 		s.restartICE(c, reason)
-		return
-	}
-	if c.controlOpen() {
-		s.restartICE(c, reason)
+		s.armRecoveryTimer(c)
 		return
 	}
 	// Nothing to talk over: start again from the play request.
+	s.failConnection(c, reason)
+}
+
+// armRecoveryTimer bounds an ICE restart: if the connection is still down
+// after ConnectionTimeout it is given up on.
+func (s *SDK) armRecoveryTimer(c *Connection) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.connectTimer != nil {
+		c.connectTimer.Stop()
+	}
+	c.connectTimer = time.AfterFunc(s.opts.ConnectionTimeout, func() {
+		if !s.isCurrent(c) {
+			return
+		}
+		st := c.pc.ConnectionState()
+		ice := c.pc.ICEConnectionState()
+		if st != webrtc.PeerConnectionStateConnected && ice != webrtc.ICEConnectionStateConnected && ice != webrtc.ICEConnectionStateCompleted {
+			s.recoverConnection(c, "restart_timeout")
+		}
+	})
+}
+
+// failConnection closes and forgets a connection that could not be recovered,
+// like the JS SDK's _handleConnectionFailed: peerDisconnected, then
+// connectionFailed, then (viewer side) a retry of the view.
+func (s *SDK) failConnection(c *Connection, reason string) {
 	c.mu.Lock()
 	sid, opts := c.streamID, c.viewOptions
 	c.mu.Unlock()
 	s.mu.Lock()
-	if pair := s.connections[c.uuid]; pair != nil && pair.viewer == c {
-		pair.viewer = nil
-		if pair.publisher == nil {
+	if pair := s.connections[c.uuid]; pair != nil {
+		if pair.viewer == c {
+			pair.viewer = nil
+		}
+		if pair.publisher == c {
+			pair.publisher = nil
+		}
+		if pair.publisher == nil && pair.viewer == nil {
 			delete(s.connections, c.uuid)
 		}
 	}
 	stopped := s.stoppedViews[sid]
 	s.mu.Unlock()
 	c.close()
-	if sid != "" && !stopped {
-		s.scheduleViewRetry(sid, opts, time.Second)
+	s.emit(Event{Type: EventPeerDisconnected, UUID: c.uuid, StreamID: sid, ConnectionType: c.typ})
+	s.emit(Event{Type: EventConnectionFailed, UUID: c.uuid, StreamID: sid, ConnectionType: c.typ, Reason: reason})
+	if c.typ == "viewer" && sid != "" && !stopped {
+		s.scheduleViewRetry(sid, opts, 2*time.Second)
 	}
 }
 

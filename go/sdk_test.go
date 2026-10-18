@@ -497,3 +497,38 @@ func TestReconnectRestoresPublish(t *testing.T) {
 		t.Fatalf("expected ErrAlreadyPublishing after reconnect, got %v", err)
 	}
 }
+
+func TestDisconnectClearsIntent(t *testing.T) {
+	host := startSignal(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	s := newTestSDK(t, host, func(o *Options) { o.ReconnectDelay = 100 * time.Millisecond })
+	if err := s.Connect(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.JoinRoom(ctx, "old-room"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Announce(ctx, PublishOptions{StreamID: "stale"}); err != nil {
+		t.Fatal(err)
+	}
+	s.Disconnect()
+	// A fresh session with no room or stream, then an unexpected drop: the old
+	// intent must not be replayed by the reconnect.
+	if err := s.Connect(ctx); err != nil {
+		t.Fatal(err)
+	}
+	reconnected := make(chan Event, 1)
+	s.On(EventReconnected, func(ev Event) { reconnected <- ev })
+	s.mu.Lock()
+	ws := s.ws
+	s.mu.Unlock()
+	_ = ws.Close()
+	waitFor(t, reconnected, 10*time.Second, "reconnect after a fresh connect")
+	s.mu.Lock()
+	publishing, sid, joined := s.publishing, s.streamID, s.roomJoined
+	s.mu.Unlock()
+	if publishing || sid != "" || joined {
+		t.Fatalf("stale intent replayed: publishing=%v streamID=%q roomJoined=%v", publishing, sid, joined)
+	}
+}
