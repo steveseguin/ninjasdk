@@ -71,19 +71,18 @@ int vdon_sanitize_label(const char *in, char *out, size_t out_size) {
     if (!in)
         return VDON_OK;
     len = strlen(in);
-    for (i = 0; i < len && cps < 100; i++) {
+    for (i = 0; i < len; i++) {
         unsigned char c = (unsigned char)in[i];
         if (c == '\r' || c == '\n')
             continue;
-        if ((c & 0xc0) != 0x80)
+        if ((c & 0xc0) != 0x80) {
+            if (cps == 100)
+                break;
             cps++;
+        }
         if (n + 1 >= out_size)
             return VDON_ERR_TOO_SMALL;
         out[n++] = (char)c;
-    }
-    /* A code point boundary may have been cut when cps hit 100: drop trailing continuation bytes. */
-    while (n > 0 && ((unsigned char)out[n - 1] & 0xc0) == 0x80 && cps >= 100) {
-        n--;
     }
     out[n] = 0;
     if (!trim_bounds(out, &s, &e)) {

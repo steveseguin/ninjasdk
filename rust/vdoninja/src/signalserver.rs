@@ -178,11 +178,22 @@ impl State {
                 &json!({"request": "videoaddedtoroom", "UUID": uuid, "streamID": stream_id}),
                 uuid,
             );
-        } else if let Some(watchers) = self.waiting.remove(stream_id) {
+        }
+        if let Some(watchers) = self.waiting.remove(stream_id) {
+            let mut remaining = HashSet::new();
             for viewer in watchers {
                 if self.clients.contains_key(&viewer) {
-                    self.send(uuid, &json!({"request": "offerSDP", "UUID": viewer}));
+                    if self.rooms.contains_key(uuid)
+                        && self.rooms.get(&viewer) != self.rooms.get(uuid)
+                    {
+                        remaining.insert(viewer);
+                    } else {
+                        self.send(uuid, &json!({"request": "offerSDP", "UUID": viewer}));
+                    }
                 }
+            }
+            if !remaining.is_empty() {
+                self.waiting.insert(stream_id.into(), remaining);
             }
         }
     }
@@ -365,6 +376,25 @@ async fn handle_client(state: Arc<Mutex<State>>, stream: TcpStream) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn seed_wakes_only_same_room_waiters() {
+        let mut state = State::default();
+        let (publisher, mut rx) = mpsc::unbounded_channel();
+        state.clients.insert("publisher".into(), publisher.clone());
+        state.clients.insert("viewer".into(), publisher.clone());
+        state.clients.insert("outside".into(), publisher);
+        state.rooms.insert("publisher".into(), "room".into());
+        state.rooms.insert("viewer".into(), "room".into());
+        state.rooms.insert("outside".into(), "other".into());
+        state.play("viewer", "future");
+        state.play("outside", "future");
+        state.seed("publisher", "future");
+        let msg: Value = serde_json::from_str(&rx.try_recv().unwrap()).unwrap();
+        assert_eq!(msg, json!({"request": "offerSDP", "UUID": "viewer"}));
+        assert!(rx.try_recv().is_err());
+        assert_eq!(state.waiting["future"], HashSet::from(["outside".into()]));
+    }
 
     #[test]
     fn join_room_cannot_steal_stream() {

@@ -239,12 +239,18 @@ func (s *Server) seed(c *client, streamID string) {
 	s.streamIDs[c.uuid] = streamID
 	if room, ok := s.rooms[c.uuid]; ok {
 		s.notifyRoom(room, map[string]any{"request": "videoaddedtoroom", "UUID": c.uuid, "streamID": streamID}, c.uuid)
-	} else if watchers := s.waiting[streamID]; len(watchers) > 0 {
-		delete(s.waiting, streamID)
+	}
+	if watchers := s.waiting[streamID]; len(watchers) > 0 {
 		for viewer := range watchers {
-			if _, alive := s.clients[viewer]; alive {
+			if _, alive := s.clients[viewer]; !alive {
+				delete(watchers, viewer)
+			} else if room := s.rooms[c.uuid]; room == "" || s.rooms[viewer] == room {
 				c.send(map[string]any{"request": "offerSDP", "UUID": viewer})
+				delete(watchers, viewer)
 			}
+		}
+		if len(watchers) == 0 {
+			delete(s.waiting, streamID)
 		}
 	}
 }

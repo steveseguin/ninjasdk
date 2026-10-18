@@ -133,6 +133,7 @@ public final class SignalingClient: NSObject, URLSessionWebSocketDelegate, @unch
     }
 
     private func scheduleReconnect() {
+        guard !intentional else { return }
         if attempts >= maxReconnectAttempts {
             onReconnectFailed?()
             return
@@ -169,11 +170,14 @@ public final class SignalingClient: NSObject, URLSessionWebSocketDelegate, @unch
             self.intentional = true
             self.reconnectWork?.cancel()
             self.reconnectWork = nil
+            let pending = self.pendingOpen
+            self.pendingOpen = nil
             self.generation += 1
             let was = self.connected
             self.connected = false
             self.task?.cancel(with: .normalClosure, reason: nil)
             self.task = nil
+            pending?(URLError(.cancelled))
             if was { self.onClose?(true) }
         }
     }

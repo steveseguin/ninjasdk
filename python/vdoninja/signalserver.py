@@ -134,10 +134,15 @@ class SignalServer:
         room = self.rooms.get(uuid)
         if room:
             await self._notify_room(room, {"request": "videoaddedtoroom", "UUID": uuid, "streamID": stream_id}, uuid)
-        else:
-            for viewer in self.waiting.pop(stream_id, set()):
-                if viewer in self.clients:
-                    await self._send(uuid, {"request": "offerSDP", "UUID": viewer})
+        watchers = self.waiting.get(stream_id, set())
+        for viewer in list(watchers):
+            if viewer not in self.clients:
+                watchers.discard(viewer)
+            elif not room or self.rooms.get(viewer) == room:
+                watchers.discard(viewer)
+                await self._send(uuid, {"request": "offerSDP", "UUID": viewer})
+        if not watchers:
+            self.waiting.pop(stream_id, None)
 
     def _leave_room(self, uuid: str) -> None:
         """Drops the room membership ({"leave": true})."""

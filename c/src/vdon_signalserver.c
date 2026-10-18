@@ -189,12 +189,15 @@ static void ss_handle(vdon_signal_server *s, ss_client *c, cJSON *msg) {
             cJSON_AddStringToObject(n, "streamID", sid);
             ss_notify_room(s, c->room, n, c->uuid);
             cJSON_Delete(n);
-        } else {
+        }
+        {
             ss_waiting **pw = &s->waiting;
             while (*pw) {
                 ss_waiting *w = *pw;
-                if (strcmp(w->stream_id, sid) == 0) {
-                    if (ss_find(s, w->viewer_uuid)) {
+                ss_client *viewer = ss_find(s, w->viewer_uuid);
+                if (strcmp(w->stream_id, sid) == 0 &&
+                    (!viewer || !c->room || (viewer->room && strcmp(viewer->room, c->room) == 0))) {
+                    if (viewer) {
                         cJSON *o = cJSON_CreateObject();
                         cJSON_AddStringToObject(o, "request", "offerSDP");
                         cJSON_AddStringToObject(o, "UUID", w->viewer_uuid);

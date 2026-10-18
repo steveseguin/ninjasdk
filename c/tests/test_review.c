@@ -94,6 +94,45 @@ static void test_retired_transfer(void) {
     pthread_mutex_destroy(&s.lock);
 }
 
+static void test_room_waiters(void) {
+    vdon_signal_server s = {0};
+    ss_client pub = {0}, viewer = {0}, outside = {0};
+    cJSON *msg;
+    strcpy(pub.uuid, "publisher");
+    strcpy(viewer.uuid, "viewer");
+    strcpy(outside.uuid, "outside");
+    pub.ws = viewer.ws = outside.ws = -1;
+    pub.room = viewer.room = "room";
+    outside.room = "other";
+    pub.next = &viewer;
+    viewer.next = &outside;
+    s.clients = &pub;
+    ss_queue(&s, "future", viewer.uuid);
+    ss_queue(&s, "future", outside.uuid);
+    msg = cJSON_Parse("{\"request\":\"seed\",\"streamID\":\"future\"}");
+    ss_handle(&s, &pub, msg);
+    CHECK(s.waiting && !s.waiting->next && strcmp(s.waiting->viewer_uuid, "outside") == 0);
+    free(s.waiting->stream_id);
+    free(s.waiting->viewer_uuid);
+    free(s.waiting);
+    free(pub.stream_id);
+    cJSON_Delete(msg);
+}
+
+static void test_label_utf8_boundary(void) {
+    const char *ends[] = {"\xc3\xa9", "\xe6\xbc\xa2", "\xf0\x9f\x98\x80"};
+    size_t i;
+    for (i = 0; i < sizeof(ends) / sizeof(ends[0]); i++) {
+        char input[128], output[128], expected[128];
+        memset(input, 'a', 99);
+        strcpy(input + 99, ends[i]);
+        strcpy(expected, input);
+        strcat(input, "extra");
+        CHECK(vdon_sanitize_label(input, output, sizeof(output)) == VDON_OK);
+        CHECK(strcmp(output, expected) == 0);
+    }
+}
+
 static int sender_finished;
 static void *slow_sender(void *arg) {
     chan_t *ch = (chan_t *)arg;
@@ -119,6 +158,8 @@ int main(void) {
     test_join_collision();
     test_retired_transfer();
     test_sender_lifetime();
+    test_room_waiters();
+    test_label_utf8_boundary();
     puts("review regressions passed");
     return 0;
 }

@@ -66,3 +66,59 @@ func TestJoinRoomCannotStealStream(t *testing.T) {
 		t.Fatal("stream routed away from owner")
 	}
 }
+
+func TestSeedWakesOnlySameRoomWaiters(t *testing.T) {
+	s := New()
+	srv := httptest.NewServer(s)
+	defer srv.Close()
+	join := func(room string) *websocket.Conn {
+		c, _, err := websocket.DefaultDialer.Dial("ws"+strings.TrimPrefix(srv.URL, "http"), nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { _ = c.Close() })
+		if err := c.WriteJSON(map[string]any{"request": "joinroom", "roomid": room}); err != nil {
+			t.Fatal(err)
+		}
+		_ = c.SetReadDeadline(time.Now().Add(3 * time.Second))
+		var msg map[string]any
+		if err := c.ReadJSON(&msg); err != nil {
+			t.Fatal(err)
+		}
+		return c
+	}
+	view, outside, pub := join("room"), join("other"), join("room")
+	for _, c := range []*websocket.Conn{view, outside} {
+		if err := c.WriteJSON(map[string]any{"request": "play", "streamID": "future"}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	deadline := time.Now().Add(3 * time.Second)
+	for {
+		s.mu.Lock()
+		n := len(s.waiting["future"])
+		s.mu.Unlock()
+		if n == 2 {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("view requests did not reach server")
+		}
+		time.Sleep(time.Millisecond)
+	}
+	if err := pub.WriteJSON(map[string]any{"request": "seed", "streamID": "future"}); err != nil {
+		t.Fatal(err)
+	}
+	var msg map[string]any
+	if err := pub.ReadJSON(&msg); err != nil {
+		t.Fatal(err)
+	}
+	if msg["request"] != "offerSDP" {
+		t.Fatalf("expected queued offer, got %v", msg)
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if len(s.waiting["future"]) != 1 || s.waiting["future"][str(msg["UUID"])] {
+		t.Fatal("seed must drain only same-room waiters")
+	}
+}
