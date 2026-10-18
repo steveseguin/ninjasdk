@@ -41,6 +41,7 @@ class SignalingClient(
 
     private val lock = Any()
     private var socket: WebSocket? = null
+    private var opening: WebSocket? = null // handshake in flight; close() cancels it
     @Volatile var connected: Boolean = false
         private set
     @Volatile private var intentional = false
@@ -102,6 +103,7 @@ class SignalingClient(
             }
         }
         val openingSocket = http.newWebSocket(Request.Builder().url(url).build(), listener)
+        synchronized(lock) { opening = openingSocket }
         fun cancelOpening() {
             synchronized(lock) {
                 if (generation.compareAndSet(gen, gen + 1)) {
@@ -117,6 +119,8 @@ class SignalingClient(
             cancelOpening()
             Thread.currentThread().interrupt()
             throw e
+        } finally {
+            synchronized(lock) { if (opening === openingSocket) opening = null }
         }
         if (!opened) {
             cancelOpening()
@@ -175,16 +179,20 @@ class SignalingClient(
     fun close() {
         intentional = true
         val ws: WebSocket?
+        val inFlight: WebSocket?
         val wasConnected: Boolean
         synchronized(lock) {
             reconnectTask?.cancel(false)
             reconnectTask = null
             generation.incrementAndGet()
             ws = socket
+            inFlight = opening
+            opening = null
             wasConnected = connected
             socket = null
             connected = false
         }
+        inFlight?.cancel() // a connect() still waiting gets onFailure and returns now
         try { ws?.close(1000, "bye") } catch (_: Exception) {}
         if (wasConnected) onClose?.invoke(true)
     }
