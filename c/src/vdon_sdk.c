@@ -135,6 +135,7 @@ const char *vdon_strerror(int code) {
     case VDON_ERR_CANCELLED: return "cancelled";
     case VDON_ERR_TOO_SMALL: return "buffer too small";
     case VDON_ERR_UNSUPPORTED: return "unsupported";
+    case VDON_ERR_ALREADY_PUBLISHING: return "already publishing on this connection; disconnect and reconnect to publish a different stream";
     default: return "unknown error";
     }
 }
@@ -2379,15 +2380,24 @@ int vdon_join_room(vdon_sdk *s, const char *room, const char *password, int clai
 }
 
 void vdon_leave_room(vdon_sdk *s) {
+    int had_room;
     if (!s)
         return;
     pthread_mutex_lock(&s->lock);
+    had_room = s->room != NULL;
     free(s->room);
     s->room = NULL;
     free(s->room_intent);
     s->room_intent = NULL;
     s->room_joined = 0;
     pthread_mutex_unlock(&s->lock);
+    if (!had_room)
+        return;
+    {
+        cJSON *m = cJSON_CreateObject(); /* the JavaScript SDK sends this too */
+        cJSON_AddBoolToObject(m, "leave", 1);
+        ws_send_free(s, m);
+    }
     {
         EV(ev, VDON_EVENT_ROOM_LEFT);
         vdon__emit(s, &ev);
@@ -2414,6 +2424,11 @@ static int seed(vdon_sdk *s, const char *stream_id, const char *room, const vdon
         return VDON_ERR_INVALID;
     if (vdon_sanitize_stream_id(stream_id, sid, sizeof(sid)) != VDON_OK)
         return VDON_ERR_INVALID;
+    pthread_mutex_lock(&s->lock);
+    rc = s->publishing ? VDON_ERR_ALREADY_PUBLISHING : VDON_OK; /* one publish per connection, like the JS SDK */
+    pthread_mutex_unlock(&s->lock);
+    if (rc != VDON_OK)
+        return rc;
     if (room && *room) {
         rc = vdon_join_room(s, room, NULL, 0, 10000);
         if (rc != VDON_OK && rc != VDON_ERR_TIMEOUT)

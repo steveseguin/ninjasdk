@@ -301,8 +301,9 @@ class VdoNinja @JvmOverloads constructor(
     }
 
     fun leaveRoom() {
-        synchronized(lock) { room = null; roomIntent = null }
-        emit(VdoEvent(VdoEvents.ROOM_LEFT))
+        val left = synchronized(lock) { val r = room; room = null; roomIntent = null; r } ?: return
+        signal.send(JSONObject().put("leave", true)) // the JavaScript SDK sends this too
+        emit(VdoEvent(VdoEvents.ROOM_LEFT, data = left))
     }
 
     // --------------------------------------------------------- publishing
@@ -317,6 +318,8 @@ class VdoNinja @JvmOverloads constructor(
 
     private fun seed(streamId: String?, room: String?, tracks: List<MediaStreamTrack>): String {
         check(connected) { "not connected" }
+        // One publish per signaling connection, like the JavaScript SDK.
+        check(!publishing) { "already publishing on this connection; disconnect and reconnect to publish a different stream" }
         val sid = Sanitize.streamId(streamId)
         if (!room.isNullOrEmpty()) {
             try { joinRoom(room) } catch (_: TimeoutException) { log("joinroom did not answer; seeding anyway") }

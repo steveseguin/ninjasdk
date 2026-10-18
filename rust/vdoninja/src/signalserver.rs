@@ -68,6 +68,10 @@ impl State {
     }
 
     fn handle(&mut self, uuid: &str, mut msg: Value) {
+        if msg.get("request").is_none() && msg.get("leave").is_some() {
+            self.leave_room(uuid);
+            return;
+        }
         let request = msg
             .get("request")
             .and_then(|v| v.as_str())
@@ -179,6 +183,22 @@ impl State {
                 if self.clients.contains_key(&viewer) {
                     self.send(uuid, &json!({"request": "offerSDP", "UUID": viewer}));
                 }
+            }
+        }
+    }
+
+    /// Drops the room membership (`{"leave": true}`).
+    fn leave_room(&mut self, uuid: &str) {
+        let Some(room) = self.rooms.remove(uuid) else {
+            return;
+        };
+        if self.directors.get(&room).map(|s| s.as_str()) == Some(uuid) {
+            self.directors.remove(&room);
+        }
+        if let Some(list) = self.room_list.get_mut(&room) {
+            list.retain(|m| m != uuid);
+            if list.is_empty() {
+                self.room_list.remove(&room);
             }
         }
     }

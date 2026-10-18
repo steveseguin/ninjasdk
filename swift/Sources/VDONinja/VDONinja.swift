@@ -175,10 +175,11 @@ public final class VDONinja {
     private var intentional = false
 
     public enum SDKError: Error, LocalizedError {
-        case notConnected, timeout(String), noChannel(String), remote(String), closed
+        case notConnected, alreadyPublishing, timeout(String), noChannel(String), remote(String), closed
         public var errorDescription: String? {
             switch self {
             case .notConnected: return "not connected"
+            case .alreadyPublishing: return "already publishing on this connection; disconnect and reconnect to publish a different stream"
             case .timeout(let s): return s
             case .noChannel(let s): return "no open data channel to \(s)"
             case .remote(let s): return s
@@ -194,6 +195,7 @@ public final class VDONinja {
             return RTCPeerConnectionFactory(encoderFactory: RTCDefaultVideoEncoderFactory(), decoderFactory: RTCDefaultVideoDecoderFactory())
         }()
         queue = DispatchQueue(label: "ninja.vdo.sdk")
+        queue.setSpecific(key: VDONinja.queueKey, value: ())
         pw = options.passwordContext()
         var info: JSON = [:]
         if let l = options.label.map(Sanitize.label), !l.isEmpty { info["label"] = l }
@@ -211,6 +213,15 @@ public final class VDONinja {
         signal.onReconnecting = { [weak self] attempt in self?.emit(VDOEvent(.reconnecting, attempt: attempt)) }
         signal.onReconnectFailed = { [weak self] in self?.emit(VDOEvent(.reconnectFailed)) }
         signal.onMessage = { [weak self] msg in self?.handleSignal(msg) }
+    }
+
+    private static let queueKey = DispatchSpecificKey<Void>()
+
+    /// Runs `body` on the SDK queue. Event listeners already run on that queue,
+    /// so calling `queue.sync` from one would deadlock; run inline instead.
+    private func onQueue<T>(_ body: () -> T) -> T {
+        if DispatchQueue.getSpecific(key: VDONinja.queueKey) != nil { return body() }
+        return queue.sync(execute: body)
     }
 
     // MARK: Events
@@ -295,7 +306,7 @@ public final class VDONinja {
 
     // MARK: Rooms
 
-    public var currentRoom: String? { queue.sync { room } }
+    public var currentRoom: String? { onQueue { room } }
 
     /// Joins a room; completes with the listing (or an empty list when `timeout` is 0).
     public func joinRoom(_ room: String? = nil, claim: Bool = false, timeout: TimeInterval = 10, completion: @escaping (Result<[ListingEntry], Error>) -> Void) {
@@ -333,7 +344,13 @@ public final class VDONinja {
     }
 
     public func leaveRoom() {
-        queue.async { self.room = nil; self.roomIntent = nil; self.emit(VDOEvent(.roomLeft)) }
+        queue.async {
+            guard let room = self.room else { return }
+            self.room = nil
+            self.roomIntent = nil
+            self.signal.send(["leave": true]) // the JavaScript SDK sends this too
+            self.emit(VDOEvent(.roomLeft, data: room))
+        }
     }
 
     // MARK: Publishing
@@ -360,6 +377,8 @@ public final class VDONinja {
         let sid = Sanitize.streamId(streamId)
         let doSeed = {
             guard self.connected else { return completion(.failure(SDKError.notConnected)) }
+            // One publish per signaling connection, like the JavaScript SDK.
+            guard !self.publishing else { return completion(.failure(SDKError.alreadyPublishing)) }
             self.streamId = sid
             self.publishing = true
             self.localTracks = tracks
@@ -482,13 +501,13 @@ public final class VDONinja {
     }
 
     /// Streams seen so far.
-    public func streams() -> [StreamInfo] { queue.sync { Array(streamTable.values) } }
+    public func streams() -> [StreamInfo] { onQueue { Array(streamTable.values) } }
 
     /// UUIDs of peers with at least one connection.
-    public func peers() -> [String] { queue.sync { order.filter { connections[$0] != nil } } }
+    public func peers() -> [String] { onQueue { order.filter { connections[$0] != nil } } }
 
     /// Finds a connection to `uuid`; nil `type` prefers the publisher side.
-    public func connection(_ uuid: String, type: String? = nil) -> VDOConnection? { queue.sync { connectionLocked(uuid, type) } }
+    public func connection(_ uuid: String, type: String? = nil) -> VDOConnection? { onQueue { connectionLocked(uuid, type) } }
 
     private func connectionLocked(_ uuid: String, _ type: String?) -> VDOConnection? {
         guard let pair = connections[uuid] else { return nil }
@@ -505,7 +524,7 @@ public final class VDONinja {
     public func autoConnect(room: String, streamId: String? = nil, fullMode: Bool = false) async throws -> String {
         if !connected { try await connect() }
         let sid = Sanitize.streamId(streamId)
-        queue.sync { self.streamId = sid; autoConnectOn = true; autoFull = fullMode }
+        onQueue { self.streamId = sid; autoConnectOn = true; autoFull = fullMode }
         _ = try await joinRoom(room)
         _ = try await announce(streamId: sid)
         queue.async { for s in Array(self.streamTable.values) { self.autoConsider(s.streamId) } }
@@ -526,7 +545,7 @@ public final class VDONinja {
     /// `uuid` nil = every peer; `preference` any|publisher|viewer|all.
     @discardableResult
     public func sendData(_ data: Any, uuid: String? = nil, type: String? = nil, preference: String = "any", allowFallback: Bool = false) -> Bool {
-        queue.sync { sendDataLocked(data, uuid: uuid, type: type, preference: preference, allowFallback: allowFallback) }
+        onQueue { sendDataLocked(data, uuid: uuid, type: type, preference: preference, allowFallback: allowFallback) }
     }
 
     private func sendDataLocked(_ data: Any, uuid: String?, type: String?, preference: String, allowFallback: Bool) -> Bool {
@@ -560,7 +579,7 @@ public final class VDONinja {
     /// Pings peers over the control channel; replies emit `peerLatency`.
     @discardableResult
     public func sendPing(_ uuid: String? = nil) -> Bool {
-        queue.sync {
+        onQueue {
             let now = Int(Date().timeIntervalSince1970 * 1000)
             var sent = false
             for c in allConnections() where (uuid == nil || c.uuid == uuid) && c.controlOpen {

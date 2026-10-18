@@ -519,9 +519,11 @@ impl VdoNinja {
             let mut st = self.inner.st.lock().unwrap();
             st.room_joined = false;
             st.intent_room = None;
-            st.room.clone()
+            std::mem::take(&mut st.room)
         };
         if !room.is_empty() {
+            // The JavaScript SDK sends this too.
+            self.inner.send_ws(json!({"leave": true}));
             self.inner.emit(Event::RoomLeft { room });
         }
     }
@@ -538,7 +540,18 @@ impl VdoNinja {
 
     /// Registers a data-only stream so peers can connect to it. Returns the stream ID.
     pub async fn announce(&self, opts: PublishOptions) -> Result<String> {
+        self.ensure_not_publishing()?;
         self.inner.clone().seed(vec![], true, opts).await
+    }
+
+    /// One publish per signaling connection, like the JavaScript SDK (the
+    /// server rejects a changed stream ID on a live socket).
+    fn ensure_not_publishing(&self) -> Result<()> {
+        if self.inner.st.lock().unwrap().publishing {
+            Err(Error::AlreadyPublishing)
+        } else {
+            Ok(())
+        }
     }
 
     /// Registers a media stream (webrtc-rs local tracks). Returns the stream ID.
@@ -547,6 +560,7 @@ impl VdoNinja {
         tracks: Vec<Arc<dyn TrackLocal>>,
         opts: PublishOptions,
     ) -> Result<String> {
+        self.ensure_not_publishing()?;
         self.inner.clone().seed(tracks, false, opts).await
     }
 
@@ -1672,6 +1686,8 @@ impl Inner {
             (hashed, rx, st.generation)
         };
         if let Some(c) = existing {
+            drop(rx);
+            self.prune_view_waiters(stream_id);
             return Ok(c);
         }
         log::debug!("requesting stream {stream_id:?} as {hashed:?}");
@@ -1680,6 +1696,9 @@ impl Inner {
             Ok(Ok(c)) => Ok(c),
             Ok(Err(_)) => Err(Error::Cancelled),
             Err(_) => {
+                // The receiver was dropped with the timeout; forget its sender so
+                // retries of a stream that never appears do not accumulate.
+                self.prune_view_waiters(stream_id);
                 {
                     let st = self.st.lock().unwrap();
                     if generation != st.generation || st.intentional {
@@ -1688,6 +1707,17 @@ impl Inner {
                 }
                 self.schedule_view_retry(stream_id, opts, self.opts.view_retry_interval);
                 Err(Error::StreamNotYetAvailable)
+            }
+        }
+    }
+
+    /// Removes view waiters whose receiver is gone (timed out or returned early).
+    fn prune_view_waiters(&self, stream_id: &str) {
+        let mut st = self.st.lock().unwrap();
+        if let Some(list) = st.view_waiters.get_mut(stream_id) {
+            list.retain(|tx| !tx.is_closed());
+            if list.is_empty() {
+                st.view_waiters.remove(stream_id);
             }
         }
     }

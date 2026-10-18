@@ -297,9 +297,12 @@ class VdoNinja {
   }
 
   void leaveRoom() {
+    final room = _room;
     _room = null;
     _roomIntent = null;
-    _emit(const VdoEvent(VdoEvents.roomLeft));
+    if (room == null) return;
+    _signal.send({'leave': true}); // the JavaScript SDK sends this too
+    _emit(VdoEvent(VdoEvents.roomLeft, data: room));
   }
 
   // --------------------------------------------------------- publishing
@@ -315,6 +318,10 @@ class VdoNinja {
 
   Future<String> _seed(String? streamId, String? room, MediaStream? stream) async {
     if (!connected) throw StateError('not connected');
+    if (_publishing) {
+      // One publish per signaling connection, like the JavaScript SDK.
+      throw StateError('already publishing on this connection; disconnect and reconnect to publish a different stream');
+    }
     final sid = sanitizeStreamId(streamId);
     if (room != null && room.isNotEmpty) {
       try {
@@ -341,6 +348,7 @@ class VdoNinja {
     for (final c in _allConnections().where((c) => c.type == 'publisher')) {
       final sender = await c.pc.addTrack(track, stream ?? _localStream ?? await createLocalMediaStream('vdoninja'));
       c._senders.add(sender);
+      _senderKinds[sender] = track.kind ?? 'video'; // needed to resume after a viewer mutes this kind
       await _renegotiate(c);
     }
   }

@@ -37,6 +37,7 @@ type Connection struct {
 	allowResource bool
 	viewOptions   ViewOptions
 	senders       []*webrtc.RTPSender
+	senderKinds   map[*webrtc.RTPSender]webrtc.RTPCodecType // survives ReplaceTrack(nil)
 
 	iceBundle      []webrtc.ICECandidateInit
 	iceTimer       *time.Timer
@@ -198,6 +199,7 @@ func (s *SDK) createConnection(uuid, typ string) (*Connection, error) {
 		allowVideo:     true,
 		iceBundleDelay: 70 * time.Millisecond,
 		advertised:     map[string]bool{},
+		senderKinds:    map[*webrtc.RTPSender]webrtc.RTPCodecType{},
 		lastMessage:    time.Now(),
 	}
 
@@ -278,6 +280,7 @@ func (s *SDK) createOffer(c *Connection, iceRestart bool) (webrtc.SessionDescrip
 			}
 			c.mu.Lock()
 			c.senders = append(c.senders, sender)
+			c.senderKinds[sender] = t.Kind()
 			c.mu.Unlock()
 			go s.drainRTCP(sender)
 		}
@@ -1108,19 +1111,28 @@ func (s *SDK) updateTracksForConnection(c *Connection) {
 	allowAudio, allowVideo := c.allowAudio, c.allowVideo
 	c.mu.Unlock()
 	for _, sender := range senders {
-		kind := sender.Track()
-		var k webrtc.RTPCodecType
-		if kind != nil {
-			k = kind.Kind()
-		} else {
-			continue
+		c.mu.Lock()
+		k, known := c.senderKinds[sender]
+		c.mu.Unlock()
+		if !known {
+			// A muted sender has no track; the recorded kind is what lets it resume.
+			if t := sender.Track(); t != nil {
+				k = t.Kind()
+			} else {
+				continue
+			}
 		}
 		allow := (k == webrtc.RTPCodecTypeAudio && allowAudio) || (k == webrtc.RTPCodecTypeVideo && allowVideo)
 		if !allow {
-			if err := sender.ReplaceTrack(nil); err != nil {
-				s.logf("ReplaceTrack(nil) failed: %v", err)
+			if sender.Track() != nil {
+				if err := sender.ReplaceTrack(nil); err != nil {
+					s.logf("ReplaceTrack(nil) failed: %v", err)
+				}
 			}
 			continue
+		}
+		if sender.Track() != nil {
+			continue // already sending this kind
 		}
 		for _, t := range tracks {
 			if t.Kind() == k {

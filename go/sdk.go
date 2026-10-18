@@ -40,6 +40,7 @@ const Version = "0.1.0"
 // Errors returned by the SDK.
 var (
 	ErrNotConnected           = errors.New("vdoninja: not connected to signaling server")
+	ErrAlreadyPublishing      = errors.New("vdoninja: already publishing on this connection; disconnect and reconnect to publish a different stream")
 	ErrRoomRequired           = errors.New("vdoninja: room name is required")
 	ErrRoomJoinTimeout        = errors.New("vdoninja: room join timeout")
 	ErrStreamNotYetAvailable  = errors.New("vdoninja: stream not available yet; view request stays pending")
@@ -426,9 +427,8 @@ func (s *SDK) restoreIntent() {
 	s.mu.Lock()
 	room := s.intentRoom
 	publishing := s.publishing || s.streamID != ""
-	wasPublishing := s.streamID != "" && (s.dataOnly || len(s.localTracks) > 0)
+	wasPublishing := s.publishing && s.streamID != ""
 	streamID := s.streamID
-	dataOnly := s.dataOnly
 	views := make(map[string]ViewOptions, len(s.viewIntent))
 	for k, v := range s.viewIntent {
 		if !s.stoppedViews[k] {
@@ -446,14 +446,12 @@ func (s *SDK) restoreIntent() {
 		}
 	}
 	if wasPublishing {
-		if dataOnly {
-			_, _ = s.Announce(ctx, PublishOptions{StreamID: streamID})
-		} else {
-			s.mu.Lock()
-			tracks := append([]webrtc.TrackLocal(nil), s.localTracks...)
-			s.mu.Unlock()
-			_, _ = s.Publish(ctx, tracks, PublishOptions{StreamID: streamID})
-		}
+		// Re-seed directly: the SDK is still "publishing" and Announce/Publish
+		// refuse a second publish on a connection.
+		s.mu.Lock()
+		hashed := s.hashedStreamID(streamID)
+		s.mu.Unlock()
+		s.sendWS(map[string]any{"request": "seed", "streamID": hashed})
 	}
 	for sid, opts := range views {
 		go func(sid string, opts ViewOptions) {
@@ -654,17 +652,20 @@ func (s *SDK) removeRoomWaiter(w chan struct{}) {
 	}
 }
 
-// LeaveRoom forgets the room locally. The hosted protocol has no leave
-// message; reconnect to join a different room.
+// LeaveRoom sends the leave message (as the JavaScript SDK does) and forgets
+// the room locally.
 func (s *SDK) LeaveRoom() {
 	s.mu.Lock()
 	room := s.room
+	s.room = ""
 	s.roomJoined = false
 	s.intentRoom = nil
 	s.mu.Unlock()
-	if room != "" {
-		s.emit(Event{Type: EventRoomLeft, Data: room})
+	if room == "" {
+		return
 	}
+	s.sendWS(map[string]any{"leave": true})
+	s.emit(Event{Type: EventRoomLeft, Data: room})
 }
 
 // Room returns the joined room name, if any.
@@ -698,6 +699,12 @@ func (s *SDK) seed(ctx context.Context, tracks []webrtc.TrackLocal, dataOnly boo
 	if !s.connected {
 		s.mu.Unlock()
 		return "", ErrNotConnected
+	}
+	if s.publishing {
+		// One publish per signaling connection, like the JavaScript SDK: the
+		// server rejects a changed stream ID on a live socket.
+		s.mu.Unlock()
+		return "", ErrAlreadyPublishing
 	}
 	gen := s.generation
 	s.setPublisherInfo(opts.Label, opts.Meta, opts.Order, opts.Info)
@@ -799,6 +806,7 @@ func (s *SDK) AddTrack(track webrtc.TrackLocal) error {
 		}
 		c.mu.Lock()
 		c.senders = append(c.senders, sender)
+		c.senderKinds[sender] = track.Kind()
 		c.mu.Unlock()
 		go s.drainRTCP(sender)
 		if err := s.renegotiate(c, false); err != nil {

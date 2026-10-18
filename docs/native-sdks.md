@@ -79,8 +79,8 @@ server and to browser peers.
   `someEncryptionKey123`; `password: false` disables hashing and encryption entirely.
 * **Encryption.** SDP and ICE candidates are JSON-serialized and encrypted with AES-256-CBC (PKCS#7), key
   `sha256(P+S)`, random 16-byte IV, both sent as hex (`description`/`candidates` plus `vector`).
-* **Requests.** `joinroom {roomid, claim?, streamID?}` → `listing {list, director?, claim?}`; `seed {streamID}`
-  registers a publisher; `play {streamID}` asks the server to find the publisher, which receives
+* **Requests.** `joinroom {roomid, claim?, streamID?}` → `listing {list, director?, claim?}`; `{leave: true}` leaves
+  the room; `seed {streamID}` registers a publisher (one publish per signaling connection; reconnect to change it); `play {streamID}` asks the server to find the publisher, which receives
   `offerSDP {UUID}`; room members receive `videoaddedtoroom` and `someonejoined`; `alert`/`error` carry text.
 * **Routing.** Any message with a `UUID` is forwarded to that peer with `UUID` rewritten to the sender. Offers carry
   `{UUID, session (8 chars), streamID (hashed), description, vector}`; answers echo `session` and `streamID`;

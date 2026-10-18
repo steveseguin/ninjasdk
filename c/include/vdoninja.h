@@ -57,6 +57,7 @@ extern "C" {
 #define VDON_ERR_CANCELLED -9      /* cancelled by disconnect */
 #define VDON_ERR_TOO_SMALL -10     /* output buffer too small */
 #define VDON_ERR_UNSUPPORTED -11
+#define VDON_ERR_ALREADY_PUBLISHING -12 /* one publish per connection; disconnect and reconnect to change streams */
 
 typedef struct vdon_sdk vdon_sdk;
 

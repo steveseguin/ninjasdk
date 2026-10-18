@@ -68,6 +68,8 @@ pub enum Error {
     StreamNotYetAvailable,
     #[error("not publishing")]
     NotPublishing,
+    #[error("already publishing on this connection; disconnect and reconnect to publish a different stream")]
+    AlreadyPublishing,
     #[error("no open data channel to peer")]
     NoDataChannel,
     #[error("peer not found")]

@@ -98,11 +98,36 @@ static void ss_queue(vdon_signal_server *s, const char *sid, const char *viewer)
     s->waiting = w;
 }
 
+/* Drops the room membership ({"leave": true}). */
+static void ss_leave_room(vdon_signal_server *s, ss_client *c) {
+    ss_director **pd = &s->directors;
+    if (!c->room)
+        return;
+    while (*pd) {
+        ss_director *d = *pd;
+        if (strcmp(d->uuid, c->uuid) == 0 && strcmp(d->room, c->room) == 0) {
+            *pd = d->next;
+            free(d->room);
+            free(d->uuid);
+            free(d);
+        } else {
+            pd = &d->next;
+        }
+    }
+    free(c->room);
+    c->room = NULL;
+}
+
 static void ss_handle(vdon_signal_server *s, ss_client *c, cJSON *msg) {
     const char *request = cJSON_GetStringValue(cJSON_GetObjectItemCaseSensitive(msg, "request"));
     if (!request) {
         const char *target = cJSON_GetStringValue(cJSON_GetObjectItemCaseSensitive(msg, "UUID"));
-        ss_client *t = target ? ss_find(s, target) : NULL;
+        ss_client *t;
+        if (cJSON_GetObjectItemCaseSensitive(msg, "leave")) {
+            ss_leave_room(s, c);
+            return;
+        }
+        t = target ? ss_find(s, target) : NULL;
         if (t) {
             cJSON_DeleteItemFromObjectCaseSensitive(msg, "from");
             cJSON_ReplaceItemInObjectCaseSensitive(msg, "UUID", cJSON_CreateString(c->uuid));

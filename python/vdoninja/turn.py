@@ -69,5 +69,8 @@ def select_turn_servers(servers: List[Dict[str, Any]], tz_offset_minutes: Option
             tcp += 1
         else:
             continue
-        out.append(RTCIceServer(urls=list(s.get("urls", [])), username=s.get("username"), credential=s.get("credential")))
+        urls = s.get("urls", [])
+        if isinstance(urls, str):
+            urls = [urls]  # the standard scalar form; list("turn:...") would split characters
+        out.append(RTCIceServer(urls=list(urls), username=s.get("username"), credential=s.get("credential")))
     return out

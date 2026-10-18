@@ -86,6 +86,9 @@ class SignalServer:
     async def handle(self, uuid: str, msg: Dict[str, Any]) -> None:
         request = msg.get("request")
         if not request:
+            if "leave" in msg:
+                self._leave_room(uuid)
+                return
             target = msg.get("UUID")
             if isinstance(target, str) and target in self.clients:
                 msg["UUID"] = uuid
@@ -135,6 +138,19 @@ class SignalServer:
             for viewer in self.waiting.pop(stream_id, set()):
                 if viewer in self.clients:
                     await self._send(uuid, {"request": "offerSDP", "UUID": viewer})
+
+    def _leave_room(self, uuid: str) -> None:
+        """Drops the room membership ({"leave": true})."""
+        room = self.rooms.pop(uuid, None)
+        if not room:
+            return
+        if self.directors.get(room) == uuid:
+            del self.directors[room]
+        members = [m for m in self.room_list.get(room, []) if m != uuid]
+        if members:
+            self.room_list[room] = members
+        else:
+            self.room_list.pop(room, None)
 
     async def join_room(self, uuid: str, room: str, claim: bool, stream_id: str) -> None:
         if not room or uuid in self.rooms:

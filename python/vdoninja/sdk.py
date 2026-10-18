@@ -531,10 +531,8 @@ class VDONinja:
             if room:
                 await self.join_room(room["room"], claim=room.get("claim", False))
             if was_publishing and stream_id:
-                if self._data_only:
-                    await self.announce(stream_id=stream_id)
-                else:
-                    await self.publish(list(self._local_tracks), stream_id=stream_id)
+                # Re-seed directly: announce()/publish() refuse a second publish per connection.
+                self._send_ws({"request": "seed", "streamID": self.hashed_stream_id(stream_id)})
         except Exception as exc:  # noqa: BLE001
             log.debug("restore intent failed: %s", exc)
         for sid, opts in views.items():
@@ -653,11 +651,13 @@ class VDONinja:
         self._emit(Event("roomJoined", data=room))
 
     def leave_room(self) -> None:
-        """Forget the room locally (the protocol has no leave message)."""
+        """Send the leave message (as the JavaScript SDK does) and forget the room."""
         room = self.room
+        self.room = ""
         self.room_joined = False
         self._intent_room = None
         if room:
+            self._send_ws({"leave": True})
             self._emit(Event("roomLeft", data=room))
 
     # ------------------------------------------------------------ publishing
@@ -673,6 +673,9 @@ class VDONinja:
     async def _seed(self, tracks, data_only, stream_id, room, password, label, meta, order, info) -> str:
         if not self._connected:
             raise VDONinjaError("not connected to signaling server")
+        if self.publishing:
+            # One publish per signaling connection, like the JavaScript SDK.
+            raise VDONinjaError("already publishing on this connection; disconnect and reconnect to publish a different stream")
         generation = self._generation
         self._set_publisher_info(label, meta, order, info)
         sid = sanitize_stream_id(stream_id) if stream_id else (self.stream_id or generate_stream_id())

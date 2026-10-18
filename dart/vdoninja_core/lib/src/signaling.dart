@@ -58,7 +58,14 @@ class SignalingClient {
   Future<void> _open(Duration timeout) async {
     final gen = ++_generation;
     final channel = WebSocketChannel.connect(Uri.parse(url));
-    await channel.ready.timeout(timeout);
+    try {
+      await channel.ready.timeout(timeout);
+    } catch (e) {
+      // A slow handshake must not complete later as an unobserved socket.
+      if (gen == _generation) _generation++;
+      unawaited(channel.sink.close().catchError((_) {}));
+      rethrow;
+    }
     if (gen != _generation) {
       await channel.sink.close();
       throw StateError('connection superseded');
