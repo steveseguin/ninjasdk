@@ -20,6 +20,7 @@ Start with `docs/guides.md` to choose an integration. Task guides: `docs/connect
 - `whep-client.js` - WHEP viewing client
 - `demos/` - Working examples
 - `docs/` - API reference
+- `go/`, `rust/`, `c/`, `python/`, `dart/`, `kotlin/`, `swift/` - Native SDKs (same protocol; see `docs/native-sdks.md` for the feature matrix)
 
 ## How to Run / Test
 

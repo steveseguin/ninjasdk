@@ -13,20 +13,20 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>VDO.Ninja SDK | JavaScript WebRTC for Video, Audio &amp; Data</title>
-    <meta name="description" content="Build VDO.Ninja-compatible video tools, remote camera viewers, and peer-to-peer messaging in JavaScript and Node.js. Explore working demos, setup guides, and API documentation.">
+    <meta name="description" content="Build VDO.Ninja-compatible video tools, remote camera viewers, and peer-to-peer messaging in JavaScript and Node.js, or natively in Go, Rust, C, Python, Flutter, Android and Swift. Working demos, setup guides, and API documentation.">
 
     <!-- Open Graph -->
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://sdk.vdo.ninja/">
     <meta property="og:title" content="VDO.Ninja SDK | JavaScript WebRTC for Video, Audio &amp; Data">
-    <meta property="og:description" content="Build custom video tools and P2P messaging in browsers and Node.js. Working demos, setup guides, and API documentation.">
+    <meta property="og:description" content="Build custom video tools and P2P messaging in browsers, Node.js, Go, Rust, C, Python and mobile apps. Working demos, setup guides, and API documentation.">
 
     <!-- Twitter -->
     <meta name="twitter:card" content="summary">
     <meta name="twitter:title" content="VDO.Ninja SDK | JavaScript WebRTC for Video, Audio &amp; Data">
-    <meta name="twitter:description" content="JavaScript and Node.js tools for VDO.Ninja-compatible media and peer-to-peer data, with working demos and guides.">
+    <meta name="twitter:description" content="JavaScript, Node.js and native SDKs (Go, Rust, C, Python, Flutter, Android, Swift) for VDO.Ninja-compatible media and peer-to-peer data.">
 
-    <meta name="keywords" content="webrtc, p2p, peer-to-peer, sdk, javascript, nodejs, npm, video streaming, audio streaming, data channels, vdo.ninja, social stream ninja, raspberry ninja, whip, whep, meshcast, cloudflare stream">
+    <meta name="keywords" content="webrtc, p2p, peer-to-peer, sdk, javascript, nodejs, npm, go, rust, c, python, flutter, android, kotlin, swift, ios, video streaming, audio streaming, data channels, vdo.ninja, social stream ninja, raspberry ninja, whip, whep, meshcast, cloudflare stream">
     <meta name="author" content="Steve Seguin">
     <link rel="canonical" href="https://sdk.vdo.ninja/">
 
@@ -41,7 +41,7 @@
         "name": "VDO.Ninja SDK",
         "applicationCategory": "DeveloperApplication",
         "description": "JavaScript WebRTC SDK for VDO.Ninja-compatible audio, video, and peer-to-peer data",
-        "operatingSystem": ["Web Browser", "Node.js"],
+        "operatingSystem": ["Web Browser", "Node.js", "Linux", "macOS", "Windows", "Android", "iOS"],
         "offers": {
             "@type": "Offer",
             "price": "0",
@@ -61,6 +61,13 @@
             "P2P",
             "SDK",
             "Node.js",
+            "Go",
+            "Rust",
+            "C",
+            "Python",
+            "Flutter",
+            "Android",
+            "Swift",
             "Real-time communication",
             "Video streaming",
             "Audio streaming",
@@ -87,6 +94,7 @@
             <nav class="site-nav" aria-label="Main">
                 <a href="#try-live">Live demo</a>
                 <a href="#quickstart">Quick start</a>
+                <a href="#sdks">SDKs</a>
                 <a href="demos/">Demos</a>
                 <a href="docs/guides.html">Guides</a>
                 <a href="docs/api-reference.html">API</a>
@@ -103,10 +111,11 @@
         <section class="hero">
             <div class="container hero-grid">
                 <div class="hero-copy">
-                    <span class="badge badge-accent">Open source · Browser &amp; Node.js</span>
+                    <span class="badge badge-accent">Open source · Browser, Node.js &amp; native SDKs</span>
                     <h1 class="hero-title">Build with VDO.Ninja</h1>
                     <p class="hero-subtitle">
-                        A JavaScript SDK for live video, audio, and data between browsers and Node.js apps.
+                        A JavaScript SDK for live video, audio, and data between browsers and Node.js apps, with the same
+                        protocol available natively for <a href="#sdks">Go, Rust, C, Python, Flutter, Android and Swift</a>.
                         Peers connect directly over WebRTC, so there is no media server to run and no account or API key to manage.
                     </p>
                     <div class="hero-actions">
@@ -416,6 +425,65 @@ function handleCustomData(data) {
             </div>
         </section>
 
+        <!-- Languages and platforms -->
+        <section id="sdks" class="section">
+            <div class="container">
+                <div class="section-head">
+                    <p class="section-label">Languages and platforms</p>
+                    <h2>One protocol, eight SDKs</h2>
+                    <p class="section-lead">The JavaScript SDK is the reference implementation. Native SDKs implement the same VDO.Ninja protocol on established WebRTC engines, so a Go service, a Rust daemon, an Android app and a browser tab can all join one room, and every stream opens in VDO.Ninja and OBS. Same room names, stream IDs, passwords and events everywhere.</p>
+                </div>
+
+                <div class="grid grid-3 sdk-grid">
+                    <a class="card sdk-card" href="#quickstart">
+                        <div class="sdk-card-head"><h3>JavaScript</h3><span class="badge badge-accent">Reference</span></div>
+                        <p>Browsers (Chrome, Edge, Firefox, Safari and mobile) and Node.js with <code>@roamhq/wrtc</code> or <code>node-datachannel</code>. Full feature set, TypeScript types, WHIP/WHEP clients.</p>
+                        <code class="sdk-install">npm install @vdoninja/sdk</code>
+                    </a>
+                    <a class="card sdk-card" href="https://github.com/steveseguin/ninjasdk/blob/main/go/README.md">
+                        <div class="sdk-card-head"><h3>Go</h3><span class="badge">pion/webrtc</span></div>
+                        <p>Linux, macOS, Windows and ARM as a single cross-compiled binary, no cgo. Servers, bots, recorders and CLI tools. Full protocol, file transfer, WHIP/WHEP, bundled signaling server.</p>
+                        <code class="sdk-install">go get github.com/steveseguin/ninjasdk/go</code>
+                    </a>
+                    <a class="card sdk-card" href="https://github.com/steveseguin/ninjasdk/blob/main/rust/README.md">
+                        <div class="sdk-card-head"><h3>Rust</h3><span class="badge">webrtc-rs</span></div>
+                        <p>Linux first, also macOS and Windows. Services and desktop apps that want memory safety and low overhead. Full protocol, WHIP/WHEP, bundled signaling server.</p>
+                        <code class="sdk-install">vdoninja = "0.1"</code>
+                    </a>
+                    <a class="card sdk-card" href="https://github.com/steveseguin/ninjasdk/blob/main/c/README.md">
+                        <div class="sdk-card-head"><h3>C</h3><span class="badge">libdatachannel</span></div>
+                        <p>Embedded devices, encoders, plugins and bindings for other languages. Raw RTP in and out, data channels, file transfer; CMake build for Linux, macOS and Windows.</p>
+                        <code class="sdk-install">cmake -S c -B build &amp;&amp; cmake --build build</code>
+                    </a>
+                    <a class="card sdk-card" href="https://github.com/steveseguin/ninjasdk/blob/main/python/README.md">
+                        <div class="sdk-card-head"><h3>Python</h3><span class="badge">aiortc</span></div>
+                        <p>Scripting, prototyping, Raspberry Pi and automation with asyncio. Full protocol, WHIP/WHEP, bundled signaling server. Python 3.10+.</p>
+                        <code class="sdk-install">pip install ./python</code>
+                    </a>
+                    <a class="card sdk-card" href="https://github.com/steveseguin/ninjasdk/blob/main/dart/README.md">
+                        <div class="sdk-card-head"><h3>Flutter / Dart</h3><span class="badge">flutter_webrtc</span></div>
+                        <p>Flutter apps on Android, iOS, desktop and web. Camera publishing, viewing, data channels, pub/sub and RPC on a pure-Dart protocol core.</p>
+                        <code class="sdk-install">dependencies: vdoninja (path or git)</code>
+                    </a>
+                    <a class="card sdk-card" href="https://github.com/steveseguin/ninjasdk/blob/main/kotlin/README.md">
+                        <div class="sdk-card-head"><h3>Android (Kotlin / Java)</h3><span class="badge">libwebrtc</span></div>
+                        <p>Native Android apps on Google's libwebrtc with OkHttp signaling. Camera publishing, viewing, data channels, pub/sub and RPC. Usable from Java.</p>
+                        <code class="sdk-install">includeBuild("ninjasdk/kotlin")</code>
+                    </a>
+                    <a class="card sdk-card" href="https://github.com/steveseguin/ninjasdk/blob/main/swift/README.md">
+                        <div class="sdk-card-head"><h3>Swift (iOS, macOS, tvOS)</h3><span class="badge">WebRTC</span></div>
+                        <p>Swift package on Google WebRTC with URLSession signaling; async/await and completion-handler APIs. Camera publishing, viewing, data, pub/sub and RPC.</p>
+                        <code class="sdk-install">.package(url: "https://github.com/steveseguin/ninjasdk.git", branch: "main")</code>
+                    </a>
+                </div>
+
+                <div class="sdk-notes">
+                    <p class="muted small">Go, Rust, C and Python implement the whole protocol (rooms, encryption, file transfer, reserved <code>x-</code> channels, resources, TURN selection, autoConnect, WHIP/WHEP) and each ships a small VDO.Ninja-compatible signaling server for LAN, offline and test use. The mobile SDKs cover the basics and bring media from the platform's own capture APIs. All of them are checked against one conformance suite generated from the JavaScript SDK and tested against each other and the Node build. <a href="docs/native-sdks.html">Feature matrix and protocol summary →</a></p>
+                    <p class="muted small">Every SDK is MPL-2.0 like the JavaScript core, and the <a href="#usage-guidelines">handshake server guidelines</a> apply to all of them.</p>
+                </div>
+            </div>
+        </section>
+
         <!-- Why / use cases -->
         <section id="features" class="section section-alt">
             <div class="container">
@@ -440,7 +508,7 @@ function handleCustomData(data) {
                     </div>
                     <div class="feature">
                         <svg class="feature-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9l3 3-3 3M13 15h4"/></svg>
-                        <div><h3>Browser and Node.js</h3><p>One API in both. Run headless bots, recorders, and bridges next to your web app.</p></div>
+                        <div><h3>Browser, Node.js and native</h3><p>One API in JavaScript for both, and the <a href="#sdks">same protocol in Go, Rust, C, Python, Flutter, Android and Swift</a>. Run headless bots, recorders, and bridges next to your web app.</p></div>
                     </div>
                     <div class="feature">
                         <svg class="feature-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l9 5-9 5-9-5z"/><path d="M3 13l9 5 9-5"/></svg>
@@ -723,7 +791,7 @@ await whep.view();</code></pre>
                     </div>
                 </div>
 
-                <p class="platforms muted small">Other platforms: <a href="https://raspberry.ninja">Raspberry.Ninja</a> for Python, and the <a href="https://github.com/steveseguin/vdon_flutter">Flutter sample app</a> for mobile.</p>
+                <p class="platforms muted small">Other platforms: the <a href="#sdks">native SDKs</a> for Go, Rust, C, Python, Flutter, Android and Swift; <a href="https://raspberry.ninja">Raspberry.Ninja</a> for GStreamer-based publishing from Python; and the <a href="https://github.com/steveseguin/vdon_flutter">Flutter sample app</a>.</p>
             </div>
         </section>
 
@@ -776,7 +844,8 @@ await whep.view();</code></pre>
                         <div class="disclosure-body">
                             <p><strong>Browsers:</strong> Chrome/Edge 80+, Firefox 75+, Safari 14+, and mobile browsers with WebRTC.</p>
                             <p><strong>Node.js:</strong> full support with <code>@roamhq/wrtc</code> or <code>node-datachannel</code>. See the <a href="https://github.com/steveseguin/ninjasdk/blob/main/README-NODE.md">Node.js guide</a>.</p>
-                            <p><strong>Python:</strong> via <a href="https://raspberry.ninja">Raspberry.Ninja</a>. <strong>Mobile:</strong> the <a href="https://github.com/steveseguin/vdon_flutter">vdon_flutter</a> sample app.</p>
+                            <p><strong>Native SDKs:</strong> <a href="#sdks">Go, Rust, C and Python</a> on Linux, macOS and Windows, plus <a href="#sdks">Flutter, Android (Kotlin/Java) and Swift</a> for iOS, macOS and tvOS. Same protocol, same rooms; see the <a href="docs/native-sdks.html">feature matrix</a>.</p>
+                            <p><strong>Also:</strong> <a href="https://raspberry.ninja">Raspberry.Ninja</a> for GStreamer-based publishing from Python, and the <a href="https://github.com/steveseguin/vdon_flutter">vdon_flutter</a> sample app.</p>
                         </div>
                     </details>
                     <details class="disclosure">
@@ -841,13 +910,14 @@ await whep.view();</code></pre>
             <div class="footer-grid">
                 <div class="footer-brand">
                     <a class="brand" href="./"><img src="favicon.svg" alt="" width="26" height="26"><span>VDO.Ninja SDK</span></a>
-                    <p class="muted small">Open-source peer-to-peer video, audio, and data for browsers and Node.js. SDK core licensed under MPL-2.0.</p>
+                    <p class="muted small">Open-source peer-to-peer video, audio, and data for browsers, Node.js, Go, Rust, C, Python and mobile apps. SDK cores licensed under MPL-2.0.</p>
                 </div>
                 <nav aria-label="Documentation">
                     <h4>Docs</h4>
                     <a href="#quickstart">Quick start</a>
                     <a href="docs/guides.html">Guides</a>
                     <a href="docs/api-reference.html">API reference</a>
+                    <a href="docs/native-sdks.html">Native SDKs</a>
                     <a href="demos/">Demos</a>
                 </nav>
                 <nav aria-label="Community">

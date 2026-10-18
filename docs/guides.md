@@ -17,6 +17,7 @@ Build custom video tools, exchange files, connect agents, or control your own ap
 | Record received media | [Recording](recording.md) | Browser MediaRecorder, or Node media sinks plus FFmpeg |
 | Publish to / watch an HTTP media endpoint | [WHIP and WHEP](streaming.md) | Separate endpoint URL and any provider token; not a VDO.Ninja room ID |
 | Diagnose interrupted connections | [Recovery](reliability-and-recovery.md) | SDK lifecycle events, ICE diagnostics, and TURN configuration |
+| Use VDO.Ninja from Go, Rust, C, Python or a mobile app | [Native SDKs](native-sdks.md) | Same rooms, stream IDs, passwords and events; Flutter, Android (Kotlin/Java) and Swift cover the mobile basics |
 
 ## IDs, passwords, and tokens are different
 

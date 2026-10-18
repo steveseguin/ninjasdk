@@ -1,19 +1,20 @@
-# Native SDKs: Go, Rust, C and Python
+# Native SDKs: Go, Rust, C, Python, Flutter, Android and Swift
 
 The JavaScript SDK (`vdoninja-sdk.js`) is the reference implementation of the VDO.Ninja client protocol. This
 repository also ships native SDKs that implement the same protocol on top of established WebRTC engines, so
-applications written in Go, Rust, C or Python can publish to and view from browsers running VDO.Ninja, talk to
-each other, and use the hosted signaling and TURN infrastructure the same way the JavaScript SDK does.
+applications written in Go, Rust, C or Python, and mobile apps in Flutter, Kotlin/Java or Swift, can publish to and
+view from browsers running VDO.Ninja, talk to each other, and use the hosted signaling and TURN infrastructure the
+same way the JavaScript SDK does.
 
 | SDK | Directory | WebRTC engine | Best for |
 | --- | --- | --- | --- |
-| Go | [`go/`](../go/README.md) | [pion/webrtc](https://github.com/pion/webrtc) | servers, bots, recorders, CLI tools, cross-compiled binaries |
-| Rust | [`rust/`](../rust/README.md) | [webrtc-rs](https://github.com/webrtc-rs/webrtc) | Linux services and desktop apps that need memory safety and low overhead |
-| C | [`c/`](../c/README.md) | [libdatachannel](https://github.com/paullouisageneau/libdatachannel) | embedded devices, encoders, plugins, bindings for other languages |
-| Python | [`python/`](../python/README.md) | [aiortc](https://github.com/aiortc/aiortc) | scripting, prototyping, Raspberry Pi and automation |
-| Dart / Flutter | [`dart/`](../dart/README.md) | [flutter_webrtc](https://pub.dev/packages/flutter_webrtc) | Flutter apps on Android, iOS, desktop and web |
-| Kotlin / Java | [`kotlin/`](../kotlin/README.md) | Google libwebrtc ([stream-webrtc-android](https://github.com/GetStream/webrtc-android)) | native Android apps |
-| Swift | [`swift/`](../swift/README.md) | Google WebRTC ([stasel/WebRTC](https://github.com/stasel/WebRTC)) | native iOS, macOS and tvOS apps |
+| Go | [`go/`](https://github.com/steveseguin/ninjasdk/blob/main/go/README.md) | [pion/webrtc](https://github.com/pion/webrtc) | servers, bots, recorders, CLI tools, cross-compiled binaries |
+| Rust | [`rust/`](https://github.com/steveseguin/ninjasdk/blob/main/rust/README.md) | [webrtc-rs](https://github.com/webrtc-rs/webrtc) | Linux services and desktop apps that need memory safety and low overhead |
+| C | [`c/`](https://github.com/steveseguin/ninjasdk/blob/main/c/README.md) | [libdatachannel](https://github.com/paullouisageneau/libdatachannel) | embedded devices, encoders, plugins, bindings for other languages |
+| Python | [`python/`](https://github.com/steveseguin/ninjasdk/blob/main/python/README.md) | [aiortc](https://github.com/aiortc/aiortc) | scripting, prototyping, Raspberry Pi and automation |
+| Dart / Flutter | [`dart/`](https://github.com/steveseguin/ninjasdk/blob/main/dart/README.md) | [flutter_webrtc](https://pub.dev/packages/flutter_webrtc) | Flutter apps on Android, iOS, desktop and web |
+| Kotlin / Java | [`kotlin/`](https://github.com/steveseguin/ninjasdk/blob/main/kotlin/README.md) | Google libwebrtc ([stream-webrtc-android](https://github.com/GetStream/webrtc-android)) | native Android apps |
+| Swift | [`swift/`](https://github.com/steveseguin/ninjasdk/blob/main/swift/README.md) | Google WebRTC ([stasel/WebRTC](https://github.com/stasel/WebRTC)) | native iOS, macOS and tvOS apps |
 
 The Flutter, Android and Swift SDKs are the "mobile basics": the same signaling, hashing, encryption,
 publishing, viewing, data channels, pub/sub and request/response as the others, with media supplied by the
@@ -21,9 +22,9 @@ platform's own capture APIs. They deliberately leave out file transfer, resource
 and screen capture. Each is split into a protocol core that is unit-tested against the shared vectors without WebRTC
 (`vdoninja_core`, `vdoninja-core`, `VDONinjaCore`) and a thin engine layer.
 
-All of them share one conformance suite: [`spec/vectors.json`](../spec/vectors.json) is generated from the JavaScript
+All of them share one conformance suite: [`spec/vectors.json`](https://github.com/steveseguin/ninjasdk/blob/main/spec/vectors.json) is generated from the JavaScript
 SDK (`spec/generate-vectors.cjs`) and every native SDK tests its hashing, encryption and sanitization against it.
-[`spec/interop/run_interop.py`](../spec/interop/run_interop.py) runs every publisher/viewer language pair, including
+[`spec/interop/run_interop.py`](https://github.com/steveseguin/ninjasdk/blob/main/spec/interop/run_interop.py) runs every publisher/viewer language pair, including
 the Node build of the JavaScript SDK, against a local signaling server.
 
 ## Feature matrix
