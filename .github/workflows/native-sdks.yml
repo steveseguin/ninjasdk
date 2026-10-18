@@ -24,8 +24,12 @@ jobs:
         working-directory: go
 
   rust:
-    name: Rust SDK
-    runs-on: ubuntu-latest
+    name: Rust SDK (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
@@ -36,6 +40,7 @@ jobs:
           workspaces: rust
       - run: cargo fmt --all -- --check
         working-directory: rust
+        if: runner.os == 'Linux'
       - run: cargo clippy --workspace --all-targets -- -D warnings
         working-directory: rust
       - run: cargo test --workspace

@@ -122,6 +122,24 @@ Events are an enum received from a `tokio::sync::broadcast` channel; variant nam
 
 Reconnection: after an unexpected socket loss the SDK reconnects with exponential backoff and replays the room join, publish/announce and pending views.
 
+## Platforms and engine choice
+
+The crate is pure Rust: webrtc-rs, rustls and ring, no system WebRTC library and no OpenSSL. It builds and runs on
+Linux (x86-64, ARM), macOS and Windows with a plain `cargo build`; CI runs the test suite on all three. Linux
+remains the primary target (static binaries for servers, Raspberry Pi and embedded boards), but nothing in the SDK is
+platform-specific.
+
+The engine is deliberately a single backend. Alternatives were weighed against "minimal dependencies":
+
+| Backend | Trade-off |
+| --- | --- |
+| webrtc-rs (current) | Pure Rust, cross-platform, data channels and media, no native toolchain beyond a C compiler for ring. Missing ICE restart; 16 KiB inbound data channel messages. |
+| libdatachannel via the `datachannel` crate | Adds a C++17 build of libdatachannel, OpenSSL/mbedTLS and usrsctp; gains ICE restart but makes cross-compiling and static Linux builds much harder. |
+| str0m (sans-IO) | Pure Rust and lean, but the SDK would have to supply the whole socket/timer loop and media is still maturing. |
+
+Swapping the backend would mean reimplementing `sdk.rs`'s peer-connection layer; the protocol core
+(`vdoninja-core`) is engine-independent and would be reused as is.
+
 ## webrtc-rs notes
 
 - Incoming data channel messages are limited to 16384 bytes by webrtc-rs 0.21; VDO.Ninja's file transfer uses that chunk size, so files work, but split large `send_binary` payloads.
