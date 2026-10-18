@@ -22,6 +22,37 @@ import kotlin.test.assertTrue
 
 class SignalingClientTest {
     @Test
+    fun overlappingConnectPreservesPendingHandshake() {
+        MockWebServer().use { server ->
+            server.enqueue(MockResponse().setSocketPolicy(SocketPolicy.NO_RESPONSE))
+            val http = OkHttpClient()
+            val client = SignalingClient(server.url("/").toString(), http = http)
+            val cancelled = CountDownLatch(1)
+            val first = Thread {
+                try { client.connect(30_000) } catch (_: IOException) { cancelled.countDown() }
+            }
+            try {
+                first.start()
+                assertNotNull(server.takeRequest(3, TimeUnit.SECONDS))
+                val error = assertFailsWith<IOException> { client.connect(1000) }
+                assertTrue(error.message.orEmpty().contains("already in progress"))
+                assertEquals(1, server.requestCount)
+                assertEquals(1L, cancelled.count, "first handshake should still be pending")
+                client.close()
+                assertTrue(cancelled.await(1, TimeUnit.SECONDS))
+                first.join(1000)
+                assertFalse(first.isAlive)
+            } finally {
+                client.shutdown()
+                first.interrupt()
+                first.join(1000)
+                http.dispatcher.executorService.shutdownNow()
+                http.connectionPool.evictAll()
+            }
+        }
+    }
+
+    @Test
     fun failedReconnectsUseExactlyOneRetryChain() {
         MockWebServer().use { server ->
             val accepted = CountDownLatch(1)

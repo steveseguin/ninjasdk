@@ -49,10 +49,12 @@ public final class SignalingClient: NSObject, URLSessionWebSocketDelegate, @unch
     }
 
     /// Opens the socket; `completion(nil)` once open. Called on `queue`.
+    /// An overlapping handshake fails with `URLError.resourceUnavailable`.
     public func connect(timeout: TimeInterval = 15, completion: @escaping (Error?) -> Void) {
         queue.async {
             self.intentional = false
             if self.connected { return completion(nil) }
+            guard self.pendingOpen == nil else { return completion(URLError(.resourceUnavailable)) }
             self.reconnectWork?.cancel()
             self.reconnectWork = nil
             self.open(timeout: timeout, reconnect: false, completion: completion)

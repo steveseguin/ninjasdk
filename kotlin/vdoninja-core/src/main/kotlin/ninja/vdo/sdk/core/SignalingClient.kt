@@ -50,7 +50,7 @@ class SignalingClient(
     private var reconnectTask: ScheduledFuture<*>? = null
     private val generation = AtomicInteger()
 
-    /** Opens the socket; blocks until open or [timeoutMs] elapsed. */
+    /** Opens the socket; blocks until open or [timeoutMs] elapsed. Rejects an overlapping handshake. */
     @Throws(java.io.IOException::class)
     fun connect(timeoutMs: Long = 15_000) {
         intentional = false
@@ -66,6 +66,7 @@ class SignalingClient(
         val gen = synchronized(lock) {
             if (intentional || (expectedGeneration != null && expectedGeneration != generation.get()))
                 return "connection cancelled"
+            if (pendingOpen != null) return "connection already in progress"
             pendingOpen = latch
             generation.incrementAndGet()
         }
