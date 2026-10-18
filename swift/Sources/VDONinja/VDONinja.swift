@@ -164,7 +164,7 @@ public final class VDONinja {
     private var stoppedViews: Set<String> = []
     private var viewWaiters: [String: [(Result<VDOConnection, Error>) -> Void]] = [:]
     private var viewRetries: [String: DispatchWorkItem] = [:]
-    private var streams: [String: StreamInfo] = [:]
+    private var streamTable: [String: StreamInfo] = [:]
     private var pendingIce: [String: [IceCandidate]] = [:]
     private var subscriptions: Set<String> = []
     private var peerSubscriptions: [String: Set<String>] = [:]
@@ -482,7 +482,7 @@ public final class VDONinja {
     }
 
     /// Streams seen so far.
-    public func streams() -> [StreamInfo] { queue.sync { Array(streams.values) } }
+    public func streams() -> [StreamInfo] { queue.sync { Array(streamTable.values) } }
 
     /// UUIDs of peers with at least one connection.
     public func peers() -> [String] { queue.sync { order.filter { connections[$0] != nil } } }
@@ -508,7 +508,7 @@ public final class VDONinja {
         queue.sync { self.streamId = sid; autoConnectOn = true; autoFull = fullMode }
         _ = try await joinRoom(room)
         _ = try await announce(streamId: sid)
-        queue.async { for s in Array(self.streams.values) { self.autoConsider(s.streamId) } }
+        queue.async { for s in Array(self.streamTable.values) { self.autoConsider(s.streamId) } }
         return sid
     }
 
@@ -551,7 +551,7 @@ public final class VDONinja {
             sent = r || sent
         }
         if sent || !allowFallback || !connected { return sent }
-        for t in uuid.map { [$0] } ?? order {
+        for t in (uuid.map { [$0] } ?? order) {
             if signal.send(["__fallback": true, "UUID": t, "pipe": data]) { sent = true }
         }
         return sent
@@ -793,7 +793,7 @@ public final class VDONinja {
         }
     }
 
-    private func setStreamState(_ sid: String?, _ state: String) { if let sid { streams[sid]?.state = state } }
+    private func setStreamState(_ sid: String?, _ state: String) { if let sid { streamTable[sid]?.state = state } }
 
     private func recoverConnection(_ c: VDOConnection, reason: String) {
         if c.closed { return }
@@ -1038,10 +1038,10 @@ public final class VDONinja {
     private func handleListing(_ msg: JSON, transferred: Bool) {
         let entries = parseListing(msg, pw)
         for e in entries where !e.streamId.isEmpty {
-            let info = streams[e.streamId] ?? StreamInfo(streamId: e.streamId, uuid: e.uuid)
+            let info = streamTable[e.streamId] ?? StreamInfo(streamId: e.streamId, uuid: e.uuid)
             if let u = e.uuid { info.uuid = u }
             if info.state == "disconnected" || info.state == "failed" { info.state = "available" }
-            streams[e.streamId] = info
+            streamTable[e.streamId] = info
         }
         if let waiter = roomWaiter {
             roomWaiter = nil
@@ -1057,10 +1057,10 @@ public final class VDONinja {
         let sid = (msg["streamID"] as? String).map(pw.stripHash)
         let uuid = msg["UUID"] as? String
         if let sid, !sid.isEmpty {
-            let info = streams[sid] ?? StreamInfo(streamId: sid, uuid: uuid)
+            let info = streamTable[sid] ?? StreamInfo(streamId: sid, uuid: uuid)
             if let uuid { info.uuid = uuid }
             if info.state == "disconnected" || info.state == "failed" { info.state = "available" }
-            streams[sid] = info
+            streamTable[sid] = info
         }
         emit(VDOEvent(type, uuid: uuid, streamId: sid, raw: msg))
         if let sid, !sid.isEmpty {
@@ -1156,9 +1156,9 @@ public final class VDONinja {
                 c.streamId = clean
                 if let clean, let opts = self.pendingViews[clean] { c.viewOptions = opts }
                 if let clean, !clean.isEmpty {
-                    let info = self.streams[clean] ?? StreamInfo(streamId: clean, uuid: uuid)
+                    let info = self.streamTable[clean] ?? StreamInfo(streamId: clean, uuid: uuid)
                     info.uuid = uuid
-                    self.streams[clean] = info
+                    self.streamTable[clean] = info
                 }
                 proceed(c)
             }
@@ -1213,7 +1213,7 @@ public final class VDONinja {
         for c in [pair?.publisher, pair?.viewer].compactMap({ $0 }) {
             if c.type == "viewer", let sid = c.streamId, !intentional, !stoppedViews.contains(sid) {
                 retry = sid
-                streams[sid]?.state = "disconnected"
+                streamTable[sid]?.state = "disconnected"
             }
             c.close()
         }
