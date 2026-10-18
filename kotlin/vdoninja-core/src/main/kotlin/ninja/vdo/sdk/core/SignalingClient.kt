@@ -41,7 +41,7 @@ class SignalingClient(
 
     private val lock = Any()
     private var socket: WebSocket? = null
-    private var opening: WebSocket? = null // handshake in flight; close() cancels it
+    private var pendingOpen: CountDownLatch? = null
     @Volatile var connected: Boolean = false
         private set
     @Volatile private var intentional = false
@@ -50,7 +50,7 @@ class SignalingClient(
     private var reconnectTask: ScheduledFuture<*>? = null
     private val generation = AtomicInteger()
 
-    /** Opens the socket; blocks until open or [timeoutMs] elapsed. */
+    /** Opens the socket; blocks until open or [timeoutMs] elapsed. Rejects an overlapping handshake. */
     @Throws(java.io.IOException::class)
     fun connect(timeoutMs: Long = 15_000) {
         intentional = false
@@ -61,9 +61,15 @@ class SignalingClient(
     }
 
     /** Returns null on success, else an error message. */
-    private fun open(timeoutMs: Long, reconnect: Boolean): String? {
-        val gen = generation.incrementAndGet()
+    private fun open(timeoutMs: Long, reconnect: Boolean, expectedGeneration: Int? = null): String? {
         val latch = CountDownLatch(1)
+        val gen = synchronized(lock) {
+            if (intentional || (expectedGeneration != null && expectedGeneration != generation.get()))
+                return "connection cancelled"
+            if (pendingOpen != null) return "connection already in progress"
+            pendingOpen = latch
+            generation.incrementAndGet()
+        }
         var error: String? = null
         val listener = object : WebSocketListener() {
             override fun onOpen(webSocket: WebSocket, response: Response) {
@@ -89,13 +95,13 @@ class SignalingClient(
             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
                 error = t.message ?: t.toString()
                 log?.invoke("signaling error: $error")
-                latch.countDown()
                 handleClosed(gen)
+                latch.countDown()
             }
 
             override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
-                latch.countDown()
                 handleClosed(gen)
+                latch.countDown()
             }
 
             override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
@@ -103,7 +109,9 @@ class SignalingClient(
             }
         }
         val openingSocket = http.newWebSocket(Request.Builder().url(url).build(), listener)
-        synchronized(lock) { opening = openingSocket }
+        synchronized(lock) {
+            if (gen == generation.get()) socket = openingSocket else openingSocket.cancel()
+        }
         fun cancelOpening() {
             synchronized(lock) {
                 if (generation.compareAndSet(gen, gen + 1)) {
@@ -117,35 +125,43 @@ class SignalingClient(
             latch.await(timeoutMs, TimeUnit.MILLISECONDS)
         } catch (e: InterruptedException) {
             cancelOpening()
+            synchronized(lock) { if (pendingOpen === latch) pendingOpen = null }
             Thread.currentThread().interrupt()
             throw e
-        } finally {
-            synchronized(lock) { if (opening === openingSocket) opening = null }
         }
-        if (!opened) {
-            cancelOpening()
-            return "connect timeout"
+        if (!opened) cancelOpening()
+        // Hand off retry ownership atomically with checking the connection result.
+        return synchronized(lock) {
+            if (pendingOpen === latch) pendingOpen = null
+            if (!opened) "connect timeout"
+            else if (gen == generation.get() && connected) null
+            else error ?: "connection failed"
         }
-        return if (connected) null else (error ?: "connection failed")
     }
 
     private fun handleClosed(gen: Int) {
         val wasConnected: Boolean
+        val opening: Boolean
         synchronized(lock) {
             if (gen != generation.get()) return
             wasConnected = connected
+            opening = pendingOpen != null
             connected = false
             socket = null
         }
         if (wasConnected) onClose?.invoke(intentional)
-        if (intentional || !everConnected) return
+        // The blocking open() caller owns retries while a handshake is pending.
+        if (!wasConnected || opening || intentional || !everConnected) return
         scheduleReconnect()
     }
 
     private fun scheduleReconnect() {
         val attempt: Int
         val delay: Long
+        val gen: Int
         synchronized(lock) {
+            if (intentional || connected) return
+            gen = generation.get()
             if (attempts >= maxReconnectAttempts) {
                 onReconnectFailed?.invoke()
                 return
@@ -153,16 +169,16 @@ class SignalingClient(
             delay = minOf(reconnectDelayMs shl attempts, 30_000L)
             attempts++
             attempt = attempts
+            reconnectTask = scheduler.schedule({
+                if (intentional || gen != generation.get()) return@schedule
+                onReconnecting?.invoke(attempt)
+                val err = open(15_000, reconnect = true, expectedGeneration = gen)
+                if (err != null) {
+                    log?.invoke("reconnect attempt $attempt failed: $err")
+                    scheduleReconnect()
+                }
+            }, delay, TimeUnit.MILLISECONDS)
         }
-        reconnectTask = scheduler.schedule({
-            if (intentional) return@schedule
-            onReconnecting?.invoke(attempt)
-            val err = open(15_000, reconnect = true)
-            if (err != null) {
-                log?.invoke("reconnect attempt $attempt failed: $err")
-                scheduleReconnect()
-            }
-        }, delay, TimeUnit.MILLISECONDS)
     }
 
     /** Sends a JSON object. Returns false when the socket is not open. */
@@ -179,21 +195,21 @@ class SignalingClient(
     fun close() {
         intentional = true
         val ws: WebSocket?
-        val inFlight: WebSocket?
         val wasConnected: Boolean
+        val opening: CountDownLatch?
         synchronized(lock) {
             reconnectTask?.cancel(false)
             reconnectTask = null
             generation.incrementAndGet()
             ws = socket
-            inFlight = opening
-            opening = null
             wasConnected = connected
             socket = null
             connected = false
+            opening = pendingOpen
+            pendingOpen = null
         }
-        inFlight?.cancel() // a connect() still waiting gets onFailure and returns now
-        try { ws?.close(1000, "bye") } catch (_: Exception) {}
+        try { if (wasConnected) ws?.close(1000, "bye") else ws?.cancel() } catch (_: Exception) {}
+        opening?.countDown()
         if (wasConnected) onClose?.invoke(true)
     }
 

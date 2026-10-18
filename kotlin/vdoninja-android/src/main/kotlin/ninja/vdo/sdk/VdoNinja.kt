@@ -11,6 +11,7 @@ package ninja.vdo.sdk
 
 import android.content.Context
 import ninja.vdo.sdk.core.Crypto
+import ninja.vdo.sdk.core.CandidateBatch
 import ninja.vdo.sdk.core.IceCandidate
 import ninja.vdo.sdk.core.IceServer
 import ninja.vdo.sdk.core.ListingEntry
@@ -182,7 +183,7 @@ class VdoNinja @JvmOverloads constructor(
     private val viewWaiters = HashMap<String, MutableList<CompletableFuture<VdoConnection>>>()
     private val viewRetries = HashMap<String, ScheduledFuture<*>>()
     private val streams = LinkedHashMap<String, StreamInfo>()
-    private val pendingIce = HashMap<String, MutableList<IceCandidate>>()
+    private val pendingIce = HashMap<String, MutableList<CandidateBatch>>()
 
     private val subscriptions = HashSet<String>()
     private val peerSubscriptions = HashMap<String, MutableSet<String>>()
@@ -1203,7 +1204,6 @@ class VdoNinja @JvmOverloads constructor(
         }
         val fail = { what: String -> emit(VdoEvent(VdoEvents.ERROR, uuid = uuid, message = "failed to handle offer: $what")) }
         conn.pc.setRemoteDescription(sdpObserver({
-            conn.remoteSet = true
             drainPendingIce(conn, "local")
             conn.pc.createAnswer(sdpObserver({ answer ->
                 if (answer == null) return@sdpObserver
@@ -1238,7 +1238,6 @@ class VdoNinja @JvmOverloads constructor(
             return
         }
         c.pc.setRemoteDescription(sdpObserver({
-            c.remoteSet = true
             drainPendingIce(c, "remote")
         }, { emit(VdoEvent(VdoEvents.ERROR, uuid = uuid, message = "failed to handle answer: $it")) }), RtcSessionDescription(RtcSessionDescription.Type.ANSWER, desc.sdp))
     }
@@ -1249,12 +1248,16 @@ class VdoNinja @JvmOverloads constructor(
         if (cands.isEmpty()) return
         // "remote" candidates come from viewers (for our publisher pc), "local" from publishers.
         val want = via?.type ?: if (msg.optString("type") == "remote") "publisher" else "viewer"
-        val c = via ?: connection(uuid, want)
-        if (c == null || !c.remoteSet) {
-            synchronized(lock) { pendingIce.getOrPut("${if (want == "publisher") "remote" else "local"}:$uuid") { ArrayList() }.addAll(cands) }
-            return
+        val batch = CandidateBatch(msg.opt("session") as? String ?: via?.session, cands)
+        val c = synchronized(lock) {
+            val current = via ?: connection(uuid, want)
+            if (current == null || !current.remoteSet) {
+                pendingIce.getOrPut("${if (want == "publisher") "remote" else "local"}:$uuid") { ArrayList() }.add(batch)
+                return
+            }
+            current
         }
-        addCandidates(c, cands)
+        addCandidates(c, batch.matching(c.session))
     }
 
     private fun addCandidates(c: VdoConnection, cands: List<IceCandidate>) {
@@ -1268,8 +1271,14 @@ class VdoNinja @JvmOverloads constructor(
     }
 
     private fun drainPendingIce(c: VdoConnection, msgType: String) {
-        val list = synchronized(lock) { pendingIce.remove("$msgType:${c.uuid}") } ?: return
-        addCandidates(c, list)
+        val list = synchronized(lock) {
+            // Queueing and the SDP-ready transition must be atomic: otherwise a
+            // candidate can be enqueued just after the only drain has finished.
+            if (connection(c.uuid, c.type) !== c) return
+            c.remoteSet = true
+            pendingIce.remove("$msgType:${c.uuid}")
+        } ?: return
+        addCandidates(c, list.flatMap { it.matching(c.session) })
     }
 
     private fun handleBye(uuid: String?, type: String, msg: JSONObject) {

@@ -3,6 +3,27 @@ import XCTest
 @testable import VDONinjaCore
 
 final class SignalingClientTests: XCTestCase {
+    func testOverlappingConnectPreservesFirstCompletion() {
+        let first = expectation(description: "first connect cancelled")
+        let second = expectation(description: "overlapping connect rejected")
+        first.assertForOverFulfill = true
+        second.assertForOverFulfill = true
+        let queue = DispatchQueue(label: "signaling-overlap-test")
+        let client = SignalingClient(url: "ws://127.0.0.1:1", queue: queue)
+        queue.suspend()
+        client.connect(timeout: 30) { error in
+            XCTAssertEqual((error as? URLError)?.code, .cancelled)
+            first.fulfill()
+        }
+        client.connect(timeout: 30) { error in
+            XCTAssertEqual((error as? URLError)?.code, .resourceUnavailable)
+            second.fulfill()
+        }
+        client.close()
+        queue.resume()
+        wait(for: [first, second], timeout: 2)
+    }
+
     func testCloseCompletesPendingConnect() {
         let completed = expectation(description: "pending connect cancelled")
         completed.assertForOverFulfill = true

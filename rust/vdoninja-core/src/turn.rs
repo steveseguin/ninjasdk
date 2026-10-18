@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 pub struct TurnServer {
     pub username: String,
     pub credential: String,
+    #[serde(deserialize_with = "deserialize_urls")]
     pub urls: Vec<String>,
     #[serde(default)]
     pub tz: i64,
@@ -17,6 +18,21 @@ pub struct TurnServer {
     pub udp: bool,
     #[serde(default)]
     pub locale: String,
+}
+
+fn deserialize_urls<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> Result<Vec<String>, D::Error> {
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum Urls {
+        Single(String),
+        Multiple(Vec<String>),
+    }
+    Ok(match Urls::deserialize(deserializer)? {
+        Urls::Single(url) => vec![url],
+        Urls::Multiple(urls) => urls,
+    })
 }
 
 /// Response body of the hosted TURN endpoint.

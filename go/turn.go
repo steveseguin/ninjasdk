@@ -25,6 +25,28 @@ type TURNServer struct {
 	delta      int
 }
 
+// UnmarshalJSON accepts the scalar and array forms of the standard urls field.
+func (s *TURNServer) UnmarshalJSON(data []byte) error {
+	type entry TURNServer
+	var decoded struct {
+		entry
+		URLs json.RawMessage `json:"urls"`
+	}
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	if len(decoded.URLs) > 0 {
+		var single string
+		if err := json.Unmarshal(decoded.URLs, &single); err == nil && string(decoded.URLs) != "null" {
+			decoded.entry.URLs = []string{single}
+		} else if err := json.Unmarshal(decoded.URLs, &decoded.entry.URLs); err != nil {
+			return err
+		}
+	}
+	*s = TURNServer(decoded.entry)
+	return nil
+}
+
 // fallbackTURNServers mirrors the JavaScript SDK's built-in list, used only when
 // the hosted TURN endpoint cannot be reached.
 var fallbackTURNServers = []TURNServer{
