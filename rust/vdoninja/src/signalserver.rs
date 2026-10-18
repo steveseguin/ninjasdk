@@ -361,3 +361,31 @@ async fn handle_client(state: Arc<Mutex<State>>, stream: TcpStream) {
     state.lock().unwrap().cleanup(&uuid);
     writer.abort();
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn join_room_cannot_steal_stream() {
+        let mut state = State::default();
+        let (owner, mut owner_rx) = mpsc::unbounded_channel();
+        let (other, mut other_rx) = mpsc::unbounded_channel();
+        state.clients.insert("owner".into(), owner);
+        state.clients.insert("other".into(), other);
+        state.seed("owner", "taken");
+        state.seed("other", "taken");
+        state.join_room("other", "room", true, "taken");
+        for _ in 0..2 {
+            let msg: Value = serde_json::from_str(&other_rx.try_recv().unwrap()).unwrap();
+            assert_eq!(msg["request"], "alert");
+        }
+        assert_eq!(state.streams["taken"], "owner");
+        assert!(!state.stream_ids.contains_key("other"));
+        assert!(!state.rooms.contains_key("other"));
+        assert!(state.directors.is_empty());
+        state.play("other", "taken");
+        let msg: Value = serde_json::from_str(&owner_rx.try_recv().unwrap()).unwrap();
+        assert_eq!(msg["request"], "offerSDP");
+    }
+}

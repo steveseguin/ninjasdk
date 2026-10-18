@@ -14,6 +14,29 @@ def make(host, **kwargs):
     return VDONinja(host, **kwargs)
 
 
+@pytest.mark.parametrize("media", [False, True])
+async def test_publishing_survives_signaling_reconnect(signal_host, media):
+    pub = make(signal_host, reconnect_delay=0.05)
+    view = make(signal_host)
+    try:
+        await pub.connect()
+        if media:
+            await pub.publish([AudioStreamTrack()], "reconnect-test")
+        else:
+            await pub.announce("reconnect-test")
+        reconnected = asyncio.create_task(pub.wait_for("reconnected", timeout=5))
+        await pub._ws.close()
+        await reconnected
+        assert pub.publishing
+        await view.connect()
+        opened = asyncio.create_task(view.wait_for("dataChannelOpen", timeout=10))
+        await view.view("reconnect-test")
+        await opened
+    finally:
+        await view.disconnect()
+        await pub.disconnect()
+
+
 async def test_data_round_trip(signal_host):
     pub = make(signal_host, label="Py publisher")
     view = make(signal_host)

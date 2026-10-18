@@ -761,14 +761,19 @@ void vdon__handle_file_request(vdon_sdk *s, conn_t *c, const char *id) {
 void vdon__chan_opened_extra(chan_t *ch) {
     vdon_sdk *s = ch->conn->sdk;
     if (ch->kind == CH_FILE_OUT) {
-        pthread_t th;
         send_ctx *ctx = (send_ctx *)calloc(1, sizeof(*ctx));
         ctx->s = s;
         ctx->ch = ch;
-        if (pthread_create(&th, NULL, file_send_thread, ctx) == 0)
-            pthread_detach(th);
-        else
+        if (pthread_create(&ch->file_thread, NULL, file_send_thread, ctx) == 0)
+            ch->file_thread_started = 1;
+        else {
             free(ctx);
+            pthread_mutex_lock(&s->lock);
+            vdon__hosted_unref(s, ch->out_file);
+            ch->out_file = NULL;
+            pthread_mutex_unlock(&s->lock);
+            vdon__schedule_close_dc(s, ch->dc);
+        }
     } else if (ch->kind == CH_RESERVED || ch->kind == CH_BINARY) {
         char *sid = conn_sid(s, ch->conn);
         EV(ev, VDON_EVENT_CHANNEL_OPEN);
@@ -843,7 +848,7 @@ static void file_in_message(chan_t *ch, const char *msg, int size) {
         ch->fsize = (int64_t)cJSON_GetNumberValue(jget(hdr, "size"));
         cJSON_Delete(hdr);
         pthread_mutex_lock(&s->lock);
-        for (in = s->inbound; in; in = in->next)
+        for (in = c->closed ? NULL : s->inbound; in; in = in->next)
             if (!in->done && strcmp(in->uuid, c->uuid) == 0 &&
                 (strcmp(in->id, ch->fid) == 0 || strcmp(in->id, ch->label) == 0))
                 break;
@@ -871,7 +876,7 @@ static void file_in_message(chan_t *ch, const char *msg, int size) {
     }
     if (size < 0) {
         if (strcmp(msg, "EOF1") == 0) {
-            if (ch->inbound && ch->received != ch->fsize) {
+            if (ch->received != ch->fsize) {
                 emit_file(s, VDON_EVENT_FILE_TRANSFER_ERROR, c, ch->fid, ch->fname, ch->fsize, ch->received, "inbound",
                           "size mismatch", NULL, 0);
                 inbound_finish(s, ch, VDON_ERR_FAILURE);
@@ -904,11 +909,14 @@ static void file_in_message(chan_t *ch, const char *msg, int size) {
         in->len += (size_t)size;
         in->received = ch->received;
     }
-    pthread_mutex_unlock(&s->lock);
-    emit_file(s, VDON_EVENT_FILE_TRANSFER_PROGRESS, c, ch->fid, ch->fname, ch->fsize, ch->received, "inbound", NULL, NULL, 0);
-    if (!ch->inbound)
-        emit_file(s, VDON_EVENT_FILE_CHUNK, c, ch->fid, ch->fname, ch->fsize, ch->received, "inbound", NULL,
-                  (const uint8_t *)msg, (size_t)size);
+    {
+        int streaming = ch->inbound == NULL;
+        pthread_mutex_unlock(&s->lock);
+        emit_file(s, VDON_EVENT_FILE_TRANSFER_PROGRESS, c, ch->fid, ch->fname, ch->fsize, ch->received, "inbound", NULL, NULL, 0);
+        if (streaming)
+            emit_file(s, VDON_EVENT_FILE_CHUNK, c, ch->fid, ch->fname, ch->fsize, ch->received, "inbound", NULL,
+                      (const uint8_t *)msg, (size_t)size);
+    }
 }
 
 static void resource_message(chan_t *ch, const char *msg, int size) {

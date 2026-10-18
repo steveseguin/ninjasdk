@@ -809,9 +809,18 @@ static void conn_bye(vdon_sdk *s, conn_t *c) {
 /* Unlinks a connection and schedules its close. lock held. */
 static void conn_retire(vdon_sdk *s, conn_t *c) {
     conn_t **pp;
+    chan_t *ch;
     if (c->closed)
         return;
     c->closed = 1;
+    /* Retired connections leave the active list before their close job runs. */
+    for (ch = c->chans; ch; ch = ch->next) {
+        if (ch->inbound && !ch->inbound->done) {
+            ch->inbound->done = 1;
+            ch->inbound->err = VDON_ERR_CANCELLED;
+        }
+        ch->inbound = NULL;
+    }
     for (pp = &s->conns; *pp; pp = &(*pp)->next)
         if (*pp == c) {
             *pp = c->next;
@@ -828,6 +837,8 @@ static void conn_free(conn_t *c) {
     ptrack_t *t;
     while ((ch = c->chans)) {
         c->chans = ch->next;
+        if (ch->file_thread_started)
+            pthread_join(ch->file_thread, NULL);
         free(ch->label);
         free(ch->fid);
         free(ch->fname);
@@ -1514,7 +1525,7 @@ static void drain_pending_ice(vdon_sdk *s, conn_t *c, const char *type) {
     pp = &s->pending_ice;
     while (*pp) {
         pice_t *p = *pp;
-        if (strcmp(p->uuid, c->uuid) == 0 && p->type == type) {
+        if (strcmp(p->uuid, c->uuid) == 0 && strcmp(p->type, type) == 0) {
             cJSON *it;
             /* Candidates queued for an earlier session of this peer are dropped. */
             if (!(p->session && c->session[0] && strcmp(p->session, c->session) != 0))

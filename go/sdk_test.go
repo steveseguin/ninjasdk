@@ -60,6 +60,84 @@ func waitFor(t *testing.T, ch <-chan Event, timeout time.Duration, what string) 
 	}
 }
 
+func TestPublishingSurvivesSignalingReconnect(t *testing.T) {
+	for _, mediaPublish := range []bool{false, true} {
+		name := "announce"
+		if mediaPublish {
+			name = "publish"
+		}
+		t.Run(name, func(t *testing.T) {
+			host := startSignal(t)
+			pub := newTestSDK(t, host, func(o *Options) { o.ReconnectDelay = 50 * time.Millisecond })
+			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+			defer cancel()
+			if err := pub.Connect(ctx); err != nil {
+				t.Fatal(err)
+			}
+			opts := PublishOptions{StreamID: "reconnect-test"}
+			if mediaPublish {
+				track, err := webrtc.NewTrackLocalStaticSample(webrtc.RTPCodecCapability{MimeType: webrtc.MimeTypeOpus}, "audio", "test")
+				if err != nil {
+					t.Fatal(err)
+				}
+				_, err = pub.Publish(ctx, []webrtc.TrackLocal{track}, opts)
+				if err != nil {
+					t.Fatal(err)
+				}
+			} else if _, err := pub.Announce(ctx, opts); err != nil {
+				t.Fatal(err)
+			}
+			reconnected := make(chan Event, 1)
+			pub.On(EventReconnected, func(ev Event) { reconnected <- ev })
+			pub.mu.Lock()
+			ws := pub.ws
+			pub.mu.Unlock()
+			_ = ws.Close()
+			waitFor(t, reconnected, 5*time.Second, "signaling reconnect")
+			pub.mu.Lock()
+			publishing := pub.publishing
+			pub.mu.Unlock()
+			if !publishing {
+				t.Fatal("publish intent was not restored")
+			}
+			view := newTestSDK(t, host, nil)
+			opened := make(chan Event, 1)
+			view.On(EventDataChannelOpen, func(ev Event) { opened <- ev })
+			if err := view.Connect(ctx); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := view.View(ctx, opts.StreamID, ViewOptions{}); err != nil {
+				t.Fatal(err)
+			}
+			waitFor(t, opened, 10*time.Second, "new viewer after reconnect")
+		})
+	}
+}
+
+func TestDisconnectCancelsReconnectBackoff(t *testing.T) {
+	s := newTestSDK(t, startSignal(t), func(o *Options) { o.ReconnectDelay = 100 * time.Millisecond })
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := s.Connect(ctx); err != nil {
+		t.Fatal(err)
+	}
+	attempt := make(chan Event, 1)
+	s.On(EventReconnecting, func(ev Event) { attempt <- ev })
+	s.mu.Lock()
+	ws := s.ws
+	s.mu.Unlock()
+	_ = ws.Close()
+	waitFor(t, attempt, time.Second, "reconnect backoff")
+	s.Disconnect()
+	time.Sleep(200 * time.Millisecond)
+	if s.Connected() {
+		t.Fatal("reconnect revived an explicitly disconnected SDK")
+	}
+	if err := s.Connect(ctx); err != nil {
+		t.Fatalf("explicit connect after cancellation: %v", err)
+	}
+}
+
 func TestDataRoundTrip(t *testing.T) {
 	host := startSignal(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)

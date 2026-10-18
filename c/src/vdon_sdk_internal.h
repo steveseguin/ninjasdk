@@ -53,6 +53,8 @@ typedef struct chan {
     int finished;
     /* outbound file */
     hosted_t *out_file;
+    pthread_t file_thread;
+    int file_thread_started;
     /* resources */
     cJSON *res_meta;
     int64_t res_size;

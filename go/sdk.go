@@ -297,7 +297,15 @@ func (s *SDK) setPublisherInfo(label string, meta any, order string, info map[st
 
 // Connect opens the signaling WebSocket. It returns once the socket is open.
 func (s *SDK) Connect(ctx context.Context) error {
+	return s.connect(ctx, nil)
+}
+
+func (s *SDK) connect(ctx context.Context, reconnectGeneration *int) error {
 	s.mu.Lock()
+	if reconnectGeneration != nil && (s.intentional || *reconnectGeneration != s.generation) {
+		s.mu.Unlock()
+		return ErrCancelled
+	}
 	if s.connected {
 		s.mu.Unlock()
 		return nil
@@ -407,7 +415,7 @@ func (s *SDK) reconnect(gen int) {
 		time.Sleep(delay)
 
 		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
-		err := s.Connect(ctx)
+		err := s.connect(ctx, &gen)
 		cancel()
 		if err != nil {
 			s.logf("Reconnect attempt %d failed: %v", attempt, err)
@@ -426,9 +434,6 @@ func (s *SDK) reconnect(gen int) {
 func (s *SDK) restoreIntent() {
 	s.mu.Lock()
 	room := s.intentRoom
-	// readLoop clears publishing when the socket drops; the retained stream ID
-	// is the publish intent (StopPublishing clears it), as _connectionIntent is
-	// in the JavaScript SDK.
 	wasPublishing := s.streamID != ""
 	streamID := s.streamID
 	views := make(map[string]ViewOptions, len(s.viewIntent))
@@ -447,12 +452,14 @@ func (s *SDK) restoreIntent() {
 		}
 	}
 	if wasPublishing {
-		// Re-seed directly rather than through Announce/Publish, which refuse a
-		// second publish per connection; publishing goes back on so offerSDP
-		// requests from new viewers are served.
+		// Restore the retained intent and accept offer requests on the new socket.
 		s.mu.Lock()
-		hashed := s.hashedStreamID(streamID)
+		if s.intentional || !s.connected || s.streamID != streamID {
+			s.mu.Unlock()
+			return
+		}
 		s.publishing = true
+		hashed := s.hashedStreamID(streamID)
 		s.mu.Unlock()
 		s.sendWS(map[string]any{"request": "seed", "streamID": hashed})
 	}

@@ -27,6 +27,8 @@ typedef struct recorder {
     pthread_cond_t cond;
     rec_event ev[MAX_EVENTS];
     int count;
+    int slow_file_header;
+    int delayed_headers;
 } recorder;
 
 static int failures = 0;
@@ -75,7 +77,17 @@ static void rec_free(recorder *r) {
 static void on_event(vdon_sdk *sdk, const vdon_event *ev, void *user) {
     recorder *r = (recorder *)user;
     rec_event *e;
+    int slow_file_header;
     (void)sdk;
+    pthread_mutex_lock(&r->lock);
+    slow_file_header = r->slow_file_header;
+    if (slow_file_header && ev->type == VDON_EVENT_FILE_TRANSFER_START &&
+        ev->direction && strcmp(ev->direction, "inbound") == 0)
+        r->delayed_headers++;
+    pthread_mutex_unlock(&r->lock);
+    if (slow_file_header && ev->type == VDON_EVENT_FILE_TRANSFER_START &&
+        ev->direction && strcmp(ev->direction, "inbound") == 0)
+        sleep_ms(1000); /* let request_file time out with its channel still active */
     if (verbose && ev->type != VDON_EVENT_RTP && ev->type != VDON_EVENT_FILE_TRANSFER_PROGRESS)
         fprintf(stderr, "[%s] %s uuid=%s label=%s json=%.120s msg=%s\n", r->name, vdon_event_name(ev->type),
                 ev->uuid ? ev->uuid : "-", ev->label ? ev->label : "-", ev->json ? ev->json : "-",
@@ -285,6 +297,25 @@ static void test_data(const char *url) {
         CHECK(wait_event(&rb, VDON_EVENT_FILE_TRANSFER_COMPLETE, 5000) >= 0, "B transfer complete");
         vdon_free(got);
         free(file);
+    }
+
+    /* Timeout after a header, followed by late chunks and EOF (ASan regression). */
+    {
+        uint8_t payload[1024] = {0}, *got = NULL;
+        size_t got_n = 0;
+        char fid[32];
+        CHECK(vdon_host_file(a, "slow.bin", payload, sizeof(payload), NULL, fid, sizeof(fid)) == VDON_OK, "host slow file");
+        CHECK(wait_event_json(&rb, VDON_EVENT_FILE_LIST, fid, 5000) >= 0, "slow file list");
+        pthread_mutex_lock(&rb.lock);
+        rb.slow_file_header = 1;
+        pthread_mutex_unlock(&rb.lock);
+        rc = vdon_request_file(b, peer_a, fid, 500, &got, &got_n);
+        CHECK(rc == VDON_ERR_TIMEOUT && !got && got_n == 0, "slow request should time out: %d", rc);
+        pthread_mutex_lock(&rb.lock);
+        CHECK(rb.delayed_headers == 1, "header must be received before the request times out");
+        pthread_mutex_unlock(&rb.lock);
+        sleep_ms(1200); /* deliver late chunks and close callback before teardown */
+        CHECK(count_events(&rb, VDON_EVENT_FILE_TRANSFER_COMPLETE) >= 2, "late EOF processed safely");
     }
 
     /* peers / streams introspection */
