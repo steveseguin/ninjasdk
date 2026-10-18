@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!--
     VDO.Ninja SDK Demo - Demo Index
-    
+
     This demo is MIT licensed; see LICENSE-DEMOS.
     The VDO.Ninja SDK core (`vdoninja-sdk.js`, `vdoninja-sdk.min.js`) is separately licensed under MPL-2.0; see LICENSE.
 -->
@@ -9,538 +9,255 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VDO.Ninja SDK - Demo Gallery</title>
-    <meta name="description" content="Explore VDO.Ninja SDK demos: P2P data channels, video streaming, WHIP/WHEP, mesh networking, and more. Working browser examples.">
-    <meta name="keywords" content="webrtc demos, p2p examples, vdo.ninja sdk, data channels, video streaming, whip, whep">
-    <meta name="author" content="VDO.Ninja">
-    <meta property="og:title" content="VDO.Ninja SDK - Demo Gallery">
-    <meta property="og:description" content="Interactive demos showcasing P2P WebRTC communication patterns with VDO.Ninja SDK.">
-    <meta property="og:image" content="https://sdk.vdo.ninja/og-image.png">
+    <title>Demos | VDO.Ninja SDK</title>
+    <meta name="description" content="Working VDO.Ninja SDK demos: P2P data channels, pub/sub, broadcast, canvas and camera streaming, WHIP/WHEP, and Node.js samples.">
+    <meta name="author" content="Steve Seguin">
+    <link rel="canonical" href="https://sdk.vdo.ninja/demos/">
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="Demos | VDO.Ninja SDK">
+    <meta property="og:description" content="Working examples of peer-to-peer data, media, and WHIP/WHEP streaming with the VDO.Ninja SDK.">
     <meta property="og:url" content="https://sdk.vdo.ninja/demos/">
     <link rel="icon" type="image/svg+xml" href="../favicon.svg">
     <link rel="icon" type="image/png" href="https://vdo.ninja/favicon.png">
     <link rel="apple-touch-icon" href="https://vdo.ninja/apple-touch-icon.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../site.css">
     <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 20px;
-            background: #0f172a;
-            color: #e2e8f0;
-            line-height: 1.6;
-        }
-        
-        h1 {
-            text-align: center;
-            color: #6366f1;
-            margin-bottom: 10px;
-            font-size: 2.5rem;
-        }
-        
-        .subtitle {
-            text-align: center;
-            color: #94a3b8;
-            margin-bottom: 40px;
-            font-size: 1.125rem;
-        }
-        
-        .back-link {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
-            color: #6366f1;
-            text-decoration: none;
-            margin-bottom: 2rem;
-            padding: 0.5rem 1rem;
-            background: rgba(99, 102, 241, 0.1);
-            border-radius: 0.5rem;
-            transition: all 0.3s;
-        }
-        
-        .back-link:hover {
-            background: rgba(99, 102, 241, 0.2);
-            transform: translateX(-5px);
-        }
-        
-        .demos-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
-            gap: 2rem;
-            margin-bottom: 3rem;
-        }
-        
-        .demo-card {
-            background: #1e293b;
-            border: 1px solid #334155;
-            border-radius: 0.75rem;
-            padding: 1.5rem;
-            text-decoration: none;
-            color: inherit;
-            transition: all 0.3s;
-            display: block;
-        }
-        
-        .demo-card:hover {
-            border-color: #6366f1;
-            transform: translateY(-5px);
-            box-shadow: 0 10px 30px rgba(99, 102, 241, 0.2);
-        }
-        
-        .demo-card h3 {
-            color: #f1f5f9;
-            margin-bottom: 0.5rem;
-            font-size: 1.25rem;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-        
-        .demo-card p {
-            color: #94a3b8;
-            margin-bottom: 1rem;
-            font-size: 0.95rem;
-        }
-        
-        .demo-features {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 0.5rem;
-            margin-top: 1rem;
-        }
-        
-        .feature-tag {
-            background: rgba(99, 102, 241, 0.1);
-            color: #818cf8;
-            padding: 0.25rem 0.75rem;
-            border-radius: 2rem;
-            font-size: 0.75rem;
-            border: 1px solid rgba(99, 102, 241, 0.3);
-        }
-        
-        .category {
-            margin-bottom: 3rem;
-        }
-        
-        .category h2 {
-            color: #6366f1;
-            margin-bottom: 1.5rem;
-            font-size: 1.75rem;
-            border-bottom: 2px solid #334155;
-            padding-bottom: 0.5rem;
-        }
-        
-        .info-box {
-            background: rgba(99, 102, 241, 0.1);
-            border: 1px solid rgba(99, 102, 241, 0.3);
-            border-radius: 0.5rem;
-            padding: 1.5rem;
-            margin-bottom: 2rem;
-        }
-        
-        .info-box h3 {
-            color: #6366f1;
-            margin-top: 0;
-        }
-        
-        .info-box p {
-            margin-bottom: 0.5rem;
-        }
-        
-        .info-box code {
-            background: #0f172a;
-            padding: 0.125rem 0.375rem;
-            border-radius: 0.25rem;
-            font-family: monospace;
-            font-size: 0.875rem;
-        }
-        
-        /* Responsive styles */
-        @media (max-width: 768px) {
-            body {
-                padding: 15px;
-            }
-            
-            h1 {
-                font-size: 2rem;
-            }
-            
-            .subtitle {
-                font-size: 1rem;
-            }
-            
-            .back-link {
-                margin-bottom: 1.5rem;
-                padding: 0.5rem 0.75rem;
-                font-size: 0.875rem;
-            }
-            
-            .info-box {
-                padding: 1rem;
-                margin-bottom: 1.5rem;
-            }
-            
-            .info-box h3 {
-                font-size: 1.125rem;
-            }
-            
-            .info-box p,
-            .info-box code {
-                font-size: 0.875rem;
-            }
-            
-            .category h2 {
-                font-size: 1.5rem;
-                margin-bottom: 1rem;
-            }
-            
-            .demos-grid {
-                grid-template-columns: 1fr;
-                gap: 1rem;
-            }
-            
-            .demo-card {
-                padding: 1.25rem;
-            }
-            
-            .demo-card h3 {
-                font-size: 1.125rem;
-            }
-            
-            .demo-card p {
-                font-size: 0.875rem;
-            }
-            
-            .feature-tag {
-                font-size: 0.7rem;
-                padding: 0.2rem 0.5rem;
-            }
-        }
-        
-        @media (max-width: 480px) {
-            body {
-                padding: 10px;
-            }
-            
-            h1 {
-                font-size: 1.75rem;
-            }
-            
-            .subtitle {
-                font-size: 0.95rem;
-                margin-bottom: 30px;
-            }
-            
-            .info-box {
-                padding: 0.875rem;
-            }
-            
-            .info-box h3 {
-                font-size: 1rem;
-            }
-            
-            .category h2 {
-                font-size: 1.25rem;
-            }
-            
-            .demo-card {
-                padding: 1rem;
-            }
-            
-            .demo-card h3 {
-                font-size: 1rem;
-            }
-        }
+        .gallery-head { max-width: 760px; }
+        .category { margin-top: 48px; }
+        .category-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px 16px; flex-wrap: wrap; margin-bottom: 16px; }
+        .category-head h2 { margin: 0; font-size: 1.25rem; }
+        .category-head p { margin: 0; color: var(--text-muted); font-size: 0.9rem; }
+        a.card h3 { font-size: 1.02rem; }
+        .card-kind { float: right; margin-left: 8px; }
+        .tips { margin-top: 48px; }
+        .tips dl { display: grid; grid-template-columns: max-content 1fr; gap: 8px 20px; margin: 0; font-size: 0.9rem; }
+        .tips dt { color: var(--text); font-weight: 600; }
+        .tips dd { margin: 0; color: var(--text-muted); }
+        @media (max-width: 640px) { .tips dl { grid-template-columns: 1fr; gap: 2px; } .tips dd { margin-bottom: 8px; } }
     </style>
 </head>
 <body>
-    <a href="../index.html" class="back-link">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/>
-        </svg>
-        Back to Main Page
-    </a>
-    
-    <h1>VDO.Ninja SDK Demo Gallery</h1>
-    <p class="subtitle">Explore working examples of P2P communication patterns and features</p>
-    
-    <div class="info-box">
-        <h3>🚀 Running the Demos</h3>
-        <p>All demos work directly in your browser - no server setup required!</p>
-        <p>For best results, open demos in multiple browser tabs or share the URL with others to test P2P connections.</p>
-        <p>Each demo includes the SDK via: <code>&lt;script src="../vdoninja-sdk.js"&gt;&lt;/script&gt;</code></p>
-    </div>
-    
-    <div class="category">
-        <h2>📡 Core Communication</h2>
-        <div class="demos-grid">
-            <a href="auto-connect.html" class="demo-card">
-                <h3>⚡ Auto Connect Mesh</h3>
-                <p>Minimal example that joins a room and automatically connects to peers. Sends and receives a message on connect.</p>
-                <div class="demo-features">
-                    <span class="feature-tag">Half/Full Mesh</span>
-                    <span class="feature-tag">Auto View</span>
-                    <span class="feature-tag">Data Channel</span>
-                </div>
-            </a>
-            <a href="clipboard.html" class="demo-card">
-                <h3>📋 Clipboard Sync</h3>
-                <p>Share clipboard content peer‑to‑peer in real time across connected clients.</p>
-                <div class="demo-features">
-                    <span class="feature-tag">P2P</span>
-                    <span class="feature-tag">Data Channel</span>
-                    <span class="feature-tag">JSON</span>
-                </div>
-            </a>
-            <a href="vdoninja-sdk-datachannel-demo.html" class="demo-card">
-                <h3>📨 Data Channel Messaging</h3>
-                <p>Comprehensive demonstration of P2P data messaging with multiple nodes, pub/sub patterns, and advanced filtering.</p>
-                <p style="font-size: 12px; color: #aaa; margin-top: 6px;">Tip: avoid reserved SDK types ('subscribe' | 'unsubscribe' | 'channelMessage') for custom protocols.</p>
-                <div class="demo-features">
-                    <span class="feature-tag">Multi-node</span>
-                    <span class="feature-tag">Pub/Sub</span>
-                    <span class="feature-tag">Filtering</span>
-                    <span class="feature-tag">JSON Messages</span>
-                </div>
-            </a>
-            
-            <a href="vdoninja-sdk-pubsub-channels.html" class="demo-card">
-                <h3>📻 Channel-Based Pub/Sub</h3>
-                <p>Topic-based messaging system with channel subscriptions, perfect for chat rooms or event systems.</p>
-                <div class="demo-features">
-                    <span class="feature-tag">Channels</span>
-                    <span class="feature-tag">Topics</span>
-                    <span class="feature-tag">Routing</span>
-                </div>
-            </a>
-            
-            <a href="vdoninja-sdk-pubsub-p2p-only.html" class="demo-card">
-                <h3>🔗 Pure P2P Pub/Sub</h3>
-                <p>Direct peer-to-peer publish/subscribe without any server relay after initial handshake.</p>
-                <div class="demo-features">
-                    <span class="feature-tag">Direct P2P</span>
-                    <span class="feature-tag">No Relay</span>
-                    <span class="feature-tag">Efficient</span>
-                </div>
-            </a>
+    <a class="skip-link" href="#main">Skip to content</a>
+    <header class="site-header">
+        <div class="site-header-inner">
+            <a class="brand" href="../index.html"><img src="../favicon.svg" alt="" width="26" height="26"><span>VDO.Ninja SDK</span></a>
+            <nav class="site-nav" aria-label="Main">
+                <a href="../index.html">Home</a>
+                <a href="./" aria-current="page">Demos</a>
+                <a href="../docs/guides.html">Guides</a>
+                <a href="../docs/api-reference.html">API</a>
+            </nav>
+            <div class="site-header-actions">
+                <a class="btn btn-secondary btn-sm" href="https://github.com/steveseguin/ninjasdk">GitHub</a>
+            </div>
         </div>
-    </div>
+    </header>
 
-    <div class="category">
-        <h2>📘 Documentation</h2>
-        <div class="demos-grid">
-            <a href="../docs/api-reference.html" class="demo-card">
-                <h3>SDK API Reference</h3>
-                <p>Complete list of SDK methods, helpers, aliases, and events.</p>
-                <div class="demo-features">
-                    <span class="feature-tag">Methods</span>
-                    <span class="feature-tag">Events</span>
-                    <span class="feature-tag">Helpers</span>
-                </div>
-            </a>
-        </div>
-    </div>
-    
-    <div class="category">
-        <h2>🎥 Media Streaming</h2>
-        <div class="demos-grid">
-            <a href="vdoninja-sdk-broadcast-demo.html" class="demo-card">
-                <h3>📺 Broadcast Mode</h3>
-                <p>One-to-many streaming setup with automatic viewer management and real-time statistics.</p>
-                <div class="demo-features">
-                    <span class="feature-tag">One-to-Many</span>
-                    <span class="feature-tag">Live Stats</span>
-                    <span class="feature-tag">Viewer Control</span>
-                </div>
-            </a>
-            
-            <a href="vdoninja-sdk-canvas-demo.html" class="demo-card">
-                <h3>🎨 Canvas & Web Audio</h3>
-                <p>Stream programmatically generated content using Canvas API and Web Audio for creative applications.</p>
-                <div class="demo-features">
-                    <span class="feature-tag">Canvas API</span>
-                    <span class="feature-tag">Web Audio</span>
-                    <span class="feature-tag">Synthetic Media</span>
-                </div>
-            </a>
-            
-            <a href="vdoninja-sdk-two-way-chat.html" class="demo-card">
-                <h3>💬 Two-Way Video Chat</h3>
-                <p>Bidirectional video/audio chat using canvas animations and tone generators.</p>
-                <div class="demo-features">
-                    <span class="feature-tag">Bidirectional</span>
-                    <span class="feature-tag">Canvas Video</span>
-                    <span class="feature-tag">Audio Tones</span>
-                </div>
-            </a>
-            
-            <a href="publisher-with-scene.html" class="demo-card">
-                <h3>🔗 Publisher with Scene Links</h3>
-                <p>Publish video/audio and generate matching VDO.Ninja scene links with proper room hashing.</p>
-                <div class="demo-features">
-                    <span class="feature-tag">Scene Links</span>
-                    <span class="feature-tag">Room Hashing</span>
-                    <span class="feature-tag">Password Support</span>
-                </div>
-            </a>
-            
-            <a href="stream-tracking-demo.html" class="demo-card">
-                <h3>📊 Stream Tracking</h3>
-                <p>Monitor all streams in a room with connection states, timestamps, and waiting times.</p>
-                <div class="demo-features">
-                    <span class="feature-tag">Stream States</span>
-                    <span class="feature-tag">Time Tracking</span>
-                    <span class="feature-tag">Live Updates</span>
-                </div>
-            </a>
-        </div>
-    </div>
-    
-    <div class="category">
-        <h2>🎛️ Advanced Features</h2>
-        <div class="demos-grid">
-            <a href="vdoninja-sdk-dynamic-media-demo.html" class="demo-card">
-                <h3>🔄 Dynamic Media Control</h3>
-                <p>Add and remove audio/video tracks on the fly, demonstrating runtime media manipulation.</p>
-                <div class="demo-features">
-                    <span class="feature-tag">Dynamic Tracks</span>
-                    <span class="feature-tag">Runtime Control</span>
-                    <span class="feature-tag">Track Toggle</span>
-                </div>
-            </a>
-            
-            <a href="sdk-monitoring-example.html" class="demo-card">
-                <h3>🧰 SDK Monitoring</h3>
-                <p>Inspect connections, streams, and SDK state with live updates and controls.</p>
-                <div class="demo-features">
-                    <span class="feature-tag">Monitoring</span>
-                    <span class="feature-tag">State</span>
-                    <span class="feature-tag">Stats</span>
-                </div>
-            </a>
-            
-            <a href="vdoninja-sdk-tracks-demo.html" class="demo-card">
-                <h3>🎚️ Track Management</h3>
-                <p>Fine-grained control over individual media tracks with quality switching and constraints.</p>
-                <div class="demo-features">
-                    <span class="feature-tag">Track Control</span>
-                    <span class="feature-tag">Quality Settings</span>
-                    <span class="feature-tag">Constraints</span>
-                </div>
-            </a>
-            
-            <a href="vdoninja-sdk-turn-demo.html" class="demo-card">
-                <h3>🔧 TURN Server Config</h3>
-                <p>Configure and test custom TURN servers for improved connectivity through firewalls.</p>
-                <div class="demo-features">
-                    <span class="feature-tag">TURN Config</span>
-                    <span class="feature-tag">ICE Testing</span>
-                    <span class="feature-tag">Connectivity</span>
-                </div>
-            </a>
-        </div>
-    </div>
-    
-    <div class="category">
-        <h2>🔌 Integrations</h2>
-        <div class="demos-grid">
-            <a href="capturevideo-example.html" class="demo-card">
-                <h3>🎮 Discord Auto-Publisher</h3>
-                <p>Chrome extension example that automatically publishes Discord video streams to VDO.Ninja.</p>
-                <div class="demo-features">
-                    <span class="feature-tag">Chrome Extension</span>
-                    <span class="feature-tag">Auto-capture</span>
-                    <span class="feature-tag">Discord</span>
-                </div>
-            </a>
-        </div>
-    </div>
+    <main id="main" class="demo-page">
+        <div class="container">
+            <div class="gallery-head">
+                <h1>Demos</h1>
+                <p class="lead muted">Each demo is a single HTML page that loads <code>vdoninja-sdk.js</code> and runs in your browser. Open one, follow the numbered steps, and use its share link to connect a second tab or device. View the page source to copy the code.</p>
+            </div>
 
-    <div class="category">
-        <h2>📤 WHIP/WHEP (Standard WebRTC Streaming)</h2>
-        <div class="demos-grid">
-            <a href="whip-publish-demo.html" class="demo-card">
-                <h3>📡 WHIP Publish</h3>
-                <p>Publish your camera or screen to WHIP-compatible services like Twitch, Meshcast.io, or Cloudflare Stream.</p>
-                <div class="demo-features">
-                    <span class="feature-tag">WHIP</span>
-                    <span class="feature-tag">Twitch</span>
-                    <span class="feature-tag">Meshcast</span>
-                    <span class="feature-tag">Cloudflare</span>
+            <section class="category" aria-labelledby="cat-data">
+                <div class="category-head">
+                    <h2 id="cat-data">Data and messaging</h2>
+                    <p>Peer-to-peer data channels, no media</p>
                 </div>
-            </a>
+                <div class="grid grid-3">
+                    <a href="auto-connect.html" class="card">
+                        <h3>Auto-connect mesh</h3>
+                        <p>The smallest example: join a room, connect to every peer automatically, and exchange messages.</p>
+                        <div class="tags"><span class="badge">autoConnect</span><span class="badge">Data channel</span></div>
+                    </a>
+                    <a href="vdoninja-sdk-datachannel-demo.html" class="card">
+                        <h3>Data channel messaging</h3>
+                        <p>Two nodes exchanging chat, custom JSON, and targeted messages, with app-level topic filtering.</p>
+                        <div class="tags"><span class="badge">sendData</span><span class="badge">Targeting</span><span class="badge">JSON</span></div>
+                    </a>
+                    <a href="clipboard.html" class="card">
+                        <h3>Clipboard sync</h3>
+                        <p>Share text between your devices in real time over a direct connection.</p>
+                        <div class="tags"><span class="badge">Share link</span><span class="badge">Data channel</span></div>
+                    </a>
+                    <a href="vdoninja-sdk-pubsub-channels.html" class="card">
+                        <h3>Pub/sub channels</h3>
+                        <p>Subscribe to named channels and publish to them with the SDK's built-in channel helpers.</p>
+                        <div class="tags"><span class="badge">subscribe</span><span class="badge">publishToChannel</span></div>
+                    </a>
+                    <a href="vdoninja-sdk-pubsub-p2p-only.html" class="card">
+                        <h3>Pub/sub over P2P only</h3>
+                        <p>The same channel pattern, but subscribing only after the peer-to-peer data channel is open.</p>
+                        <div class="tags"><span class="badge">Channels</span><span class="badge">dataChannelOpen</span></div>
+                    </a>
+                    <a href="vdoninja-sdk-broadcast-demo.html" class="card">
+                        <h3>Broadcast</h3>
+                        <p>One publisher sends messages to many viewers, and each viewer can reply.</p>
+                        <div class="tags"><span class="badge">One to many</span><span class="badge">Replies</span></div>
+                    </a>
+                </div>
+            </section>
 
-            <a href="whep-view-demo.html" class="demo-card">
-                <h3>👁️ WHEP View</h3>
-                <p>Watch streams from WHEP-compatible endpoints. Connect to Meshcast.io or any WHEP server.</p>
-                <div class="demo-features">
-                    <span class="feature-tag">WHEP</span>
-                    <span class="feature-tag">Meshcast</span>
-                    <span class="feature-tag">Low Latency</span>
+            <section class="category" aria-labelledby="cat-media">
+                <div class="category-head">
+                    <h2 id="cat-media">Audio and video</h2>
+                    <p>Camera, canvas, and synthesized media over WebRTC</p>
                 </div>
-            </a>
-        </div>
-        <div class="info-box">
-            <h3>ℹ️ About WHIP/WHEP</h3>
-            <p><strong>WHIP</strong> (WebRTC-HTTP Ingestion Protocol) lets you publish media to streaming services using standard HTTP.</p>
-            <p><strong>WHEP</strong> (WebRTC-HTTP Egress Protocol) lets you consume media from streaming services.</p>
-            <p>These are IETF standards that work independently of VDO.Ninja's P2P system.</p>
-        </div>
-    </div>
+                <div class="grid grid-3">
+                    <a href="vdoninja-sdk-two-way-chat.html" class="card">
+                        <h3>Two-way video chat</h3>
+                        <p>Bidirectional audio and video using canvas animations and tone generators, no camera needed.</p>
+                        <div class="tags"><span class="badge">publish</span><span class="badge">view</span></div>
+                    </a>
+                    <a href="vdoninja-sdk-canvas-demo.html" class="card">
+                        <h3>Canvas and Web Audio</h3>
+                        <p>Stream programmatically drawn video and synthesized audio, viewable in VDO.Ninja.</p>
+                        <div class="tags"><span class="badge">captureStream</span><span class="badge">Web Audio</span></div>
+                    </a>
+                    <a href="publisher-with-scene.html" class="card">
+                        <h3>Publisher with scene links</h3>
+                        <p>Publish your camera and get matching VDO.Ninja viewer, scene, and director links.</p>
+                        <div class="tags"><span class="badge">VDO.Ninja links</span><span class="badge">Passwords</span></div>
+                    </a>
+                    <a href="vdoninja-sdk-media-quality-demo.html" class="card">
+                        <h3>Media quality controls</h3>
+                        <p>Change resolution, frame rate, bitrate, and codec preferences on a live stream.</p>
+                        <div class="tags"><span class="badge">Bitrate</span><span class="badge">Codecs</span></div>
+                    </a>
+                    <a href="vdoninja-sdk-video-mute-demo.html" class="card">
+                        <h3>Video mute state</h3>
+                        <p>Mute and unmute video, and show the remote mute state on the viewer side.</p>
+                        <div class="tags"><span class="badge">remoteVideoMuteState</span></div>
+                    </a>
+                    <a href="stream-tracking-demo.html" class="card">
+                        <h3>Stream tracking</h3>
+                        <p>Watch every stream in a room appear and disappear, with timestamps and previews.</p>
+                        <div class="tags"><span class="badge">listing</span><span class="badge">Room state</span></div>
+                    </a>
+                </div>
+            </section>
 
-    <div class="category">
-        <h2>🧰 Node Demos</h2>
-        <div class="demos-grid">
-            <a href="../docs/tally.html" class="demo-card">
-                <h3>OBS Tally to VRChat OSC</h3>
-                <p>Discover browser cameras and screens by label, read program/preview through alpha's API, and send OSC booleans. Includes API-only and SDK data-marker configurations, late-join snapshots, and a UDP test receiver.</p>
-                <div class="demo-features">
-                    <span class="feature-tag">Node.js</span>
-                    <span class="feature-tag">OBS</span>
-                    <span class="feature-tag">Tested guide</span>
+            <section class="category" aria-labelledby="cat-advanced">
+                <div class="category-head">
+                    <h2 id="cat-advanced">Advanced</h2>
+                    <p>Tracks, networking, and diagnostics</p>
                 </div>
-            </a>
-            <a href="node-example.js" class="demo-card">
-                <h3>📦 Node.js Example</h3>
-                <p>Minimal Node usage with auto‑detected WebRTC. Announces a data‑only stream and logs P2P messages.</p>
-                <div class="demo-features">
-                    <span class="feature-tag">Node.js</span>
-                    <span class="feature-tag">Data Channel</span>
-                    <span class="feature-tag">Auto‑detect</span>
+                <div class="grid grid-3">
+                    <a href="vdoninja-sdk-dynamic-media-demo.html" class="card">
+                        <h3>Dynamic media</h3>
+                        <p>Add and remove audio and video tracks while a connection is live.</p>
+                        <div class="tags"><span class="badge">addTrack</span><span class="badge">removeTrack</span></div>
+                    </a>
+                    <a href="vdoninja-sdk-tracks-demo.html" class="card">
+                        <h3>Track management</h3>
+                        <p>Replace, toggle, and switch individual tracks, including switching cameras.</p>
+                        <div class="tags"><span class="badge">replaceTrack</span><span class="badge">Constraints</span></div>
+                    </a>
+                    <a href="vdoninja-sdk-turn-demo.html" class="card">
+                        <h3>TURN configuration</h3>
+                        <p>Use the default relays, your own TURN server, or force relayed connections for testing.</p>
+                        <div class="tags"><span class="badge">ICE</span><span class="badge">TURN</span></div>
+                    </a>
+                    <a href="sdk-monitoring-example.html" class="card">
+                        <h3>SDK monitoring</h3>
+                        <p>Inspect connections, streams, and SDK events live while you publish and view.</p>
+                        <div class="tags"><span class="badge">Events</span><span class="badge">State</span></div>
+                    </a>
                 </div>
-            </a>
-            <a href="socialstreamninja-listener.js" class="demo-card">
-                <h3>🗨️ Social Stream Ninja Listener</h3>
-                <p>Connect to Social Stream Ninja (SSN) and receive consolidated live chat via P2P data channels.</p>
-                <div class="demo-features">
-                    <span class="feature-tag">Node.js</span>
-                    <span class="feature-tag">Social Stream</span>
-                    <span class="feature-tag">Data Channel</span>
+            </section>
+
+            <section class="category" aria-labelledby="cat-whip">
+                <div class="category-head">
+                    <h2 id="cat-whip">WHIP and WHEP</h2>
+                    <p>Standard WebRTC streaming to and from media services, separate from VDO.Ninja rooms</p>
                 </div>
-            </a>
-            <a href="node-audio-sine.js" class="demo-card">
-                <h3>🎶 Node Sine-Wave Publisher</h3>
-                <p>Stream a generated sine tone from Node using @roamhq/wrtc's RTCAudioSource with ready-to-share scene links.</p>
-                <div class="demo-features">
-                    <span class="feature-tag">Node.js</span>
-                    <span class="feature-tag">Audio</span>
-                    <span class="feature-tag">RTCAudioSource</span>
+                <div class="grid grid-3">
+                    <a href="whip-publish-demo.html" class="card">
+                        <h3>WHIP publish</h3>
+                        <p>Publish your camera or screen to Meshcast, Cloudflare Stream, Twitch, or any WHIP endpoint.</p>
+                        <div class="tags"><span class="badge">WHIPClient</span></div>
+                    </a>
+                    <a href="whep-view-demo.html" class="card">
+                        <h3>WHEP view</h3>
+                        <p>Watch a stream from any WHEP endpoint, such as the one you just published with WHIP.</p>
+                        <div class="tags"><span class="badge">WHEPClient</span></div>
+                    </a>
+                    <a href="capturevideo-example.html" class="card">
+                        <h3>Browser extension auto-publisher</h3>
+                        <p>An example Chrome extension script that republishes Discord video streams to VDO.Ninja.</p>
+                        <div class="tags"><span class="badge">Extension</span><span class="badge">Example code</span></div>
+                    </a>
                 </div>
-            </a>
+            </section>
+
+            <section class="category" aria-labelledby="cat-node">
+                <div class="category-head">
+                    <h2 id="cat-node">Node.js samples</h2>
+                    <p>Run from a checkout of the repository with <code>node demos/&lt;file&gt;</code></p>
+                </div>
+                <div class="grid grid-3">
+                    <a href="node-example.js" class="card">
+                        <span class="badge card-kind">.js</span>
+                        <h3>Minimal Node peer</h3>
+                        <p>Auto-detects a WebRTC runtime, announces a data-only stream, and logs messages.</p>
+                    </a>
+                    <a href="node-room-audio-recorder.js" class="card">
+                        <span class="badge card-kind">.js</span>
+                        <h3>Room audio recorder</h3>
+                        <p>Joins a room, finds every publisher, and saves each participant's audio as a WAV file.</p>
+                    </a>
+                    <a href="node-room-media-recorder.js" class="card">
+                        <span class="badge card-kind">.js</span>
+                        <h3>Room media recorder</h3>
+                        <p>Records each participant's audio and video using ffmpeg.</p>
+                    </a>
+                    <a href="node-audio-sine.js" class="card">
+                        <span class="badge card-kind">.js</span>
+                        <h3>Sine-wave publisher</h3>
+                        <p>Streams a generated tone from Node with <code>RTCAudioSource</code> and prints viewer links.</p>
+                    </a>
+                    <a href="socialstreamninja-listener.js" class="card">
+                        <span class="badge card-kind">.js</span>
+                        <h3>Social Stream Ninja listener</h3>
+                        <p>Receives consolidated live chat from Social Stream Ninja over P2P data channels.</p>
+                    </a>
+                    <a href="sdk-workflows.cjs" class="card">
+                        <span class="badge card-kind">.cjs</span>
+                        <h3>Request and response workflows</h3>
+                        <p>Two peers using <code>onRequest</code> for status checks, authorized commands, and binary payloads.</p>
+                    </a>
+                    <a href="../docs/tally.html" class="card">
+                        <span class="badge card-kind">Guide</span>
+                        <h3>OBS tally to VRChat OSC</h3>
+                        <p>Discover browser cameras by label, read program/preview tally, and send OSC. Tested setup.</p>
+                    </a>
+                </div>
+                <div class="callout" style="margin-top: 20px;">
+                    Install dependencies with <code>npm install @vdoninja/sdk @roamhq/wrtc</code> (or <code>node-datachannel</code> for data-only peers), then run, for example, <code>node demos/node-example.js</code>. See the <a href="https://github.com/steveseguin/ninjasdk/blob/main/README-NODE.md">Node.js guide</a>.
+                </div>
+            </section>
+
+            <section class="tips card" aria-labelledby="tips-title">
+                <h2 id="tips-title" class="section-label">Tips for testing</h2>
+                <dl>
+                    <dt>Two tabs</dt><dd>Use a demo's <strong>Open second tab</strong> link. The room is in the URL, so both tabs join the same one.</dd>
+                    <dt>Other devices</dt><dd>Copy the share link to a phone or another computer. Peers connect directly, so no server setup is needed.</dd>
+                    <dt>Camera and microphone</dt><dd>Browsers only allow capture on HTTPS or <code>localhost</code>.</dd>
+                    <dt>Debugging</dt><dd>Open the browser console for detailed SDK connection logs.</dd>
+                </dl>
+            </section>
         </div>
-        <div class="info-box">
-            <h3>ℹ️ Running Node Demos</h3>
-            <p>Install dependencies: <code>npm install ws @roamhq/wrtc</code> (or <code>node-datachannel</code>).</p>
-            <p>Run examples: <code>node demos/node-example.js</code> or <code>node demos/socialstreamninja-listener.js &lt;session-id&gt;</code></p>
+    </main>
+
+    <footer class="site-footer">
+        <div class="container">
+            <span>VDO.Ninja SDK demos · MIT licensed (SDK core MPL-2.0)</span>
+            <nav aria-label="Footer"><a href="../index.html">Home</a><a href="../docs/guides.html">Guides</a><a href="../docs/api-reference.html">API reference</a><a href="https://github.com/steveseguin/ninjasdk">GitHub</a></nav>
         </div>
-    </div>
-    
-    <div class="info-box">
-        <h3>💡 Tips for Testing</h3>
-        <p><strong>Local Testing:</strong> Open demos in multiple browser tabs or windows</p>
-        <p><strong>Remote Testing:</strong> Share the demo URL with others - no server needed!</p>
-        <p><strong>Debug Mode:</strong> Open browser console to see detailed connection logs</p>
-        <p><strong>Room Names:</strong> Most demos generate random room names to avoid conflicts</p>
-    </div>
+    </footer>
 </body>
 </html>

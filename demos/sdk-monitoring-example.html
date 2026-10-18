@@ -1,450 +1,640 @@
 <!DOCTYPE html>
+<!--
+    VDO.Ninja SDK Demo - Connection and Stream Monitoring
+
+    This demo is MIT licensed; see LICENSE-DEMOS.
+
+    Note: The VDO.Ninja SDK core (`vdoninja-sdk.js`, `vdoninja-sdk.min.js`) is
+    separately licensed under MPL-2.0; see LICENSE.
+-->
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VDO.Ninja SDK - Connection & Stream Monitoring</title>
+    <title>Monitoring demo | VDO.Ninja SDK</title>
+    <meta name="description" content="Join a VDO.Ninja room and watch the SDK's events, its connections map, and the streams it has seen, live.">
     <link rel="icon" type="image/svg+xml" href="../favicon.svg">
-    <link rel="icon" type="image/png" href="https://vdo.ninja/favicon.png">
-    <link rel="apple-touch-icon" href="https://vdo.ninja/apple-touch-icon.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../site.css">
     <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 20px;
-            background: #f5f5f5;
+        .conn-list { display: grid; gap: 12px; }
+        .conn-card {
+            padding: 12px 14px;
+            background: var(--bg-alt);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            font-size: 0.875rem;
+            min-width: 0;
         }
-        
-        .container {
-            background: white;
-            border-radius: 12px;
-            padding: 30px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-        
-        h1 {
-            color: #333;
-            margin-bottom: 10px;
-        }
-        
-        .controls {
-            margin-bottom: 20px;
-        }
-        
-        button {
-            background: #2196F3;
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 6px;
-            font-size: 16px;
-            cursor: pointer;
-            margin-right: 10px;
-        }
-        
-        button:hover {
-            background: #1976D2;
-        }
-        
-        .info-section {
-            background: #f0f0f0;
-            border-radius: 8px;
-            padding: 15px;
-            margin: 15px 0;
-        }
-        
-        .info-section h3 {
-            margin-top: 0;
-            color: #555;
-        }
-        
-        pre {
-            background: #263238;
-            color: #aed581;
-            padding: 15px;
-            border-radius: 4px;
-            overflow-x: auto;
-            font-size: 14px;
-        }
-        
-        .event-log {
-            background: #f5f5f5;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            padding: 10px;
-            max-height: 300px;
-            overflow-y: auto;
-            font-family: monospace;
-            font-size: 13px;
-        }
-        
-        .event-item {
-            margin: 5px 0;
-            padding: 5px;
-            background: white;
-            border-radius: 3px;
-        }
-        
-        .event-time {
-            color: #666;
-            font-size: 11px;
-        }
-        
-        .connection-info {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 15px;
-            margin-top: 15px;
-        }
-        
-        .connection-card {
-            background: #e3f2fd;
-            border: 1px solid #1976d2;
-            border-radius: 6px;
-            padding: 12px;
-        }
-        
-        .connection-card h4 {
-            margin: 0 0 8px 0;
-            color: #1976d2;
-        }
-        
-        .connection-detail {
-            font-size: 12px;
-            margin: 3px 0;
-        }
-        
-        .stream-list {
-            background: #f0f0f0;
-            border-radius: 6px;
-            padding: 10px;
-            margin-top: 10px;
-        }
-        
-        .stream-item {
-            background: white;
-            padding: 8px;
-            margin: 5px 0;
-            border-radius: 4px;
-            font-size: 13px;
-        }
+        .conn-card h3 { margin: 0 0 6px; font-size: 0.95rem; font-family: var(--mono); overflow-wrap: anywhere; }
+        .conn-line { color: var(--text-muted); overflow-wrap: anywhere; }
+        .conn-line + .conn-line { margin-top: 4px; }
+        .empty-note { margin: 0; color: var(--text-faint); font-size: 0.9rem; }
+        .state-pre { margin: 0; max-height: 260px; }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>VDO.Ninja SDK - Connection & Stream Monitoring</h1>
-        <p>This demo shows how to monitor active connections, room streams, and handle disconnect events.</p>
-        
-        <div class="controls">
-            <input type="text" id="roomInput" placeholder="Room name" value="monitor_demo" style="padding: 8px; margin-right: 10px;">
-            <button onclick="connect()">Connect</button>
-            <button onclick="disconnect()">Disconnect</button>
-            <button onclick="publishStream()">Publish Stream</button>
-            <button onclick="refreshInfo()">Refresh Info</button>
-        </div>
-        
-        <div class="info-section">
-            <h3>Active Connections</h3>
-            <div id="connections" class="connection-info">
-                <em>Not connected</em>
-            </div>
-        </div>
-        
-        <div class="info-section">
-            <h3>Room Streams</h3>
-            <div id="roomStreams" class="stream-list">
-                <em>No room joined</em>
-            </div>
-        </div>
-        
-        <div class="info-section">
-            <h3>Event Log</h3>
-            <div id="eventLog" class="event-log"></div>
-        </div>
-        
-        <div class="info-section">
-            <h3>SDK State</h3>
-            <pre id="sdkState">{}</pre>
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="site-header">
+    <div class="site-header-inner">
+        <a class="brand" href="../index.html"><img src="../favicon.svg" alt="" width="26" height="26"><span>VDO.Ninja SDK</span></a>
+        <nav class="site-nav" aria-label="Main">
+            <a href="../index.html">Home</a>
+            <a href="./" aria-current="page">Demos</a>
+            <a href="../docs/guides.html">Guides</a>
+            <a href="../docs/api-reference.html">API</a>
+        </nav>
+        <div class="site-header-actions">
+            <a class="btn btn-secondary btn-sm" href="https://github.com/steveseguin/ninjasdk">GitHub</a>
         </div>
     </div>
-    
-    <script src="../vdoninja-sdk.js"></script>
-    <script>
-        let vdo = null;
-        let roomStreams = new Map(); // Track streams and their metadata
-        let eventCount = 0;
-        
-        function logEvent(type, data) {
-            const log = document.getElementById('eventLog');
-            const time = new Date().toLocaleTimeString();
-            const item = document.createElement('div');
-            item.className = 'event-item';
-            item.innerHTML = `
-                <span class="event-time">${time}</span>
-                <strong>${type}:</strong> ${JSON.stringify(data, null, 2)}
-            `;
-            log.insertBefore(item, log.firstChild);
-            
-            // Keep only last 50 events
-            while (log.children.length > 50) {
-                log.removeChild(log.lastChild);
+</header>
+
+<main id="main" class="demo-page">
+    <div class="container">
+        <a class="crumb" href="./">← All demos</a>
+        <div class="demo-head">
+            <h1>Connection monitoring</h1>
+            <p class="lead">Join a room and watch what the SDK reports: its events, the <code>vdo.connections</code> map, the streams it has seen (<code>vdo.getStreams()</code>), and <code>vdo.state</code>.</p>
+        </div>
+
+        <ol class="steps">
+            <li><strong>Connect</strong> to the room in the URL.</li>
+            <li><strong>Publish your camera</strong> (optional) so another tab has something to view.</li>
+            <li><strong>Open a second tab</strong> with the share link, connect there, and click <strong>View</strong> on a stream.</li>
+            <li><strong>Watch both logs.</strong> Each side logs <code>peerConnected</code>; disconnect one tab and the other logs <code>peerDisconnected</code>.</li>
+        </ol>
+
+        <div class="share-bar">
+            <span>Room <code id="roomName">…</code></span>
+            <div class="row">
+                <button class="btn btn-secondary btn-sm" id="copyLinkBtn" type="button">Copy link</button>
+                <a class="btn btn-secondary btn-sm" id="openTabLink" href="#" target="_blank" rel="noopener">Open second tab</a>
+            </div>
+        </div>
+
+        <section class="panel" aria-labelledby="controlsTitle">
+            <div class="panel-header">
+                <h2 id="controlsTitle">Controls</h2>
+                <span class="status" id="monitorStatus" data-state="idle" role="status">Not connected</span>
+            </div>
+            <div class="panel-body">
+                <div class="field-row">
+                    <div class="field">
+                        <label for="roomInput">Room name</label>
+                        <input type="text" id="roomInput" autocomplete="off" spellcheck="false">
+                    </div>
+                </div>
+                <div class="row" style="margin-top:14px">
+                    <button class="btn btn-primary" id="connectBtn" type="button">Connect</button>
+                    <button class="btn btn-danger" id="disconnectBtn" type="button" disabled>Disconnect</button>
+                    <button class="btn btn-secondary" id="publishBtn" type="button" disabled>Publish camera</button>
+                    <button class="btn btn-ghost" id="refreshBtn" type="button">Refresh info</button>
+                </div>
+                <p class="small muted" id="publishInfo" style="margin:12px 0 0">Not publishing.</p>
+            </div>
+        </section>
+
+        <div class="grid grid-2" style="margin-top:20px">
+            <section class="panel" aria-labelledby="connTitle">
+                <div class="panel-header"><h2 id="connTitle">Active connections</h2><span class="small faint">vdo.connections</span></div>
+                <div class="panel-body"><div id="connections" class="conn-list"><p class="empty-note">Not connected</p></div></div>
+            </section>
+
+            <section class="panel" aria-labelledby="streamsTitle">
+                <div class="panel-header"><h2 id="streamsTitle">Streams seen in the room</h2><span class="small faint">vdo.getStreams()</span></div>
+                <div class="panel-body"><div id="roomStreams"><p class="empty-note">No room joined</p></div></div>
+            </section>
+        </div>
+
+        <div class="grid grid-2" style="margin-top:20px">
+            <section class="panel" aria-labelledby="logTitle">
+                <div class="panel-header">
+                    <h2 id="logTitle">Event log</h2>
+                    <button class="btn btn-ghost btn-sm" id="clearLogBtn" type="button">Clear</button>
+                </div>
+                <div class="panel-body"><div class="log" id="eventLog" aria-live="polite"></div></div>
+            </section>
+
+            <section class="panel" aria-labelledby="stateTitle">
+                <div class="panel-header"><h2 id="stateTitle">SDK state</h2><span class="small faint">vdo.state</span></div>
+                <div class="panel-body"><pre class="state-pre"><code id="sdkState">{}</code></pre></div>
+            </section>
+        </div>
+
+        <details class="disclosure" style="margin-top:24px">
+            <summary>Key SDK calls in this demo</summary>
+            <div class="disclosure-body"><pre><code>const vdo = new VDONinjaSDK({ room, salt: 'vdo.ninja', debug: true });
+vdo.addEventListener('listing', (e) =&gt; { /* once for the whole list, then once per stream */ });
+vdo.addEventListener('peerConnected', (e) =&gt; console.log('peer up', e.detail.uuid));
+vdo.addEventListener('peerDisconnected', (e) =&gt; console.log('peer gone', e.detail.uuid));
+
+await vdo.connect();
+await vdo.joinRoom({ room });
+await vdo.publish(camera, { streamID });                    // optional
+await vdo.view(otherStreamID, { audio: false, video: false }); // data-only peer link
+
+console.log(vdo.connections, vdo.getStreams(), vdo.state);
+
+await vdo.disconnect();
+camera.getTracks().forEach((t) =&gt; t.stop());   // disconnect() leaves your camera on</code></pre></div>
+        </details>
+    </div>
+</main>
+
+<footer class="site-footer">
+    <div class="container">
+        <span>VDO.Ninja SDK demos · MIT licensed (SDK core MPL-2.0)</span>
+        <nav aria-label="Footer"><a href="./">All demos</a><a href="../docs/guides.html">Guides</a><a href="https://github.com/steveseguin/ninjasdk">GitHub</a></nav>
+    </div>
+</footer>
+
+<script src="../vdoninja-sdk.js"></script>
+<script>
+    let vdo = null;
+    let localStream = null;      // camera stream we published (we own it and must stop it)
+    let busy = false;            // connect / disconnect in progress
+    let publishBusy = false;     // camera prompt / publish in progress
+    let reconnectGaveUp = false; // SDK emitted reconnectFailed
+    let refreshTimer = null;
+    const viewRequests = new Set(); // streamIDs we asked to view on this connection
+
+    const $ = (id) => document.getElementById(id);
+    const els = {
+        roomInput: $('roomInput'),
+        connectBtn: $('connectBtn'),
+        disconnectBtn: $('disconnectBtn'),
+        publishBtn: $('publishBtn'),
+        status: $('monitorStatus'),
+        publishInfo: $('publishInfo'),
+        connections: $('connections'),
+        roomStreams: $('roomStreams'),
+        sdkState: $('sdkState')
+    };
+
+    // ---------- Room in the URL + share link ----------
+
+    const params = new URLSearchParams(location.search);
+    let room = params.get('room') || 'monitor_' + crypto.randomUUID().slice(0, 8);
+    function syncRoomToUrl() {
+        const p = new URLSearchParams(location.search);
+        if (p.get('room') !== room) {
+            p.set('room', room);
+            history.replaceState(null, '', '?' + p);
+        }
+        $('roomName').textContent = room;
+        $('openTabLink').href = location.href;
+    }
+    els.roomInput.value = room;
+    syncRoomToUrl();
+
+    els.roomInput.addEventListener('change', () => {
+        const value = els.roomInput.value.trim();
+        if (!value) {
+            els.roomInput.value = room;
+            return;
+        }
+        room = value;
+        syncRoomToUrl();
+    });
+
+    $('copyLinkBtn').addEventListener('click', async () => {
+        const btn = $('copyLinkBtn');
+        try {
+            await navigator.clipboard.writeText(location.href);
+            btn.textContent = 'Copied';
+        } catch {
+            btn.textContent = 'Copy failed';
+        }
+        setTimeout(() => { btn.textContent = 'Copy link'; }, 1500);
+    });
+
+    // ---------- Helpers ----------
+
+    function log(text, type = 'system') {
+        const logEl = $('eventLog');
+        const entry = document.createElement('div');
+        entry.className = 'log-entry ' + type;
+        const time = document.createElement('span');
+        time.className = 'log-time';
+        time.textContent = new Date().toLocaleTimeString();
+        const body = document.createElement('span');
+        body.textContent = String(text);
+        entry.append(time, body);
+        logEl.appendChild(entry);
+        while (logEl.children.length > 200) logEl.removeChild(logEl.firstChild);
+        logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    // Pick a few readable fields from an event detail. Event details can hold whole
+    // connection objects (RTCPeerConnection, channels), so never dump them wholesale.
+    function summarize(detail) {
+        if (detail === undefined || detail === null) return '';
+        if (typeof detail !== 'object') return String(detail);
+        const out = {};
+        const keys = ['room', 'uuid', 'UUID', 'streamID', 'type', 'label', 'reason', 'phase', 'intentional', 'willReconnect', 'message'];
+        for (const key of keys) {
+            const value = detail[key];
+            if (value !== undefined && value !== null && typeof value !== 'object') out[key] = value;
+        }
+        if (detail.connection && typeof detail.connection === 'object') {
+            if (out.type === undefined && detail.connection.type) out.type = detail.connection.type;
+            if (out.streamID === undefined && detail.connection.streamID) out.streamID = detail.connection.streamID;
+        }
+        if (detail.info && typeof detail.info === 'object' && typeof detail.info.label === 'string') {
+            out.label = detail.info.label;
+        }
+        if (detail.error) out.error = detail.error.message || String(detail.error);
+        const text = JSON.stringify(out);
+        return text === '{}' ? '' : text;
+    }
+
+    function logEvent(name, detail, type = 'info') {
+        const summary = summarize(detail);
+        log(summary ? `${name} ${summary}` : name, type);
+    }
+
+    function setStatus(state, text) {
+        els.status.dataset.state = state;
+        els.status.textContent = text;
+    }
+
+    function shortId(id) {
+        const s = String(id || '');
+        return s.length > 12 ? s.slice(0, 8) + '…' : s;
+    }
+
+    function updateControls() {
+        const connected = !!(vdo && vdo.state.connected);
+        els.connectBtn.disabled = busy || !!vdo;
+        els.disconnectBtn.disabled = busy || !vdo;
+        els.publishBtn.disabled = busy || publishBusy || !connected || !!localStream || !!(vdo && vdo.state.publishing);
+        els.roomInput.disabled = !!vdo;
+    }
+
+    function connectedPeerCount() {
+        if (!vdo || !vdo.connections) return 0;
+        let count = 0;
+        for (const conns of vdo.connections.values()) {
+            for (const type of ['viewer', 'publisher']) {
+                const conn = conns && conns[type];
+                if (conn && conn.pc && conn.pc.connectionState === 'connected') count++;
             }
         }
-        
-        function updateConnectionsDisplay() {
-            const container = document.getElementById('connections');
-            
-            if (!vdo || !vdo.connections || vdo.connections.size === 0) {
-                container.innerHTML = '<em>No active connections</em>';
-                return;
-            }
-            
-            container.innerHTML = '';
-            
-            // Access the connections Map
-            for (const [uuid, connections] of vdo.connections) {
-                const card = document.createElement('div');
-                card.className = 'connection-card';
-                
-                let html = `<h4>Peer: ${uuid.substring(0, 8)}...</h4>`;
-                
-                // Check viewer connection
-                if (connections.viewer) {
-                    html += `
-                        <div class="connection-detail">
-                            <strong>Viewer Connection:</strong><br>
-                            Stream ID: ${connections.viewer.streamID || 'N/A'}<br>
-                            State: ${connections.viewer.pc?.connectionState || 'Unknown'}<br>
-                            Session: ${connections.viewer.session || 'N/A'}
-                        </div>
-                    `;
-                }
-                
-                // Check publisher connection
-                if (connections.publisher) {
-                    html += `
-                        <div class="connection-detail">
-                            <strong>Publisher Connection:</strong><br>
-                            Stream ID: ${connections.publisher.streamID || 'N/A'}<br>
-                            State: ${connections.publisher.pc?.connectionState || 'Unknown'}<br>
-                            Session: ${connections.publisher.session || 'N/A'}
-                        </div>
-                    `;
-                }
-                
-                card.innerHTML = html;
-                container.appendChild(card);
-            }
-        }
-        
-        function updateRoomStreamsDisplay() {
-            const container = document.getElementById('roomStreams');
-            
-            if (roomStreams.size === 0) {
-                container.innerHTML = '<em>No streams in room</em>';
-                return;
-            }
-            
-            container.innerHTML = '<strong>Streams in room:</strong>';
-            
-            for (const [streamID, metadata] of roomStreams) {
-                const item = document.createElement('div');
-                item.className = 'stream-item';
-                item.innerHTML = `
-                    Stream ID: <strong>${streamID}</strong><br>
-                    First seen: ${metadata.firstSeen.toLocaleTimeString()}<br>
-                    Last update: ${metadata.lastUpdate.toLocaleTimeString()}<br>
-                    UUID: ${metadata.uuid || 'Unknown'}
-                `;
-                container.appendChild(item);
-            }
-        }
-        
-        function updateSDKState() {
-            const stateEl = document.getElementById('sdkState');
-            if (vdo) {
-                const state = {
-                    connected: vdo.state.connected,
-                    room: vdo.state.room,
-                    roomJoined: vdo.state.roomJoined,
-                    publishing: vdo.state.publishing,
-                    streamID: vdo.state.streamID,
-                    uuid: vdo.state.uuid,
-                    connectionCount: vdo.connections ? vdo.connections.size : 0,
-                    roomStreamCount: roomStreams.size
-                };
-                stateEl.textContent = JSON.stringify(state, null, 2);
+        return count;
+    }
+
+    // Green only when at least one peer connection is actually up.
+    function refreshStatus() {
+        if (!vdo) {
+            setStatus('idle', 'Not connected');
+        } else if (!vdo.state.connected) {
+            if (reconnectGaveUp) setStatus('error', 'Reconnect failed; disconnect and connect again');
+            else setStatus('connecting', busy ? 'Connecting' : 'Reconnecting');
+        } else if (!vdo.state.roomJoined) {
+            setStatus('connecting', 'Joining room');
+        } else {
+            const peers = connectedPeerCount();
+            if (peers > 0) {
+                setStatus('live', `${peers} peer connection${peers === 1 ? '' : 's'} up`);
             } else {
-                stateEl.textContent = '{}';
+                setStatus('waiting', 'In room, no peers yet');
             }
         }
-        
-        async function connect() {
-            if (vdo) {
-                await disconnect();
-            }
-            
-            const room = document.getElementById('roomInput').value || 'monitor_demo';
-            
-            vdo = new VDONinjaSDK({
-                room: room,
-                salt: "vdo.ninja",
-                debug: true
-            });
-            
-            // Set up all event listeners
-            vdo.addEventListener('connected', () => {
-                logEvent('connected', { message: 'Connected to server' });
-                updateSDKState();
-            });
-            
-            vdo.addEventListener('disconnected', () => {
-                logEvent('disconnected', { message: 'Disconnected from server' });
-                roomStreams.clear();
-                updateConnectionsDisplay();
-                updateRoomStreamsDisplay();
-                updateSDKState();
-            });
-            
-            vdo.addEventListener('roomJoined', (event) => {
-                logEvent('roomJoined', event.detail);
-                updateSDKState();
-            });
-            
-            // Listen for room listing (shows all streams in room)
-            vdo.addEventListener('listing', (event) => {
-                logEvent('listing', event.detail);
-                
-                // Update our room streams map
-                if (event.detail.list) {
-                    const now = new Date();
-                    event.detail.list.forEach(item => {
-                        const streamID = typeof item === 'string' ? item : item.streamID;
-                        if (streamID) {
-                            const existing = roomStreams.get(streamID);
-                            roomStreams.set(streamID, {
-                                firstSeen: existing ? existing.firstSeen : now,
-                                lastUpdate: now,
-                                uuid: item.UUID || existing?.uuid
-                            });
-                        }
-                    });
-                    updateRoomStreamsDisplay();
+    }
+
+    // ---------- Displays (built with DOM + textContent; peer data is never parsed as HTML) ----------
+
+    function emptyNote(text) {
+        const p = document.createElement('p');
+        p.className = 'empty-note';
+        p.textContent = text;
+        return p;
+    }
+
+    function updateConnectionsDisplay() {
+        const container = els.connections;
+        if (!vdo) {
+            container.replaceChildren(emptyNote('Not connected'));
+            return;
+        }
+        if (!vdo.connections || vdo.connections.size === 0) {
+            container.replaceChildren(emptyNote('No active connections'));
+            return;
+        }
+
+        const cards = [];
+        for (const [uuid, conns] of vdo.connections) {
+            const card = document.createElement('div');
+            card.className = 'conn-card';
+            const title = document.createElement('h3');
+            title.textContent = 'Peer ' + shortId(uuid);
+            title.title = String(uuid);
+            card.appendChild(title);
+
+            for (const type of ['viewer', 'publisher']) {
+                const conn = conns && conns[type];
+                if (!conn) continue;
+                const line = document.createElement('div');
+                line.className = 'conn-line';
+                const role = type === 'viewer'
+                    ? 'Viewing their stream'
+                    : 'They view my stream';
+                const parts = [
+                    role,
+                    'stream ' + (conn.streamID || 'n/a'),
+                    'state ' + (conn.pc ? conn.pc.connectionState : 'unknown')
+                ];
+                if (conn.info && typeof conn.info.label === 'string' && conn.info.label) {
+                    parts.push('label ' + conn.info.label);
                 }
-            });
-            
-            // Listen for viewer/peer events
-            vdo.addEventListener('viewerJoined', (event) => {
-                logEvent('viewerJoined', event.detail);
-                updateConnectionsDisplay();
-            });
-            
-            vdo.addEventListener('viewerLeft', (event) => {
-                logEvent('viewerLeft', event.detail);
-                updateConnectionsDisplay();
-            });
-            
-            // Listen for bye messages (peer disconnection)
-            vdo.addEventListener('bye', (event) => {
-                logEvent('bye', { uuid: event.detail.UUID, message: 'Peer disconnected' });
-                updateConnectionsDisplay();
-                
-                // Remove streams associated with this peer
-                for (const [streamID, metadata] of roomStreams) {
-                    if (metadata.uuid === event.detail.UUID) {
-                        roomStreams.delete(streamID);
-                    }
-                }
-                updateRoomStreamsDisplay();
-            });
-            
-            // Listen for hangup messages
-            vdo.addEventListener('hangup', (event) => {
-                logEvent('hangup', { uuid: event.detail.UUID, message: 'Peer hung up' });
-                updateConnectionsDisplay();
-            });
-            
-            // Listen for connection events
-            vdo.addEventListener('peerConnected', (event) => {
-                logEvent('peerConnected', event.detail);
-                updateConnectionsDisplay();
-            });
-            
-            vdo.addEventListener('connectionFailed', (event) => {
-                logEvent('connectionFailed', event.detail);
-                updateConnectionsDisplay();
-            });
-            
-            // Listen for approved/rejected events
-            vdo.addEventListener('approved', (event) => {
-                logEvent('approved', event.detail);
-            });
-            
-            vdo.addEventListener('rejected', (event) => {
-                logEvent('rejected', event.detail);
-            });
-            
-            try {
-                await vdo.connect();
-                await vdo.joinRoom({ room });
-                logEvent('roomJoined', { room });
-                
-                // Refresh display
-                refreshInfo();
-            } catch (error) {
-                logEvent('error', { message: error.message });
-                console.error('Connection error:', error);
+                line.textContent = parts.join(' · ');
+                card.appendChild(line);
             }
+            cards.push(card);
         }
-        
-        async function disconnect() {
-            if (vdo) {
-                vdo.disconnect();
-                vdo = null;
-                roomStreams.clear();
-                updateConnectionsDisplay();
-                updateRoomStreamsDisplay();
-                updateSDKState();
-            }
+        container.replaceChildren(...cards);
+    }
+
+    function isViewing(streamID) {
+        if (!vdo || !vdo.connections) return false;
+        for (const conns of vdo.connections.values()) {
+            if (conns && conns.viewer && conns.viewer.streamID === streamID) return true;
         }
-        
-        async function publishStream() {
-            if (!vdo || !vdo.state.connected) {
-                alert('Please connect first');
-                return;
-            }
-            
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ 
-                    video: true, 
-                    audio: true 
-                });
-                
-                const streamID = 'monitor_' + Math.random().toString(36).substring(7);
-                await vdo.publish(stream, { streamID });
-                
-                logEvent('publishStarted', { streamID });
-                updateSDKState();
-            } catch (error) {
-                logEvent('publishError', { message: error.message });
-                console.error('Publish error:', error);
-            }
+        return false;
+    }
+
+    async function requestView(streamID, button) {
+        if (!vdo || viewRequests.has(streamID)) return;
+        const sdk = vdo;
+        viewRequests.add(streamID);
+        button.disabled = true;
+        button.textContent = 'Requested';
+        log(`view("${streamID}") requested (data only)`, 'sent');
+        try {
+            const pc = await sdk.view(streamID, { audio: false, video: false });
+            if (sdk !== vdo) return;
+            if (!pc) log(`${streamID} did not answer yet; the SDK will keep retrying`, 'warning');
+        } catch (error) {
+            if (sdk !== vdo) return;
+            viewRequests.delete(streamID);
+            log(`view("${streamID}") failed: ${error.message}`, 'error');
         }
-        
-        function refreshInfo() {
-            updateConnectionsDisplay();
-            updateRoomStreamsDisplay();
-            updateSDKState();
+        refreshInfo();
+    }
+
+    function updateRoomStreamsDisplay() {
+        const container = els.roomStreams;
+        if (!vdo || !vdo.state.roomJoined) {
+            container.replaceChildren(emptyNote('No room joined'));
+            return;
         }
-        
-        // Auto-refresh every 2 seconds when connected
-        setInterval(() => {
-            if (vdo && vdo.state.connected) {
-                updateConnectionsDisplay();
-                updateSDKState();
+        const streams = typeof vdo.getStreams === 'function' ? vdo.getStreams() : [];
+        if (streams.length === 0) {
+            container.replaceChildren(emptyNote('No other streams seen yet. Publish from a second tab.'));
+            return;
+        }
+
+        const wrap = document.createElement('div');
+        wrap.className = 'table-wrap';
+        const table = document.createElement('table');
+        const thead = document.createElement('thead');
+        const headRow = document.createElement('tr');
+        for (const label of ['Stream ID', 'State', 'Last seen', 'Action']) {
+            const th = document.createElement('th');
+            th.textContent = label;
+            headRow.appendChild(th);
+        }
+        thead.appendChild(headRow);
+        const tbody = document.createElement('tbody');
+
+        for (const s of streams) {
+            const tr = document.createElement('tr');
+            const idCell = document.createElement('td');
+            idCell.className = 'mono';
+            idCell.textContent = String(s.streamID);
+            const stateCell = document.createElement('td');
+            stateCell.textContent = String(s.state || 'unknown');
+            const seenCell = document.createElement('td');
+            seenCell.textContent = s.lastSeen ? new Date(s.lastSeen).toLocaleTimeString() : '-';
+            const actionCell = document.createElement('td');
+            const streamID = String(s.streamID);
+            if (vdo.state.streamID && vdo.state.streamID === streamID) {
+                // getStreams() also tracks the stream this tab publishes.
+                const own = document.createElement('span');
+                own.className = 'faint';
+                own.textContent = 'This tab';
+                actionCell.appendChild(own);
+                tr.append(idCell, stateCell, seenCell, actionCell);
+                tbody.appendChild(tr);
+                continue;
             }
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'btn btn-secondary btn-sm';
+            if (isViewing(streamID)) {
+                btn.textContent = 'Viewing';
+                btn.disabled = true;
+            } else if (viewRequests.has(streamID)) {
+                btn.textContent = 'Requested';
+                btn.disabled = true;
+            } else {
+                btn.textContent = 'View';
+                btn.addEventListener('click', () => requestView(streamID, btn));
+            }
+            actionCell.appendChild(btn);
+            tr.append(idCell, stateCell, seenCell, actionCell);
+            tbody.appendChild(tr);
+        }
+        table.append(thead, tbody);
+        wrap.appendChild(table);
+        container.replaceChildren(wrap);
+    }
+
+    function updateSDKState() {
+        if (!vdo) {
+            els.sdkState.textContent = '{}';
+            return;
+        }
+        const state = {
+            connected: vdo.state.connected,
+            room: vdo.state.room,
+            roomJoined: vdo.state.roomJoined,
+            publishing: vdo.state.publishing,
+            streamID: vdo.state.streamID,
+            uuid: vdo.state.uuid,
+            connectionCount: vdo.connections ? vdo.connections.size : 0,
+            streamsSeen: typeof vdo.getStreams === 'function' ? vdo.getStreams().length : 0
+        };
+        els.sdkState.textContent = JSON.stringify(state, null, 2);
+    }
+
+    function refreshInfo() {
+        updateConnectionsDisplay();
+        updateRoomStreamsDisplay();
+        updateSDKState();
+        refreshStatus();
+        updateControls();
+    }
+
+    // ---------- SDK events ----------
+
+    function attachListeners(sdk) {
+        // Only update the UI for the current instance; old instances can still emit during teardown.
+        const on = (name, handler) => sdk.addEventListener(name, (event) => {
+            handler(event.detail);
+            if (sdk === vdo) refreshInfo();
+        });
+
+        on('connected', () => { if (sdk === vdo) reconnectGaveUp = false; logEvent('connected', null, 'success'); });
+        on('disconnected', (d) => logEvent('disconnected', d, d && d.intentional ? 'system' : 'warning'));
+        on('reconnecting', (d) => logEvent('reconnecting', d, 'warning'));
+        on('reconnected', (d) => { if (sdk === vdo) reconnectGaveUp = false; logEvent('reconnected', d, 'success'); });
+        on('reconnectFailed', (d) => { if (sdk === vdo) reconnectGaveUp = true; logEvent('reconnectFailed', d, 'error'); });
+        on('roomJoined', (d) => logEvent('roomJoined', d, 'success'));
+
+        // 'listing' fires once for the whole list, then once more per stream in it.
+        // Log the list as one summary line and skip the per-stream repeats.
+        on('listing', (d) => {
+            if (!d) return;
+            if (Array.isArray(d.list) && d.streamID === undefined) {
+                const ids = d.list.map((item) => (typeof item === 'string' ? item : item && item.streamID)).filter(Boolean);
+                log(`listing: ${ids.length} stream${ids.length === 1 ? '' : 's'} in room${ids.length ? ' (' + ids.join(', ') + ')' : ''}`, 'received');
+            } else if (d.streamID !== undefined && !Array.isArray(d.list)) {
+                logEvent('listing (single stream)', { streamID: d.streamID, uuid: d.uuid, label: d.label }, 'received');
+            }
+        });
+        on('streamAdded', (d) => logEvent('streamAdded', d, 'received'));
+
+        on('peerConnected', (d) => logEvent('peerConnected', d, 'success'));
+        on('peerDisconnected', (d) => logEvent('peerDisconnected', d, 'warning'));
+        on('dataChannelOpen', (d) => logEvent('dataChannelOpen', d, 'success'));
+        on('dataChannelClose', (d) => logEvent('dataChannelClose', d, 'warning'));
+        on('peerInfo', (d) => logEvent('peerInfo', d, 'received'));
+        on('connectionFailed', (d) => logEvent('connectionFailed', d, 'error'));
+        on('bye', (d) => logEvent('bye', d, 'warning'));
+        on('hangup', (d) => logEvent('hangup', d, 'warning'));
+        on('approved', (d) => logEvent('approved', d, 'info'));
+        on('rejected', (d) => logEvent('rejected', d, 'error'));
+        on('publishing', (d) => logEvent('publishing', d, 'success'));
+        on('publishingStopped', (d) => logEvent('publishingStopped', d, 'warning'));
+        on('alert', (d) => logEvent('alert', d, 'warning'));
+        on('error', (d) => logEvent('error', d, 'error'));
+    }
+
+    // ---------- Actions ----------
+
+    function stopLocalStream() {
+        if (localStream) {
+            localStream.getTracks().forEach((track) => track.stop());
+            localStream = null;
+        }
+        els.publishInfo.textContent = 'Not publishing.';
+    }
+
+    async function connect() {
+        if (vdo || busy) return;
+        busy = true;                       // lock the buttons before the first await
+        const sdk = new VDONinjaSDK({ room, salt: 'vdo.ninja', debug: true });
+        vdo = sdk;
+        reconnectGaveUp = false;
+        viewRequests.clear();
+        attachListeners(sdk);
+        updateControls();
+        refreshStatus();
+        log(`Connecting to room "${room}"...`, 'system');
+
+        try {
+            await sdk.connect();
+            await sdk.joinRoom({ room });
+        } catch (error) {
+            log(`Connection error: ${error.message}`, 'error');
+            if (vdo === sdk) vdo = null;
+            try { await sdk.disconnect(); } catch { /* ignore */ }
+            busy = false;
+            refreshInfo();
+            setStatus('error', 'Connection failed');
+            return;
+        }
+
+        busy = false;
+        if (vdo !== sdk) return;
+        startAutoRefresh();
+        refreshInfo();
+    }
+
+    async function disconnect() {
+        if (!vdo) return;
+        const sdk = vdo;
+        vdo = null;
+        busy = true;
+        stopAutoRefresh();
+        viewRequests.clear();
+        updateControls();
+        setStatus('connecting', 'Disconnecting');
+        try {
+            await sdk.disconnect();
+        } catch (error) {
+            log(`Disconnect error: ${error.message}`, 'warning');
+        }
+        stopLocalStream();                 // the SDK leaves our camera running; release it
+        busy = false;
+        refreshInfo();
+        log('Disconnected; camera released.', 'system');
+    }
+
+    async function publishStream() {
+        if (!vdo || !vdo.state.connected || busy || publishBusy || localStream || vdo.state.publishing) return;
+        const sdk = vdo;
+        publishBusy = true;                // block double-clicks before the first await
+        updateControls();
+
+        let stream = null;
+        try {
+            stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+            if (sdk !== vdo) throw new Error('Disconnected before publishing');
+            const streamID = 'monitor_' + Math.random().toString(36).substring(2, 9);
+            await sdk.publish(stream, { streamID });
+            if (sdk !== vdo) throw new Error('Disconnected before publishing');
+            localStream = stream;
+            els.publishInfo.textContent = `Publishing camera as ${streamID}. A second tab can now View it.`;
+        } catch (error) {
+            if (stream) stream.getTracks().forEach((track) => track.stop());
+            log(`Publish error: ${error.message}`, 'error');
+        }
+        publishBusy = false;
+        refreshInfo();
+    }
+
+    function startAutoRefresh() {
+        stopAutoRefresh();
+        refreshTimer = setInterval(() => {
+            if (vdo) refreshInfo();
         }, 2000);
-    </script>
+    }
+
+    function stopAutoRefresh() {
+        if (refreshTimer) {
+            clearInterval(refreshTimer);
+            refreshTimer = null;
+        }
+    }
+
+    els.connectBtn.addEventListener('click', connect);
+    els.disconnectBtn.addEventListener('click', disconnect);
+    els.publishBtn.addEventListener('click', publishStream);
+    $('refreshBtn').addEventListener('click', refreshInfo);
+    $('clearLogBtn').addEventListener('click', () => $('eventLog').replaceChildren());
+
+    window.addEventListener('beforeunload', () => {
+        stopAutoRefresh();
+        if (vdo) vdo.disconnect();
+        stopLocalStream();
+    });
+
+    refreshInfo();
+</script>
 </body>
 </html>

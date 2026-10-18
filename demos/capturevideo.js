@@ -1036,7 +1036,7 @@
         
         indicator.innerHTML = `
             <div style="font-weight: bold;">📡 VDO.Ninja</div>
-            <div style="font-size: 14px; margin: 4px 0;">${displayLabel}</div>
+            <div class="vdo-indicator-label" style="font-size: 14px; margin: 4px 0;"></div>
             <div style="font-size: 10px;">${streamId}</div>
             <div>${videoIcon} ${audioIcon}</div>
             <div style="margin-top: 6px; display: flex; gap: 4px; justify-content: center; pointer-events: auto;">
@@ -1068,6 +1068,9 @@
                 </button>
             </div>
         `;
+
+        // The label comes from host-page text (usernames, titles), so set it as text, never HTML.
+        indicator.querySelector('.vdo-indicator-label').textContent = displayLabel;
         
         indicator.style.cssText = `
             position: absolute;

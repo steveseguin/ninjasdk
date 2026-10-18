@@ -6,37 +6,29 @@
   <title>OBS Tally to VRChat OSC — VDO.Ninja SDK Guide</title>
   <meta name="description" content="Tested Node samples for VDO.Ninja browser camera and screen tally: SDK room discovery, alpha API snapshots, and VRChat OSC output.">
   <link rel="icon" type="image/svg+xml" href="../favicon.svg">
+  <link rel="canonical" href="https://sdk.vdo.ninja/docs/tally.html">
+  <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../site.css">
+  <link rel="stylesheet" href="guide.css">
   <style>
-    :root { color-scheme: dark; }
-    body { margin: 0 auto; max-width: 940px; padding: 24px; font: 17px/1.65 system-ui, sans-serif; background: #0f172a; color: #e2e8f0; }
-    a { color: #a5b4fc; text-underline-offset: 3px; }
-    h1, h2, h3 { line-height: 1.25; color: #fff; }
-    h1 { font-size: clamp(2rem, 5vw, 3rem); }
-    h2 { margin-top: 2.5rem; }
-    code { background: #1e293b; padding: 2px 5px; border-radius: 4px; overflow-wrap: anywhere; }
-    pre { padding: 18px; background: #1e293b; border-radius: 8px; overflow-x: auto; }
-    pre code { padding: 0; overflow-wrap: normal; }
-    nav { display: flex; flex-wrap: wrap; gap: 12px 24px; }
-    .intro, .note { background: #1e293b; border-left: 3px solid #818cf8; padding: 16px 20px; }
-    .table-wrap { overflow-x: auto; }
-    table { width: 100%; border-collapse: collapse; }
-    th, td { text-align: left; padding: 12px; border-bottom: 1px solid #334155; }
-    .muted { color: #cbd5e1; }
-    li { margin: 8px 0; }
-    footer { margin-top: 48px; border-top: 1px solid #334155; padding-top: 20px; }
+    main .intro { font-size: 1.05rem; color: var(--text-muted); }
+    .note { padding: 14px 18px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); }
   </style>
 </head>
 <body>
-  <nav aria-label="Site"><a href="../index.html#guides">SDK guides</a><a href="../demos/">All demos</a><a href="https://github.com/steveseguin/ninjasdk/tree/main/demos/tally-osc">Sample source on GitHub</a></nav>
-  <main>
+  <a class="skip-link" href="#content">Skip to content</a>
+  <header class="site-header"><div class="site-header-inner"><a class="brand" href="../index.html"><img src="../favicon.svg" alt="" width="26" height="26"><span>VDO.Ninja SDK</span></a><nav class="site-nav" aria-label="Main"><a href="../index.html">Home</a><a href="../demos/">Demos</a><a href="guides.html">Guides</a><a href="api-reference.html">API</a></nav><div class="site-header-actions"><a class="btn btn-secondary btn-sm" href="https://github.com/steveseguin/ninjasdk">GitHub</a></div></div></header>
+  <div class="layout">
+  <aside><nav aria-label="On this page"><strong>On this page</strong><a href="#choose">Choose a method</a><a href="#setup">Run the sample</a><a href="#discovery">Stream IDs and labels</a><a href="#state">Tally and late joins</a><a href="#api">API details</a><a href="#marker">SDK marker</a><a href="#vrctally">VRCTally</a><a href="#osc">VRChat setup</a><a href="#source">Source and tests</a></nav></aside>
+  <main id="content">
     <h1>OBS tally to VRChat OSC</h1>
     <p class="intro">Camera operators keep publishing from their browsers. A Node script discovers room streams and labels with the SDK, reads OBS tally through the updated alpha API, and sends the selected stream's program/preview state to OSC.</p>
     <p><strong>Tested with actual OBS Browser Sources against <a href="https://vdo.ninja/alpha/">VDO.Ninja alpha</a>.</strong> Includes browser camera and screen publishing, late joins, disconnect cleanup, and UDP output. VRChat avatar rendering itself was not tested.</p>
-    <nav aria-label="Guide sections"><a href="#choose">Choose a method</a><a href="#setup">Run the sample</a><a href="#discovery">Stream IDs and labels</a><a href="#state">Tally and late joins</a><a href="#api">API details</a><a href="#marker">SDK marker</a><a href="#osc">VRChat setup</a></nav>
 
     <h2 id="choose">Choose a method</h2>
     <p><strong>Using the VRCTally avatar asset?</strong> Start with <a href="../demos/tally-osc/vrctally.example.json">vrctally.example.json</a> and the <a href="#vrctally">per-operator instructions</a>. It includes label matching, the required OSC paths, and heartbeat. The generic <code>config.example.json</code> remains valid for generic OSC lights; it is not the VRCTally configuration. The per-operator bridge needs no room setting because it reads the operator's publishing-page API.</p>
-    <div class="table-wrap"><table>
+    <div class="table-scroll" tabindex="0" role="region" aria-label="Comparison table"><table>
       <thead><tr><th>Method</th><th>Use it for</th><th>Configuration</th></tr></thead>
       <tbody>
         <tr><td>SDK discovery + API tally</td><td>List browser publishers and select their camera or screen by ID or label.</td><td><a href="../demos/tally-osc/config.example.json">Hybrid JSON</a></td></tr>
@@ -79,7 +71,7 @@ npm install --no-save @roamhq/wrtc@0.10.0</code></pre>
 
     <h2 id="state">Tally state and late joins</h2>
     <p>Before a show, put each source in Program once, let the transition finish, then put it in Preview. OBS can initially report <code>sourceActive:null</code> until an activity change. Unknown state stays unknown; it is not assumed to be Preview.</p>
-    <div class="table-wrap"><table>
+    <div class="table-scroll" tabindex="0" role="region" aria-label="Comparison table"><table>
       <thead><tr><th>State</th><th>Program</th><th>Preview</th><th>Known</th></tr></thead>
       <tbody>
         <tr><td>Program</td><td>true</td><td>false</td><td>true</td></tr>
@@ -131,7 +123,7 @@ ws.on('message', raw =&gt; {
     <pre><code>node demos/tally-osc/udp-monitor.cjs 9002</code></pre>
     <p>Switch OBS scenes and watch the booleans. Restore port 9000 for VRChat.</p>
 
-    <h2>Source, tests, and limits</h2>
+    <h2 id="source">Source, tests, and limits</h2>
     <ul>
       <li><a href="https://github.com/steveseguin/ninjasdk/blob/main/demos/tally-osc/README.md">Complete sample README</a></li>
       <li><a href="https://github.com/steveseguin/ninjasdk/blob/main/demos/tally-osc/bridge.cjs">Runnable bridge source</a> and <a href="https://github.com/steveseguin/ninjasdk/tree/main/demos/tally-osc">all sample files</a></li>
@@ -140,6 +132,7 @@ ws.on('message', raw =&gt; {
     </ul>
     <p class="muted">Validated September 5, 2026: OBS 32.2.2, OBS WebSocket 5.7.4, Node 22.14.0, and @roamhq/wrtc 0.10.0. Browser camera and getDisplayMedia runs used Chromium's synthetic capture devices and actual OBS activity events. Actual UDP output was verified; avatar rendering, attached :s screen layouts, and every director layout were not. This sample does not implement vMix tally.</p>
   </main>
-  <footer><a href="../index.html#guides">Back to SDK guides</a> · <a href="../demos/">Browse demos</a></footer>
+  </div>
+  <footer class="site-footer"><div class="container"><span>VDO.Ninja SDK guides</span><nav aria-label="Footer"><a href="guides.html">All guides</a><a href="../demos/">Demos</a><a href="https://github.com/steveseguin/ninjasdk/tree/main/demos/tally-osc">Sample source</a><a href="https://github.com/steveseguin/ninjasdk">Repository</a></nav></div></footer>
 </body>
 </html>

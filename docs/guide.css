@@ -1,27 +1,63 @@
-:root { color-scheme: dark; font-family: system-ui, sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.65; }
-* { box-sizing: border-box; }
-body { margin: 0; }
-a { color: #a5b4fc; text-underline-offset: .2em; }
-a:hover { color: #d5dcff; }
-a:focus-visible, .table-scroll:focus-visible { outline: 2px solid #67e8f9; outline-offset: 4px; }
-header, footer { padding: 22px max(20px, calc((100vw - 1180px) / 2)); background: #172237; }
-header nav { display: flex; flex-wrap: wrap; gap: 12px 28px; }
-.layout { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 48px; max-width: 1180px; margin: 40px auto; padding: 0 20px; }
-aside nav { position: sticky; top: 24px; display: flex; flex-direction: column; gap: 12px; font-size: .92rem; }
-main { min-width: 0; overflow-wrap: anywhere; }
-h1, h2, h3 { line-height: 1.25; color: #fff; scroll-margin-top: 24px; }
-h1 { font-size: clamp(2rem, 4vw, 2.8rem); margin-top: 0; letter-spacing: -.03em; }
-h2 { margin-top: 2.6rem; font-size: 1.5rem; }
-p, li { max-width: 78ch; }
-li { margin: .45rem 0; }
-code { font-size: .9em; background: #1e293b; border-radius: 4px; padding: .12em .3em; }
-pre { padding: 20px; background: #172237; border: 1px solid #334155; border-radius: 10px; overflow: auto; }
-pre code { padding: 0; background: transparent; overflow-wrap: normal; }
-.table-scroll { max-width: 100%; overflow-x: auto; margin: 24px 0; border: 1px solid #334155; border-radius: 8px; }
-table { width: 100%; border-collapse: collapse; font-size: .95rem; }
-th, td { text-align: left; vertical-align: top; padding: 13px 16px; border-bottom: 1px solid #334155; min-width: 130px; }
-th { background: #1e293b; color: #fff; }
+/* Guide pages. Builds on ../site.css (tokens, header, footer, base typography). */
+
+.layout {
+    display: grid;
+    grid-template-columns: 220px minmax(0, 1fr);
+    gap: 56px;
+    max-width: var(--container);
+    margin: 48px auto 0;
+    padding: 0 var(--gutter);
+}
+
+aside nav {
+    position: sticky;
+    top: calc(var(--header-h) + 24px);
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    font-size: 0.875rem;
+}
+aside nav strong {
+    margin-bottom: 8px;
+    color: var(--text-faint);
+    font-size: 0.75rem;
+    font-weight: 650;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+aside nav a {
+    padding: 5px 10px;
+    border-radius: var(--radius-sm);
+    color: var(--text-muted);
+    text-decoration: none;
+    line-height: 1.4;
+}
+aside nav a:hover { color: #fff; background: var(--surface-2); }
+
+main { min-width: 0; overflow-wrap: anywhere; padding-bottom: 32px; }
+main h1 { margin-bottom: 16px; }
+main h2 { margin-top: 2.6rem; padding-top: 0.4rem; }
+main h3 { margin-top: 1.8rem; }
+main p, main li { max-width: 76ch; color: #cdd4e2; }
+main li { margin: 0.4rem 0; }
+main strong { color: #fff; }
+
+.table-scroll {
+    max-width: 100%;
+    overflow-x: auto;
+    margin: 24px 0;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+}
+.table-scroll:focus-visible { outline: 2px solid var(--accent-text); outline-offset: 2px; }
+table { width: 100%; border-collapse: collapse; font-size: 0.925rem; }
+th, td { text-align: left; vertical-align: top; padding: 12px 16px; border-bottom: 1px solid var(--border); min-width: 130px; }
+th { background: var(--surface-2); color: #fff; font-weight: 600; }
+td { color: #cdd4e2; }
 tbody tr:last-child td { border-bottom: 0; }
-.skip { position: absolute; top: -100px; left: 16px; padding: 8px; background: #172237; }
-.skip:focus { top: 8px; }
-@media (max-width: 800px) { .layout { display: block; margin-top: 28px; } aside { margin-bottom: 30px; padding: 16px; background: #172237; border-radius: 8px; } aside nav { position: static; } header, footer { padding: 20px; } pre { padding: 14px; } }
+
+@media (max-width: 860px) {
+    .layout { display: block; margin-top: 28px; }
+    aside { margin-bottom: 32px; padding: 16px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
+    aside nav { position: static; }
+}

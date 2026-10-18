@@ -5,8 +5,12 @@
 <link rel="canonical" href="https://sdk.vdo.ninja/docs/agent-network.html">
 <meta property="og:title" content="Agent messaging and task exchange"><meta property="og:description" content="Agent messaging and task exchange. VDO.Ninja SDK options, practical examples, requirements, and validation limits.">
 <meta property="og:type" content="article"><meta property="og:url" content="https://sdk.vdo.ninja/docs/agent-network.html">
-<link rel="icon" href="../favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="guide.css"></head>
-<body><a class="skip" href="#content">Skip to content</a><header><nav aria-label="Main"><a href="../index.html">VDO.Ninja SDK</a><a href="guides.html">Choose a guide</a><a href="api-reference.html">API reference</a><a href="../demos/">Demos</a></nav></header>
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../site.css"><link rel="stylesheet" href="guide.css"></head>
+<body><a class="skip-link" href="#content">Skip to content</a>
+<header class="site-header"><div class="site-header-inner"><a class="brand" href="../index.html"><img src="../favicon.svg" alt="" width="26" height="26"><span>VDO.Ninja SDK</span></a><nav class="site-nav" aria-label="Main"><a href="../index.html">Home</a><a href="../demos/">Demos</a><a href="guides.html">Guides</a><a href="api-reference.html">API</a></nav><div class="site-header-actions"><a class="btn btn-secondary btn-sm" href="https://github.com/steveseguin/ninjasdk">GitHub</a></div></div></header>
 <div class="layout"><aside><nav aria-label="On this page"><strong>On this page</strong><a href="#sdk-or-mcp">SDK or MCP?</a><a href="#direct-sdk-requestresponse">Direct SDK request/response</a><a href="#optional-mcp-bridge">Optional MCP bridge</a><a href="#choose-the-smallest-tool-profile">Choose the smallest tool profile</a><a href="#practical-three-agent-workflow">Practical three-agent workflow</a><a href="#persistent-and-community-rooms">Persistent and community rooms</a><a href="#transport-behavior">Transport behavior</a><a href="#client-configuration-and-skill-material">Client configuration and skill material</a><a href="#troubleshooting">Troubleshooting</a></nav></aside>
 <main id="content"><h1 id="agent-messaging-and-task-exchange">Agent messaging and task exchange</h1>
 <p>Use P2P messages for online workers exchanging status, bounded jobs, or results. The SDK is a transport; receiving a task does not authorize an agent to execute it.</p>
@@ -131,4 +135,4 @@ npx vdon-mcp-install --preset secure-full
 <li>Use <code>vdo_receive</code> to inspect <code>sdk_error</code>, <code>connection_failed</code>, and <code>reconnect_scheduled</code> events.</li>
 </ol>
 </main></div>
-<footer><a href="agent-network.md">Markdown source</a> · <a href="validation.html">Validation and limits</a> · <a href="https://github.com/steveseguin/ninjasdk">Repository</a></footer></body></html>
+<footer class="site-footer"><div class="container"><span>VDO.Ninja SDK guides</span><nav aria-label="Footer"><a href="guides.html">All guides</a><a href="validation.html">Validation and limits</a><a href="agent-network.md">Markdown source</a><a href="https://github.com/steveseguin/ninjasdk">Repository</a></nav></div></footer></body></html>

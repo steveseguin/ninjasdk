@@ -1,9 +1,9 @@
 <!DOCTYPE html>
 <!--
     VDO.Ninja SDK Demo - TURN Server Configuration
-    
+
     This demo is MIT licensed; see LICENSE-DEMOS.
-    
+
     Note: The VDO.Ninja SDK core (`vdoninja-sdk.js`, `vdoninja-sdk.min.js`) is
     separately licensed under MPL-2.0; see LICENSE.
 -->
@@ -11,596 +11,656 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VDO.Ninja SDK - TURN Server Configuration Demo</title>
+    <title>TURN servers demo | VDO.Ninja SDK</title>
+    <meta name="description" content="Configure how the VDO.Ninja SDK uses TURN relay servers, then publish or view a test stream and see whether the connection is direct or relayed.">
     <link rel="icon" type="image/svg+xml" href="../favicon.svg">
-    <link rel="icon" type="image/png" href="https://vdo.ninja/favicon.png">
-    <link rel="apple-touch-icon" href="https://vdo.ninja/apple-touch-icon.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../site.css">
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 20px;
-            background-color: #1a1a1a;
-            color: #e0e0e0;
-        }
-        
-        h1 {
-            text-align: center;
-            color: #ffffff;
-            margin-bottom: 10px;
-        }
-        
-        .subtitle {
-            text-align: center;
-            color: #999;
-            font-size: 16px;
-            margin-bottom: 30px;
-        }
-        
-        .main-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 20px;
-        }
-        
-        .section {
-            background: #2a2a2a;
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.5);
-            border: 1px solid #3a3a3a;
-        }
-        
-        h2 {
-            color: #e0e0e0;
-            margin-top: 0;
-        }
-        
-        .control-group {
-            margin-bottom: 15px;
-            padding: 10px;
-            background-color: #333;
-            border-radius: 5px;
-            border: 1px solid #444;
-        }
-        
-        label {
-            display: block;
-            margin-bottom: 5px;
-            color: #b0b0b0;
-            font-weight: bold;
-        }
-        
-        select, input[type="text"] {
-            width: 100%;
-            padding: 8px;
-            border: 1px solid #444;
-            border-radius: 4px;
-            background-color: #1a1a1a;
-            color: #e0e0e0;
-            margin-bottom: 5px;
-        }
-        
-        input[type="checkbox"] {
-            margin-right: 8px;
-        }
-        
-        button {
-            background-color: #4CAF50;
-            color: white;
-            padding: 10px 20px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            margin-right: 10px;
-            margin-bottom: 10px;
-            font-size: 14px;
-            transition: background-color 0.3s;
-        }
-        
-        button:hover:not(:disabled) {
-            background-color: #5cbf60;
-        }
-        
-        button:disabled {
-            background-color: #444;
-            color: #666;
-            cursor: not-allowed;
-        }
-        
-        button.stop {
-            background-color: #f44336;
-        }
-        
-        button.stop:hover:not(:disabled) {
-            background-color: #ff6659;
-        }
-        
-        .ice-config {
-            margin-top: 20px;
-            padding: 15px;
-            background-color: #1a1a1a;
-            border-radius: 5px;
-            border: 1px solid #444;
-            font-family: monospace;
-            font-size: 12px;
-            white-space: pre-wrap;
-            word-break: break-all;
-            max-height: 300px;
-            overflow-y: auto;
-        }
-        
-        .status {
-            margin-top: 10px;
-            padding: 10px;
-            background-color: #1a1a1a;
-            border-radius: 5px;
-            border: 1px solid #444;
-            font-size: 14px;
-        }
-        
-        .status.connected {
-            border-color: #4CAF50;
-        }
-        
-        .status.error {
-            border-color: #f44336;
-        }
-        
-        video {
-            width: 100%;
-            max-width: 400px;
-            height: 300px;
-            background-color: #000;
-            border-radius: 8px;
-            border: 2px solid #444;
-            margin-top: 20px;
-        }
-        
-        .info {
-            background-color: #2196F3;
-            color: white;
-            padding: 10px;
-            border-radius: 5px;
-            margin-bottom: 20px;
-            font-size: 14px;
-        }
-        
-        @media (max-width: 768px) {
-            .main-grid {
-                grid-template-columns: 1fr;
-            }
-        }
+        .options-pre { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+        .peer-card { padding: 12px; background: var(--bg-alt); border: 1px solid var(--border); border-radius: var(--radius); }
+        .peer-card + .peer-card { margin-top: 10px; }
+        .peer-card-title { margin: 0 0 8px; font-size: 0.875rem; font-weight: 600; color: var(--text); overflow-wrap: anywhere; }
+        .peer-card .stat-value { font-size: 0.95rem; overflow-wrap: anywhere; }
+        .peer-card-note { margin: 8px 0 0; font-size: 0.8rem; color: var(--text-muted); overflow-wrap: anywhere; }
     </style>
 </head>
 <body>
-    <h1>🌐 VDO.Ninja SDK - TURN Server Configuration</h1>
-    <div class="subtitle">Demonstrate different TURN server configuration options</div>
-    
-    <div class="info">
-        💡 This demo shows how to configure TURN servers for the VDO.Ninja SDK:
-        <ul style="margin: 10px 0;">
-            <li><strong>Auto-fetch (default)</strong>: Automatically fetches optimal TURN servers from VDO.Ninja API</li>
-            <li><strong>Disabled</strong>: Use only STUN servers (may fail behind restrictive firewalls)</li>
-            <li><strong>Custom</strong>: Provide your own TURN server configuration</li>
-            <li><strong>Force TURN</strong>: Force all traffic through TURN servers for privacy</li>
-        </ul>
-    </div>
-    
-    <div class="main-grid">
-        <!-- Configuration Section -->
-        <div class="section">
-            <h2>🔧 TURN Configuration</h2>
-            
-            <div class="control-group">
-                <label for="turnMode">TURN Server Mode:</label>
-                <select id="turnMode" onchange="updateTurnConfig()">
-                    <option value="auto">Auto-fetch (Default)</option>
-                    <option value="disabled">Disabled (STUN only)</option>
-                    <option value="custom">Custom TURN servers</option>
-                </select>
-            </div>
-            
-            <div class="control-group" id="customTurnGroup" style="display: none;">
-                <label>Custom TURN Server:</label>
-                <input type="text" id="turnUrl" placeholder="turn:turn.example.com:3478" value="turn:turn.example.com:3478">
-                <input type="text" id="turnUsername" placeholder="Username" value="testuser" style="margin-top: 5px;">
-                <input type="text" id="turnCredential" placeholder="Credential" value="testpass" style="margin-top: 5px;">
-            </div>
-            
-            <div class="control-group">
-                <label>
-                    <input type="checkbox" id="forceTURN" onchange="updateTurnConfig()">
-                    Force TURN relay (privacy mode)
-                </label>
-                <small style="color: #888;">Routes all traffic through TURN servers, hiding peer IPs</small>
-            </div>
-            
-            <div class="control-group">
-                <label for="room">Room:</label>
-                <input type="text" id="room" value="turn_demo_room" placeholder="Enter room name">
-            </div>
-            
-            <div class="control-group">
-                <label for="password">Password:</label>
-                <input type="text" id="password" value="testPassword123" placeholder="Room password">
-            </div>
-            
-            <button id="connectBtn" onclick="connectSDK()">Connect</button>
-            <button id="disconnectBtn" onclick="disconnectSDK()" disabled>Disconnect</button>
-            <button id="clearCacheBtn" onclick="clearTURNCache()" style="background-color: #ff9800;">Clear TURN Cache</button>
-            
-            <div class="status" id="status">Not connected</div>
-            
-            <div class="ice-config" id="iceConfig">
-                ICE configuration will appear here after connection...
+    <a class="skip-link" href="#main">Skip to content</a>
+    <header class="site-header">
+        <div class="site-header-inner">
+            <a class="brand" href="../index.html"><img src="../favicon.svg" alt="" width="26" height="26"><span>VDO.Ninja SDK</span></a>
+            <nav class="site-nav" aria-label="Main">
+                <a href="../index.html">Home</a>
+                <a href="./" aria-current="page">Demos</a>
+                <a href="../docs/guides.html">Guides</a>
+                <a href="../docs/api-reference.html">API</a>
+            </nav>
+            <div class="site-header-actions">
+                <a class="btn btn-secondary btn-sm" href="https://github.com/steveseguin/ninjasdk">GitHub</a>
             </div>
         </div>
-        
-        <!-- Test Section -->
-        <div class="section">
-            <h2>📹 Connection Test</h2>
-            
-            <div style="display: flex; gap: 10px; margin-bottom: 20px;">
-                <button id="publishBtn" onclick="startPublishing()" disabled>Publish</button>
-                <button id="viewBtn" onclick="startViewing()" disabled>View</button>
-                <button id="stopBtn" onclick="stopAll()" disabled>Stop</button>
+    </header>
+
+    <main id="main" class="demo-page">
+        <div class="container">
+            <a class="crumb" href="./">← All demos</a>
+            <div class="demo-head">
+                <h1>TURN servers</h1>
+                <p class="lead">Choose how the SDK finds TURN relay servers, then publish or view a test stream and check whether the peer connection is direct or relayed through TURN.</p>
             </div>
-            
-            <video id="localVideo" autoplay muted playsinline style="display: none;"></video>
-            <video id="remoteVideo" autoplay playsinline style="display: none;"></video>
-            
-            <div class="ice-config" id="connectionStats" style="margin-top: 20px;">
-                Connection statistics will appear here...
+
+            <ol class="steps">
+                <li><strong>Pick a TURN mode</strong> (tick Force TURN to send everything through a relay) and press Connect.</li>
+                <li><strong>Press Publish camera</strong>, then open the share link in a second tab or on another device.</li>
+                <li><strong>In the second tab</strong>, press Connect, then View. The stream ID is filled in from the link.</li>
+                <li><strong>Read Connection path.</strong> "Relayed" means media goes through a TURN server; "Direct" means it does not.</li>
+            </ol>
+
+            <div class="share-bar">
+                <span>Room <code id="roomName">…</code> · Your stream <code id="streamName">…</code></span>
+                <div class="row">
+                    <button class="btn btn-secondary btn-sm" id="copyLinkBtn" type="button">Copy link</button>
+                    <a class="btn btn-secondary btn-sm" id="openTabLink" href="#" target="_blank" rel="noopener">Open second tab</a>
+                </div>
             </div>
+
+            <div class="grid grid-2">
+                <section class="panel" aria-labelledby="configHeading">
+                    <div class="panel-header">
+                        <h2 id="configHeading">TURN configuration</h2>
+                        <span class="status" id="status" data-state="idle">Not connected</span>
+                    </div>
+                    <div class="panel-body stack">
+                        <div class="field">
+                            <label for="turnMode">TURN mode</label>
+                            <select id="turnMode">
+                                <option value="auto">Auto-fetch from VDO.Ninja (default)</option>
+                                <option value="disabled">Disabled (STUN only)</option>
+                                <option value="custom">Custom TURN server</option>
+                            </select>
+                            <p class="small muted" id="turnModeHelp" style="margin:0"></p>
+                        </div>
+
+                        <div class="stack" id="customTurnGroup" hidden>
+                            <div class="field">
+                                <label for="turnUrl">TURN URL</label>
+                                <input type="text" id="turnUrl" placeholder="turn:turn.example.com:3478" autocomplete="off" spellcheck="false">
+                            </div>
+                            <div class="field-row">
+                                <div class="field">
+                                    <label for="turnUsername">Username</label>
+                                    <input type="text" id="turnUsername" placeholder="username" autocomplete="off" spellcheck="false">
+                                </div>
+                                <div class="field">
+                                    <label for="turnCredential">Credential</label>
+                                    <input type="password" id="turnCredential" placeholder="credential" autocomplete="off">
+                                </div>
+                            </div>
+                        </div>
+
+                        <label class="check"><input type="checkbox" id="forceTURN"> Force TURN relay (hides peer IP addresses)</label>
+
+                        <div class="callout callout-warning" id="turnWarning" role="alert" hidden></div>
+
+                        <div class="field">
+                            <label for="room">Room</label>
+                            <input type="text" id="room" autocomplete="off" spellcheck="false">
+                        </div>
+
+                        <div class="row">
+                            <button class="btn btn-primary" id="connectBtn" type="button">Connect</button>
+                            <button class="btn btn-danger" id="disconnectBtn" type="button" disabled>Disconnect</button>
+                            <button class="btn btn-secondary" id="clearCacheBtn" type="button">Clear TURN cache</button>
+                        </div>
+                        <p class="small faint" style="margin:0">TURN settings apply when the SDK is created. Disconnect to change them.</p>
+
+                        <div>
+                            <p class="section-label">Options passed to new VDONinjaSDK()</p>
+                            <pre class="options-pre"><code id="iceConfig"></code></pre>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="panel" aria-labelledby="testHeading">
+                    <div class="panel-header">
+                        <h2 id="testHeading">Connection test</h2>
+                    </div>
+                    <div class="panel-body stack">
+                        <div class="row">
+                            <button class="btn btn-primary" id="publishBtn" type="button" disabled>Publish camera</button>
+                            <button class="btn btn-danger" id="stopBtn" type="button" disabled>Stop</button>
+                        </div>
+
+                        <div class="field">
+                            <label for="viewStreamInput">Stream ID to view</label>
+                            <div class="input-group">
+                                <input type="text" id="viewStreamInput" placeholder="Stream ID from the other tab" autocomplete="off" spellcheck="false">
+                                <button class="btn btn-secondary" id="viewBtn" type="button" disabled>View</button>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-2">
+                            <div class="video-frame" id="localFrame" hidden>
+                                <video id="localVideo" autoplay muted playsinline></video>
+                                <span class="video-label">You</span>
+                            </div>
+                            <div class="video-frame" id="remoteFrame" hidden>
+                                <!-- Video-only test stream, so muted autoplay loses nothing. -->
+                                <video id="remoteVideo" autoplay muted playsinline></video>
+                                <span class="video-label">Remote</span>
+                            </div>
+                        </div>
+
+                        <div>
+                            <p class="section-label">Connection path</p>
+                            <div id="connectionStats" aria-live="polite"></div>
+                        </div>
+
+                        <div class="log" id="log" aria-live="polite"></div>
+                    </div>
+                </section>
+            </div>
+
+            <details class="disclosure" style="margin-top:24px">
+                <summary>Key SDK calls in this demo</summary>
+                <div class="disclosure-body"><pre><code>// TURN options are read when the SDK is created
+const sdk = new VDONinjaSDK({
+    turnServers: [{ urls: ['turn:turn.example.com:3478'], username, credential }],
+    // turnServers: false  -&gt; STUN only;  omit it -&gt; auto-fetch from VDO.Ninja
+    forceTURN: true        // iceTransportPolicy 'relay': every connection uses TURN
+});
+await sdk.connect();
+await sdk.joinRoom({ room });
+await sdk.publish(cameraStream, { streamID });   // tab 1
+await sdk.view(otherStreamID, { video: true });  // tab 2
+
+const quality = await sdk.getPeerQuality(uuid);  // { relayed, candidatePairType, rttMs, ... }
+sdk.clearTURNCache();                            // next connection fetches a fresh list</code></pre></div>
+            </details>
         </div>
-    </div>
-    
-    <!-- Load the SDK -->
+    </main>
+
+    <footer class="site-footer">
+        <div class="container">
+            <span>VDO.Ninja SDK demos · MIT licensed (SDK core MPL-2.0)</span>
+            <nav aria-label="Footer"><a href="./">All demos</a><a href="../docs/guides.html">Guides</a><a href="https://github.com/steveseguin/ninjasdk">GitHub</a></nav>
+        </div>
+    </footer>
+
     <script src="../vdoninja-sdk.js"></script>
-    
     <script>
+        const cleanId = (value) => String(value || '').trim().replace(/[\W]+/g, '_');
+        const randomPart = () => crypto.randomUUID().slice(0, 8);
+
+        // Room lives in the URL so a second tab joins the same one. "stream" is the stream to view.
+        const params = new URLSearchParams(location.search);
+        let room = cleanId(params.get('room')).slice(0, 30) || 'turn_' + randomPart();
+        const MY_STREAM_ID = 'turnpub_' + randomPart();   // this tab's own stream, new on every load
+        const viewTarget = cleanId(params.get('stream')).slice(0, 64);
+
         let sdk = null;
+        let localStream = null;
         let isPublishing = false;
-        let isViewing = false;
-        
-        function updateTurnConfig() {
-            const mode = document.getElementById('turnMode').value;
-            const customGroup = document.getElementById('customTurnGroup');
-            
-            if (mode === 'custom') {
-                customGroup.style.display = 'block';
-            } else {
-                customGroup.style.display = 'none';
+        let stoppingPublish = false;
+        let viewingStreamID = null;
+        const peers = new Set();
+        let statsTimer = null;
+        let lastPathText = '';
+
+        const el = (id) => document.getElementById(id);
+
+        function log(text, type = 'system') {
+            const logEl = el('log');
+            const entry = document.createElement('div');
+            entry.className = 'log-entry ' + type;
+            const time = document.createElement('span');
+            time.className = 'log-time';
+            time.textContent = new Date().toLocaleTimeString();
+            const body = document.createElement('span');
+            body.textContent = String(text);
+            entry.append(time, body);
+            logEl.appendChild(entry);
+            while (logEl.childNodes.length > 200) logEl.removeChild(logEl.firstChild);
+            logEl.scrollTop = logEl.scrollHeight;
+        }
+
+        function setStatus(state, text) {
+            el('status').dataset.state = state;
+            el('status').textContent = text;
+        }
+
+        // ---------- Room and share link ----------
+
+        function shareUrl() {
+            const shared = new URLSearchParams();
+            shared.set('room', room);
+            shared.set('stream', MY_STREAM_ID);
+            return location.origin + location.pathname + '?' + shared;
+        }
+
+        function applyRoom(value) {
+            room = cleanId(value).slice(0, 30) || 'turn_' + randomPart();
+            el('room').value = room;
+            const current = new URLSearchParams(location.search);
+            if (current.get('room') !== room) {
+                current.set('room', room);
+                history.replaceState(null, '', '?' + current);
             }
+            el('roomName').textContent = room;
+            el('openTabLink').href = shareUrl();
+            renderOptions();
         }
-        
-        function getTurnConfig() {
-            const mode = document.getElementById('turnMode').value;
-            const forceTURN = document.getElementById('forceTURN').checked;
-            
-            const config = {
-                forceTURN: forceTURN
-            };
-            
-            if (mode === 'disabled') {
-                config.turnServers = false;
-            } else if (mode === 'custom') {
-                config.turnServers = [{
-                    urls: [document.getElementById('turnUrl').value],
-                    username: document.getElementById('turnUsername').value,
-                    credential: document.getElementById('turnCredential').value
-                }];
-            }
-            // For 'auto' mode, we don't set turnServers (null by default)
-            
-            return config;
-        }
-        
-        async function connectSDK() {
-            try {
-                const room = document.getElementById('room').value;
-                const password = document.getElementById('password').value;
-                const turnConfig = getTurnConfig();
-                
-                // Create SDK instance with TURN configuration
-                sdk = new VDONinjaSDK({
-                    room: room,
-                    password: password,
-                    debug: true,
-                    ...turnConfig
-                });
-                
-                // Event listeners
-                sdk.addEventListener('connected', () => {
-                    document.getElementById('status').textContent = 'Connected to signaling server';
-                    document.getElementById('status').className = 'status connected';
-                    
-                    document.getElementById('connectBtn').disabled = true;
-                    document.getElementById('disconnectBtn').disabled = false;
-                    document.getElementById('publishBtn').disabled = false;
-                    document.getElementById('viewBtn').disabled = false;
-                    
-                    // Display ICE configuration
-                    displayICEConfig();
-                });
-                
-                sdk.addEventListener('disconnected', () => {
-                    document.getElementById('status').textContent = 'Disconnected';
-                    document.getElementById('status').className = 'status';
-                    resetUI();
-                });
-                
-                sdk.addEventListener('error', (event) => {
-                    document.getElementById('status').textContent = `Error: ${event.detail.error}`;
-                    document.getElementById('status').className = 'status error';
-                });
-                
-                sdk.addEventListener('peerConnected', (event) => {
-                    updateConnectionStats();
-                });
-                
-                sdk.addEventListener('track', (event) => {
-                    const remoteVideo = document.getElementById('remoteVideo');
-                    if (!remoteVideo.srcObject) {
-                        remoteVideo.srcObject = new MediaStream();
-                    }
-                    remoteVideo.srcObject.addTrack(event.detail.track);
-                    remoteVideo.style.display = 'block';
-                });
-                
-                // Connect
-                await sdk.connect();
-                
-            } catch (error) {
-                console.error('Connection error:', error);
-                document.getElementById('status').textContent = `Error: ${error.message}`;
-                document.getElementById('status').className = 'status error';
-            }
-        }
-        
-        async function displayICEConfig() {
-            if (!sdk) return;
-            
-            // Get the actual ICE configuration used
-            const config = await sdk._getICEConfiguration();
-            
-            // Check if servers came from cache
-            let cacheInfo = '';
-            try {
-                const cached = localStorage.getItem('turnlist');
-                if (cached) {
-                    const data = JSON.parse(cached);
-                    if (data.expiry && Date.now() < data.expiry) {
-                        const remainingMinutes = Math.round((data.expiry - Date.now()) / 60000);
-                        cacheInfo = `\n// TURN servers loaded from cache (expires in ${remainingMinutes} minutes)\n`;
-                    }
-                }
-            } catch (e) {}
-            
-            const display = {
-                iceTransportPolicy: config.iceTransportPolicy || 'all',
-                iceServers: config.iceServers.map(server => ({
-                    urls: server.urls,
-                    username: server.username ? '***' : undefined,
-                    credential: server.credential ? '***' : undefined,
-                    locale: server.locale
-                }))
-            };
-            
-            document.getElementById('iceConfig').textContent = cacheInfo + JSON.stringify(display, null, 2);
-        }
-        
-        async function startPublishing() {
-            if (!sdk || isPublishing) return;
-            
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ 
-                    video: true, 
-                    audio: true 
-                });
-                
-                document.getElementById('localVideo').srcObject = stream;
-                document.getElementById('localVideo').style.display = 'block';
-                
-                await sdk.quickPublish({
-                    stream: stream
-                });
-                
-                isPublishing = true;
-                document.getElementById('publishBtn').disabled = true;
-                document.getElementById('stopBtn').disabled = false;
-                
-                updateConnectionStats();
-                
-            } catch (error) {
-                console.error('Publishing error:', error);
-                alert('Error publishing: ' + error.message);
-            }
-        }
-        
-        async function startViewing() {
-            if (!sdk || isViewing) return;
-            
-            try {
-                // Get list of available streams
-                const roomInfo = await sdk.getRoomInfo();
-                if (!roomInfo || roomInfo.length === 0) {
-                    alert('No streams available in the room');
-                    return;
-                }
-                
-                // View the first available stream
-                const streamID = roomInfo[0].streamID;
-                await sdk.quickView({
-                    streamID: streamID
-                });
-                
-                isViewing = true;
-                document.getElementById('viewBtn').disabled = true;
-                document.getElementById('stopBtn').disabled = false;
-                
-                updateConnectionStats();
-                
-            } catch (error) {
-                console.error('Viewing error:', error);
-                alert('Error viewing: ' + error.message);
-            }
-        }
-        
-        function stopAll() {
-            if (sdk) {
-                // Stop local stream
-                const localVideo = document.getElementById('localVideo');
-                if (localVideo.srcObject) {
-                    localVideo.srcObject.getTracks().forEach(track => track.stop());
-                    localVideo.srcObject = null;
-                    localVideo.style.display = 'none';
-                }
-                
-                // Clear remote video
-                const remoteVideo = document.getElementById('remoteVideo');
-                if (remoteVideo.srcObject) {
-                    remoteVideo.srcObject = null;
-                    remoteVideo.style.display = 'none';
-                }
-                
-                // Reset SDK connections
-                for (const [uuid, connections] of sdk.connections) {
-                    if (connections.viewer && connections.viewer.pc) {
-                        connections.viewer.pc.close();
-                    }
-                    if (connections.publisher && connections.publisher.pc) {
-                        connections.publisher.pc.close();
-                    }
-                }
-                sdk.connections.clear();
-            }
-            
-            isPublishing = false;
-            isViewing = false;
-            
-            document.getElementById('publishBtn').disabled = false;
-            document.getElementById('viewBtn').disabled = false;
-            document.getElementById('stopBtn').disabled = true;
-            
-            document.getElementById('connectionStats').textContent = 'Connection statistics will appear here...';
-        }
-        
-        async function updateConnectionStats() {
-            if (!sdk) return;
-            
-            const stats = [];
-            
-            for (const [uuid, connections] of sdk.connections) {
-                for (const [type, connection] of Object.entries(connections)) {
-                    if (connection && connection.pc) {
-                        const state = connection.pc.connectionState;
-                        const iceState = connection.pc.iceConnectionState;
-                        
-                        // Get selected candidate pair
-                        try {
-                            const statsReport = await connection.pc.getStats();
-                            let candidatePair = null;
-                            let localCandidate = null;
-                            let remoteCandidate = null;
-                            
-                            statsReport.forEach(report => {
-                                if (report.type === 'candidate-pair' && report.state === 'succeeded') {
-                                    candidatePair = report;
-                                }
-                            });
-                            
-                            if (candidatePair) {
-                                statsReport.forEach(report => {
-                                    if (report.type === 'local-candidate' && report.id === candidatePair.localCandidateId) {
-                                        localCandidate = report;
-                                    }
-                                    if (report.type === 'remote-candidate' && report.id === candidatePair.remoteCandidateId) {
-                                        remoteCandidate = report;
-                                    }
-                                });
-                            }
-                            
-                            stats.push({
-                                type: type,
-                                uuid: uuid.substring(0, 8) + '...',
-                                state: state,
-                                iceState: iceState,
-                                localCandidate: localCandidate ? {
-                                    type: localCandidate.candidateType,
-                                    protocol: localCandidate.protocol,
-                                    address: localCandidate.address ? '***' : 'N/A'
-                                } : null,
-                                remoteCandidate: remoteCandidate ? {
-                                    type: remoteCandidate.candidateType,
-                                    protocol: remoteCandidate.protocol,
-                                    address: remoteCandidate.address ? '***' : 'N/A'
-                                } : null
-                            });
-                        } catch (error) {
-                            stats.push({
-                                type: type,
-                                uuid: uuid.substring(0, 8) + '...',
-                                state: state,
-                                iceState: iceState,
-                                error: 'Could not get stats'
-                            });
-                        }
-                    }
-                }
-            }
-            
-            document.getElementById('connectionStats').textContent = JSON.stringify(stats, null, 2);
-        }
-        
-        function disconnectSDK() {
-            if (sdk) {
-                stopAll();
-                sdk.disconnect();
-                sdk = null;
-            }
-            resetUI();
-        }
-        
-        function resetUI() {
-            document.getElementById('connectBtn').disabled = false;
-            document.getElementById('disconnectBtn').disabled = true;
-            document.getElementById('publishBtn').disabled = true;
-            document.getElementById('viewBtn').disabled = true;
-            document.getElementById('stopBtn').disabled = true;
-            
-            document.getElementById('iceConfig').textContent = 'ICE configuration will appear here after connection...';
-            document.getElementById('connectionStats').textContent = 'Connection statistics will appear here...';
-        }
-        
-        function clearTURNCache() {
-            if (sdk) {
-                sdk.clearTURNCache();
-                alert('TURN cache cleared! Next connection will fetch fresh servers.');
-            } else {
-                // Clear even without SDK instance
-                try {
-                    localStorage.removeItem('turnlist');
-                    alert('TURN cache cleared!');
-                } catch (e) {
-                    alert('Failed to clear cache: ' + e.message);
-                }
-            }
-        }
-        
-        // Initialize with random room name
-        window.addEventListener('load', () => {
-            const randomRoom = Math.floor(Math.random() * 10000);
-            document.getElementById('room').value = `turn-demo-room-${randomRoom}`;
+
+        el('room').addEventListener('change', () => applyRoom(el('room').value));
+        el('copyLinkBtn').addEventListener('click', async () => {
+            const btn = el('copyLinkBtn');
+            try { await navigator.clipboard.writeText(shareUrl()); btn.textContent = 'Copied'; }
+            catch { btn.textContent = 'Copy failed'; }
+            setTimeout(() => { btn.textContent = 'Copy link'; }, 1500);
         });
-        
-        // Clean up on page unload
-        window.addEventListener('beforeunload', () => {
-            if (sdk) {
-                sdk.disconnect();
+
+        // ---------- TURN options (the page's own config object) ----------
+
+        const MODE_HELP = {
+            auto: 'The SDK fetches nearby TURN servers from VDO.Ninja when the first peer connection starts and caches the list for 5 minutes.',
+            disabled: 'Only the default STUN servers are used. Direct connections work on most networks but fail behind strict firewalls.',
+            custom: 'Your TURN server is used together with the default STUN servers.'
+        };
+
+        function buildOptions({ maskCredential = false } = {}) {
+            const mode = el('turnMode').value;
+            const options = { room };
+            if (mode === 'disabled') {
+                options.turnServers = false;
+            } else if (mode === 'custom') {
+                const server = { urls: [el('turnUrl').value.trim()] };
+                const username = el('turnUsername').value;
+                const credential = el('turnCredential').value;
+                if (username) server.username = username;
+                if (credential) server.credential = maskCredential ? '********' : credential;
+                options.turnServers = [server];
             }
+            if (el('forceTURN').checked) options.forceTURN = true;
+            return options;
+        }
+
+        function renderOptions() {
+            const mode = el('turnMode').value;
+            const force = el('forceTURN').checked;
+            el('customTurnGroup').hidden = mode !== 'custom';
+            el('turnModeHelp').textContent = MODE_HELP[mode];
+            el('iceConfig').textContent = JSON.stringify(buildOptions({ maskCredential: true }), null, 2);
+
+            const warning = el('turnWarning');
+            if (force && mode === 'disabled') {
+                warning.textContent = 'Force TURN with TURN disabled leaves no relay servers, so every peer connection will fail. Choose Auto or Custom, or untick Force TURN.';
+                warning.hidden = false;
+            } else if (mode === 'custom' && !/^turns?:/i.test(el('turnUrl').value.trim())) {
+                warning.textContent = 'Enter a TURN URL that starts with turn: or turns:, plus the username and credential for that server.';
+                warning.hidden = false;
+            } else {
+                warning.hidden = true;
+            }
+        }
+
+        ['turnMode', 'forceTURN', 'turnUrl', 'turnUsername', 'turnCredential'].forEach(id => {
+            el(id).addEventListener('input', renderOptions);
+            el(id).addEventListener('change', renderOptions);
+        });
+
+        function setConfigLocked(locked) {
+            ['turnMode', 'forceTURN', 'turnUrl', 'turnUsername', 'turnCredential', 'room'].forEach(id => { el(id).disabled = locked; });
+        }
+
+        // ---------- Connection stats (public getStats API) ----------
+
+        function stopStatsTimer() {
+            if (statsTimer) { clearInterval(statsTimer); statsTimer = null; }
+        }
+
+        function startStatsTimer() {
+            if (!statsTimer) statsTimer = setInterval(refreshStats, 2000);
+        }
+
+        function describeRole(role) {
+            return role === 'publisher' ? 'Sending to' : 'Receiving from';
+        }
+
+        function makeStat(label, value) {
+            const box = document.createElement('div');
+            box.className = 'stat';
+            const l = document.createElement('span');
+            l.className = 'stat-label';
+            l.textContent = label;
+            const v = document.createElement('span');
+            v.className = 'stat-value';
+            v.textContent = value;
+            box.append(l, v);
+            return box;
+        }
+
+        function renderStats(rows) {
+            const container = el('connectionStats');
+            container.replaceChildren();
+            if (!rows.length) {
+                const p = document.createElement('p');
+                p.className = 'small muted';
+                p.style.margin = '0';
+                p.textContent = sdk ? 'No peer connection yet.' : 'Connect, then publish or view.';
+                container.appendChild(p);
+                return;
+            }
+            rows.forEach(row => {
+                const card = document.createElement('div');
+                card.className = 'peer-card';
+                const title = document.createElement('p');
+                title.className = 'peer-card-title';
+                title.textContent = `${describeRole(row.role)} peer ${row.uuid.slice(0, 8)}`;
+                const stats = document.createElement('div');
+                stats.className = 'stats';
+                const path = !row.local ? 'Checking…' : (row.relayed ? 'Relayed (TURN)' : 'Direct');
+                stats.append(
+                    makeStat('Path', path),
+                    makeStat('Local', row.local ? row.local.candidateType || '?' : '-'),
+                    makeStat('Remote', row.remote ? row.remote.candidateType || '?' : '-'),
+                    makeStat('RTT', row.rttMs != null ? Math.round(row.rttMs) + ' ms' : '-')
+                );
+                card.append(title, stats);
+                if (row.local && row.local.candidateType === 'relay') {
+                    const note = document.createElement('p');
+                    note.className = 'peer-card-note';
+                    const via = row.local.url ? String(row.local.url) : 'a TURN server';
+                    const proto = row.local.relayProtocol ? ` over ${row.local.relayProtocol}` : '';
+                    note.textContent = `Relay: ${via}${proto}`;
+                    card.appendChild(note);
+                }
+                container.appendChild(card);
+            });
+        }
+
+        async function refreshStats() {
+            const instance = sdk;
+            if (!instance || !peers.size) { renderStats([]); stopStatsTimer(); return; }
+            const rows = [];
+            for (const uuid of peers) {
+                let report;
+                try { report = await instance.getStats(uuid); } catch (e) { continue; }
+                const entries = (report && report[uuid]) || [];
+                for (const role of ['publisher', 'viewer']) {
+                    const list = entries.filter(e => e.connectionType === role);
+                    if (!list.length) continue;
+                    const byId = new Map(list.map(e => [e.id, e]));
+                    const transport = list.find(e => e.type === 'transport' && e.selectedCandidatePairId);
+                    const pairs = list.filter(e => e.type === 'candidate-pair');
+                    const active = (transport && byId.get(transport.selectedCandidatePairId)) ||
+                        pairs.find(p => p.nominated && p.state === 'succeeded') ||
+                        pairs.find(p => p.selected) ||
+                        pairs.find(p => p.state === 'succeeded') || null;
+                    const local = active ? byId.get(active.localCandidateId) : null;
+                    const remote = active ? byId.get(active.remoteCandidateId) : null;
+                    rows.push({
+                        uuid: String(uuid),
+                        role,
+                        local,
+                        remote,
+                        relayed: !!((local && local.candidateType === 'relay') || (remote && remote.candidateType === 'relay')),
+                        rttMs: active && typeof active.currentRoundTripTime === 'number' ? active.currentRoundTripTime * 1000 : null
+                    });
+                }
+            }
+            if (sdk !== instance) return;
+            renderStats(rows);
+            const settled = rows.filter(r => r.local);
+            if (settled.length) {
+                const text = settled.some(r => r.relayed) ? 'Connected · relayed via TURN' : 'Connected · direct';
+                setStatus('live', text);
+                if (text !== lastPathText) {
+                    lastPathText = text;
+                    log(text, 'success');
+                }
+            }
+        }
+
+        // ---------- Connect / disconnect ----------
+
+        function resetUI() {
+            el('connectBtn').disabled = false;
+            el('disconnectBtn').disabled = true;
+            el('publishBtn').disabled = true;
+            el('viewBtn').disabled = true;
+            el('stopBtn').disabled = true;
+            setConfigLocked(false);
+            renderStats([]);
+        }
+
+        async function connectSDK() {
+            if (sdk) return;
+            el('connectBtn').disabled = true;
+            applyRoom(el('room').value);
+            renderOptions();
+
+            const mode = el('turnMode').value;
+            if (mode === 'custom' && !/^turns?:/i.test(el('turnUrl').value.trim())) {
+                log('Custom mode needs a TURN URL that starts with turn: or turns:', 'error');
+                el('connectBtn').disabled = false;
+                return;
+            }
+
+            const options = buildOptions();
+            const instance = new VDONinjaSDK({ ...options, debug: true });
+            sdk = instance;
+            lastPathText = '';
+            setConfigLocked(true);
+            el('disconnectBtn').disabled = false;
+            setStatus('connecting', 'Connecting');
+            log(`Connecting with TURN mode "${mode}"${options.forceTURN ? ' and Force TURN' : ''}…`);
+
+            instance.addEventListener('disconnected', (event) => {
+                if (sdk !== instance) return;
+                const detail = event.detail || {};
+                if (detail.intentional) return;
+                if (detail.willReconnect) {
+                    setStatus('connecting', 'Reconnecting');
+                    log('Signaling connection lost. Reconnecting…', 'warning');
+                } else {
+                    setStatus('error', 'Disconnected');
+                    log('Signaling connection lost.', 'error');
+                }
+            });
+            instance.addEventListener('reconnected', () => {
+                if (sdk !== instance) return;
+                setStatus(peers.size ? 'live' : 'waiting', peers.size ? 'Connected' : 'Ready: publish or view');
+                log('Reconnected to signaling server', 'success');
+            });
+            instance.addEventListener('error', (event) => {
+                if (sdk !== instance) return;
+                const detail = event.detail || {};
+                log('SDK error: ' + String(detail.error || 'unknown'), 'error');
+            });
+            instance.addEventListener('peerConnected', (event) => {
+                if (sdk !== instance) return;
+                const uuid = String(event.detail.uuid || '');
+                peers.add(uuid);
+                log('Peer connected: ' + uuid.slice(0, 8), 'success');
+                refreshStats();
+                startStatsTimer();
+            });
+            instance.addEventListener('peerDisconnected', (event) => {
+                if (sdk !== instance) return;
+                const uuid = String(event.detail.uuid || '');
+                if (!peers.delete(uuid)) return;
+                log('Peer disconnected: ' + uuid.slice(0, 8), 'warning');
+                if (!peers.size) {
+                    lastPathText = '';
+                    setStatus('waiting', 'Ready: publish or view');
+                    el('remoteVideo').srcObject = null;
+                    el('remoteFrame').hidden = true;
+                }
+                refreshStats();
+            });
+            instance.addEventListener('connectionFailed', (event) => {
+                if (sdk !== instance) return;
+                setStatus('error', 'Peer connection failed');
+                log('Peer connection failed: no usable network path. Check the TURN settings (Force TURN needs working TURN servers).', 'error');
+            });
+            instance.addEventListener('track', (event) => {
+                if (sdk !== instance || !event.detail.track) return;
+                const video = el('remoteVideo');
+                const tracks = video.srcObject ? video.srcObject.getTracks().filter(t => t.kind !== event.detail.track.kind) : [];
+                video.srcObject = new MediaStream(tracks.concat(event.detail.track));
+                video.play().catch(() => {});
+                el('remoteFrame').hidden = false;
+                log(`Receiving ${event.detail.track.kind}`, 'success');
+            });
+            instance.addEventListener('publishingStopped', () => {
+                if (sdk !== instance) return;
+                stoppingPublish = false;
+                el('publishBtn').disabled = isPublishing;
+            });
+
+            try {
+                await instance.connect();
+                await instance.joinRoom({ room });
+                if (sdk !== instance) return;
+                setStatus('waiting', 'Ready: publish or view');
+                el('publishBtn').disabled = false;
+                el('viewBtn').disabled = false;
+                renderStats([]);
+                log(`Connected and joined room "${room}"`, 'success');
+            } catch (error) {
+                if (sdk !== instance) return;
+                log('Connect failed: ' + error.message, 'error');
+                sdk = null;
+                Promise.resolve().then(() => instance.disconnect()).catch(() => {});
+                resetUI();
+                setStatus('error', 'Connection failed');
+            }
+        }
+
+        async function disconnectSDK() {
+            const instance = sdk;
+            if (!instance) return;
+            stopAll();
+            sdk = null;
+            stoppingPublish = false;
+            resetUI();
+            setStatus('idle', 'Not connected');
+            try { await instance.disconnect(); } catch (e) {}
+            log('Disconnected');
+        }
+
+        // ---------- Publish / view / stop ----------
+
+        async function startPublishing() {
+            const instance = sdk;
+            if (!instance || isPublishing || stoppingPublish) return;
+            el('publishBtn').disabled = true;
+            let stream = null;
+            try {
+                log('Requesting camera…');
+                stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+                if (sdk !== instance) { stream.getTracks().forEach(t => t.stop()); return; }
+                el('localVideo').srcObject = stream;
+                el('localFrame').hidden = false;
+                await instance.publish(stream, { streamID: MY_STREAM_ID });
+                if (sdk !== instance) return;
+                localStream = stream;
+                isPublishing = true;
+                el('stopBtn').disabled = false;
+                log(`Publishing "${MY_STREAM_ID}". Open the share link in another tab or device and press View there.`, 'success');
+            } catch (error) {
+                if (stream) stream.getTracks().forEach(t => t.stop());
+                el('localVideo').srcObject = null;
+                el('localFrame').hidden = true;
+                log('Publish failed: ' + error.message, 'error');
+                if (sdk === instance) el('publishBtn').disabled = false;
+            }
+        }
+
+        async function startViewing() {
+            const instance = sdk;
+            if (!instance || viewingStreamID) return;
+            const target = cleanId(el('viewStreamInput').value).slice(0, 64);
+            el('viewStreamInput').value = target;
+            if (!target) { log('Enter the stream ID shown in the other tab.', 'warning'); return; }
+            if (target === MY_STREAM_ID) { log('That is this tab\'s own stream. View it from a second tab instead.', 'warning'); return; }
+
+            el('viewBtn').disabled = true;
+            el('viewStreamInput').disabled = true;
+            el('stopBtn').disabled = false;
+            viewingStreamID = target;
+            log(`Requesting "${target}"…`);
+            try {
+                const pc = await instance.view(target, { audio: false, video: true });
+                if (sdk !== instance || viewingStreamID !== target) return;
+                if (!pc) log(`"${target}" is not live yet. It connects automatically when it is published in this room.`, 'warning');
+            } catch (error) {
+                if (sdk !== instance || viewingStreamID !== target) return;
+                log('View failed: ' + error.message, 'error');
+                viewingStreamID = null;
+                el('viewBtn').disabled = false;
+                el('viewStreamInput').disabled = false;
+                el('stopBtn').disabled = !isPublishing;
+            }
+        }
+
+        function stopAll() {
+            if (sdk && isPublishing) {
+                stoppingPublish = true;   // Publish re-enables on 'publishingStopped'
+                sdk.stopPublishing();
+            }
+            isPublishing = false;
+            if (localStream) {
+                localStream.getTracks().forEach(track => track.stop());
+                localStream = null;
+            }
+            el('localVideo').srcObject = null;
+            el('localFrame').hidden = true;
+
+            if (sdk && viewingStreamID) sdk.stopViewing(viewingStreamID);
+            viewingStreamID = null;
+            el('remoteVideo').srcObject = null;
+            el('remoteFrame').hidden = true;
+
+            peers.clear();
+            stopStatsTimer();
+            lastPathText = '';
+            renderStats([]);
+
+            el('publishBtn').disabled = !sdk || stoppingPublish;
+            el('viewBtn').disabled = !sdk;
+            el('viewStreamInput').disabled = false;
+            el('stopBtn').disabled = true;
+            if (sdk) setStatus('waiting', 'Ready: publish or view');
+        }
+
+        function clearTURNCache() {
+            // clearTURNCache() is public; a throwaway instance (no connect) works when not connected.
+            (sdk || new VDONinjaSDK()).clearTURNCache();
+            log('TURN cache cleared. The next peer connection fetches a fresh server list.', 'success');
+        }
+
+        // ---------- Wiring ----------
+
+        el('connectBtn').addEventListener('click', () => connectSDK());
+        el('disconnectBtn').addEventListener('click', () => disconnectSDK());
+        el('clearCacheBtn').addEventListener('click', clearTURNCache);
+        el('publishBtn').addEventListener('click', () => startPublishing());
+        el('viewBtn').addEventListener('click', () => startViewing());
+        el('stopBtn').addEventListener('click', () => stopAll());
+
+        el('streamName').textContent = MY_STREAM_ID;
+        el('viewStreamInput').value = viewTarget;
+        applyRoom(room);   // also renders the options preview
+        renderStats([]);
+
+        window.addEventListener('beforeunload', () => {
+            if (localStream) localStream.getTracks().forEach(track => track.stop());
+            const instance = sdk;
+            if (instance) Promise.resolve().then(() => instance.disconnect()).catch(() => {});
         });
     </script>
 </body>

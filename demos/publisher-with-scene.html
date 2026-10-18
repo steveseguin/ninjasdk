@@ -1,301 +1,220 @@
 <!DOCTYPE html>
+<!--
+    VDO.Ninja SDK Demo - Publisher with Scene Links
+
+    This demo is MIT licensed; see LICENSE-DEMOS.
+
+    Note: The VDO.Ninja SDK core (`vdoninja-sdk.js`, `vdoninja-sdk.min.js`) is
+    separately licensed under MPL-2.0; see LICENSE.
+-->
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VDO.Ninja SDK - Publisher with Scene Link Demo</title>
+    <title>Publisher with scene links demo | VDO.Ninja SDK</title>
+    <meta name="description" content="Publish your camera into a room with the VDO.Ninja SDK and get matching VDO.Ninja scene, director, and view links.">
     <link rel="icon" type="image/svg+xml" href="../favicon.svg">
-    <link rel="icon" type="image/png" href="https://vdo.ninja/favicon.png">
-    <link rel="apple-touch-icon" href="https://vdo.ninja/apple-touch-icon.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../site.css">
     <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 20px;
-            background: #f5f5f5;
-        }
-        
-        .container {
-            background: white;
-            border-radius: 12px;
-            padding: 30px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-        
-        h1 {
-            color: #333;
-            margin-bottom: 10px;
-        }
-        
-        .description {
-            color: #666;
-            margin-bottom: 30px;
-        }
-        
-        .controls {
-            display: flex;
-            gap: 20px;
-            margin-bottom: 30px;
-            flex-wrap: wrap;
-        }
-        
-        .control-group {
-            flex: 1;
-            min-width: 250px;
-        }
-        
-        label {
-            display: block;
-            margin-bottom: 5px;
-            font-weight: 500;
-            color: #555;
-        }
-        
-        input, select {
-            width: 100%;
-            padding: 10px;
-            border: 1px solid #ddd;
-            border-radius: 6px;
-            font-size: 14px;
-            box-sizing: border-box;
-        }
-        
-        button {
-            background: #2196F3;
-            color: white;
-            border: none;
-            padding: 12px 24px;
-            border-radius: 6px;
-            font-size: 16px;
-            cursor: pointer;
-            transition: background 0.3s;
-        }
-        
-        button:hover {
-            background: #1976D2;
-        }
-        
-        button:disabled {
-            background: #ccc;
-            cursor: not-allowed;
-        }
-        
-        .status {
-            margin: 20px 0;
-            padding: 15px;
-            border-radius: 6px;
-            font-family: monospace;
-            font-size: 14px;
-            white-space: pre-wrap;
-            word-break: break-all;
-        }
-        
-        .status.info {
-            background: #e3f2fd;
-            border: 1px solid #1976d2;
-            color: #0d47a1;
-        }
-        
-        .status.success {
-            background: #e8f5e9;
-            border: 1px solid #4caf50;
-            color: #1b5e20;
-        }
-        
-        .status.error {
-            background: #ffebee;
-            border: 1px solid #f44336;
-            color: #b71c1c;
-        }
-        
-        .video-container {
-            display: flex;
-            gap: 20px;
-            margin-top: 20px;
-            flex-wrap: wrap;
-        }
-        
-        .video-wrapper {
-            flex: 1;
-            min-width: 300px;
-        }
-        
-        .video-wrapper h3 {
-            margin-bottom: 10px;
-            color: #333;
-        }
-        
-        video {
-            width: 100%;
-            max-width: 100%;
-            background: #000;
-            border-radius: 8px;
-        }
-        
-        .links {
-            background: #f0f0f0;
-            padding: 20px;
-            border-radius: 8px;
-            margin-top: 20px;
-        }
-        
-        .link-item {
-            margin: 10px 0;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-        
-        .link-item label {
-            font-weight: bold;
-            min-width: 120px;
-        }
-        
-        .link-item input {
-            flex: 1;
-            font-family: monospace;
-            font-size: 13px;
-        }
-        
-        .link-item button {
-            padding: 8px 16px;
-            font-size: 14px;
-        }
-        
-        .info-box {
-            background: #fff3e0;
-            border: 1px solid #ff9800;
-            border-radius: 6px;
-            padding: 15px;
-            margin: 20px 0;
-        }
-        
-        .debug-info {
-            background: #f5f5f5;
-            border: 1px solid #ddd;
-            border-radius: 6px;
-            padding: 15px;
-            margin-top: 20px;
-            font-family: monospace;
-            font-size: 12px;
-        }
-        
-        .debug-info h4 {
-            margin-top: 0;
-            color: #666;
-        }
-        
-        .debug-info pre {
-            margin: 5px 0;
-            white-space: pre-wrap;
-            word-break: break-all;
-        }
+        .link-list { display: grid; gap: 14px; }
+        .link-list input[readonly] { font-family: var(--mono); font-size: 0.8rem; }
+        .link-hint { margin: 0; font-size: 0.8rem; color: var(--text-faint); }
+        .debug-pre { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>VDO.Ninja SDK - Publisher with Scene Link</h1>
-        <p class="description">
-            This demo shows how to publish video/audio using the SDK and generate matching VDO.Ninja links. 
-            Leave the password field empty to use the default password.
-        </p>
-        
-        <div class="controls">
-            <div class="control-group">
-                <label for="roomInput">Room Name:</label>
-                <input type="text" id="roomInput" placeholder="Enter room name or leave empty for random" />
-            </div>
-            
-            <div class="control-group">
-                <label for="passwordInput">Password (optional):</label>
-                <input type="text" id="passwordInput" placeholder="Leave empty for default password" />
-            </div>
-            
-            <div class="control-group">
-                <label for="streamIDInput">Stream ID:</label>
-                <input type="text" id="streamIDInput" placeholder="Enter stream ID or leave empty for random" />
+    <a class="skip-link" href="#main">Skip to content</a>
+    <header class="site-header">
+        <div class="site-header-inner">
+            <a class="brand" href="../index.html"><img src="../favicon.svg" alt="" width="26" height="26"><span>VDO.Ninja SDK</span></a>
+            <nav class="site-nav" aria-label="Main">
+                <a href="../index.html">Home</a>
+                <a href="./" aria-current="page">Demos</a>
+                <a href="../docs/guides.html">Guides</a>
+                <a href="../docs/api-reference.html">API</a>
+            </nav>
+            <div class="site-header-actions">
+                <a class="btn btn-secondary btn-sm" href="https://github.com/steveseguin/ninjasdk">GitHub</a>
             </div>
         </div>
-        
-        <div class="controls">
-            <button id="startPublishing" onclick="startPublishing()">Start Publishing</button>
-            <button id="stopPublishing" onclick="stopPublishing()" disabled>Stop Publishing</button>
-        </div>
-        
-        <div id="status"></div>
-        
-        <div class="links" id="linksContainer" style="display: none;">
-            <h3>VDO.Ninja Links</h3>
-            <div class="link-item">
-                <label>Scene Link:</label>
-                <input type="text" id="sceneLink" readonly>
-                <button onclick="copyLink('sceneLink')">Copy</button>
-                <button onclick="openLink('sceneLink')">Open</button>
+    </header>
+
+    <main id="main" class="demo-page">
+        <div class="container">
+            <a class="crumb" href="./">← All demos</a>
+            <div class="demo-head">
+                <h1>Publisher with scene links</h1>
+                <p class="lead">Publish your camera into a room with the SDK, then open the matching VDO.Ninja scene, director, or view link to see the stream in the regular VDO.Ninja app or OBS.</p>
             </div>
-            <div class="link-item">
-                <label>Director Link:</label>
-                <input type="text" id="directorLink" readonly>
-                <button onclick="copyLink('directorLink')">Copy</button>
-                <button onclick="openLink('directorLink')">Open</button>
+
+            <ol class="steps">
+                <li><strong>Optionally set</strong> a room, password, and stream ID. Blank fields get a random name or the default password.</li>
+                <li><strong>Press Start publishing</strong> and allow camera and microphone access.</li>
+                <li><strong>Open a link:</strong> Scene shows everyone in the room, Director controls the room, View shows only this stream.</li>
+            </ol>
+
+            <div class="grid grid-2">
+                <section class="panel" aria-labelledby="settingsHeading">
+                    <div class="panel-header">
+                        <h2 id="settingsHeading">Settings</h2>
+                        <span class="status" id="status" data-state="idle">Not publishing</span>
+                    </div>
+                    <div class="panel-body stack">
+                        <div class="field">
+                            <label for="roomInput">Room name</label>
+                            <input type="text" id="roomInput" placeholder="Leave empty for a random room" autocomplete="off" spellcheck="false">
+                        </div>
+                        <div class="field">
+                            <label for="passwordInput">Password (optional)</label>
+                            <input type="text" id="passwordInput" placeholder="Leave empty for the default password" autocomplete="off" spellcheck="false">
+                        </div>
+                        <div class="field">
+                            <label for="streamIDInput">Stream ID</label>
+                            <input type="text" id="streamIDInput" placeholder="Leave empty for a random stream ID" autocomplete="off" spellcheck="false">
+                        </div>
+                        <div class="row">
+                            <button class="btn btn-primary" id="startPublishing" type="button">Start publishing</button>
+                            <button class="btn btn-danger" id="stopPublishing" type="button" disabled>Stop publishing</button>
+                        </div>
+                        <p class="small muted" id="statusDetail" aria-live="polite" style="margin:0;overflow-wrap:anywhere"></p>
+                    </div>
+                </section>
+
+                <section class="panel" aria-labelledby="previewHeading">
+                    <div class="panel-header">
+                        <h2 id="previewHeading">Local preview</h2>
+                    </div>
+                    <div class="panel-body">
+                        <div class="video-frame">
+                            <video id="localVideo" autoplay muted playsinline></video>
+                        </div>
+                    </div>
+                </section>
             </div>
-            <div class="link-item">
-                <label>View Link:</label>
-                <input type="text" id="viewLink" readonly>
-                <button onclick="copyLink('viewLink')">Copy</button>
-                <button onclick="openLink('viewLink')">Open</button>
+
+            <section class="panel" id="linksContainer" aria-labelledby="linksHeading" style="margin-top:20px" hidden>
+                <div class="panel-header">
+                    <h2 id="linksHeading">VDO.Ninja links</h2>
+                </div>
+                <div class="panel-body">
+                    <div class="link-list">
+                        <div class="field">
+                            <label for="sceneLink">Scene link</label>
+                            <div class="input-group">
+                                <input type="text" id="sceneLink" readonly>
+                                <button class="btn btn-secondary btn-sm" type="button" data-copy="sceneLink">Copy</button>
+                                <a class="btn btn-secondary btn-sm" id="sceneLinkOpen" href="#" target="_blank" rel="noopener">Open</a>
+                            </div>
+                            <p class="link-hint">Every publisher in the room, ready for an OBS browser source.</p>
+                        </div>
+                        <div class="field">
+                            <label for="directorLink">Director link</label>
+                            <div class="input-group">
+                                <input type="text" id="directorLink" readonly>
+                                <button class="btn btn-secondary btn-sm" type="button" data-copy="directorLink">Copy</button>
+                                <a class="btn btn-secondary btn-sm" id="directorLinkOpen" href="#" target="_blank" rel="noopener">Open</a>
+                            </div>
+                            <p class="link-hint">Control the room: mute, hide, or move guests.</p>
+                        </div>
+                        <div class="field">
+                            <label for="viewLink">View link</label>
+                            <div class="input-group">
+                                <input type="text" id="viewLink" readonly>
+                                <button class="btn btn-secondary btn-sm" type="button" data-copy="viewLink">Copy</button>
+                                <a class="btn btn-secondary btn-sm" id="viewLinkOpen" href="#" target="_blank" rel="noopener">Open</a>
+                            </div>
+                            <p class="link-hint">Only this stream.</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <div class="callout callout-info" style="margin-top:20px">
+                <p><strong>How it works</strong></p>
+                <ul style="margin:0;padding-left:20px">
+                    <li>With an empty password field, the SDK uses VDO.Ninja's default password, so the links need no <code>&amp;password</code>.</li>
+                    <li>The room name is hashed with the password to make the room ID on the server.</li>
+                    <li>A custom password is added to every link; anyone with the link can join, so share it with care.</li>
+                </ul>
             </div>
+
+            <details class="disclosure" id="debugInfo" style="margin-top:20px" hidden>
+                <summary>Debug information</summary>
+                <div class="disclosure-body"><pre class="debug-pre"><code id="debugContent"></code></pre></div>
+            </details>
+
+            <details class="disclosure" style="margin-top:20px">
+                <summary>Key SDK calls in this demo</summary>
+                <div class="disclosure-body"><pre><code>const vdo = new VDONinjaSDK({ room, password, salt: 'vdo.ninja' });  // omit password for the default
+vdo.addEventListener('peerConnected', (e) =&gt; viewers.add(e.detail.uuid));
+vdo.addEventListener('peerDisconnected', (e) =&gt; viewers.delete(e.detail.uuid));
+
+await vdo.connect();
+await vdo.joinRoom({ room });
+const streamID = await vdo.publish(cameraStream, { streamID: requestedID });
+
+// Matching VDO.Ninja links (add &amp;password=... only for a custom password)
+const scene    = `https://vdo.ninja/?room=${room}&amp;scene`;
+const director = `https://vdo.ninja/?director=${room}`;
+const view     = `https://vdo.ninja/?room=${room}&amp;view=${streamID}&amp;scene`;</code></pre></div>
+            </details>
         </div>
-        
-        <div class="info-box">
-            <strong>How it works:</strong>
-            <ul>
-                <li>If you leave the password field empty, the SDK uses the default password: "someEncryptionKey123"</li>
-                <li>The room name is hashed with the password to create a secure room ID</li>
-                <li>The scene link will show all publishers in the room</li>
-                <li>The director link allows you to control the room</li>
-                <li>The view link shows only this specific stream</li>
-            </ul>
+    </main>
+
+    <footer class="site-footer">
+        <div class="container">
+            <span>VDO.Ninja SDK demos · MIT licensed (SDK core MPL-2.0)</span>
+            <nav aria-label="Footer"><a href="./">All demos</a><a href="../docs/guides.html">Guides</a><a href="https://github.com/steveseguin/ninjasdk">GitHub</a></nav>
         </div>
-        
-        <div class="video-container">
-            <div class="video-wrapper">
-                <h3>Local Preview</h3>
-                <video id="localVideo" autoplay muted playsinline></video>
-            </div>
-        </div>
-        
-        <div class="debug-info" id="debugInfo" style="display: none;">
-            <h4>Debug Information</h4>
-            <pre id="debugContent"></pre>
-        </div>
-    </div>
-    
-    <!-- Load the SDK -->
+    </footer>
+
     <script src="../vdoninja-sdk.js"></script>
-    
     <script>
         let vdo = null;
         let localStream = null;
-        
-        function updateStatus(message, type = 'info') {
+        let starting = false;
+        const viewers = new Set();
+
+        function setStatus(state, text, detail = '') {
             const status = document.getElementById('status');
-            status.textContent = message;
-            status.className = `status ${type}`;
+            status.dataset.state = state;
+            status.textContent = text;
+            document.getElementById('statusDetail').textContent = detail;
         }
-        
+
+        function updateViewerStatus() {
+            if (!vdo || !vdo.state.publishing) return;
+            const detail = document.getElementById('statusDetail').textContent;
+            if (viewers.size) {
+                setStatus('live', viewers.size === 1 ? 'Publishing · 1 viewer' : `Publishing · ${viewers.size} viewers`, detail);
+            } else {
+                setStatus('waiting', 'Publishing · no viewers yet', detail);
+            }
+        }
+
         function updateDebugInfo(info) {
-            const debugContent = document.getElementById('debugContent');
-            const debugInfo = document.getElementById('debugInfo');
-            debugInfo.style.display = 'block';
-            debugContent.textContent = JSON.stringify(info, null, 2);
+            document.getElementById('debugContent').textContent = JSON.stringify(info, null, 2);
+            document.getElementById('debugInfo').hidden = false;
         }
-        
+
+        function setInputsDisabled(disabled) {
+            ['roomInput', 'passwordInput', 'streamIDInput'].forEach(id => {
+                document.getElementById(id).disabled = disabled;
+            });
+        }
+
         async function startPublishing() {
+            if (vdo || starting) return;
+            starting = true;
+            document.getElementById('startPublishing').disabled = true;
+            setInputsDisabled(true);
+            let sdk = null;
             try {
-                updateStatus('Requesting camera and microphone access...', 'info');
-                
-                // Get user media
+                setStatus('connecting', 'Starting', 'Requesting camera and microphone access…');
+
                 localStream = await navigator.mediaDevices.getUserMedia({
                     video: {
                         width: { ideal: 1280 },
@@ -308,177 +227,175 @@
                         autoGainControl: true
                     }
                 });
-                
-                // Show local preview
                 document.getElementById('localVideo').srcObject = localStream;
-                
-                // Get input values
+
                 const roomInput = document.getElementById('roomInput').value.trim();
                 const passwordInput = document.getElementById('passwordInput').value;
                 const streamIDInput = document.getElementById('streamIDInput').value.trim();
-                
-                // Generate room name if not provided
-                const room = roomInput || 'room_' + Math.random().toString(36).substring(7);
-                
-                // Generate stream ID if not provided
-                const streamID = streamIDInput || 'stream_' + Math.random().toString(36).substring(7);
-                
-                // Handle password - empty string means use default
-                let password = passwordInput;
-                if (password === '') {
-                    password = undefined; // This will use the default password
-                }
-                
-                updateStatus('Connecting to VDO.Ninja...', 'info');
-                
-                // Create SDK instance
+
+                const requestedRoom = roomInput || 'room_' + crypto.randomUUID().slice(0, 8);
+                const requestedStreamID = streamIDInput || 'stream_' + crypto.randomUUID().slice(0, 8);
+                // Empty password means "use the default"; the SDK and VDO.Ninja share the same default.
+                const password = passwordInput === '' ? undefined : passwordInput;
+
+                setStatus('connecting', 'Connecting', 'Connecting to VDO.Ninja…');
+
                 const sdkOptions = {
-                    room: room,
-                    salt: "vdo.ninja",  // Ensure compatibility with VDO.Ninja
+                    room: requestedRoom,
+                    salt: 'vdo.ninja',  // match vdo.ninja links even when this page is hosted elsewhere
                     debug: true
                 };
-                
-                // Only add password if explicitly provided
                 if (password !== undefined) {
                     sdkOptions.password = password;
                 }
-                
-                vdo = new VDONinjaSDK(sdkOptions);
-                
-                // Set up event listeners
-                vdo.addEventListener('connected', () => {
-                    updateStatus('Connected to server', 'success');
+
+                sdk = new VDONinjaSDK(sdkOptions);
+                vdo = sdk;
+                viewers.clear();
+                document.getElementById('stopPublishing').disabled = false;
+
+                sdk.addEventListener('connected', () => {
+                    if (vdo === sdk) setStatus('connecting', 'Connected', 'Joining room…');
                 });
-                
-                vdo.addEventListener('roomJoined', (event) => {
+                sdk.addEventListener('roomJoined', (event) => {
                     console.log('Room joined:', event.detail);
                 });
-                
-                vdo.addEventListener('viewerConnected', (event) => {
-                    console.log('Viewer connected:', event.detail);
+                sdk.addEventListener('peerConnected', (event) => {
+                    if (vdo !== sdk) return;
+                    viewers.add(String(event.detail.uuid || ''));
+                    updateViewerStatus();
                 });
-                
-                vdo.addEventListener('viewerDisconnected', (event) => {
-                    console.log('Viewer disconnected:', event.detail);
+                sdk.addEventListener('peerDisconnected', (event) => {
+                    if (vdo !== sdk) return;
+                    if (viewers.delete(String(event.detail.uuid || ''))) updateViewerStatus();
                 });
-                
-                // Connect to server
-                await vdo.connect();
-                
-                // Join room
-                await vdo.joinRoom({ room });
-                
-                // Publish stream
-                await vdo.publish(localStream, { streamID });
-                
-                updateStatus(`Publishing as "${streamID}" in room "${room}"`, 'success');
-                
-                // Generate links
+                sdk.addEventListener('disconnected', (event) => {
+                    if (vdo !== sdk) return;
+                    const detail = event.detail || {};
+                    if (detail.intentional) return;
+                    setStatus(detail.willReconnect ? 'connecting' : 'error',
+                        detail.willReconnect ? 'Reconnecting' : 'Disconnected',
+                        'Lost the connection to the VDO.Ninja server.');
+                });
+
+                await sdk.connect();
+                await sdk.joinRoom({ room: requestedRoom });
+                const streamID = await sdk.publish(localStream, { streamID: requestedStreamID });
+                if (vdo !== sdk) return;
+
+                // Use the SDK's sanitized values so the links match what was actually published.
+                const room = sdk.state.room || requestedRoom;
                 generateLinks(room, streamID, password);
-                
-                // Update debug info
+
                 updateDebugInfo({
                     room: room,
-                    roomHashed: vdo.state.room ? 'Hashed (see console)' : 'Not hashed',
                     streamID: streamID,
-                    password: password === undefined ? 'Using default: someEncryptionKey123' : password || 'No password',
-                    uuid: vdo.state.uuid,
-                    connected: vdo.state.connected,
-                    publishing: vdo.state.publishing
+                    password: password === undefined ? 'Default (someEncryptionKey123)' : 'Custom (included in links)',
+                    uuid: sdk.state.uuid,
+                    connected: sdk.state.connected,
+                    publishing: sdk.state.publishing
                 });
-                
-                // Update button states
-                document.getElementById('startPublishing').disabled = true;
-                document.getElementById('stopPublishing').disabled = false;
-                
+
+                setStatus('waiting', 'Publishing · no viewers yet', `Publishing "${streamID}" in room "${room}".`);
+                updateViewerStatus();
             } catch (error) {
                 console.error('Error:', error);
-                updateStatus(`Error: ${error.message}`, 'error');
-                
-                // Clean up on error
+                if (sdk && vdo !== sdk) return; // stopped while starting
+                const message = error && error.message ? error.message : String(error);
+                // Clean up everything this attempt created.
                 if (localStream) {
                     localStream.getTracks().forEach(track => track.stop());
                     localStream = null;
                 }
-                if (vdo) {
-                    vdo.disconnect();
-                    vdo = null;
+                document.getElementById('localVideo').srcObject = null;
+                if (sdk) {
+                    Promise.resolve().then(() => sdk.disconnect()).catch(() => {});
+                }
+                vdo = null;
+                viewers.clear();
+                document.getElementById('startPublishing').disabled = false;
+                document.getElementById('stopPublishing').disabled = true;
+                setInputsDisabled(false);
+                setStatus('error', 'Failed to start', 'Error: ' + message);
+            } finally {
+                starting = false;
+                if (!vdo) {
+                    // Stopped (or failed) while starting: make Start usable again.
+                    document.getElementById('startPublishing').disabled = false;
+                    setInputsDisabled(false);
                 }
             }
         }
-        
+
         function stopPublishing() {
-            if (vdo) {
-                vdo.disconnect();
-                vdo = null;
+            const sdk = vdo;
+            vdo = null;
+            viewers.clear();
+            if (sdk) {
+                Promise.resolve().then(() => sdk.disconnect()).catch(() => {});
             }
-            
             if (localStream) {
                 localStream.getTracks().forEach(track => track.stop());
                 localStream = null;
-                document.getElementById('localVideo').srcObject = null;
             }
-            
-            updateStatus('Publishing stopped', 'info');
-            document.getElementById('linksContainer').style.display = 'none';
-            document.getElementById('debugInfo').style.display = 'none';
-            
-            // Update button states
-            document.getElementById('startPublishing').disabled = false;
+            document.getElementById('localVideo').srcObject = null;
+
+            setStatus('idle', 'Not publishing', sdk ? 'Publishing stopped.' : '');
+            document.getElementById('linksContainer').hidden = true;
+            document.getElementById('debugInfo').hidden = true;
+
+            document.getElementById('startPublishing').disabled = starting;
             document.getElementById('stopPublishing').disabled = true;
+            if (!starting) setInputsDisabled(false);
         }
-        
+
         function generateLinks(room, streamID, password) {
             const baseUrl = 'https://vdo.ninja';
-            
-            // Build query parameters based on whether password was provided
-            let roomParam = `room=${encodeURIComponent(room)}`;
+            const roomParam = `room=${encodeURIComponent(room)}`;
+
+            // A custom password must be in every link; the default needs none.
             let passwordParam = '';
-            
-            // If password was explicitly provided (not undefined), add it to the URL
             if (password !== undefined && password !== '') {
                 passwordParam = `&password=${encodeURIComponent(password)}`;
             }
-            // If password is undefined or empty string, VDO.Ninja will use the default
-            
-            // Generate links
-            const sceneLink = `${baseUrl}/?${roomParam}${passwordParam}&scene`;
-            // Director link uses director=ROOMNAME format (no password needed for director)
-            const directorLink = `${baseUrl}/?director=${encodeURIComponent(room)}`;
-            // View link needs &scene when viewing within a room context
-            const viewLink = `${baseUrl}/?${roomParam}${passwordParam}&view=${encodeURIComponent(streamID)}&scene`;
-            
-            // Update link inputs
-            document.getElementById('sceneLink').value = sceneLink;
-            document.getElementById('directorLink').value = directorLink;
-            document.getElementById('viewLink').value = viewLink;
-            
-            // Show links container
-            document.getElementById('linksContainer').style.display = 'block';
+
+            const links = {
+                sceneLink: `${baseUrl}/?${roomParam}${passwordParam}&scene`,
+                directorLink: `${baseUrl}/?director=${encodeURIComponent(room)}${passwordParam}`,
+                // &scene keeps the view link to a clean, single-stream layout inside the room
+                viewLink: `${baseUrl}/?${roomParam}${passwordParam}&view=${encodeURIComponent(streamID)}&scene`
+            };
+
+            Object.entries(links).forEach(([id, url]) => {
+                document.getElementById(id).value = url;
+                document.getElementById(id + 'Open').href = url;
+            });
+
+            document.getElementById('linksContainer').hidden = false;
         }
-        
-        function copyLink(elementId) {
+
+        async function copyLink(elementId, button) {
             const input = document.getElementById(elementId);
-            input.select();
-            document.execCommand('copy');
-            
-            // Visual feedback
-            const button = input.nextElementSibling;
-            const originalText = button.textContent;
-            button.textContent = 'Copied!';
-            button.style.background = '#4CAF50';
-            
-            setTimeout(() => {
-                button.textContent = originalText;
-                button.style.background = '';
-            }, 2000);
+            let ok = false;
+            try {
+                await navigator.clipboard.writeText(input.value);
+                ok = true;
+            } catch (e) {
+                input.select();
+                try { ok = document.execCommand('copy'); } catch (err) { ok = false; }
+            }
+            if (button) {
+                button.textContent = ok ? 'Copied' : 'Copy failed';
+                setTimeout(() => { button.textContent = 'Copy'; }, 1500);
+            }
         }
-        
-        function openLink(elementId) {
-            const url = document.getElementById(elementId).value;
-            window.open(url, '_blank');
-        }
-        
+
+        document.getElementById('startPublishing').addEventListener('click', () => startPublishing());
+        document.getElementById('stopPublishing').addEventListener('click', () => stopPublishing());
+        document.querySelectorAll('[data-copy]').forEach(button => {
+            button.addEventListener('click', () => copyLink(button.dataset.copy, button));
+        });
+
         // Clean up on page unload
         window.addEventListener('beforeunload', () => {
             stopPublishing();

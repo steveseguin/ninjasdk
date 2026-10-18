@@ -5,8 +5,12 @@
 <link rel="canonical" href="https://sdk.vdo.ninja/docs/data-messaging.html">
 <meta property="og:title" content="Build a status dashboard or shared control surface"><meta property="og:description" content="Build a status dashboard or shared control surface. VDO.Ninja SDK options, practical examples, requirements, and validation limits.">
 <meta property="og:type" content="article"><meta property="og:url" content="https://sdk.vdo.ninja/docs/data-messaging.html">
-<link rel="icon" href="../favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="guide.css"></head>
-<body><a class="skip" href="#content">Skip to content</a><header><nav aria-label="Main"><a href="../index.html">VDO.Ninja SDK</a><a href="guides.html">Choose a guide</a><a href="api-reference.html">API reference</a><a href="../demos/">Demos</a></nav></header>
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../site.css"><link rel="stylesheet" href="guide.css"></head>
+<body><a class="skip-link" href="#content">Skip to content</a>
+<header class="site-header"><div class="site-header-inner"><a class="brand" href="../index.html"><img src="../favicon.svg" alt="" width="26" height="26"><span>VDO.Ninja SDK</span></a><nav class="site-nav" aria-label="Main"><a href="../index.html">Home</a><a href="../demos/">Demos</a><a href="guides.html">Guides</a><a href="api-reference.html">API</a></nav><div class="site-header-actions"><a class="btn btn-secondary btn-sm" href="https://github.com/steveseguin/ninjasdk">GitHub</a></div></div></header>
 <div class="layout"><aside><nav aria-label="On this page"><strong>On this page</strong><a href="#choose-a-delivery-pattern">Choose a delivery pattern</a><a href="#exchange-a-current-state-snapshot">Exchange a current-state snapshot</a><a href="#routing-and-delivery-limits">Routing and delivery limits</a></nav></aside>
 <main id="content"><h1 id="build-a-status-dashboard-or-shared-control-surface">Build a status dashboard or shared control surface</h1>
 <p>Use small SDK messages for camera status, sensor readings, chat, collaborative cursors, or progress from a worker. Both ends run your application and agree on a message schema. Native VDO.Ninja transports the generic <code>pipe</code> payload, but does not implement your custom dashboard actions.</p>
@@ -81,4 +85,4 @@ async function stopDashboard() {
 <p><code>allowFallback: true</code> explicitly permits generic signaling relay when a data route is unavailable. That changes the transport and its privacy assumptions; leave it off for data-channel-only applications. It is not durable offline delivery. Custom messages should use your own application namespace and avoid the SDK's reserved request/response types.</p>
 <p>See <a href="connecting.html">connection options</a>, <a href="agent-network.html">agent messaging</a>, and <a href="validation.html">validation notes</a>. The executable <a href="../demos/sdk-workflows.cjs">workflow sample</a> checks real peer RPC and file delivery; the SDK live suite also checks generic data-channel messages.</p>
 </main></div>
-<footer><a href="data-messaging.md">Markdown source</a> · <a href="validation.html">Validation and limits</a> · <a href="https://github.com/steveseguin/ninjasdk">Repository</a></footer></body></html>
+<footer class="site-footer"><div class="container"><span>VDO.Ninja SDK guides</span><nav aria-label="Footer"><a href="guides.html">All guides</a><a href="validation.html">Validation and limits</a><a href="data-messaging.md">Markdown source</a><a href="https://github.com/steveseguin/ninjasdk">Repository</a></nav></div></footer></body></html>

@@ -1,9 +1,9 @@
 <!DOCTYPE html>
 <!--
     VDO.Ninja SDK Demo - Broadcast
-    
+
     This demo is MIT licensed; see LICENSE-DEMOS.
-    
+
     Note: The VDO.Ninja SDK core (`vdoninja-sdk.js`, `vdoninja-sdk.min.js`) is
     separately licensed under MPL-2.0; see LICENSE.
 -->
@@ -11,639 +11,583 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VDO.Ninja SDK - Broadcast Demo</title>
+    <title>Broadcast demo | VDO.Ninja SDK</title>
+    <meta name="description" content="One broadcaster sends text messages to many viewers over WebRTC data channels, and each viewer can reply to the broadcaster.">
     <link rel="icon" type="image/svg+xml" href="../favicon.svg">
-    <link rel="icon" type="image/png" href="https://vdo.ninja/favicon.png">
-    <link rel="apple-touch-icon" href="https://vdo.ninja/apple-touch-icon.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../site.css">
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 20px;
-            background-color: #1a1a1a;
-            color: #e0e0e0;
-        }
-        
-        h1 {
-            text-align: center;
-            color: #ffffff;
-            margin-bottom: 10px;
-        }
-        
-        .subtitle {
-            text-align: center;
-            color: #999;
-            font-size: 16px;
-            margin-bottom: 30px;
-        }
-        
-        .broadcaster-section {
-            background: #2a2a2a;
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.5);
-            border: 2px solid #4CAF50;
-            margin-bottom: 30px;
-        }
-        
-        .viewers-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 20px;
-        }
-        
-        .viewer-section {
-            background: #2a2a2a;
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.5);
-            border: 1px solid #3a3a3a;
-        }
-        
-        h2 {
-            color: #e0e0e0;
-            margin-top: 0;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-        
-        .status-indicator {
-            width: 10px;
-            height: 10px;
-            border-radius: 50%;
-            background-color: #666;
-        }
-        
-        .status-indicator.connected {
-            background-color: #4CAF50;
-        }
-        
-        .control-group {
-            margin-bottom: 15px;
-        }
-        
-        label {
-            display: inline-block;
-            width: 100px;
-            font-weight: bold;
-            color: #b0b0b0;
-        }
-        
-        input[type="text"] {
-            width: calc(100% - 110px);
-            padding: 8px;
-            border: 1px solid #444;
-            border-radius: 4px;
-            background-color: #1a1a1a;
-            color: #e0e0e0;
-            font-family: inherit;
-        }
-        
-        textarea {
-            width: 100%;
-            padding: 8px;
-            border: 1px solid #444;
-            border-radius: 4px;
-            background-color: #1a1a1a;
-            color: #e0e0e0;
-            font-family: inherit;
-            margin-bottom: 10px;
-            resize: vertical;
-            height: 60px;
-        }
-        
-        button {
-            background-color: #4CAF50;
-            color: white;
-            padding: 10px 20px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            margin-right: 10px;
-            font-size: 14px;
-            transition: background-color 0.3s;
-        }
-        
-        button:hover:not(:disabled) {
-            background-color: #5cbf60;
-        }
-        
-        button:disabled {
-            background-color: #444;
-            color: #666;
-            cursor: not-allowed;
-        }
-        
-        button.stop {
-            background-color: #f44336;
-        }
-        
-        button.stop:hover:not(:disabled) {
-            background-color: #ff6659;
-        }
-        
-        button.secondary {
-            background-color: #2196F3;
-        }
-        
-        button.secondary:hover:not(:disabled) {
-            background-color: #42a5f5;
-        }
-        
-        .connected-viewers {
-            margin-top: 20px;
-            padding: 15px;
-            background-color: #333;
-            border-radius: 5px;
-            border: 1px solid #444;
-        }
-        
-        .viewer-list {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-            margin-top: 10px;
-        }
-        
-        .viewer-tag {
-            background-color: #4CAF50;
-            color: white;
-            padding: 5px 15px;
-            border-radius: 20px;
-            font-size: 14px;
-            display: flex;
-            align-items: center;
-            gap: 5px;
-        }
-        
-        .viewer-tag .label {
-            font-weight: bold;
-        }
-        
-        .viewer-tag .uuid {
-            font-size: 11px;
-            opacity: 0.8;
-        }
-        
-        .message-log {
-            margin-top: 15px;
-            padding: 10px;
-            background-color: #1a1a1a;
-            border: 1px solid #444;
-            border-radius: 5px;
-            height: 200px;
-            overflow-y: auto;
-            font-family: monospace;
-            font-size: 12px;
-        }
-        
-        .message-entry {
-            padding: 5px;
-            margin-bottom: 5px;
-            border-radius: 3px;
-        }
-        
-        .message-entry.sent {
-            background-color: #1e3a1e;
-            border-left: 3px solid #4CAF50;
-        }
-        
-        .message-entry.received {
-            background-color: #1e2838;
-            border-left: 3px solid #2196F3;
-        }
-        
-        .message-entry.system {
-            background-color: #3a3a1e;
-            border-left: 3px solid #ff9800;
-            color: #ffc947;
-        }
-        
-        .message-entry.broadcast {
-            background-color: #3a1e3a;
-            border-left: 3px solid #e91e63;
-        }
-        
-        .sender-label {
-            font-weight: bold;
-            color: #4CAF50;
-            margin-right: 5px;
-        }
-        
-        .message-time {
-            color: #666;
-            font-size: 11px;
-            margin-right: 10px;
-        }
-        
-        .room-info {
-            text-align: center;
-            padding: 10px;
-            background-color: #333;
-            border-radius: 5px;
-            margin-bottom: 20px;
-            font-size: 14px;
-        }
-        
-        .room-info strong {
-            color: #4CAF50;
-        }
-        
-        @media (max-width: 768px) {
-            .viewers-grid {
-                grid-template-columns: 1fr;
-            }
-        }
+        .broadcast-log { height: 260px; }
+        .viewer-log { height: 180px; }
+        #connectedViewersList { margin-top: 0; min-height: 26px; }
+        .viewers-grid { margin-top: 20px; }
     </style>
 </head>
 <body>
-    <h1>📡 VDO.Ninja SDK - Broadcast Demo</h1>
-    <div class="subtitle">One broadcaster sends to all viewers, viewers can respond back</div>
-    
-    <div class="room-info">
-        Room: <strong id="roomName">broadcast-demo</strong> | 
-        Stream ID: <strong id="streamId">broadcaster</strong>
-    </div>
-    
-    <!-- Broadcaster Section -->
-    <div class="broadcaster-section">
-        <h2>
-            <span class="status-indicator" id="broadcasterStatus"></span>
-            🎙️ Broadcaster
-        </h2>
-        
-        <div class="control-group">
-            <label for="broadcasterLabel">Label:</label>
-            <input type="text" id="broadcasterLabel" value="Main Broadcaster" placeholder="Your label">
-        </div>
-        
-        <button id="startBroadcast" onclick="startBroadcasting()">Start Broadcasting</button>
-        <button id="stopBroadcast" class="stop" onclick="stopBroadcasting()" disabled>Stop Broadcasting</button>
-        
-        <div class="connected-viewers" id="viewersList" style="display: none;">
-            <h3 style="margin-top: 0;">👥 Connected Viewers</h3>
-            <div class="viewer-list" id="connectedViewersList">
-                <!-- Viewer tags will be added here dynamically -->
-            </div>
-        </div>
-        
-        <div style="margin-top: 20px;">
-            <h3>📤 Broadcast Message</h3>
-            <textarea id="broadcastMessage" placeholder="Type your broadcast message here..."></textarea>
-            <button onclick="sendBroadcast()" id="sendBroadcastBtn" disabled>Send to All Viewers</button>
-        </div>
-        
-        <div class="message-log" id="broadcasterLog"></div>
-    </div>
-    
-    <!-- Viewers Section -->
-    <div class="viewers-grid">
-        <!-- Viewer 1 -->
-        <div class="viewer-section">
-            <h2>
-                <span class="status-indicator" id="viewer1Status"></span>
-                👁️ Viewer 1
-            </h2>
-            
-            <div class="control-group">
-                <label for="viewer1Label">Label:</label>
-                <input type="text" id="viewer1Label" value="Viewer One" placeholder="Your label">
-            </div>
-            
-            <button id="viewer1Start" onclick="startViewing(1)">Connect</button>
-            <button id="viewer1Stop" class="stop" onclick="stopViewing(1)" disabled>Disconnect</button>
-            
-            <div style="margin-top: 15px;">
-                <textarea id="viewer1Message" placeholder="Send message to broadcaster..."></textarea>
-                <button onclick="sendViewerMessage(1)" id="viewer1SendBtn" disabled>Send to Broadcaster</button>
-            </div>
-            
-            <div class="message-log" id="viewer1Log"></div>
-        </div>
-        
-        <!-- Viewer 2 -->
-        <div class="viewer-section">
-            <h2>
-                <span class="status-indicator" id="viewer2Status"></span>
-                👁️ Viewer 2
-            </h2>
-            
-            <div class="control-group">
-                <label for="viewer2Label">Label:</label>
-                <input type="text" id="viewer2Label" value="Viewer Two" placeholder="Your label">
-            </div>
-            
-            <button id="viewer2Start" onclick="startViewing(2)">Connect</button>
-            <button id="viewer2Stop" class="stop" onclick="stopViewing(2)" disabled>Disconnect</button>
-            
-            <div style="margin-top: 15px;">
-                <textarea id="viewer2Message" placeholder="Send message to broadcaster..."></textarea>
-                <button onclick="sendViewerMessage(2)" id="viewer2SendBtn" disabled>Send to Broadcaster</button>
-            </div>
-            
-            <div class="message-log" id="viewer2Log"></div>
-        </div>
-        
-        <!-- Viewer 3 -->
-        <div class="viewer-section">
-            <h2>
-                <span class="status-indicator" id="viewer3Status"></span>
-                👁️ Viewer 3
-            </h2>
-            
-            <div class="control-group">
-                <label for="viewer3Label">Label:</label>
-                <input type="text" id="viewer3Label" value="Viewer Three" placeholder="Your label">
-            </div>
-            
-            <button id="viewer3Start" onclick="startViewing(3)">Connect</button>
-            <button id="viewer3Stop" class="stop" onclick="stopViewing(3)" disabled>Disconnect</button>
-            
-            <div style="margin-top: 15px;">
-                <textarea id="viewer3Message" placeholder="Send message to broadcaster..."></textarea>
-                <button onclick="sendViewerMessage(3)" id="viewer3SendBtn" disabled>Send to Broadcaster</button>
-            </div>
-            
-            <div class="message-log" id="viewer3Log"></div>
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="site-header">
+    <div class="site-header-inner">
+        <a class="brand" href="../index.html"><img src="../favicon.svg" alt="" width="26" height="26"><span>VDO.Ninja SDK</span></a>
+        <nav class="site-nav" aria-label="Main">
+            <a href="../index.html">Home</a>
+            <a href="./" aria-current="page">Demos</a>
+            <a href="../docs/guides.html">Guides</a>
+            <a href="../docs/api-reference.html">API</a>
+        </nav>
+        <div class="site-header-actions">
+            <a class="btn btn-secondary btn-sm" href="https://github.com/steveseguin/ninjasdk">GitHub</a>
         </div>
     </div>
-    
-    <!-- Load the SDK -->
-    <script src="../vdoninja-sdk.js"></script>
-    
-    <script>
-        // Configuration with random IDs
-        const randomRoom = Math.floor(Math.random() * 10000);
-        const randomStream = Math.floor(Math.random() * 1000);
-        const ROOM = `broadcast-demo-${randomRoom}`;
-        const STREAM_ID = `broadcaster-${randomStream}`;
-        
-        // State
-        let broadcaster = null;
-        let viewers = {
-            1: null,
-            2: null,
-            3: null
-        };
-        let connectedViewers = new Map(); // uuid -> {label, connectedAt}
-        
-        // Update room info display
-        document.getElementById('roomName').textContent = ROOM;
-        document.getElementById('streamId').textContent = STREAM_ID;
-        
-        // Logging functions
-        function log(elementId, message, type = 'system') {
-            const logDiv = document.getElementById(elementId);
-            const entry = document.createElement('div');
-            entry.className = `message-entry ${type}`;
-            
-            const time = new Date().toLocaleTimeString();
-            entry.innerHTML = `<span class="message-time">${time}</span>${message}`;
-            
-            logDiv.appendChild(entry);
-            logDiv.scrollTop = logDiv.scrollHeight;
+</header>
+
+<main id="main" class="demo-page">
+    <div class="container">
+        <a class="crumb" href="./">← All demos</a>
+        <div class="demo-head">
+            <h1>Broadcast</h1>
+            <p class="lead">One broadcaster sends text messages to many viewers over WebRTC data channels, and each viewer can reply to the broadcaster. No audio or video is sent.</p>
+        </div>
+
+        <ol class="steps">
+            <li><strong>Start broadcasting</strong> in the Broadcaster panel.</li>
+            <li><strong>Connect viewers</strong> below, or open the share link on another device and connect a viewer there.</li>
+            <li><strong>Send a message</strong> and watch it arrive on every connected viewer.</li>
+        </ol>
+
+        <div class="share-bar">
+            <span>Room <code id="roomName">…</code></span>
+            <span>Stream ID <code id="streamId">…</code></span>
+            <div class="row">
+                <button class="btn btn-secondary btn-sm" id="copyLinkBtn" type="button">Copy link</button>
+                <a class="btn btn-secondary btn-sm" id="openTabLink" href="#" target="_blank" rel="noopener">Open second tab</a>
+            </div>
+        </div>
+
+        <section class="panel" aria-labelledby="broadcasterTitle">
+            <div class="panel-header">
+                <h2 id="broadcasterTitle">Broadcaster</h2>
+                <span class="status" id="broadcasterStatus" data-state="idle">Not broadcasting</span>
+            </div>
+            <div class="panel-body">
+                <div class="grid grid-2">
+                    <div class="stack">
+                        <div class="field">
+                            <label for="broadcasterLabel">Label</label>
+                            <input type="text" id="broadcasterLabel" value="Main Broadcaster" maxlength="60" placeholder="Your label">
+                        </div>
+                        <div class="row">
+                            <button class="btn btn-primary" id="startBroadcast" type="button">Start broadcasting</button>
+                            <button class="btn btn-danger" id="stopBroadcast" type="button" disabled>Stop</button>
+                        </div>
+                        <div id="viewersList">
+                            <p class="section-label">Connected viewers</p>
+                            <div class="tags" id="connectedViewersList"></div>
+                        </div>
+                        <div class="field">
+                            <label for="broadcastMessage">Message to all viewers</label>
+                            <textarea id="broadcastMessage" rows="2" placeholder="Type a message, then press Enter"></textarea>
+                        </div>
+                        <div class="row">
+                            <button class="btn btn-secondary" id="sendBroadcastBtn" type="button" disabled>Send to all viewers</button>
+                        </div>
+                    </div>
+                    <div>
+                        <p class="section-label">Broadcaster log</p>
+                        <div class="log broadcast-log" id="broadcasterLog" role="log" aria-live="polite"></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <div class="grid grid-3 viewers-grid">
+            <section class="panel" aria-labelledby="viewer1Title">
+                <div class="panel-header">
+                    <h2 id="viewer1Title">Viewer 1</h2>
+                    <span class="status" id="viewer1Status" data-state="idle">Not connected</span>
+                </div>
+                <div class="panel-body stack">
+                    <div class="field">
+                        <label for="viewer1Label">Label</label>
+                        <input type="text" id="viewer1Label" value="Viewer One" maxlength="60" placeholder="Your label">
+                    </div>
+                    <div class="row">
+                        <button class="btn btn-primary" id="viewer1Start" type="button">Connect</button>
+                        <button class="btn btn-danger" id="viewer1Stop" type="button" disabled>Disconnect</button>
+                    </div>
+                    <div class="field">
+                        <label for="viewer1Message">Reply to the broadcaster</label>
+                        <div class="input-group">
+                            <input type="text" id="viewer1Message" placeholder="Message">
+                            <button class="btn btn-secondary" id="viewer1SendBtn" type="button" disabled>Send</button>
+                        </div>
+                    </div>
+                    <div class="log viewer-log" id="viewer1Log" role="log" aria-live="polite"></div>
+                </div>
+            </section>
+
+            <section class="panel" aria-labelledby="viewer2Title">
+                <div class="panel-header">
+                    <h2 id="viewer2Title">Viewer 2</h2>
+                    <span class="status" id="viewer2Status" data-state="idle">Not connected</span>
+                </div>
+                <div class="panel-body stack">
+                    <div class="field">
+                        <label for="viewer2Label">Label</label>
+                        <input type="text" id="viewer2Label" value="Viewer Two" maxlength="60" placeholder="Your label">
+                    </div>
+                    <div class="row">
+                        <button class="btn btn-primary" id="viewer2Start" type="button">Connect</button>
+                        <button class="btn btn-danger" id="viewer2Stop" type="button" disabled>Disconnect</button>
+                    </div>
+                    <div class="field">
+                        <label for="viewer2Message">Reply to the broadcaster</label>
+                        <div class="input-group">
+                            <input type="text" id="viewer2Message" placeholder="Message">
+                            <button class="btn btn-secondary" id="viewer2SendBtn" type="button" disabled>Send</button>
+                        </div>
+                    </div>
+                    <div class="log viewer-log" id="viewer2Log" role="log" aria-live="polite"></div>
+                </div>
+            </section>
+
+            <section class="panel" aria-labelledby="viewer3Title">
+                <div class="panel-header">
+                    <h2 id="viewer3Title">Viewer 3</h2>
+                    <span class="status" id="viewer3Status" data-state="idle">Not connected</span>
+                </div>
+                <div class="panel-body stack">
+                    <div class="field">
+                        <label for="viewer3Label">Label</label>
+                        <input type="text" id="viewer3Label" value="Viewer Three" maxlength="60" placeholder="Your label">
+                    </div>
+                    <div class="row">
+                        <button class="btn btn-primary" id="viewer3Start" type="button">Connect</button>
+                        <button class="btn btn-danger" id="viewer3Stop" type="button" disabled>Disconnect</button>
+                    </div>
+                    <div class="field">
+                        <label for="viewer3Message">Reply to the broadcaster</label>
+                        <div class="input-group">
+                            <input type="text" id="viewer3Message" placeholder="Message">
+                            <button class="btn btn-secondary" id="viewer3SendBtn" type="button" disabled>Send</button>
+                        </div>
+                    </div>
+                    <div class="log viewer-log" id="viewer3Log" role="log" aria-live="polite"></div>
+                </div>
+            </section>
+        </div>
+
+        <details class="disclosure" style="margin-top:24px">
+            <summary>Key SDK calls in this demo</summary>
+            <div class="disclosure-body"><pre><code>// Broadcaster: data-only, no camera or microphone
+const host = new VDONinjaSDK();
+await host.connect();
+await host.joinRoom({ room });
+await host.announce({ streamID, label: 'Main Broadcaster' });
+host.sendData({ type: 'broadcast', message: 'Hello everyone' });   // every viewer
+host.sendData({ type: 'requestLabel' }, viewerUUID);               // one viewer
+
+// Each viewer
+const viewer = new VDONinjaSDK();
+viewer.addEventListener('dataReceived', (e) =&gt; console.log(e.detail.data));
+await viewer.connect();
+await viewer.joinRoom({ room });
+await viewer.view(streamID, { audio: false, video: false });
+viewer.sendData({ type: 'message', message: 'Hi from a viewer' }); // to the broadcaster</code></pre></div>
+        </details>
+    </div>
+</main>
+
+<footer class="site-footer">
+    <div class="container">
+        <span>VDO.Ninja SDK demos · MIT licensed (SDK core MPL-2.0)</span>
+        <nav aria-label="Footer"><a href="./">All demos</a><a href="../docs/guides.html">Guides</a><a href="https://github.com/steveseguin/ninjasdk">GitHub</a></nav>
+    </div>
+</footer>
+
+<script src="../vdoninja-sdk.js"></script>
+<script>
+    // ---- Room and stream ID live in the URL so another tab or device joins the same broadcast ----
+    function sanitizeId(value) {
+        return String(value || '').trim().replace(/\W+/g, '_').slice(0, 30);
+    }
+    function randomId() {
+        if (window.crypto && typeof crypto.randomUUID === 'function') return crypto.randomUUID().slice(0, 8);
+        return Math.random().toString(36).slice(2, 10);
+    }
+
+    const params = new URLSearchParams(location.search);
+    const ROOM = sanitizeId(params.get('room')) || 'bcast_' + randomId();
+    const STREAM_ID = ROOM + '_host';
+    if (params.get('room') !== ROOM) {
+        params.set('room', ROOM);
+        history.replaceState(null, '', '?' + params);
+    }
+    document.getElementById('roomName').textContent = ROOM;
+    document.getElementById('streamId').textContent = STREAM_ID;
+    document.getElementById('openTabLink').href = location.href;
+    document.getElementById('copyLinkBtn').addEventListener('click', async () => {
+        const btn = document.getElementById('copyLinkBtn');
+        try { await navigator.clipboard.writeText(location.href); btn.textContent = 'Copied'; }
+        catch (e) { btn.textContent = 'Copy failed'; }
+        setTimeout(() => { btn.textContent = 'Copy link'; }, 1500);
+    });
+
+    // ---- State ----
+    let broadcaster = null;
+    let broadcasterReady = false;
+    const viewers = { 1: null, 2: null, 3: null };
+    const connectedViewers = new Map(); // uuid -> { label }
+
+    // ---- Helpers ----
+    function shortId(uuid) {
+        return String(uuid || '').slice(0, 8);
+    }
+
+    // Safe log: peer data only ever goes into textContent.
+    function log(logId, text, type = 'system', sender = null) {
+        const logEl = document.getElementById(logId);
+        if (!logEl) return;
+        const entry = document.createElement('div');
+        entry.className = 'log-entry ' + type;
+        const time = document.createElement('span');
+        time.className = 'log-time';
+        time.textContent = new Date().toLocaleTimeString();
+        const body = document.createElement('span');
+        if (sender) {
+            const who = document.createElement('strong');
+            who.textContent = '[' + sender + '] ';
+            body.appendChild(who);
         }
-        
-        // Broadcaster functions
-        async function startBroadcasting() {
-            try {
-                const label = document.getElementById('broadcasterLabel').value || 'Broadcaster';
-                
-                log('broadcasterLog', 'Starting broadcast...', 'system');
-                
-                broadcaster = new VDONinjaSDK({
-                    room: ROOM,
-                    streamID: STREAM_ID,
-                    label: label,
-                    debug: true
-                });
-                
-                // Setup event listeners
-                broadcaster.addEventListener('connected', () => {
-                    log('broadcasterLog', 'Connected to server', 'system');
-                    document.getElementById('broadcasterStatus').classList.add('connected');
-                });
-                
-                broadcaster.addEventListener('dataChannelOpen', (event) => {
-                    const uuid = event.detail.uuid;
-                    log('broadcasterLog', `Viewer connected: ${uuid.substring(0, 8)}...`, 'system');
-                    
-                    // Request viewer's label
-                    broadcaster.sendData({ type: 'requestLabel' }, uuid);
-                });
-                
-                broadcaster.addEventListener('dataReceived', (event) => {
-                    const { data, uuid } = event.detail;
-                    
-                    if (data.type === 'label') {
-                        // Store viewer label
-                        connectedViewers.set(uuid, {
-                            label: data.label,
-                            connectedAt: new Date()
-                        });
-                        updateViewersList();
-                        log('broadcasterLog', `Viewer identified as: ${data.label}`, 'system');
-                    } else if (data.type === 'message') {
-                        // Display message from viewer
-                        const viewer = connectedViewers.get(uuid) || { label: 'Unknown' };
-                        log('broadcasterLog', 
-                            `<span class="sender-label">[${viewer.label}]</span> ${data.message}`, 
-                            'received'
-                        );
-                    }
-                });
-                
-                broadcaster.addEventListener('bye', (event) => {
-                    const uuid = event.detail.UUID;
-                    const viewer = connectedViewers.get(uuid);
-                    if (viewer) {
-                        log('broadcasterLog', `Viewer disconnected: ${viewer.label}`, 'system');
-                        connectedViewers.delete(uuid);
-                        updateViewersList();
-                    }
-                });
-                
-                // Connect and publish
-                await broadcaster.connect();
-                
-                // Use announce for data-only connection
-                await broadcaster.announce({
-                    streamID: STREAM_ID
-                });
-                
-                // Update UI
-                document.getElementById('startBroadcast').disabled = true;
-                document.getElementById('stopBroadcast').disabled = false;
-                document.getElementById('sendBroadcastBtn').disabled = false;
-                document.getElementById('viewersList').style.display = 'block';
-                
-                log('broadcasterLog', `Broadcasting as "${label}" in room: ${ROOM}`, 'system');
-                
-            } catch (error) {
-                log('broadcasterLog', `Error: ${error.message}`, 'system');
-                console.error('Broadcasting error:', error);
-            }
-        }
-        
-        function stopBroadcasting() {
-            if (broadcaster) {
-                broadcaster.disconnect();
-                broadcaster = null;
-            }
-            
-            connectedViewers.clear();
-            updateViewersList();
-            
-            document.getElementById('startBroadcast').disabled = false;
-            document.getElementById('stopBroadcast').disabled = true;
-            document.getElementById('sendBroadcastBtn').disabled = true;
-            document.getElementById('viewersList').style.display = 'none';
-            document.getElementById('broadcasterStatus').classList.remove('connected');
-            
-            log('broadcasterLog', 'Broadcast stopped', 'system');
-        }
-        
-        function sendBroadcast() {
-            if (!broadcaster) return;
-            
-            const message = document.getElementById('broadcastMessage').value.trim();
-            if (!message) return;
-            
-            // Send to all connected viewers
-            broadcaster.sendData({
-                type: 'broadcast',
-                message: message,
-                timestamp: Date.now()
-            });
-            
-            log('broadcasterLog', `📢 Broadcast sent: "${message}"`, 'broadcast');
-            document.getElementById('broadcastMessage').value = '';
-        }
-        
-        function updateViewersList() {
-            const container = document.getElementById('connectedViewersList');
-            
-            if (connectedViewers.size === 0) {
-                container.innerHTML = '<div style="color: #666; text-align: center;">No viewers connected</div>';
-                return;
-            }
-            
-            container.innerHTML = '';
+        body.appendChild(document.createTextNode(String(text)));
+        entry.append(time, body);
+        logEl.appendChild(entry);
+        logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    function setStatus(id, state, text) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.dataset.state = state;
+        el.textContent = text;
+    }
+
+    // ---- Broadcaster ----
+    function updateBroadcasterStatus() {
+        if (!broadcaster || !broadcasterReady) return;
+        const n = connectedViewers.size;
+        if (n > 0) setStatus('broadcasterStatus', 'live', n === 1 ? 'Live · 1 viewer' : 'Live · ' + n + ' viewers');
+        else setStatus('broadcasterStatus', 'waiting', 'Waiting for viewers');
+    }
+
+    function updateViewersList() {
+        const container = document.getElementById('connectedViewersList');
+        container.replaceChildren();
+        if (connectedViewers.size === 0) {
+            const empty = document.createElement('span');
+            empty.className = 'faint small';
+            empty.textContent = 'No viewers connected';
+            container.appendChild(empty);
+        } else {
             connectedViewers.forEach((viewer, uuid) => {
-                const tag = document.createElement('div');
-                tag.className = 'viewer-tag';
-                tag.innerHTML = `
-                    <span class="label">${viewer.label}</span>
-                    <span class="uuid">(${uuid.substring(0, 8)}...)</span>
-                `;
+                const tag = document.createElement('span');
+                tag.className = 'badge badge-accent';
+                tag.textContent = (viewer.label || 'Viewer') + ' · ' + shortId(uuid);
                 container.appendChild(tag);
             });
         }
-        
-        // Viewer functions
-        async function startViewing(viewerId) {
-            try {
-                const label = document.getElementById(`viewer${viewerId}Label`).value || `Viewer ${viewerId}`;
-                
-                log(`viewer${viewerId}Log`, 'Connecting to broadcaster...', 'system');
-                
-                viewers[viewerId] = new VDONinjaSDK({
-                    room: ROOM,
-                    label: label,
-                    debug: true
-                });
-                
-                const viewer = viewers[viewerId];
-                
-                // Setup event listeners
-                viewer.addEventListener('connected', () => {
-                    log(`viewer${viewerId}Log`, 'Connected to server', 'system');
-                    document.getElementById(`viewer${viewerId}Status`).classList.add('connected');
-                });
-                
-                viewer.addEventListener('dataChannelOpen', (event) => {
-                    log(`viewer${viewerId}Log`, 'Connected to broadcaster', 'system');
-                    
-                    // Send our label when requested
-                    viewer.addEventListener('dataReceived', (event) => {
-                        const { data } = event.detail;
-                        
-                        if (data.type === 'requestLabel') {
-                            viewer.sendData({
-                                type: 'label',
-                                label: label
-                            });
-                        } else if (data.type === 'broadcast') {
-                            log(`viewer${viewerId}Log`, 
-                                `<span class="sender-label">[Broadcast]</span> ${data.message}`, 
-                                'broadcast'
-                            );
-                        }
-                    });
-                });
-                
-                // Connect and view
-                await viewer.connect();
-                await viewer.quickView({
-                    streamID: STREAM_ID,
-                    audio: false,
-                    video: false
-                });
-                
-                // Update UI
-                document.getElementById(`viewer${viewerId}Start`).disabled = true;
-                document.getElementById(`viewer${viewerId}Stop`).disabled = false;
-                document.getElementById(`viewer${viewerId}SendBtn`).disabled = false;
-                
-                log(`viewer${viewerId}Log`, `Connected as "${label}"`, 'system');
-                
-            } catch (error) {
-                log(`viewer${viewerId}Log`, `Error: ${error.message}`, 'system');
-                console.error(`Viewer ${viewerId} error:`, error);
-            }
-        }
-        
-        function stopViewing(viewerId) {
-            if (viewers[viewerId]) {
-                viewers[viewerId].disconnect();
-                viewers[viewerId] = null;
-            }
-            
-            document.getElementById(`viewer${viewerId}Start`).disabled = false;
-            document.getElementById(`viewer${viewerId}Stop`).disabled = true;
-            document.getElementById(`viewer${viewerId}SendBtn`).disabled = true;
-            document.getElementById(`viewer${viewerId}Status`).classList.remove('connected');
-            
-            log(`viewer${viewerId}Log`, 'Disconnected', 'system');
-        }
-        
-        function sendViewerMessage(viewerId) {
-            const viewer = viewers[viewerId];
-            if (!viewer) return;
-            
-            const message = document.getElementById(`viewer${viewerId}Message`).value.trim();
-            if (!message) return;
-            
-            viewer.sendData({
-                type: 'message',
-                message: message,
-                timestamp: Date.now()
-            });
-            
-            log(`viewer${viewerId}Log`, `Sent: "${message}"`, 'sent');
-            document.getElementById(`viewer${viewerId}Message`).value = '';
-        }
-        
-        // Initialize
+        updateBroadcasterStatus();
+    }
+
+    function removeViewer(uuid) {
+        const viewer = connectedViewers.get(uuid);
+        if (!viewer) return;
+        connectedViewers.delete(uuid);
+        log('broadcasterLog', 'Viewer left: ' + (viewer.label || shortId(uuid)), 'warning');
         updateViewersList();
-        
-        // Clean up on page unload
-        window.addEventListener('beforeunload', () => {
-            stopBroadcasting();
-            [1, 2, 3].forEach(id => stopViewing(id));
+    }
+
+    async function startBroadcasting() {
+        if (broadcaster) return;
+        document.getElementById('startBroadcast').disabled = true;
+        const labelInput = document.getElementById('broadcasterLabel');
+        const label = labelInput.value.trim() || 'Broadcaster';
+        labelInput.disabled = true;
+
+        const sdk = new VDONinjaSDK();
+        broadcaster = sdk;
+        broadcasterReady = false;
+        document.getElementById('stopBroadcast').disabled = false;
+        setStatus('broadcasterStatus', 'connecting', 'Connecting');
+        log('broadcasterLog', 'Connecting to the signaling server...');
+
+        sdk.addEventListener('dataChannelOpen', (event) => {
+            if (broadcaster !== sdk) return;
+            const uuid = event.detail.uuid;
+            if (!connectedViewers.has(uuid)) connectedViewers.set(uuid, { label: null });
+            log('broadcasterLog', 'Viewer connected (' + shortId(uuid) + ')', 'success');
+            updateViewersList();
+            // Ask this one viewer for its label.
+            sdk.sendData({ type: 'requestLabel' }, uuid);
         });
-    </script>
+
+        sdk.addEventListener('dataChannelClose', (event) => {
+            if (broadcaster !== sdk) return;
+            removeViewer(event.detail.uuid);
+        });
+
+        sdk.addEventListener('peerDisconnected', (event) => {
+            if (broadcaster !== sdk) return;
+            removeViewer(event.detail.uuid);
+        });
+
+        sdk.addEventListener('dataReceived', (event) => {
+            if (broadcaster !== sdk) return;
+            const { data, uuid } = event.detail;
+            if (!data || typeof data !== 'object') return;
+            if (data.type === 'label' && typeof data.label === 'string') {
+                const viewerLabel = data.label.trim().slice(0, 60) || 'Viewer';
+                connectedViewers.set(uuid, { label: viewerLabel });
+                updateViewersList();
+                log('broadcasterLog', 'Viewer ' + shortId(uuid) + ' is "' + viewerLabel + '"');
+            } else if (data.type === 'message' && typeof data.message === 'string') {
+                const viewer = connectedViewers.get(uuid);
+                log('broadcasterLog', data.message, 'received', (viewer && viewer.label) || 'Viewer ' + shortId(uuid));
+            }
+        });
+
+        sdk.addEventListener('alert', (event) => {
+            if (broadcaster !== sdk) return;
+            const message = String((event.detail && event.detail.message) || '');
+            log('broadcasterLog', 'Server alert: ' + message, 'warning');
+            if (message.includes('already in use')) {
+                stopBroadcasting({ state: 'error', text: 'Stream ID in use' });
+            }
+        });
+
+        sdk.addEventListener('disconnected', (event) => {
+            if (broadcaster !== sdk || (event.detail && event.detail.intentional)) return;
+            setStatus('broadcasterStatus', 'connecting', 'Reconnecting');
+            log('broadcasterLog', 'Signaling connection lost; reconnecting...', 'warning');
+        });
+
+        sdk.addEventListener('reconnected', () => {
+            if (broadcaster !== sdk) return;
+            log('broadcasterLog', 'Reconnected', 'success');
+            updateBroadcasterStatus();
+        });
+
+        sdk.addEventListener('reconnectFailed', () => {
+            if (broadcaster !== sdk) return;
+            log('broadcasterLog', 'Could not reconnect to the signaling server.', 'error');
+            stopBroadcasting({ state: 'error', text: 'Connection lost' });
+        });
+
+        try {
+            await sdk.connect();
+            await sdk.joinRoom({ room: ROOM });
+            // announce() publishes without media, so the connection is data-only.
+            await sdk.announce({ streamID: STREAM_ID, label });
+            if (broadcaster !== sdk) return;
+            broadcasterReady = true;
+            document.getElementById('sendBroadcastBtn').disabled = false;
+            log('broadcasterLog', 'Broadcasting as "' + label + '" in room ' + ROOM, 'success');
+            updateViewersList();
+        } catch (error) {
+            if (broadcaster !== sdk) return;
+            log('broadcasterLog', 'Could not start: ' + (error && error.message ? error.message : error), 'error');
+            console.error('Broadcasting error:', error);
+            stopBroadcasting({ state: 'error', text: 'Failed to start' });
+        }
+    }
+
+    async function stopBroadcasting(options = {}) {
+        const sdk = broadcaster;
+        broadcaster = null;
+        broadcasterReady = false;
+        connectedViewers.clear();
+        updateViewersList();
+
+        document.getElementById('startBroadcast').disabled = false;
+        document.getElementById('stopBroadcast').disabled = true;
+        document.getElementById('sendBroadcastBtn').disabled = true;
+        document.getElementById('broadcasterLabel').disabled = false;
+        setStatus('broadcasterStatus', options.state || 'idle', options.text || 'Not broadcasting');
+
+        if (sdk) {
+            log('broadcasterLog', 'Broadcast stopped');
+            try { await sdk.disconnect(); } catch (e) { /* already closed */ }
+        }
+    }
+
+    function sendBroadcast() {
+        if (!broadcaster || !broadcasterReady) return;
+        const input = document.getElementById('broadcastMessage');
+        const message = input.value.trim();
+        if (!message) return;
+        if (connectedViewers.size === 0) {
+            log('broadcasterLog', 'No viewers are connected yet. Connect a viewer first.', 'warning');
+            return;
+        }
+        // No target: one copy goes to every connected viewer.
+        broadcaster.sendData({ type: 'broadcast', message, timestamp: Date.now() });
+        log('broadcasterLog', message, 'sent', 'You to all');
+        input.value = '';
+    }
+
+    // ---- Viewers ----
+    async function startViewing(viewerId) {
+        if (viewers[viewerId]) return;
+        const logId = 'viewer' + viewerId + 'Log';
+        const statusId = 'viewer' + viewerId + 'Status';
+        const sendBtn = document.getElementById('viewer' + viewerId + 'SendBtn');
+        document.getElementById('viewer' + viewerId + 'Start').disabled = true;
+        const labelInput = document.getElementById('viewer' + viewerId + 'Label');
+        const label = labelInput.value.trim() || 'Viewer ' + viewerId;
+        labelInput.disabled = true;
+
+        const sdk = new VDONinjaSDK();
+        viewers[viewerId] = sdk;
+        let channelOpen = false;
+        let hostLabel = 'Broadcast';
+        document.getElementById('viewer' + viewerId + 'Stop').disabled = false;
+        setStatus(statusId, 'connecting', 'Connecting');
+        log(logId, 'Connecting...');
+
+        // Registered once per SDK instance, so reconnects never stack duplicate handlers.
+        sdk.addEventListener('dataReceived', (event) => {
+            if (viewers[viewerId] !== sdk) return;
+            const { data, uuid } = event.detail;
+            if (!data || typeof data !== 'object') return;
+            if (data.type === 'requestLabel') {
+                sdk.sendData({ type: 'label', label }, uuid);
+            } else if (data.type === 'broadcast' && typeof data.message === 'string') {
+                log(logId, data.message, 'received', hostLabel);
+            }
+        });
+
+        // The broadcaster's announce() label arrives as publisher info.
+        sdk.addEventListener('peerInfo', (event) => {
+            if (viewers[viewerId] !== sdk) return;
+            const info = event.detail && event.detail.info;
+            if (info && typeof info.label === 'string' && info.label.trim()) {
+                hostLabel = info.label.trim().slice(0, 60);
+            }
+        });
+
+        sdk.addEventListener('dataChannelOpen', () => {
+            if (viewers[viewerId] !== sdk) return;
+            channelOpen = true;
+            setStatus(statusId, 'live', 'Connected');
+            sendBtn.disabled = false;
+            log(logId, 'Connected to the broadcaster as "' + label + '"', 'success');
+        });
+
+        const onBroadcasterGone = () => {
+            if (viewers[viewerId] !== sdk || !channelOpen) return;
+            channelOpen = false;
+            sendBtn.disabled = true;
+            setStatus(statusId, 'waiting', 'Waiting for broadcaster');
+            log(logId, 'The broadcaster left. Waiting for it to come back...', 'warning');
+        };
+        sdk.addEventListener('dataChannelClose', onBroadcasterGone);
+        sdk.addEventListener('peerDisconnected', onBroadcasterGone);
+
+        sdk.addEventListener('disconnected', (event) => {
+            if (viewers[viewerId] !== sdk || (event.detail && event.detail.intentional)) return;
+            channelOpen = false;
+            sendBtn.disabled = true;
+            setStatus(statusId, 'connecting', 'Reconnecting');
+            log(logId, 'Signaling connection lost; reconnecting...', 'warning');
+        });
+
+        sdk.addEventListener('reconnected', () => {
+            if (viewers[viewerId] !== sdk || channelOpen) return;
+            setStatus(statusId, 'waiting', 'Waiting for broadcaster');
+        });
+
+        sdk.addEventListener('reconnectFailed', () => {
+            if (viewers[viewerId] !== sdk) return;
+            log(logId, 'Could not reconnect to the signaling server.', 'error');
+            stopViewing(viewerId, { state: 'error', text: 'Connection lost' });
+        });
+
+        try {
+            await sdk.connect();
+            await sdk.joinRoom({ room: ROOM });
+            // Data only: no audio or video is requested.
+            const pc = await sdk.view(STREAM_ID, { audio: false, video: false });
+            if (viewers[viewerId] !== sdk) return;
+            if (!pc && !channelOpen) {
+                setStatus(statusId, 'waiting', 'Waiting for broadcaster');
+                log(logId, 'The broadcaster is not live yet. This viewer stays in the room and connects when it starts.', 'warning');
+            }
+        } catch (error) {
+            if (viewers[viewerId] !== sdk) return;
+            log(logId, 'Could not connect: ' + (error && error.message ? error.message : error), 'error');
+            console.error('Viewer ' + viewerId + ' error:', error);
+            stopViewing(viewerId, { state: 'error', text: 'Failed to connect' });
+        }
+    }
+
+    async function stopViewing(viewerId, options = {}) {
+        const sdk = viewers[viewerId];
+        viewers[viewerId] = null;
+
+        document.getElementById('viewer' + viewerId + 'Start').disabled = false;
+        document.getElementById('viewer' + viewerId + 'Stop').disabled = true;
+        document.getElementById('viewer' + viewerId + 'SendBtn').disabled = true;
+        document.getElementById('viewer' + viewerId + 'Label').disabled = false;
+        setStatus('viewer' + viewerId + 'Status', options.state || 'idle', options.text || 'Not connected');
+
+        if (sdk) {
+            log('viewer' + viewerId + 'Log', 'Disconnected');
+            try { await sdk.disconnect(); } catch (e) { /* already closed */ }
+        }
+    }
+
+    function sendViewerMessage(viewerId) {
+        const viewer = viewers[viewerId];
+        if (!viewer) return;
+        const input = document.getElementById('viewer' + viewerId + 'Message');
+        const message = input.value.trim();
+        if (!message) return;
+        // A viewer's only peer is the broadcaster, so no target is needed.
+        viewer.sendData({ type: 'message', message, timestamp: Date.now() });
+        log('viewer' + viewerId + 'Log', message, 'sent', 'You');
+        input.value = '';
+    }
+
+    // ---- Wiring ----
+    document.getElementById('startBroadcast').addEventListener('click', () => startBroadcasting());
+    document.getElementById('stopBroadcast').addEventListener('click', () => stopBroadcasting());
+    document.getElementById('sendBroadcastBtn').addEventListener('click', sendBroadcast);
+    document.getElementById('broadcastMessage').addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' && !event.shiftKey) {
+            event.preventDefault();
+            sendBroadcast();
+        }
+    });
+
+    [1, 2, 3].forEach((id) => {
+        document.getElementById('viewer' + id + 'Start').addEventListener('click', () => startViewing(id));
+        document.getElementById('viewer' + id + 'Stop').addEventListener('click', () => stopViewing(id));
+        document.getElementById('viewer' + id + 'SendBtn').addEventListener('click', () => sendViewerMessage(id));
+        document.getElementById('viewer' + id + 'Message').addEventListener('keydown', (event) => {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                sendViewerMessage(id);
+            }
+        });
+    });
+
+    updateViewersList();
+
+    window.addEventListener('beforeunload', () => {
+        if (broadcaster) broadcaster.disconnect();
+        [1, 2, 3].forEach((id) => { if (viewers[id]) viewers[id].disconnect(); });
+    });
+</script>
 </body>
 </html>

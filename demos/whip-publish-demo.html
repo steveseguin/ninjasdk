@@ -9,533 +9,634 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WHIP Publish Demo - VDO.Ninja SDK</title>
+    <title>WHIP publish demo | VDO.Ninja SDK</title>
+    <meta name="description" content="Publish your camera or screen to a WHIP ingest server such as Meshcast, Cloudflare Stream, or Twitch using the standalone WHIP client.">
     <link rel="icon" type="image/svg+xml" href="../favicon.svg">
-    <link rel="icon" type="image/png" href="https://vdo.ninja/favicon.png">
-    <link rel="apple-touch-icon" href="https://vdo.ninja/apple-touch-icon.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../site.css">
     <style>
-        * {
-            box-sizing: border-box;
+        .preset-row .btn[aria-pressed="true"] {
+            border-color: var(--accent-border);
+            background: var(--accent-soft);
+            color: var(--accent-text);
         }
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            max-width: 1000px;
-            margin: 0 auto;
-            padding: 20px;
-            background-color: #1a1a1a;
-            color: #e0e0e0;
-        }
-        h1 {
-            text-align: center;
-            color: #fff;
-            margin-bottom: 10px;
-        }
-        .subtitle {
-            text-align: center;
-            color: #888;
-            margin-bottom: 30px;
-        }
-        .card {
-            background: #2a2a2a;
-            border-radius: 10px;
-            padding: 20px;
-            margin-bottom: 20px;
-            border: 1px solid #3a3a3a;
-        }
-        .card h2 {
-            margin-top: 0;
-            color: #fff;
-            font-size: 18px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-        .status-dot {
-            width: 10px;
-            height: 10px;
-            border-radius: 50%;
-            background: #666;
-        }
-        .status-dot.connecting { background: #ffc107; }
-        .status-dot.connected { background: #4caf50; }
-        .status-dot.error { background: #f44336; }
-
-        .form-group {
-            margin-bottom: 15px;
-        }
-        label {
-            display: block;
-            margin-bottom: 5px;
-            color: #aaa;
-            font-size: 14px;
-        }
-        input, select {
-            width: 100%;
-            padding: 10px;
-            border: 1px solid #444;
-            border-radius: 5px;
-            background: #1a1a1a;
-            color: #e0e0e0;
-            font-size: 14px;
-        }
-        input:focus, select:focus {
-            outline: none;
-            border-color: #4caf50;
-        }
-        .row {
-            display: flex;
-            gap: 15px;
-        }
-        .row > * {
-            flex: 1;
-        }
-        button {
-            padding: 12px 24px;
-            border: none;
-            border-radius: 5px;
-            font-size: 14px;
-            cursor: pointer;
-            transition: background 0.2s;
-        }
-        button:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-        .btn-primary {
-            background: #4caf50;
-            color: white;
-        }
-        .btn-primary:hover:not(:disabled) {
-            background: #5cbf60;
-        }
-        .btn-danger {
-            background: #f44336;
-            color: white;
-        }
-        .btn-danger:hover:not(:disabled) {
-            background: #ff5252;
-        }
-        .btn-secondary {
-            background: #555;
-            color: white;
-        }
-        .btn-secondary:hover:not(:disabled) {
-            background: #666;
-        }
-        .button-row {
-            display: flex;
-            gap: 10px;
-            margin-top: 15px;
-        }
-        video {
-            width: 100%;
-            max-height: 400px;
-            background: #000;
-            border-radius: 5px;
-        }
-        .log {
-            background: #111;
-            border: 1px solid #333;
-            border-radius: 5px;
-            padding: 10px;
-            height: 200px;
-            overflow-y: auto;
-            font-family: 'Monaco', 'Menlo', monospace;
-            font-size: 12px;
-        }
-        .log-entry {
-            margin-bottom: 5px;
-            line-height: 1.4;
-        }
-        .log-entry.info { color: #4caf50; }
-        .log-entry.error { color: #f44336; }
-        .log-entry.warn { color: #ffc107; }
-        .stats {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 10px;
-            margin-top: 15px;
-        }
-        .stat {
-            background: #1a1a1a;
-            padding: 10px;
-            border-radius: 5px;
-            text-align: center;
-        }
-        .stat-value {
-            font-size: 20px;
-            font-weight: bold;
-            color: #4caf50;
-        }
-        .stat-label {
-            font-size: 12px;
-            color: #888;
-        }
-        .preset-buttons {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 15px;
-            flex-wrap: wrap;
-        }
-        .preset-btn {
-            padding: 8px 16px;
-            background: #333;
-            border: 1px solid #444;
-            color: #e0e0e0;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 13px;
-        }
-        .preset-btn:hover {
-            background: #444;
-        }
-        .info-box {
-            background: #1e3a5f;
-            border: 1px solid #2a4a6f;
-            border-radius: 5px;
-            padding: 15px;
-            margin-bottom: 20px;
-            font-size: 14px;
-        }
-        .info-box a {
-            color: #64b5f6;
-        }
+        .preset-help { margin: 0; font-size: 0.875rem; color: var(--text-muted); }
+        .controls-stack > * + * { margin-top: 14px; }
     </style>
 </head>
 <body>
-    <h1>WHIP Publish Demo</h1>
-    <p class="subtitle">Publish your camera/screen to WHIP-compatible services</p>
-
-    <div class="info-box">
-        <strong>Supported Services:</strong>
-        <ul style="margin: 10px 0; padding-left: 20px;">
-            <li><strong>Meshcast.io</strong> - Free WebRTC relay (use preset below)</li>
-            <li><strong>Twitch</strong> - Use your WHIP ingest URL from <a href="https://dashboard.twitch.tv/settings/stream" target="_blank">Twitch Dashboard</a></li>
-            <li><strong>Cloudflare Stream</strong> - Use your Stream WHIP endpoint</li>
-            <li>Any other WHIP-compliant media server</li>
-        </ul>
-    </div>
-
-    <!-- Configuration -->
-    <div class="card">
-        <h2>Configuration</h2>
-
-        <div class="preset-buttons">
-            <button class="preset-btn" onclick="setPreset('meshcast')">Meshcast.io</button>
-            <button class="preset-btn" onclick="setPreset('cloudflare')">Cloudflare</button>
-            <button class="preset-btn" onclick="setPreset('twitch')">Twitch</button>
-        </div>
-
-        <div class="form-group">
-            <label for="whipUrl">WHIP Endpoint URL</label>
-            <input type="text" id="whipUrl" placeholder="https://example.com/whip/your-stream-id">
-        </div>
-
-        <div class="form-group">
-            <label for="authToken">Auth Token (optional)</label>
-            <input type="text" id="authToken" placeholder="Bearer token for authentication">
-        </div>
-
-        <div class="row">
-            <div class="form-group">
-                <label for="videoCodec">Video Codec</label>
-                <select id="videoCodec">
-                    <option value="">Auto</option>
-                    <option value="h264">H.264</option>
-                    <option value="vp8">VP8</option>
-                    <option value="vp9">VP9</option>
-                    <option value="av1">AV1</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label for="videoBitrate">Video Bitrate (kbps)</label>
-                <input type="number" id="videoBitrate" value="2500" min="100" max="20000">
-            </div>
-        </div>
-
-        <div class="row">
-            <div class="form-group">
-                <label for="videoSource">Video Source</label>
-                <select id="videoSource">
-                    <option value="camera">Camera</option>
-                    <option value="screen">Screen Share</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label for="resolution">Resolution</label>
-                <select id="resolution">
-                    <option value="1920x1080">1080p (1920x1080)</option>
-                    <option value="1280x720" selected>720p (1280x720)</option>
-                    <option value="854x480">480p (854x480)</option>
-                    <option value="640x360">360p (640x360)</option>
-                </select>
-            </div>
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="site-header">
+    <div class="site-header-inner">
+        <a class="brand" href="../index.html"><img src="../favicon.svg" alt="" width="26" height="26"><span>VDO.Ninja SDK</span></a>
+        <nav class="site-nav" aria-label="Main">
+            <a href="../index.html">Home</a>
+            <a href="./" aria-current="page">Demos</a>
+            <a href="../docs/guides.html">Guides</a>
+            <a href="../docs/api-reference.html">API</a>
+        </nav>
+        <div class="site-header-actions">
+            <a class="btn btn-secondary btn-sm" href="https://github.com/steveseguin/ninjasdk">GitHub</a>
         </div>
     </div>
+</header>
 
-    <!-- Preview -->
-    <div class="card">
-        <h2>
-            <span class="status-dot" id="statusDot"></span>
-            Preview & Status
-        </h2>
-        <video id="preview" autoplay muted playsinline></video>
-
-        <div class="button-row">
-            <button class="btn-secondary" id="previewBtn" onclick="startPreview()">Start Preview</button>
-            <button class="btn-primary" id="publishBtn" onclick="startPublish()" disabled>Publish</button>
-            <button class="btn-danger" id="stopBtn" onclick="stopPublish()" disabled>Stop</button>
+<main id="main" class="demo-page">
+    <div class="container">
+        <a class="crumb" href="./">← All demos</a>
+        <div class="demo-head">
+            <h1>WHIP publish</h1>
+            <p class="lead">Send your camera or screen to any WHIP ingest server (Meshcast, Cloudflare Stream, Twitch) with the standalone <code>whip-client.js</code>. No VDO.Ninja room is involved; viewers watch through the service's WHEP endpoint or player.</p>
         </div>
 
-        <div class="stats" id="stats" style="display: none;">
-            <div class="stat">
-                <div class="stat-value" id="statBitrate">0</div>
-                <div class="stat-label">kbps (video)</div>
-            </div>
-            <div class="stat">
-                <div class="stat-value" id="statFramerate">0</div>
-                <div class="stat-label">FPS</div>
-            </div>
-            <div class="stat">
-                <div class="stat-value" id="statPackets">0</div>
-                <div class="stat-label">Packets Sent</div>
-            </div>
+        <ol class="steps">
+            <li><strong>Pick a service.</strong> Meshcast works with no account; the others need your own URL or key.</li>
+            <li><strong>Start the preview</strong> of your camera or screen.</li>
+            <li><strong>Publish.</strong> It worked when the status turns green ("ICE connected") and the bitrate keeps rising.</li>
+            <li><strong>Open the viewer link</strong> in another tab or on another device to watch over WHEP.</li>
+        </ol>
+
+        <div class="grid grid-2">
+            <section class="panel" aria-labelledby="serviceTitle">
+                <div class="panel-header"><h2 id="serviceTitle">Service and settings</h2></div>
+                <div class="panel-body controls-stack">
+                    <div class="row preset-row" role="group" aria-label="Service presets">
+                        <button class="btn btn-secondary btn-sm" type="button" data-preset="meshcast" aria-pressed="false">Meshcast</button>
+                        <button class="btn btn-secondary btn-sm" type="button" data-preset="cloudflare" aria-pressed="false">Cloudflare Stream</button>
+                        <button class="btn btn-secondary btn-sm" type="button" data-preset="twitch" aria-pressed="false">Twitch</button>
+                    </div>
+                    <p class="preset-help" id="presetHelp"></p>
+
+                    <div class="field">
+                        <label for="whipUrl">WHIP endpoint URL</label>
+                        <input type="url" id="whipUrl" placeholder="https://example.com/whip/your-stream-id" spellcheck="false" autocomplete="off">
+                    </div>
+
+                    <div class="field">
+                        <label for="authToken">Auth token or stream key (optional)</label>
+                        <div class="input-group">
+                            <input type="password" id="authToken" placeholder="Sent as a Bearer token" autocomplete="off" spellcheck="false">
+                            <button class="btn btn-secondary" id="toggleTokenBtn" type="button" aria-pressed="false" aria-controls="authToken">Show</button>
+                        </div>
+                    </div>
+
+                    <div class="field-row">
+                        <div class="field">
+                            <label for="videoCodec">Video codec</label>
+                            <select id="videoCodec">
+                                <option value="">Auto</option>
+                                <option value="h264">H.264</option>
+                                <option value="vp8">VP8</option>
+                                <option value="vp9">VP9</option>
+                                <option value="av1">AV1</option>
+                            </select>
+                        </div>
+                        <div class="field">
+                            <label for="videoBitrate">Video bitrate (kbps)</label>
+                            <input type="number" id="videoBitrate" value="2500" min="100" max="20000">
+                        </div>
+                    </div>
+
+                    <div class="field-row">
+                        <div class="field">
+                            <label for="videoSource">Video source</label>
+                            <select id="videoSource">
+                                <option value="camera">Camera</option>
+                                <option value="screen">Screen share</option>
+                            </select>
+                        </div>
+                        <div class="field">
+                            <label for="resolution">Resolution</label>
+                            <select id="resolution">
+                                <option value="1920x1080">1080p (1920x1080)</option>
+                                <option value="1280x720" selected>720p (1280x720)</option>
+                                <option value="854x480">480p (854x480)</option>
+                                <option value="640x360">360p (640x360)</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="panel" aria-labelledby="previewTitle">
+                <div class="panel-header">
+                    <h2 id="previewTitle">Preview and publish</h2>
+                    <span class="status" id="publishStatus" data-state="idle" role="status">Not publishing</span>
+                </div>
+                <div class="panel-body controls-stack">
+                    <div class="video-frame">
+                        <video id="preview" autoplay muted playsinline></video>
+                        <span class="video-label">Local preview</span>
+                    </div>
+
+                    <div class="row">
+                        <button class="btn btn-secondary" id="previewBtn" type="button">Start preview</button>
+                        <button class="btn btn-primary" id="publishBtn" type="button" disabled>Publish</button>
+                        <button class="btn btn-danger" id="stopBtn" type="button" disabled>Stop</button>
+                    </div>
+
+                    <div class="stats" id="stats" hidden>
+                        <div class="stat"><span class="stat-label">Video kbps</span><span class="stat-value" id="statBitrate">0</span></div>
+                        <div class="stat"><span class="stat-label">FPS</span><span class="stat-value" id="statFramerate">0</span></div>
+                        <div class="stat"><span class="stat-label">Packets sent</span><span class="stat-value" id="statPackets">0</span></div>
+                    </div>
+
+                    <div class="callout callout-success" id="viewerBox" hidden>
+                        <p><strong>Viewer link.</strong> Open it in another tab or send it to another device:</p>
+                        <div class="input-group">
+                            <input type="text" id="viewerLink" readonly aria-label="Viewer link">
+                            <button class="btn btn-secondary btn-sm" id="copyViewerBtn" type="button">Copy</button>
+                            <a class="btn btn-secondary btn-sm" id="openViewerLink" href="#" target="_blank" rel="noopener">Open</a>
+                        </div>
+                        <p class="small" style="margin-top:10px">WHEP URL: <code id="whepUrlOut"></code><br>
+                        Meshcast's own player: <a id="meshcastPage" href="#" target="_blank" rel="noopener"></a></p>
+                    </div>
+                </div>
+            </section>
         </div>
+
+        <section class="panel" style="margin-top:20px" aria-labelledby="logTitle">
+            <div class="panel-header"><h2 id="logTitle">Log</h2></div>
+            <div class="panel-body"><div class="log" id="log" aria-live="polite"></div></div>
+        </section>
+
+        <details class="disclosure" style="margin-top:24px">
+            <summary>Key WHIP client calls in this demo</summary>
+            <div class="disclosure-body"><pre><code>const client = new WHIPClient('https://cae1.meshcast.io/whip/' + streamId, {
+    authToken,           // optional; sent as "Authorization: Bearer ..."
+    videoCodec: 'h264',  // optional codec preference
+    videoBitrate: 2500   // kbps
+});
+client.addEventListener('icestate', (e) =&gt; console.log('ICE', e.detail.state));
+
+const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+await client.publish(stream);   // POSTs the SDP offer, applies the answer
+
+// Viewers: new WHEPClient('https://cae1.meshcast.io/whep/' + streamId)
+await client.stop();            // DELETEs the session and closes the connection</code></pre></div>
+        </details>
     </div>
+</main>
 
-    <!-- Log -->
-    <div class="card">
-        <h2>Log</h2>
-        <div class="log" id="log"></div>
+<footer class="site-footer">
+    <div class="container">
+        <span>VDO.Ninja SDK demos · MIT licensed (SDK core MPL-2.0)</span>
+        <nav aria-label="Footer"><a href="./">All demos</a><a href="../docs/guides.html">Guides</a><a href="https://github.com/steveseguin/ninjasdk">GitHub</a></nav>
     </div>
+</footer>
 
-    <script src="../whip-client.js"></script>
-    <script>
-        let client = null;
-        let localStream = null;
-        let statsInterval = null;
-        let lastBytesSent = 0;
-        let lastTimestamp = 0;
+<script src="../whip-client.js"></script>
+<script>
+    let client = null;
+    let localStream = null;
+    let statsInterval = null;
+    let lastBytesSent = 0;
+    let lastTimestamp = 0;
+    let lastIceState = 'new';
+    let phase = 'idle';          // idle | starting | publishing | stopping
+    let previewBusy = false;
+    let publishAttempt = 0;      // bumps on every start/stop so stale async results are ignored
 
-        // Generate random stream ID for Meshcast
-        const randomStreamId = 'demo' + Math.random().toString(36).substring(2, 10);
+    // Random stream ID for the Meshcast preset (new one per page load)
+    const randomStreamId = 'demo' + Math.random().toString(36).substring(2, 10);
 
-        function setPreset(preset) {
-            const urlInput = document.getElementById('whipUrl');
-            const tokenInput = document.getElementById('authToken');
-            const codecSelect = document.getElementById('videoCodec');
+    const $ = (id) => document.getElementById(id);
+    const els = {
+        whipUrl: $('whipUrl'),
+        authToken: $('authToken'),
+        toggleTokenBtn: $('toggleTokenBtn'),
+        videoCodec: $('videoCodec'),
+        videoBitrate: $('videoBitrate'),
+        videoSource: $('videoSource'),
+        resolution: $('resolution'),
+        preview: $('preview'),
+        previewBtn: $('previewBtn'),
+        publishBtn: $('publishBtn'),
+        stopBtn: $('stopBtn'),
+        status: $('publishStatus'),
+        stats: $('stats'),
+        presetHelp: $('presetHelp'),
+        viewerBox: $('viewerBox'),
+        viewerLink: $('viewerLink'),
+        copyViewerBtn: $('copyViewerBtn'),
+        openViewerLink: $('openViewerLink'),
+        whepUrlOut: $('whepUrlOut'),
+        meshcastPage: $('meshcastPage')
+    };
+    const presetButtons = Array.from(document.querySelectorAll('[data-preset]'));
 
-            switch (preset) {
-                case 'meshcast':
-                    urlInput.value = `https://cae1.meshcast.io/whip/${randomStreamId}`;
-                    tokenInput.value = '';
-                    codecSelect.value = '';
-                    log(`Meshcast preset loaded. View URL: https://meshcast.io/${randomStreamId}`, 'info');
-                    break;
-                case 'cloudflare':
-                    urlInput.value = 'https://customer-XXXXX.cloudflarestream.com/XXXXX/webRTC/publish';
-                    tokenInput.value = '';
-                    codecSelect.value = 'h264';
-                    log('Cloudflare preset loaded. Replace XXXXX with your stream details.', 'info');
-                    break;
-                case 'twitch':
-                    urlInput.value = 'https://g.webrtc.live-video.net:4443/v2/offer';
-                    tokenInput.value = '';
-                    codecSelect.value = 'h264';
-                    log('Twitch preset loaded. Get your stream key from Twitch Dashboard and add as auth token.', 'info');
-                    break;
+    function log(text, type = 'system') {
+        const logEl = $('log');
+        const entry = document.createElement('div');
+        entry.className = 'log-entry ' + type;
+        const time = document.createElement('span');
+        time.className = 'log-time';
+        time.textContent = new Date().toLocaleTimeString();
+        const body = document.createElement('span');
+        body.textContent = String(text);
+        entry.append(time, body);
+        logEl.appendChild(entry);
+        logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    function setStatus(state, text) {
+        els.status.dataset.state = state;
+        els.status.textContent = text;
+    }
+
+    function idleStatus() {
+        setStatus('idle', localStream ? 'Preview on, not publishing' : 'Not publishing');
+    }
+
+    function updateControls() {
+        const idle = phase === 'idle';
+        els.previewBtn.disabled = !idle || previewBusy;
+        els.previewBtn.textContent = localStream ? 'Restart preview' : 'Start preview';
+        els.publishBtn.disabled = !idle || previewBusy || !localStream;
+        els.stopBtn.disabled = !(phase === 'starting' || phase === 'publishing');
+        for (const el of [els.whipUrl, els.authToken, els.videoCodec, els.videoBitrate, els.videoSource, els.resolution]) {
+            el.disabled = !idle;
+        }
+        presetButtons.forEach((btn) => { btn.disabled = !idle; });
+    }
+
+    // ---------- Presets ----------
+
+    function setPresetHelp(parts) {
+        // parts: array of strings and { code } objects; built as text, never HTML
+        els.presetHelp.replaceChildren();
+        for (const part of parts) {
+            if (typeof part === 'string') {
+                els.presetHelp.append(part);
+            } else {
+                const code = document.createElement('code');
+                code.textContent = part.code;
+                els.presetHelp.append(code);
             }
         }
+    }
 
-        function log(message, type = 'info') {
-            const logDiv = document.getElementById('log');
-            const entry = document.createElement('div');
-            entry.className = `log-entry ${type}`;
-            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
-            logDiv.appendChild(entry);
-            logDiv.scrollTop = logDiv.scrollHeight;
+    function setPreset(preset) {
+        presetButtons.forEach((btn) => btn.setAttribute('aria-pressed', String(btn.dataset.preset === preset)));
+
+        switch (preset) {
+            case 'meshcast':
+                els.whipUrl.value = `https://cae1.meshcast.io/whip/${randomStreamId}`;
+                els.authToken.value = '';
+                els.videoCodec.value = '';
+                setPresetHelp(['Free public relay, no account needed. Stream ID ', { code: randomStreamId }, ' was generated for this page; anyone with the viewer link can watch.']);
+                log(`Meshcast preset loaded. Viewers will use https://cae1.meshcast.io/whep/${randomStreamId}`, 'info');
+                break;
+            case 'cloudflare':
+                els.whipUrl.value = 'https://customer-XXXXX.cloudflarestream.com/XXXXX/webRTC/publish';
+                els.authToken.value = '';
+                els.videoCodec.value = 'h264';
+                setPresetHelp(['Replace the placeholder with your own URL: Cloudflare Stream dashboard → Live inputs → open your live input → copy the WebRTC (WHIP) URL.']);
+                log('Cloudflare preset loaded. Replace the XXXXX placeholder URL with your live input\'s WHIP URL.', 'info');
+                break;
+            case 'twitch':
+                els.whipUrl.value = 'https://g.webrtc.live-video.net:4443/v2/offer';
+                els.authToken.value = '';
+                els.videoCodec.value = 'h264';
+                setPresetHelp(['Paste your stream key (Twitch Dashboard → Settings → Stream) into the token field. It stays hidden unless you click Show.']);
+                log('Twitch preset loaded. Add your stream key as the auth token.', 'info');
+                break;
+        }
+    }
+
+    // ---------- Preview ----------
+
+    function stopLocalStream() {
+        if (localStream) {
+            localStream.getTracks().forEach((track) => track.stop());
+        }
+        localStream = null;
+        els.preview.srcObject = null;
+    }
+
+    async function startPreview() {
+        if (phase !== 'idle' || previewBusy) return;
+        previewBusy = true;
+        updateControls();
+
+        const source = els.videoSource.value;
+        const [width, height] = els.resolution.value.split('x').map((n) => parseInt(n, 10));
+        const video = { width: { ideal: width }, height: { ideal: height }, frameRate: { ideal: 30 } };
+
+        let stream = null;
+        try {
+            if (source === 'screen') {
+                stream = await navigator.mediaDevices.getDisplayMedia({ video: { ...video, cursor: 'always' }, audio: true });
+            } else {
+                stream = await navigator.mediaDevices.getUserMedia({ video, audio: true });
+            }
+        } catch (error) {
+            previewBusy = false;
+            updateControls();
+            log(`Failed to start preview: ${error.message}`, 'error');
+            return;
         }
 
-        function setStatus(status) {
-            const dot = document.getElementById('statusDot');
-            dot.className = 'status-dot ' + status;
-        }
+        // Replace any previous preview so old cameras/screens are released.
+        stopLocalStream();
+        localStream = stream;
+        els.preview.srcObject = stream;
+        stream.getVideoTracks().forEach((track) => {
+            track.addEventListener('ended', () => onSourceEnded(stream));
+        });
 
-        async function startPreview() {
+        previewBusy = false;
+        updateControls();
+        idleStatus();
+        log(`Preview started (${source === 'screen' ? 'screen share' : 'camera'}, ${width}x${height} requested)`, 'info');
+    }
+
+    // Screen share stopped from the browser bar, or camera unplugged.
+    async function onSourceEnded(stream) {
+        if (stream !== localStream) return;
+        const wasLive = phase === 'starting' || phase === 'publishing';
+        if (wasLive) {
+            await stopPublish('Video source ended (screen share stopped or camera removed). Publishing stopped.');
+        }
+        if (stream !== localStream) return;
+        stopLocalStream();
+        updateControls();
+        idleStatus();
+        if (!wasLive) log('Video source ended. Start the preview again to continue.', 'warning');
+    }
+
+    // ---------- Publish ----------
+
+    function whepUrlFor(endpoint) {
+        // Meshcast serves viewers at the same path with /whep/ instead of /whip/.
+        try {
+            const url = new URL(endpoint);
+            if (!/(^|\.)meshcast\.io$/i.test(url.hostname) || !url.pathname.includes('/whip/')) return null;
+            url.pathname = url.pathname.replace('/whip/', '/whep/');
+            return url.href;
+        } catch {
+            return null;
+        }
+    }
+
+    function showViewerLink(endpoint) {
+        const whepUrl = whepUrlFor(endpoint);
+        if (!whepUrl) {
+            log('Publishing to a non-Meshcast server: watch it with that service\'s player or its WHEP URL in the WHEP view demo.', 'info');
+            return;
+        }
+        const viewerUrl = new URL('whep-view-demo.html?url=' + encodeURIComponent(whepUrl), location.href).href;
+        const streamId = new URL(whepUrl).pathname.split('/').filter(Boolean).pop() || '';
+        els.viewerLink.value = viewerUrl;
+        els.openViewerLink.href = viewerUrl;
+        els.whepUrlOut.textContent = whepUrl;
+        els.meshcastPage.href = 'https://meshcast.io/' + encodeURIComponent(streamId);
+        els.meshcastPage.textContent = 'https://meshcast.io/' + streamId;
+        els.viewerBox.hidden = false;
+        log(`Viewer link ready: ${viewerUrl}`, 'success');
+    }
+
+    function hideViewerLink() {
+        els.viewerBox.hidden = true;
+        els.viewerLink.value = '';
+        els.openViewerLink.href = '#';
+    }
+
+    function resetStats() {
+        lastBytesSent = 0;
+        lastTimestamp = 0;
+        $('statBitrate').textContent = '0';
+        $('statFramerate').textContent = '0';
+        $('statPackets').textContent = '0';
+    }
+
+    function stopStatsMonitoring() {
+        if (statsInterval) {
+            clearInterval(statsInterval);
+            statsInterval = null;
+        }
+    }
+
+    function startStatsMonitoring() {
+        stopStatsMonitoring();
+        resetStats();
+        statsInterval = setInterval(async () => {
+            const c = client;
+            if (!c || phase !== 'publishing') return;
+
+            let stats;
             try {
-                const source = document.getElementById('videoSource').value;
-                const resolution = document.getElementById('resolution').value.split('x');
-
-                const constraints = {
-                    video: {
-                        width: { ideal: parseInt(resolution[0]) },
-                        height: { ideal: parseInt(resolution[1]) },
-                        frameRate: { ideal: 30 }
-                    },
-                    audio: true
-                };
-
-                if (source === 'screen') {
-                    localStream = await navigator.mediaDevices.getDisplayMedia({
-                        video: { ...constraints.video, cursor: 'always' },
-                        audio: true
-                    });
-                } else {
-                    localStream = await navigator.mediaDevices.getUserMedia(constraints);
-                }
-
-                document.getElementById('preview').srcObject = localStream;
-                document.getElementById('publishBtn').disabled = false;
-                document.getElementById('previewBtn').disabled = true;
-                log('Preview started', 'info');
-            } catch (error) {
-                log(`Failed to start preview: ${error.message}`, 'error');
+                stats = await c.getStats();
+            } catch {
+                return; // connection closed between ticks
             }
+            if (c !== client) return;
+
+            let videoBytesSent = 0;
+            let framesPerSecond = 0;
+            let packetsSent = 0;
+            stats.forEach((report) => {
+                if (report.type === 'outbound-rtp' && report.kind === 'video') {
+                    videoBytesSent += report.bytesSent || 0;
+                    framesPerSecond = Math.max(framesPerSecond, report.framesPerSecond || 0);
+                    packetsSent += report.packetsSent || 0;
+                }
+            });
+
+            const now = Date.now();
+            if (lastTimestamp > 0 && videoBytesSent >= lastBytesSent) {
+                const seconds = (now - lastTimestamp) / 1000;
+                const kbps = Math.round(((videoBytesSent - lastBytesSent) * 8) / seconds / 1000);
+                $('statBitrate').textContent = String(kbps);
+            }
+            lastBytesSent = videoBytesSent;
+            lastTimestamp = now;
+
+            $('statFramerate').textContent = String(Math.round(framesPerSecond));
+            $('statPackets').textContent = packetsSent.toLocaleString();
+        }, 1000);
+    }
+
+    async function startPublish() {
+        if (phase !== 'idle') return;
+
+        const endpoint = els.whipUrl.value.trim();
+        if (!endpoint) {
+            log('Enter a WHIP endpoint URL first.', 'error');
+            setStatus('error', 'No WHIP URL');
+            return;
+        }
+        if (/XXXXX/.test(endpoint)) {
+            log('Replace the XXXXX placeholders with your own Cloudflare Stream WHIP URL.', 'error');
+            setStatus('error', 'Placeholder URL');
+            return;
+        }
+        if (!localStream) {
+            log('Start the preview first.', 'error');
+            return;
         }
 
-        async function startPublish() {
-            const endpoint = document.getElementById('whipUrl').value.trim();
-            if (!endpoint) {
-                log('Please enter a WHIP endpoint URL', 'error');
-                return;
-            }
+        // Lock the controls before the first await so a double-click can't start two sessions.
+        phase = 'starting';
+        const attempt = ++publishAttempt;
+        updateControls();
+        resetStats();
+        lastIceState = 'new';
+        setStatus('connecting', 'Connecting');
+        log('Sending offer to the WHIP endpoint...', 'info');
 
-            if (!localStream) {
-                log('Please start preview first', 'error');
-                return;
-            }
+        const options = { debug: true, trickleIce: true };
+        const authToken = els.authToken.value.trim();
+        if (authToken) options.authToken = authToken;
+        const videoCodec = els.videoCodec.value;
+        if (videoCodec) options.videoCodec = videoCodec;
+        const videoBitrate = parseInt(els.videoBitrate.value, 10);
+        if (videoBitrate) options.videoBitrate = videoBitrate;
 
-            setStatus('connecting');
-            log('Connecting to WHIP endpoint...', 'info');
-
-            try {
-                const options = {
-                    debug: true,
-                    trickleIce: true
-                };
-
-                const authToken = document.getElementById('authToken').value.trim();
-                if (authToken) {
-                    options.authToken = authToken;
-                }
-
-                const videoCodec = document.getElementById('videoCodec').value;
-                if (videoCodec) {
-                    options.videoCodec = videoCodec;
-                }
-
-                const videoBitrate = parseInt(document.getElementById('videoBitrate').value);
-                if (videoBitrate) {
-                    options.videoBitrate = videoBitrate;
-                }
-
-                client = new WHIPClient(endpoint, options);
-
-                client.addEventListener('connecting', () => {
-                    setStatus('connecting');
-                    log('Connecting...', 'info');
-                });
-
-                client.addEventListener('connected', (e) => {
-                    setStatus('connected');
-                    log(`Connected! Resource URL: ${e.detail.resourceUrl || 'N/A'}`, 'info');
-                    startStatsMonitoring();
-                });
-
-                client.addEventListener('icestate', (e) => {
-                    log(`ICE state: ${e.detail.state}`, 'info');
-                });
-
-                client.addEventListener('error', (e) => {
-                    setStatus('error');
-                    log(`Error: ${e.detail.error?.message || 'Unknown error'}`, 'error');
-                });
-
-                client.addEventListener('disconnected', () => {
-                    log('Disconnected', 'warn');
-                });
-
-                await client.publish(localStream);
-
-                document.getElementById('publishBtn').disabled = true;
-                document.getElementById('stopBtn').disabled = false;
-                document.getElementById('stats').style.display = 'grid';
-
-            } catch (error) {
-                setStatus('error');
-                log(`Failed to publish: ${error.message}`, 'error');
-                client = null;
-            }
+        let c;
+        try {
+            c = new WHIPClient(endpoint, options);
+        } catch (error) {
+            phase = 'idle';
+            updateControls();
+            setStatus('error', 'Publish failed');
+            log(`Failed to publish: ${error.message}`, 'error');
+            return;
         }
+        client = c;
 
-        async function stopPublish() {
-            if (statsInterval) {
-                clearInterval(statsInterval);
-                statsInterval = null;
-            }
-
-            if (client) {
-                await client.stop();
-                client = null;
-            }
-
-            setStatus('');
-            document.getElementById('publishBtn').disabled = false;
-            document.getElementById('stopBtn').disabled = true;
-            document.getElementById('stats').style.display = 'none';
-            log('Publishing stopped', 'info');
-        }
-
-        function startStatsMonitoring() {
-            statsInterval = setInterval(async () => {
-                if (!client) return;
-
-                try {
-                    const stats = await client.getStats();
-                    let videoBytesSent = 0;
-                    let framesPerSecond = 0;
-                    let packetsSent = 0;
-
-                    stats.forEach(report => {
-                        if (report.type === 'outbound-rtp' && report.kind === 'video') {
-                            videoBytesSent = report.bytesSent || 0;
-                            framesPerSecond = report.framesPerSecond || 0;
-                            packetsSent = report.packetsSent || 0;
-                        }
-                    });
-
-                    // Calculate bitrate
-                    const now = Date.now();
-                    if (lastTimestamp > 0) {
-                        const timeDiff = (now - lastTimestamp) / 1000;
-                        const bytesDiff = videoBytesSent - lastBytesSent;
-                        const bitrate = Math.round((bytesDiff * 8) / timeDiff / 1000);
-                        document.getElementById('statBitrate').textContent = bitrate;
-                    }
-                    lastBytesSent = videoBytesSent;
-                    lastTimestamp = now;
-
-                    document.getElementById('statFramerate').textContent = Math.round(framesPerSecond);
-                    document.getElementById('statPackets').textContent = packetsSent.toLocaleString();
-
-                } catch (error) {
-                    // Stats not available
-                }
-            }, 1000);
-        }
-
-        // Cleanup on page unload
-        window.addEventListener('beforeunload', () => {
-            if (client) {
-                client.stop();
-            }
-            if (localStream) {
-                localStream.getTracks().forEach(track => track.stop());
+        c.addEventListener('icestate', (e) => {
+            if (client !== c) return;
+            lastIceState = e.detail.state;
+            log(`ICE state: ${e.detail.state}`, e.detail.state === 'failed' ? 'error' : 'info');
+            if (phase !== 'publishing') return;
+            if (lastIceState === 'connected' || lastIceState === 'completed') {
+                setStatus('live', 'Publishing (ICE connected)');
+            } else if (lastIceState === 'disconnected') {
+                setStatus('waiting', 'Connection interrupted');
+            } else if (lastIceState === 'failed') {
+                setStatus('error', 'ICE failed');
             }
         });
 
-        // Set default Meshcast URL
-        setPreset('meshcast');
-    </script>
+        c.addEventListener('error', (e) => {
+            // Errors during the initial publish() are reported by the catch below.
+            if (client !== c || phase !== 'publishing') return;
+            log(`Error: ${e.detail.error?.message || 'Unknown error'}`, 'error');
+        });
+
+        c.addEventListener('disconnected', () => {
+            if (client !== c) return;
+            log('Connection interrupted (ICE disconnected). It may recover on its own.', 'warning');
+        });
+
+        try {
+            await c.publish(localStream);
+        } catch (error) {
+            if (attempt !== publishAttempt) return; // user pressed Stop while connecting
+            client = null;
+            try { await c.stop(); } catch { /* already closed by the client */ }
+            phase = 'idle';
+            updateControls();
+            setStatus('error', 'Publish failed');
+            let msg = error.message;
+            if (error instanceof TypeError && /fetch/i.test(msg)) {
+                // CORS blocks and unreachable hosts both surface as "Failed to fetch".
+                msg += '. The server was unreachable or refused the request; check the URL and token.';
+            }
+            log(`Failed to publish: ${msg}`, 'error');
+            return;
+        }
+
+        if (attempt !== publishAttempt) {
+            // Stop was pressed while the offer was in flight; make sure the session is closed.
+            try { await c.stop(); } catch { /* ignore */ }
+            return;
+        }
+
+        phase = 'publishing';
+        updateControls();
+        els.stats.hidden = false;
+        startStatsMonitoring();
+        log(`Offer answered. Resource URL: ${c.resourceUrl || 'N/A'}`, 'success');
+        if (lastIceState === 'connected' || lastIceState === 'completed') {
+            setStatus('live', 'Publishing (ICE connected)');
+        } else {
+            setStatus('waiting', 'Waiting for ICE');
+        }
+        showViewerLink(endpoint);
+    }
+
+    async function stopPublish(reason) {
+        if (phase !== 'starting' && phase !== 'publishing') return;
+        publishAttempt++;            // invalidate any in-flight start
+        phase = 'stopping';
+        updateControls();
+        stopStatsMonitoring();
+        hideViewerLink();
+        setStatus('connecting', 'Stopping');
+
+        const c = client;
+        client = null;
+        if (c) {
+            try {
+                await c.stop();
+            } catch (error) {
+                log(`Error while stopping: ${error.message}`, 'warning');
+            }
+        }
+
+        phase = 'idle';
+        resetStats();
+        els.stats.hidden = true;
+        updateControls();
+        idleStatus();
+        log(typeof reason === 'string' ? reason : 'Publishing stopped', typeof reason === 'string' ? 'warning' : 'info');
+    }
+
+    // ---------- Wiring ----------
+
+    presetButtons.forEach((btn) => btn.addEventListener('click', () => setPreset(btn.dataset.preset)));
+    els.previewBtn.addEventListener('click', startPreview);
+    els.publishBtn.addEventListener('click', startPublish);
+    els.stopBtn.addEventListener('click', () => stopPublish());
+
+    els.toggleTokenBtn.addEventListener('click', () => {
+        const show = els.authToken.type === 'password';
+        els.authToken.type = show ? 'text' : 'password';
+        els.toggleTokenBtn.textContent = show ? 'Hide' : 'Show';
+        els.toggleTokenBtn.setAttribute('aria-pressed', String(show));
+    });
+
+    // Changing source or resolution while previewing restarts the preview with the new settings.
+    for (const el of [els.videoSource, els.resolution]) {
+        el.addEventListener('change', () => {
+            if (localStream && phase === 'idle') startPreview();
+        });
+    }
+
+    els.copyViewerBtn.addEventListener('click', async () => {
+        const btn = els.copyViewerBtn;
+        try {
+            await navigator.clipboard.writeText(els.viewerLink.value);
+            btn.textContent = 'Copied';
+        } catch {
+            btn.textContent = 'Copy failed';
+        }
+        setTimeout(() => { btn.textContent = 'Copy'; }, 1500);
+    });
+
+    // Cleanup on page unload
+    window.addEventListener('beforeunload', () => {
+        stopStatsMonitoring();
+        if (client) client.stop();
+        stopLocalStream();
+    });
+
+    setPreset('meshcast');
+    updateControls();
+</script>
 </body>
 </html>

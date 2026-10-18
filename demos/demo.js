@@ -1,229 +1,172 @@
 /**
- * VDO.Ninja SDK Demo - Two-Peer P2P Messaging
- * 
+ * VDO.Ninja SDK Demo - Two-Peer P2P Messaging (landing page)
+ *
  * This demo is MIT licensed; see LICENSE-DEMOS.
- * 
+ *
  * Note: The VDO.Ninja SDK core (`vdoninja-sdk.js`, `vdoninja-sdk.min.js`) is
  * separately licensed under MPL-2.0; see LICENSE.
+ *
+ * Two independent SDK instances run in this page. Each one calls autoConnect()
+ * on the same private room, which connects to the handshake server, joins the
+ * room, announces a data-only stream, and opens a data channel to the other peer.
  */
 
-// Live demo functionality with two peers
-let peers = {
-    1: { vdo: null, isConnected: false, streamID: null, viewingStreamID: null },
-    2: { vdo: null, isConnected: false, streamID: null, viewingStreamID: null }
+const peers = {
+    1: { vdo: null, isConnected: false, connecting: false, streamID: null, openChannels: new Set() },
+    2: { vdo: null, isConnected: false, connecting: false, streamID: null, openChannels: new Set() }
 };
 
-let demoRoom = null;
+// A random room per page load keeps visitors from landing in each other's demo.
+const demoRoom = 'sdkdemo_' + Array.from(crypto.getRandomValues(new Uint8Array(6)), b => b.toString(16).padStart(2, '0')).join('');
 
-// Initialize demo room name
+const progress = { sent: false, received: false };
+
 document.addEventListener('DOMContentLoaded', () => {
-    // Generate random room name for this demo session
-    const randomSuffix = Math.floor(Math.random() * 10000);
-    demoRoom = `demo-p2p-${randomSuffix}`;
     const roomNameEl = document.getElementById('demoRoomName');
-    if (roomNameEl) {
-        roomNameEl.textContent = demoRoom;
-    }
-    
-    // Handle enter key for both peer inputs
-    const peer1Input = document.getElementById('peer1Input');
-    const peer2Input = document.getElementById('peer2Input');
-    
-    if (peer1Input) {
-        peer1Input.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') sendPeerMessage(1);
-        });
-    }
-    if (peer2Input) {
-        peer2Input.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') sendPeerMessage(2);
-        });
+    if (roomNameEl) roomNameEl.textContent = demoRoom;
+
+    for (const peerId of [1, 2]) {
+        const input = document.getElementById(`peer${peerId}Input`);
+        if (input) {
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') sendPeerMessage(peerId);
+            });
+        }
+        updatePeerStatus(peerId);
     }
 });
 
 async function togglePeer(peerId) {
-    if (peers[peerId].isConnected) {
-        disconnectPeer(peerId);
+    const peer = peers[peerId];
+    if (peer.connecting) return;
+    if (peer.isConnected || peer.vdo) {
+        await disconnectPeer(peerId);
     } else {
         await connectPeer(peerId);
     }
 }
 
+async function toggleBothPeers() {
+    const anyActive = Object.values(peers).some(peer => peer.vdo || peer.connecting);
+    if (anyActive) {
+        await Promise.all([disconnectPeer(1), disconnectPeer(2)]);
+        return;
+    }
+    // Connect one after the other so the second peer finds the first in the room listing.
+    await connectPeer(1);
+    await connectPeer(2);
+}
+
 async function connectPeer(peerId) {
-    try {
-        const peer = peers[peerId];
-        
-        // Update UI
-        document.getElementById(`peer${peerId}Status`).classList.add('connecting');
-        document.getElementById(`peer${peerId}StatusText`).textContent = 'Connecting...';
-        document.getElementById(`peer${peerId}ConnectBtn`).disabled = true;
-
-        // Initialize SDK
-        peer.vdo = new VDONinjaSDK();
-        // Use underscore instead of dash to avoid sanitization
-        peer.streamID = `peer${peerId}_${Math.floor(Math.random() * 1000)}`;
-
-        // Set up event handlers
-        // Try both data and dataReceived events for compatibility
-        peer.vdo.addEventListener('dataReceived', (event) => {
-            const { data, uuid } = event.detail;
-            displayPeerMessage(peerId, data, uuid, 'received');
-        });
-        
-        peer.vdo.addEventListener('data', (event) => {
-            const { data, uuid } = event.detail;
-            console.log(`Peer ${peerId} received data event:`, event.detail);
-            displayPeerMessage(peerId, data, uuid, 'received');
-        });
-
-        peer.vdo.addEventListener('peerConnected', (event) => {
-            const { uuid } = event.detail;
-            displayPeerMessage(peerId, { message: `Peer connected: ${uuid.substring(0, 8)}` }, 'System', 'info');
-            updateConnectionInfo();
-        });
-
-        peer.vdo.addEventListener('peerDisconnected', (event) => {
-            const { uuid } = event.detail;
-            displayPeerMessage(peerId, { message: `Peer disconnected: ${uuid.substring(0, 8)}` }, 'System', 'info');
-            updateConnectionInfo();
-        });
-        
-        peer.vdo.addEventListener('dataChannelOpen', (event) => {
-            const { uuid } = event.detail;
-            updatePeerStatus(peerId, peer.isConnected);
-            displayPeerMessage(peerId, { message: `✅ Data channel opened with: ${uuid.substring(0, 8)}` }, 'System', 'success');
-        });
-        
-        peer.vdo.addEventListener('dataChannelClose', (event) => {
-            const { uuid } = event.detail;
-            updatePeerStatus(peerId, peer.isConnected);
-            displayPeerMessage(peerId, { message: `❌ Data channel closed with: ${uuid.substring(0, 8)}` }, 'System', 'error');
-        });
-
-        // Listen for new streams being announced
-        peer.vdo.addEventListener('listing', async (event) => {
-            const detail = event.detail;
-            
-            // Skip if this is a list event (not individual stream)
-            if (detail.list && !detail.streamID) {
-                return;
-            }
-            
-            const streamID = detail.streamID;
-            const uuid = detail.uuid;
-            
-            // Skip if no valid streamID
-            if (!streamID || streamID === 'undefined') {
-                return;
-            }
-            
-            // Don't try to view our own stream
-            if (streamID === peer.streamID) {
-                return;
-            }
-            
-            // If we're not already viewing this stream, try to view it
-            if (peer.viewingStreamID !== streamID) {
-                try {
-                    displayPeerMessage(peerId, { message: `New stream detected: ${streamID} (uuid: ${uuid ? uuid.substring(0, 8) : 'unknown'})` }, 'System', 'info');
-                    
-                    // Use quickView with dataOnly flag like the other demos
-                    await peer.vdo.quickView({
-                        streamID: streamID,
-                        audio: false,
-                        video: false
-                    });
-                    
-                    peer.viewingStreamID = streamID;
-                    displayPeerMessage(peerId, { message: `Successfully viewing: ${streamID}` }, 'System', 'success');
-                    
-                    // Update the UI to show which stream we're viewing
-                    document.getElementById(`peer${peerId}Viewing`).textContent = streamID;
-                } catch (err) {
-                    displayPeerMessage(peerId, { error: `Failed to view ${streamID}: ${err.message}` }, 'System', 'error');
-                }
-            }
-        });
-
-        // Connect to server
-        await peer.vdo.connect();
-        
-        // Join room
-        await peer.vdo.joinRoom({
-            room: demoRoom,
-            password: 'demo123'
-        });
-        
-        // Announce as data-only peer
-        await peer.vdo.announce({
-            streamID: peer.streamID
-        });
-
-        peer.isConnected = true;
-        updatePeerStatus(peerId, true);
-        
-        // Update UI with stream ID
-        document.getElementById(`peer${peerId}StreamID`).textContent = peer.streamID;
-        
-        displayPeerMessage(peerId, { message: `Announced as ${peer.streamID}` }, 'System', 'info');
-
-    } catch (error) {
-        console.error(`Peer ${peerId} connection failed:`, error);
-        displayPeerMessage(peerId, { error: 'Connection failed: ' + error.message }, 'system', 'error');
-        updatePeerStatus(peerId, false);
-    }
-}
-
-function disconnectPeer(peerId) {
     const peer = peers[peerId];
-    if (peer.vdo) {
-        peer.vdo.disconnect();
-        peer.vdo = null;
+    if (peer.vdo || peer.connecting) return;
+
+    peer.connecting = true;
+    peer.openChannels.clear();
+    updatePeerStatus(peerId);
+
+    const vdo = new VDONinjaSDK();
+    peer.vdo = vdo;
+
+    vdo.addEventListener('dataReceived', (event) => {
+        const { data, uuid } = event.detail;
+        displayPeerMessage(peerId, data, uuid, 'received');
+    });
+
+    vdo.addEventListener('dataChannelOpen', (event) => {
+        peer.openChannels.add(event.detail.uuid);
+        logEvent(peerId, `Data channel open with ${shortId(event.detail.uuid)}`, 'success');
+        updatePeerStatus(peerId);
+    });
+
+    vdo.addEventListener('dataChannelClose', (event) => {
+        peer.openChannels.delete(event.detail.uuid);
+        logEvent(peerId, `Data channel closed with ${shortId(event.detail.uuid)}`, 'warning');
+        updatePeerStatus(peerId);
+    });
+
+    vdo.addEventListener('peerConnected', (event) => {
+        logEvent(peerId, `WebRTC connection established with ${shortId(event.detail.uuid)}`, 'info');
+    });
+
+    vdo.addEventListener('peerDisconnected', (event) => {
+        peer.openChannels.delete(event.detail.uuid);
+        logEvent(peerId, `Peer ${shortId(event.detail.uuid)} left`, 'warning');
+        updatePeerStatus(peerId);
+    });
+
+    try {
+        logEvent(peerId, `autoConnect({ room: '${demoRoom}' })`, 'system');
+        const { streamID } = await vdo.autoConnect({ room: demoRoom, label: `Peer ${peerId}` });
+        if (peer.vdo !== vdo) return; // Disconnected while connecting
+        peer.streamID = streamID;
+        peer.isConnected = true;
+        logEvent(peerId, `Joined the room and announced as ${streamID}`, 'info');
+    } catch (error) {
+        // Ignore failures caused by the user disconnecting mid-connect.
+        if (peer.vdo === vdo) {
+            console.error(`Peer ${peerId} connection failed:`, error);
+            logEvent(peerId, `Connection failed: ${error.message}`, 'error');
+            peer.vdo = null;
+            try { await vdo.disconnect(); } catch (e) { /* already closed */ }
+        }
+    } finally {
+        if (peer.vdo === vdo || !peer.vdo) peer.connecting = false;
+        updatePeerStatus(peerId);
     }
-    peer.isConnected = false;
-    peer.streamID = null;
-    peer.viewingStreamID = null;
-    updatePeerStatus(peerId, false);
-    clearPeerMessages(peerId);
-    
-    // Clear UI info
-    document.getElementById(`peer${peerId}StreamID`).textContent = '-';
-    document.getElementById(`peer${peerId}Viewing`).textContent = '-';
 }
 
-function updatePeerStatus(peerId, connected) {
+async function disconnectPeer(peerId) {
+    const peer = peers[peerId];
+    const vdo = peer.vdo;
+    peer.vdo = null;
+    peer.isConnected = false;
+    peer.connecting = false;
+    peer.streamID = null;
+    peer.openChannels.clear();
+    updatePeerStatus(peerId);
+    if (vdo) {
+        try { await vdo.disconnect(); } catch (e) { /* already closed */ }
+        logEvent(peerId, 'Disconnected', 'system');
+    }
+    clearPeerMessages(peerId);
+}
+
+function updatePeerStatus(peerId) {
+    const peer = peers[peerId];
     const statusEl = document.getElementById(`peer${peerId}Status`);
-    const textEl = document.getElementById(`peer${peerId}StatusText`);
     const connectBtn = document.getElementById(`peer${peerId}ConnectBtn`);
     const messageInput = document.getElementById(`peer${peerId}Input`);
     const sendBtn = document.getElementById(`peer${peerId}SendBtn`);
-    const messageContainer = document.getElementById(`peer${peerId}MessageContainer`);
+    const streamIdEl = document.getElementById(`peer${peerId}StreamID`);
+    if (!statusEl || !connectBtn) return;
 
-    if (connected) {
-        statusEl.classList.remove('connecting');
-        statusEl.classList.add('connected');
-        const ready = Array.from(peers[peerId].vdo.connections.values()).some(connections =>
-            ['publisher', 'viewer'].some(role => connections[role]?.dataChannel?.readyState === 'open')
-        );
-        textEl.textContent = ready ? 'Ready to chat' : 'Waiting for peer';
-        connectBtn.textContent = 'Disconnect';
-        connectBtn.classList.remove('btn-primary');
-        connectBtn.classList.add('btn-secondary');
-        messageInput.disabled = !ready;
-        sendBtn.disabled = !ready;
-        messageContainer.style.display = 'block';
-    } else {
-        statusEl.classList.remove('connecting', 'connected');
-        textEl.textContent = 'Not connected';
-        connectBtn.textContent = 'Connect';
-        connectBtn.classList.remove('btn-secondary');
-        connectBtn.classList.add('btn-primary');
-        messageInput.disabled = true;
-        sendBtn.disabled = true;
-        messageContainer.style.display = 'none';
+    const ready = peer.isConnected && peer.openChannels.size > 0;
+    let state = 'idle';
+    let label = 'Not connected';
+    if (peer.connecting) {
+        state = 'connecting';
+        label = 'Connecting…';
+    } else if (ready) {
+        state = 'live';
+        label = 'Ready to chat';
+    } else if (peer.isConnected) {
+        state = 'waiting';
+        label = 'Waiting for the other peer';
     }
-    
-    connectBtn.disabled = false;
+    statusEl.dataset.state = state;
+    statusEl.textContent = label;
+
+    connectBtn.textContent = peer.vdo ? 'Disconnect' : 'Connect';
+    connectBtn.classList.toggle('btn-primary', !peer.vdo);
+    connectBtn.classList.toggle('btn-secondary', !!peer.vdo);
+    connectBtn.disabled = peer.connecting;
+
+    messageInput.disabled = !ready;
+    sendBtn.disabled = !ready;
+    messageInput.placeholder = ready ? `Message from Peer ${peerId}…` : 'Connect both peers to chat';
+    if (streamIdEl) streamIdEl.textContent = peer.streamID || '—';
+
     updateConnectionInfo();
 }
 
@@ -231,88 +174,131 @@ function sendPeerMessage(peerId) {
     const peer = peers[peerId];
     const input = document.getElementById(`peer${peerId}Input`);
     const message = input.value.trim();
-    
+
     if (!message || !peer.vdo || !peer.isConnected) return;
 
-    // Send the message
     const sent = peer.vdo.sendData({
-        message: message, 
+        message: message,
         from: `Peer ${peerId}`,
-        timestamp: Date.now() 
+        timestamp: Date.now()
     });
 
     if (!sent) {
-        displayPeerMessage(peerId, { error: 'Message not sent. Wait for a peer connection and try again.' }, 'System', 'error');
+        logEvent(peerId, 'Message not sent: no open data channel yet. Wait for the other peer and try again.', 'error');
         return;
     }
-    
-    // Display it locally
+
     displayPeerMessage(peerId, { message: message }, 'You', 'sent');
-    
-    // Clear input
+    progress.sent = true;
+    updateConnectionInfo();
+
     input.value = '';
     input.focus();
 }
 
+// Renders a chat message. Message text and sender names can come from an
+// untrusted peer, so everything is written with textContent, never as HTML.
 function displayPeerMessage(peerId, data, sender, type = 'received') {
     const messageArea = document.getElementById(`peer${peerId}Messages`);
-    const messageEl = document.createElement('div');
-    messageEl.className = `message ${type}`;
-    
-    const time = new Date().toLocaleTimeString();
-    
-    // Handle different message types
-    let content = '';
-    if (data.error) {
-        content = data.error;
-        sender = 'System';
-    } else if (data.message) {
-        content = data.message;
-        if (type === 'received' && data.from) {
-            sender = data.from;
-        } else if (type === 'received') {
-            sender = sender ? sender.substring(0, 8) : 'Unknown';
-        }
+    if (!messageArea) return;
+    const empty = messageArea.querySelector('.chat-empty');
+    if (empty) empty.remove();
+
+    let content;
+    if (data && typeof data === 'object' && data.message !== undefined) {
+        content = String(data.message);
+    } else if (typeof data === 'string') {
+        content = data;
     } else {
         content = JSON.stringify(data);
     }
-    
-    // Both message content and sender names can come from an untrusted peer.
-    const header = document.createElement('div');
-    header.className = 'message-header';
+
+    let senderName = sender;
+    if (type === 'received') {
+        senderName = (data && typeof data.from === 'string' && data.from) ? data.from : shortId(sender);
+    }
+
+    const messageEl = document.createElement('div');
+    messageEl.className = 'msg' + (type === 'sent' ? ' self' : '');
+
+    const meta = document.createElement('div');
+    meta.className = 'msg-meta';
     const senderEl = document.createElement('span');
-    senderEl.className = 'message-sender';
-    senderEl.textContent = sender;
+    senderEl.className = 'msg-sender';
+    senderEl.textContent = senderName;
     const timeEl = document.createElement('span');
-    timeEl.className = 'message-time';
-    timeEl.textContent = time;
-    header.append(senderEl, timeEl);
-    const contentEl = document.createElement('div');
-    contentEl.className = 'message-content';
-    contentEl.textContent = content;
-    messageEl.append(header, contentEl);
-    
+    timeEl.textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    meta.append(senderEl, timeEl);
+
+    const body = document.createElement('div');
+    body.className = 'msg-body message-content';
+    body.textContent = content;
+
+    messageEl.append(meta, body);
     messageArea.appendChild(messageEl);
     messageArea.scrollTop = messageArea.scrollHeight;
+
+    if (type === 'received') {
+        progress.received = true;
+        updateConnectionInfo();
+    }
 }
 
 function clearPeerMessages(peerId) {
-    document.getElementById(`peer${peerId}Messages`).innerHTML = '';
+    const messageArea = document.getElementById(`peer${peerId}Messages`);
+    if (!messageArea) return;
+    messageArea.replaceChildren();
+    const empty = document.createElement('div');
+    empty.className = 'chat-empty';
+    empty.textContent = 'Messages will appear here';
+    messageArea.appendChild(empty);
+}
+
+// Connection events go to one shared log so the chat stays readable.
+function logEvent(peerId, text, type = 'system') {
+    const logEl = document.getElementById('demoLog');
+    if (!logEl) return;
+    const entry = document.createElement('div');
+    entry.className = 'log-entry ' + type;
+    const time = document.createElement('span');
+    time.className = 'log-time';
+    time.textContent = new Date().toLocaleTimeString();
+    const body = document.createElement('span');
+    body.textContent = `Peer ${peerId}: ${text}`;
+    entry.append(time, body);
+    logEl.appendChild(entry);
+    logEl.scrollTop = logEl.scrollHeight;
+}
+
+function shortId(id) {
+    return typeof id === 'string' && id ? id.substring(0, 8) : 'unknown';
 }
 
 function updateConnectionInfo() {
     const info = document.getElementById('connectionInfo');
-    const peer1Connected = peers[1].isConnected;
-    const peer2Connected = peers[2].isConnected;
-    
-    if (peer1Connected && peer2Connected) {
-        info.textContent = '🟢 Both peers connected - P2P messaging active!';
-        info.style.color = '#10b981';
-    } else if (peer1Connected || peer2Connected) {
-        info.textContent = '🟡 Waiting for the other peer to connect...';
-        info.style.color = '#f59e0b';
-    } else {
-        info.textContent = 'Connect both peers to start chatting';
-        info.style.color = '#94a3b8';
+    const bothBtn = document.getElementById('connectBothBtn');
+    const connected = [1, 2].filter(id => peers[id].isConnected).length;
+    const ready = [1, 2].every(id => peers[id].isConnected && peers[id].openChannels.size > 0);
+    const busy = [1, 2].some(id => peers[id].connecting);
+
+    if (info) {
+        if (ready) info.textContent = 'Both peers are connected directly. Send a message from either side.';
+        else if (busy) info.textContent = 'Connecting through the handshake server…';
+        else if (connected) info.textContent = 'Waiting for the other peer to connect.';
+        else info.textContent = 'Connect both peers to start.';
     }
+
+    if (bothBtn) {
+        const anyActive = Object.values(peers).some(peer => peer.vdo || peer.connecting);
+        bothBtn.textContent = anyActive ? 'Disconnect both' : 'Connect both peers';
+        bothBtn.classList.toggle('btn-primary', !anyActive);
+        bothBtn.classList.toggle('btn-secondary', anyActive);
+        bothBtn.disabled = busy;
+    }
+
+    const steps = [ready, progress.sent && ready, progress.received && ready];
+    steps.forEach((done, index) => {
+        const step = document.getElementById(`demoStep${index + 1}`);
+        if (step) step.classList.toggle('done', done);
+    });
 }

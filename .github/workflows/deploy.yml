@@ -46,7 +46,7 @@ jobs:
         cp favicon.svg robots.txt sitemap.xml llms.txt CNAME dist/
         cp LICENSE LICENSE-MIT LICENSE-DEMOS LICENSING.md dist/
         cp index.html dist/
-        cp style.css dist/
+        cp site.css style.css dist/
         cp -r demos/*.html dist/demos/
         cp -r demos/*.js dist/demos/
         cp -r demos/*.cjs dist/demos/

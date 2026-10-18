@@ -5,8 +5,12 @@
 <link rel="canonical" href="https://sdk.vdo.ninja/docs/reliability-and-recovery.html">
 <meta property="og:title" content="Reliability and Recovery"><meta property="og:description" content="Reliability and Recovery. VDO.Ninja SDK options, practical examples, requirements, and validation limits.">
 <meta property="og:type" content="article"><meta property="og:url" content="https://sdk.vdo.ninja/docs/reliability-and-recovery.html">
-<link rel="icon" href="../favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="guide.css"></head>
-<body><a class="skip" href="#content">Skip to content</a><header><nav aria-label="Main"><a href="../index.html">VDO.Ninja SDK</a><a href="guides.html">Choose a guide</a><a href="api-reference.html">API reference</a><a href="../demos/">Demos</a></nav></header>
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../site.css"><link rel="stylesheet" href="guide.css"></head>
+<body><a class="skip-link" href="#content">Skip to content</a>
+<header class="site-header"><div class="site-header-inner"><a class="brand" href="../index.html"><img src="../favicon.svg" alt="" width="26" height="26"><span>VDO.Ninja SDK</span></a><nav class="site-nav" aria-label="Main"><a href="../index.html">Home</a><a href="../demos/">Demos</a><a href="guides.html">Guides</a><a href="api-reference.html">API</a></nav><div class="site-header-actions"><a class="btn btn-secondary btn-sm" href="https://github.com/steveseguin/ninjasdk">GitHub</a></div></div></header>
 <div class="layout"><aside><nav aria-label="On this page"><strong>On this page</strong><a href="#connection-intent">Connection intent</a><a href="#directional-peer-recovery">Directional peer recovery</a><a href="#options">Options</a><a href="#observability-events">Observability events</a><a href="#failure-testing">Failure testing</a></nav></aside>
 <main id="content"><h1 id="reliability-and-recovery">Reliability and Recovery</h1>
 <p>The SDK treats signaling, each directional peer connection, the data channel, and media tracks as related but distinct state.</p>
@@ -68,4 +72,4 @@ sdk.addEventListener('connectionFailed', event =&gt; {
 </code></pre>
 <p>Production testing should additionally cover WebSocket loss, one-way ICE failure, TURN-only networks, stale signaling after peer replacement, data-channel closure, and media that connects but stops advancing.</p>
 </main></div>
-<footer><a href="reliability-and-recovery.md">Markdown source</a> · <a href="validation.html">Validation and limits</a> · <a href="https://github.com/steveseguin/ninjasdk">Repository</a></footer></body></html>
+<footer class="site-footer"><div class="container"><span>VDO.Ninja SDK guides</span><nav aria-label="Footer"><a href="guides.html">All guides</a><a href="validation.html">Validation and limits</a><a href="reliability-and-recovery.md">Markdown source</a><a href="https://github.com/steveseguin/ninjasdk">Repository</a></nav></div></footer></body></html>

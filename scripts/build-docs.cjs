@@ -34,6 +34,7 @@ function renderGuide(name) {
   md.renderer.rules.table_close = () => '</table></div>\n';
   const body = md.render(source);
   const description = title + '. VDO.Ninja SDK options, practical examples, requirements, and validation limits.';
+  const current = page => (page === name ? ' aria-current="page"' : '');
   return `<!doctype html>
 <!-- Generated from ${name}.md by npm run docs:build. Edit the Markdown source. -->
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -41,15 +42,19 @@ function renderGuide(name) {
 <link rel="canonical" href="https://sdk.vdo.ninja/docs/${name}.html">
 <meta property="og:title" content="${escape(title)}"><meta property="og:description" content="${escape(description)}">
 <meta property="og:type" content="article"><meta property="og:url" content="https://sdk.vdo.ninja/docs/${name}.html">
-<link rel="icon" href="../favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="guide.css"></head>
-<body><a class="skip" href="#content">Skip to content</a><header><nav aria-label="Main"><a href="../index.html">VDO.Ninja SDK</a><a href="guides.html">Choose a guide</a><a href="api-reference.html">API reference</a><a href="../demos/">Demos</a></nav></header>
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../site.css"><link rel="stylesheet" href="guide.css"></head>
+<body><a class="skip-link" href="#content">Skip to content</a>
+<header class="site-header"><div class="site-header-inner"><a class="brand" href="../index.html"><img src="../favicon.svg" alt="" width="26" height="26"><span>VDO.Ninja SDK</span></a><nav class="site-nav" aria-label="Main"><a href="../index.html">Home</a><a href="../demos/">Demos</a><a href="guides.html"${current('guides')}>Guides</a><a href="api-reference.html"${current('api-reference')}>API</a></nav><div class="site-header-actions"><a class="btn btn-secondary btn-sm" href="https://github.com/steveseguin/ninjasdk">GitHub</a></div></div></header>
 <div class="layout"><aside><nav aria-label="On this page"><strong>On this page</strong>${toc.map(item => `<a href="#${escape(item.id)}">${escape(item.text)}</a>`).join('')}</nav></aside>
 <main id="content">${body}</main></div>
-<footer><a href="${name}.md">Markdown source</a> · <a href="validation.html">Validation and limits</a> · <a href="https://github.com/steveseguin/ninjasdk">Repository</a></footer></body></html>\n`;
+<footer class="site-footer"><div class="container"><span>VDO.Ninja SDK guides</span><nav aria-label="Footer"><a href="guides.html">All guides</a><a href="validation.html">Validation and limits</a><a href="${name}.md">Markdown source</a><a href="https://github.com/steveseguin/ninjasdk">Repository</a></nav></div></footer></body></html>\n`;
 }
 if (require.main === module) {
   for (const name of guides) fs.writeFileSync(path.join(root, 'docs', name + '.html'), renderGuide(name));
-  const urls = ['/', '/docs/tally.html', ...guides.map(name => '/docs/' + name + '.html')];
+  const urls = ['/', '/demos/', '/docs/tally.html', ...guides.map(name => '/docs/' + name + '.html')];
   fs.writeFileSync(path.join(root, 'sitemap.xml'), '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' + urls.map(url => '  <url><loc>https://sdk.vdo.ninja' + url + '</loc></url>').join('\n') + '\n</urlset>\n');
   console.log('Built ' + guides.length + ' static guides from Markdown');
 }

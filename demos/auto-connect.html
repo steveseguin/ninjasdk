@@ -1,81 +1,226 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>VDO.Ninja SDK – Auto Connect (Minimal)</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Auto connect demo | VDO.Ninja SDK</title>
+  <meta name="description" content="Minimal VDO.Ninja SDK example: one autoConnect() call joins a room and opens a peer-to-peer data channel with every other tab in it.">
   <link rel="icon" type="image/svg+xml" href="../favicon.svg">
-  <link rel="icon" type="image/png" href="https://vdo.ninja/favicon.png">
-  <link rel="apple-touch-icon" href="https://vdo.ninja/apple-touch-icon.png">
-  <style>
-    body { font-family: system-ui, sans-serif; max-width: 720px; margin: 24px auto; padding: 0 12px; }
-    h1 { font-size: 20px; }
-    .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 12px 0; }
-    input, select, button { padding: 8px 10px; font-size: 14px; }
-    #logs { background: #111; color: #eee; padding: 10px; min-height: 180px; border-radius: 6px; font-family: ui-monospace, Menlo, monospace; }
-    .small { color: #666; font-size: 12px; }
-  </style>
-  <script src="../vdoninja-sdk.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../site.css">
 </head>
 <body>
-  <h1>VDO.Ninja SDK – Auto Connect (Minimal)</h1>
-  <div class="row">
-    <label>Room:</label>
-    <input id="room" placeholder="myroom" />
-    <label>Mode:</label>
-    <select id="mode">
-      <option value="half">Half (data only)</option>
-      <option value="full">Full (A/V)</option>
-    </select>
-    <button id="start">Start</button>
-    <button id="stop" disabled>Stop</button>
-  </div>
-  <div class="row small">Open this page in two tabs with the same room to see messages flow.</div>
-  <div id="logs"></div>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="site-header">
+    <div class="site-header-inner">
+      <a class="brand" href="../index.html"><img src="../favicon.svg" alt="" width="26" height="26"><span>VDO.Ninja SDK</span></a>
+      <nav class="site-nav" aria-label="Main">
+        <a href="../index.html">Home</a>
+        <a href="./" aria-current="page">Demos</a>
+        <a href="../docs/guides.html">Guides</a>
+        <a href="../docs/api-reference.html">API</a>
+      </nav>
+      <div class="site-header-actions">
+        <a class="btn btn-secondary btn-sm" href="https://github.com/steveseguin/ninjasdk">GitHub</a>
+      </div>
+    </div>
+  </header>
 
+  <main id="main" class="demo-page">
+    <div class="container">
+      <a class="crumb" href="./">← All demos</a>
+      <div class="demo-head">
+        <h1>Auto connect</h1>
+        <p class="lead">The smallest useful SDK example: one <code>autoConnect()</code> call joins a room, announces this tab, and opens a peer-to-peer data channel with every other tab in the same room.</p>
+      </div>
+
+      <ol class="steps">
+        <li><strong>Start</strong> in this tab.</li>
+        <li><strong>Open a second tab</strong> with the share link and press Start there too.</li>
+        <li><strong>Messages appear</strong> in both logs. Type your own below.</li>
+      </ol>
+
+      <div class="share-bar">
+        <span>Room <code id="roomName">…</code></span>
+        <div class="row">
+          <button class="btn btn-secondary btn-sm" id="copyLinkBtn" type="button">Copy link</button>
+          <a class="btn btn-secondary btn-sm" id="openTabLink" href="#" target="_blank" rel="noopener">Open second tab</a>
+        </div>
+      </div>
+
+      <section class="panel">
+        <div class="panel-header">
+          <h2>This tab</h2>
+          <span class="status" id="status" data-state="idle">Not connected</span>
+        </div>
+        <div class="panel-body stack">
+          <div class="field">
+            <label for="room">Room</label>
+            <input id="room" type="text" autocomplete="off" spellcheck="false">
+          </div>
+          <div class="row">
+            <button class="btn btn-primary" id="start" type="button">Start</button>
+            <button class="btn btn-danger" id="stop" type="button" disabled>Stop</button>
+          </div>
+          <div class="input-group">
+            <input id="msgInput" type="text" placeholder="Type a message" aria-label="Message" disabled>
+            <button class="btn btn-secondary" id="sendBtn" type="button" disabled>Send</button>
+          </div>
+          <div class="log" id="log" role="log" aria-live="polite"></div>
+        </div>
+      </section>
+
+      <details class="disclosure" style="margin-top:24px">
+        <summary>Key SDK calls in this demo</summary>
+        <div class="disclosure-body"><pre><code>const sdk = new VDONinjaSDK();
+sdk.addEventListener('dataChannelOpen', () =&gt; sdk.sendData({ hello: 'world' }));
+sdk.addEventListener('dataReceived', (e) =&gt; console.log(e.detail.data, e.detail.uuid));
+
+// Connect, join the room, announce, and view every other peer in it
+const ctl = await sdk.autoConnect({ room });
+
+sdk.sendData({ text: 'hi' });   // to every connected peer
+
+ctl.stop();                     // stop auto-viewing new peers
+sdk.disconnect();</code></pre></div>
+      </details>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <span>VDO.Ninja SDK demos · MIT licensed (SDK core MPL-2.0)</span>
+      <nav aria-label="Footer"><a href="./">All demos</a><a href="../docs/guides.html">Guides</a><a href="https://github.com/steveseguin/ninjasdk">GitHub</a></nav>
+    </div>
+  </footer>
+
+  <script src="../vdoninja-sdk.js"></script>
   <script>
-    const logs = document.getElementById('logs');
     const roomInput = document.getElementById('room');
-    const modeSel = document.getElementById('mode');
     const startBtn = document.getElementById('start');
     const stopBtn = document.getElementById('stop');
+    const msgInput = document.getElementById('msgInput');
+    const sendBtn = document.getElementById('sendBtn');
+    const statusEl = document.getElementById('status');
 
-    roomInput.value = 'room_' + Math.random().toString(36).slice(2, 7);
+    // The room lives in the URL so a second tab (or another person) joins the same one.
+    const params = new URLSearchParams(location.search);
+    roomInput.value = params.get('room') || 'demo_' + crypto.randomUUID().slice(0, 8);
+    syncRoomToUrl();
+    roomInput.addEventListener('input', syncRoomToUrl);
 
-    const log = (...a) => { logs.innerHTML += a.map(x => typeof x==='string'? x : JSON.stringify(x)).join(' ') + '\n'; logs.scrollTop = logs.scrollHeight; };
+    function syncRoomToUrl() {
+      const room = roomInput.value.trim();
+      if (room) params.set('room', room); else params.delete('room');
+      history.replaceState(null, '', '?' + params);
+      document.getElementById('roomName').textContent = room || '(none)';
+      document.getElementById('openTabLink').href = location.href;
+    }
+
+    document.getElementById('copyLinkBtn').addEventListener('click', async () => {
+      const btn = document.getElementById('copyLinkBtn');
+      try { await navigator.clipboard.writeText(location.href); btn.textContent = 'Copied'; }
+      catch { btn.textContent = 'Copy failed'; }
+      setTimeout(() => { btn.textContent = 'Copy link'; }, 1500);
+    });
+
+    function log(text, type = 'system') {
+      const logEl = document.getElementById('log');
+      const entry = document.createElement('div');
+      entry.className = 'log-entry ' + type;
+      const time = document.createElement('span');
+      time.className = 'log-time';
+      time.textContent = new Date().toLocaleTimeString();
+      const body = document.createElement('span');
+      body.textContent = String(text);
+      entry.append(time, body);
+      logEl.appendChild(entry);
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    function setStatus(state, text) {
+      statusEl.dataset.state = state;
+      statusEl.textContent = text;
+    }
 
     let sdk = null;
     let ctl = null;
+    const openPeers = new Set();   // peers with an open data channel
 
-    startBtn.onclick = async () => {
-      startBtn.disabled = true; stopBtn.disabled = false;
+    function refreshPeers() {
+      const n = openPeers.size;
+      if (n) setStatus('live', 'Connected to ' + n + (n === 1 ? ' peer' : ' peers'));
+      else setStatus('waiting', 'Waiting for another tab');
+      msgInput.disabled = sendBtn.disabled = n === 0;
+    }
+
+    startBtn.addEventListener('click', async () => {
       const room = roomInput.value.trim();
-      const mode = modeSel.value;
-      sdk = new VDONinjaSDK({ debug: true });
+      if (!room) { log('Enter a room name first.', 'error'); return; }
+      startBtn.disabled = true;
+      stopBtn.disabled = false;
+      roomInput.disabled = true;
+      setStatus('connecting', 'Connecting…');
 
-      sdk.addEventListener('connected', () => log('Connected'));
-      sdk.addEventListener('dataChannelOpen', (e) => {
-        log('Data channel open with', e.detail.uuid, 'type', e.detail.type);
-        sdk.sendData({ hello: 'world', at: Date.now() });
+      const s = sdk = new VDONinjaSDK();
+      // Ignore late events from an instance that has already been stopped.
+      const on = (name, fn) => s.addEventListener(name, (e) => { if (s === sdk) fn(e); });
+
+      on('dataChannelOpen', (e) => {
+        openPeers.add(e.detail.uuid);
+        refreshPeers();
+        log('Data channel open with ' + e.detail.uuid, 'success');
+        s.sendData({ hello: 'world', at: Date.now() }, e.detail.uuid);
       });
-      sdk.addEventListener('dataReceived', (e) => log('Received:', e.detail.data, 'from', e.detail.uuid));
-      sdk.addEventListener('error', (e) => log('Error:', e.detail?.error || e.detail));
+      const peerLeft = (e) => {
+        if (openPeers.delete(e.detail.uuid)) log('Peer left: ' + e.detail.uuid, 'warning');
+        refreshPeers();
+      };
+      on('dataChannelClose', peerLeft);
+      on('peerDisconnected', peerLeft);
+      on('dataReceived', (e) => log('From ' + e.detail.uuid + ': ' + JSON.stringify(e.detail.data), 'received'));
+      on('error', (e) => log('Error: ' + (e.detail?.error || 'unknown'), 'error'));
 
       try {
-        ctl = await sdk.autoConnect({ room, mode });
-        log('Announced as', ctl.streamID, 'in', room, 'mode=', mode);
+        ctl = await s.autoConnect({ room });
+        if (s !== sdk) return;   // stopped while connecting
+        log('Joined ' + room + ' as ' + ctl.streamID, 'info');
+        refreshPeers();
       } catch (err) {
-        log('Failed:', err.message);
+        if (s !== sdk) return;
+        log('Failed: ' + (err?.message || err), 'error');
+        stop();
+        setStatus('error', 'Failed to connect');
       }
-    };
+    });
 
-    stopBtn.onclick = () => {
-      try { ctl && ctl.stop && ctl.stop(); } catch (e) {}
-      try { sdk && sdk.disconnect && sdk.disconnect(); } catch (e) {}
-      startBtn.disabled = false; stopBtn.disabled = true;
-      log('Stopped');
-    };
+    function stop() {
+      try { ctl?.stop(); } catch (e) {}
+      try { sdk?.disconnect(); } catch (e) {}
+      ctl = null;
+      sdk = null;
+      openPeers.clear();
+      startBtn.disabled = false;
+      stopBtn.disabled = true;
+      roomInput.disabled = false;
+      msgInput.disabled = sendBtn.disabled = true;
+      setStatus('idle', 'Not connected');
+    }
+
+    stopBtn.addEventListener('click', () => { stop(); log('Stopped'); });
+
+    function sendMessage() {
+      const text = msgInput.value.trim();
+      if (!text || !sdk) return;
+      if (sdk.sendData({ text })) { log('Sent: ' + text, 'sent'); msgInput.value = ''; }
+      else log('No open data channel yet.', 'warning');
+    }
+    sendBtn.addEventListener('click', sendMessage);
+    msgInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') sendMessage(); });
+
+    window.addEventListener('beforeunload', () => { try { sdk?.disconnect(); } catch (e) {} });
   </script>
 </body>
 </html>
-

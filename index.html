@@ -14,30 +14,26 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>VDO.Ninja SDK | JavaScript WebRTC for Video, Audio &amp; Data</title>
     <meta name="description" content="Build VDO.Ninja-compatible video tools, remote camera viewers, and peer-to-peer messaging in JavaScript and Node.js. Explore working demos, setup guides, and API documentation.">
-    
-    <!-- Open Graph / Facebook -->
+
+    <!-- Open Graph -->
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://sdk.vdo.ninja/">
     <meta property="og:title" content="VDO.Ninja SDK | JavaScript WebRTC for Video, Audio &amp; Data">
     <meta property="og:description" content="Build custom video tools and P2P messaging in browsers and Node.js. Working demos, setup guides, and API documentation.">
-    
+
     <!-- Twitter -->
-    <meta property="twitter:card" content="summary">
-    <meta property="twitter:url" content="https://sdk.vdo.ninja/">
-    <meta property="twitter:title" content="VDO.Ninja SDK | JavaScript WebRTC for Video, Audio &amp; Data">
-    <meta property="twitter:description" content="JavaScript and Node.js tools for VDO.Ninja-compatible media and peer-to-peer data, with working demos and guides.">
-    
-    <!-- Additional SEO -->
-    <meta name="keywords" content="webrtc, p2p, peer-to-peer, sdk, nodejs, npm, python, flutter, mobile, cross-platform, video streaming, audio streaming, data channels, ai friendly, no server, free, open source, vdo.ninja, social stream ninja, raspberry ninja, whip, whep, twitch, meshcast, cloudflare stream, webrtc-http">
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="VDO.Ninja SDK | JavaScript WebRTC for Video, Audio &amp; Data">
+    <meta name="twitter:description" content="JavaScript and Node.js tools for VDO.Ninja-compatible media and peer-to-peer data, with working demos and guides.">
+
+    <meta name="keywords" content="webrtc, p2p, peer-to-peer, sdk, javascript, nodejs, npm, video streaming, audio streaming, data channels, vdo.ninja, social stream ninja, raspberry ninja, whip, whep, meshcast, cloudflare stream">
     <meta name="author" content="Steve Seguin">
     <link rel="canonical" href="https://sdk.vdo.ninja/">
 
-    <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
     <link rel="icon" type="image/png" href="https://vdo.ninja/favicon.png">
     <link rel="apple-touch-icon" href="https://vdo.ninja/apple-touch-icon.png">
-    
-    <!-- Structured Data -->
+
     <script type="application/ld+json">
     {
         "@context": "https://schema.org",
@@ -65,1408 +61,875 @@
             "P2P",
             "SDK",
             "Node.js",
-            "Python",
-            "Flutter",
             "Real-time communication",
             "Video streaming",
             "Audio streaming",
             "Data channels",
             "WHIP",
             "WHEP",
-            "Twitch streaming",
             "Meshcast"
         ]
     }
     </script>
-    
-    <link rel="stylesheet" href="style.css">
+
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
-    
-    <style>
-        /* Social Stream Ninja Section Styles */
-        .ssn-features {
-            display: grid;
-            gap: 2rem;
-            margin: 3rem 0;
-        }
-        
-        .ssn-feature {
-            background: #f8f9fa;
-            padding: 2rem;
-            border-radius: 8px;
-        }
-        
-        .ssn-feature h3 {
-            margin-bottom: 1rem;
-            color: #2c3e50;
-        }
-        
-        .platform-grid {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 0.5rem;
-        }
-        
-        .platform-badge {
-            background: #007bff;
-            color: white;
-            padding: 0.25rem 0.75rem;
-            border-radius: 20px;
-            font-size: 0.9rem;
-        }
-        
-        .ssn-feature ul {
-            list-style: none;
-            padding: 0;
-        }
-        
-        .ssn-feature ul li {
-            padding: 0.5rem 0;
-            padding-left: 1.5rem;
-            position: relative;
-            color: #333;  /* Fix white on white text issue */
-        }
-        
-        .ssn-feature ul li:before {
-            content: "✓";
-            position: absolute;
-            left: 0;
-            color: #28a745;
-        }
-        
-        .ssn-cta {
-            text-align: center;
-            margin-top: 3rem;
-        }
-        
-        .ssn-cta .btn {
-            margin: 0 0.5rem;
-        }
-        
-        .section-subtitle {
-            text-align: center;
-            font-size: 1.25rem;
-            color: #6c757d;
-            margin-bottom: 2rem;
-        }
-        
-        /* Navigation Dropdown Styles */
-        .nav-dropdown {
-            position: relative;
-        }
-        
-        .nav-dropdown-menu {
-            display: none;
-            position: absolute;
-            top: 100%;
-            left: 0;
-            background: white;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            border-radius: 4px;
-            min-width: 200px;
-            padding: 0.5rem 0;
-            z-index: 1000;
-        }
-        
-        .nav-dropdown:hover .nav-dropdown-menu {
-            display: block;
-        }
-        
-        .nav-dropdown-menu li {
-            list-style: none;
-        }
-        
-        .nav-dropdown-menu a {
-            display: block;
-            padding: 0.5rem 1rem;
-            color: #333;
-            text-decoration: none;
-            transition: background 0.2s;
-        }
-        
-        .nav-dropdown-menu a:hover {
-            background: #f8f9fa;
-        }
-        
-        /* Adjust nav spacing */
-        .nav-links {
-            gap: 1rem;
-        }
-        
-        .nav-links > li > a {
-            padding: 0.5rem 1rem;
-        }
-        
-        /* Mobile adjustments */
-        @media (max-width: 768px) {
-            .nav-dropdown-menu {
-                position: static;
-                display: none;
-                box-shadow: none;
-                background: transparent;
-                padding-left: 1rem;
-            }
-            
-            .nav-dropdown.open .nav-dropdown-menu {
-                display: block;
-            }
-            
-            .nav-dropdown > a {
-                cursor: pointer;
-            }
-        }
-    </style>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="site.css">
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <nav class="navbar">
-        <div class="container">
-            <div class="nav-brand">VDO.Ninja SDK</div>
-            <button class="nav-toggle" id="navToggle" onclick="toggleNav()">
-                <span></span>
-                <span></span>
-                <span></span>
-            </button>
-            <ul class="nav-links" id="navLinks">
-                <li><a href="#try-live">Try Live</a></li>
-                <li><a href="#quickstart">Quick Start</a></li>
-                <li class="nav-dropdown">
-                    <a href="#features">Features ▼</a>
-                    <ul class="nav-dropdown-menu">
-                        <li><a href="#features">Core Features</a></li>
-                        <li><a href="#whip-whep">📤 WHIP/WHEP</a></li>
-                        <li><a href="#social-stream-ninja">💬 Social Stream</a></li>
-                        <li><a href="#ai-integration">🤖 AI Integration</a></li>
-                        <li><a href="#examples">Live Examples</a></li>
-                        <li><a href="demos/">All Demos (JS & Node)</a></li>
-                    </ul>
-                </li>
-                <li><a href="#download">Download</a></li>
-                <li><a href="#guides">Guides</a></li>
-                <li><a href="#faq">FAQ</a></li>
-                <li><a href="#usage-guidelines">Guidelines</a></li>
-                <li><a href="https://github.com/steveseguin/ninjasdk" target="_blank">GitHub</a></li>
-            </ul>
-        </div>
-    </nav>
+    <a class="skip-link" href="#main">Skip to content</a>
 
-    <header class="hero">
-        <div class="container">
-            <h1 class="hero-title">Build with VDO.Ninja</h1>
-            <p class="hero-subtitle">JavaScript WebRTC for live video, audio, and peer-to-peer data.</p>
-            <p class="hero-description">
-                Build custom broadcast tools, remote camera viewers, and connected applications
-                in browsers and Node.js. Start with a working demo, then use the SDK to
-                connect your own interface to VDO.Ninja.
-            </p>
-            <div class="hero-features">
-                <div class="hero-feature">
-                    <span class="hero-icon">🌐</span>
-                    <span>Website-to-Website Direct</span>
-                </div>
-                <div class="hero-feature">
-                    <span class="hero-icon">🎮</span>
-                    <span>Remote Control Anything</span>
-                </div>
-                <div class="hero-feature">
-                    <span class="hero-icon">🎵</span>
-                    <span>Stream Media P2P</span>
-                </div>
-                <div class="hero-feature">
-                    <span class="hero-icon">🤖</span>
-                    <span>AI with Live Video/Audio</span>
-                </div>
-            </div>
-            <div class="hero-actions">
-                <a href="#try-live" class="btn btn-primary">Try It Live Now</a>
-                <a href="#vdo-ecosystem" class="btn btn-secondary">Works with VDO.Ninja</a>
-            </div>
-            <div class="hero-mini-addon">
-                <span class="hero-mini-badge">Optional MCP Add-on</span>
-                <span class="hero-mini-text">
-                    Claude Code ↔ Codex helper rooms, OpenClaw bot-to-bot chats, and private encrypted multi-agent collaboration.
-                </span>
-                <span class="hero-mini-links">
-                    <a href="https://www.npmjs.com/package/@vdoninja/mcp" target="_blank">npm</a>
-                    <span>•</span>
-                    <a href="https://github.com/steveseguin/ninjamcp" target="_blank">repo</a>
-                </span>
-            </div>
-            <div class="hero-tagline">
-                Hosted signaling connects peers. Media and data use WebRTC, with TURN relays when needed.
+    <header class="site-header">
+        <div class="site-header-inner">
+            <a class="brand" href="./"><img src="favicon.svg" alt="" width="26" height="26"><span>VDO.Ninja SDK</span></a>
+            <nav class="site-nav" aria-label="Main">
+                <a href="#try-live">Live demo</a>
+                <a href="#quickstart">Quick start</a>
+                <a href="demos/">Demos</a>
+                <a href="docs/guides.html">Guides</a>
+                <a href="docs/api-reference.html">API</a>
+                <a href="#faq">FAQ</a>
+            </nav>
+            <div class="site-header-actions">
+                <a class="btn btn-secondary btn-sm" href="https://github.com/steveseguin/ninjasdk">GitHub</a>
             </div>
         </div>
     </header>
 
-    <section id="try-live" class="section section-demo">
-        <div class="container">
-            <h2 class="section-title">🚀 Try It Live - No Setup Required</h2>
-            <div class="live-demo-container">
-                <div class="demo-info">
-                    <p>Experience true P2P messaging right here. Two independent peers that can connect and chat directly through your browser.</p>
+    <main id="main">
+        <!-- Hero -->
+        <section class="hero">
+            <div class="container hero-grid">
+                <div class="hero-copy">
+                    <span class="badge badge-accent">Open source · Browser &amp; Node.js</span>
+                    <h1 class="hero-title">Build with VDO.Ninja</h1>
+                    <p class="hero-subtitle">
+                        A JavaScript SDK for live video, audio, and data between browsers and Node.js apps.
+                        Peers connect directly over WebRTC, so there is no media server to run and no account or API key to manage.
+                    </p>
+                    <div class="hero-actions">
+                        <a href="#try-live" class="btn btn-primary btn-lg">Try the live demo</a>
+                        <a href="#quickstart" class="btn btn-secondary btn-lg">Quick start</a>
+                    </div>
+                    <div class="install-line">
+                        <code id="installCmd">npm install @vdoninja/sdk</code>
+                        <button type="button" class="btn btn-ghost btn-sm" data-copy-target="installCmd" aria-label="Copy install command">Copy</button>
+                    </div>
+                    <p class="hero-note">MPL-2.0 licensed · Works with VDO.Ninja, OBS, and WHIP/WHEP services</p>
                 </div>
-                <div class="demo-grid demo-grid-peers">
-                    <!-- Peer 1 -->
-                    <div class="demo-panel peer-panel">
-                        <h3>👤 Peer 1</h3>
-                        <div class="demo-status">
-                            <span class="status-indicator" id="peer1Status"></span>
-                            <span id="peer1StatusText">Not connected</span>
+                <div class="hero-code" aria-label="Example code">
+                    <div class="code-window">
+                        <div class="code-window-bar"><span></span><span></span><span></span><em>app.js</em></div>
+                        <pre><code class="language-javascript">const vdo = new VDONinjaSDK();
+
+// Receive messages from any peer in the room
+vdo.addEventListener('dataReceived', (e) => {
+    console.log(e.detail.data);
+});
+
+// Join a room, announce yourself, connect to peers
+await vdo.autoConnect({ room: 'my_unique_room' });
+
+// Send to every connected peer
+vdo.sendData({ hello: 'world' });</code></pre>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Live demo -->
+        <section id="try-live" class="section section-alt">
+            <div class="container">
+                <div class="section-head">
+                    <p class="section-label">Live demo</p>
+                    <h2>Two peers, one page, a direct connection</h2>
+                    <p class="section-lead">Each panel below is a separate SDK instance. Connect both and they find each other through the handshake server, then exchange messages directly over a WebRTC data channel.</p>
+                </div>
+
+                <ol class="steps demo-steps">
+                    <li id="demoStep1"><strong>Connect both peers.</strong> Each joins the same private room.</li>
+                    <li id="demoStep2"><strong>Send a message</strong> from either panel.</li>
+                    <li id="demoStep3"><strong>See it arrive</strong> on the other side, peer to peer.</li>
+                </ol>
+
+                <div class="demo-toolbar">
+                    <button type="button" id="connectBothBtn" class="btn btn-primary" onclick="toggleBothPeers()">Connect both peers</button>
+                    <span id="connectionInfo" class="muted small" role="status">Connect both peers to start.</span>
+                    <span class="demo-room small">Room <code id="demoRoomName">—</code></span>
+                </div>
+
+                <div class="demo-grid">
+                    <div class="panel peer-panel">
+                        <div class="panel-header">
+                            <h3>Peer 1</h3>
+                            <span class="status" id="peer1Status" data-state="idle">Not connected</span>
                         </div>
-                        <div class="demo-controls">
-                            <button id="peer1ConnectBtn" class="btn btn-primary" onclick="togglePeer(1)">Connect</button>
-                        </div>
-                        <div class="peer-info">
-                            <small>Stream ID: <span id="peer1StreamID">-</span></small><br>
-                            <small>Viewing: <span id="peer1Viewing">-</span></small>
-                        </div>
-                        <div class="message-container" id="peer1MessageContainer" style="display: none;">
-                            <div class="message-area" id="peer1Messages"></div>
-                            <div class="message-controls">
-                                <input type="text" id="peer1Input" aria-label="Message from Peer 1" placeholder="Type a message..." class="demo-input" disabled>
-                                <button id="peer1SendBtn" class="btn btn-secondary" onclick="sendPeerMessage(1)" disabled>Send</button>
+                        <div class="panel-body">
+                            <div class="peer-meta">
+                                <span class="faint small">Stream ID <code id="peer1StreamID">—</code></span>
+                                <button id="peer1ConnectBtn" type="button" class="btn btn-primary btn-sm" onclick="togglePeer(1)">Connect</button>
+                            </div>
+                            <div class="chat" id="peer1Messages" aria-live="polite"><div class="chat-empty">Messages will appear here</div></div>
+                            <div class="message-controls input-group">
+                                <input type="text" id="peer1Input" aria-label="Message from Peer 1" placeholder="Connect both peers to chat" disabled>
+                                <button id="peer1SendBtn" type="button" class="btn btn-primary" onclick="sendPeerMessage(1)" disabled>Send</button>
                             </div>
                         </div>
                     </div>
-                    
-                    <!-- Peer 2 -->
-                    <div class="demo-panel peer-panel">
-                        <h3>👤 Peer 2</h3>
-                        <div class="demo-status">
-                            <span class="status-indicator" id="peer2Status"></span>
-                            <span id="peer2StatusText">Not connected</span>
+
+                    <div class="panel peer-panel">
+                        <div class="panel-header">
+                            <h3>Peer 2</h3>
+                            <span class="status" id="peer2Status" data-state="idle">Not connected</span>
                         </div>
-                        <div class="demo-controls">
-                            <button id="peer2ConnectBtn" class="btn btn-primary" onclick="togglePeer(2)">Connect</button>
-                        </div>
-                        <div class="peer-info">
-                            <small>Stream ID: <span id="peer2StreamID">-</span></small><br>
-                            <small>Viewing: <span id="peer2Viewing">-</span></small>
-                        </div>
-                        <div class="message-container" id="peer2MessageContainer" style="display: none;">
-                            <div class="message-area" id="peer2Messages"></div>
-                            <div class="message-controls">
-                                <input type="text" id="peer2Input" aria-label="Message from Peer 2" placeholder="Type a message..." class="demo-input" disabled>
-                                <button id="peer2SendBtn" class="btn btn-secondary" onclick="sendPeerMessage(2)" disabled>Send</button>
+                        <div class="panel-body">
+                            <div class="peer-meta">
+                                <span class="faint small">Stream ID <code id="peer2StreamID">—</code></span>
+                                <button id="peer2ConnectBtn" type="button" class="btn btn-primary btn-sm" onclick="togglePeer(2)">Connect</button>
+                            </div>
+                            <div class="chat" id="peer2Messages" aria-live="polite"><div class="chat-empty">Messages will appear here</div></div>
+                            <div class="message-controls input-group">
+                                <input type="text" id="peer2Input" aria-label="Message from Peer 2" placeholder="Connect both peers to chat" disabled>
+                                <button id="peer2SendBtn" type="button" class="btn btn-primary" onclick="sendPeerMessage(2)" disabled>Send</button>
                             </div>
                         </div>
                     </div>
                 </div>
-                <div class="demo-room-info">
-                    <span>Room: <strong id="demoRoomName">-</strong></span>
-                    <span class="separator">|</span>
-                    <span id="connectionInfo">Connect both peers to start chatting</span>
+
+                <div class="demo-details">
+                    <details class="disclosure" open>
+                        <summary>The code each peer runs</summary>
+                        <div class="disclosure-body">
+                            <pre><code class="language-javascript">const vdo = new VDONinjaSDK();
+
+vdo.addEventListener('dataReceived', (e) => {
+    showMessage(e.detail.data.message);
+});
+
+// Connects, joins the room, announces a data-only stream,
+// and opens a data channel to the other peer
+await vdo.autoConnect({ room: 'my_unique_room', label: 'Peer 1' });
+
+// After 'dataChannelOpen' fires:
+vdo.sendData({ message: 'Hello!' });</code></pre>
+                        </div>
+                    </details>
+                    <details class="disclosure">
+                        <summary>Connection log</summary>
+                        <div class="disclosure-body">
+                            <div class="log" id="demoLog" aria-live="off"></div>
+                        </div>
+                    </details>
                 </div>
-                <div class="demo-code">
-                    <h4>This demo uses just these few lines:</h4>
-                    <pre><code class="language-javascript">// Minimal mesh with autoConnect (data-only by default)
+            </div>
+        </section>
+
+        <!-- Quick start -->
+        <section id="quickstart" class="section">
+            <div class="container">
+                <div class="section-head">
+                    <p class="section-label">Quick start</p>
+                    <h2>Up and running in a few lines</h2>
+                    <p class="section-lead">Pick where your code runs. Every example connects to the same hosted handshake server, so a browser, a Node.js process, and VDO.Ninja itself can all join one room.</p>
+                </div>
+
+                <div class="tabs" data-tabs>
+                    <div class="tab-list" role="tablist" aria-label="Quick start options">
+                        <button type="button" role="tab" id="tab-browser" aria-controls="panel-browser" aria-selected="true">Browser</button>
+                        <button type="button" role="tab" id="tab-video" aria-controls="panel-video" aria-selected="false">Camera &amp; video</button>
+                        <button type="button" role="tab" id="tab-node" aria-controls="panel-node" aria-selected="false">Node.js</button>
+                        <button type="button" role="tab" id="tab-iframe" aria-controls="panel-iframe" aria-selected="false">iframe API</button>
+                    </div>
+
+                    <div class="tab-panel" role="tabpanel" id="panel-browser" aria-labelledby="tab-browser">
+                        <div class="qs-script">
+                            <h3>1. Add the script</h3>
+                            <pre><code class="language-html">&lt;script src="https://cdn.jsdelivr.net/gh/steveseguin/ninjasdk@latest/vdoninja-sdk.min.js"&gt;&lt;/script&gt;</code></pre>
+                            <p class="muted small">Or install from npm: <code>npm install @vdoninja/sdk</code>. Pin a release tag such as <code>@vX.Y.Z</code> instead of <code>@latest</code> for reproducible builds.</p>
+                        </div>
+                        <div class="qs-grid">
+                            <div>
+                                <h3>2. Exchange data between two tabs</h3>
+                                <p class="muted small">Open this page in two tabs with the same room name. Each peer waits for a data channel before sending.</p>
+                            </div>
+                            <pre><code class="language-javascript">const vdo = new VDONinjaSDK();
+
+vdo.addEventListener('dataReceived', (event) => {
+    const { data, uuid } = event.detail;
+    console.log(`Received from ${uuid}:`, data);
+});
+
+vdo.addEventListener('dataChannelOpen', () => {
+    vdo.sendData({ message: 'Hello from this peer!' });
+});
+
+await vdo.autoConnect({ room: 'replace_with_your_unique_room' });</code></pre>
+                        </div>
+                        <p class="tab-foot"><a href="docs/connecting.html">Connection guide: rooms, passwords, hosts, and troubleshooting →</a></p>
+                    </div>
+
+                    <div class="tab-panel" role="tabpanel" id="panel-video" aria-labelledby="tab-video">
+                        <div class="qs-grid">
+                            <div>
+                                <h3>Publish a camera, view it anywhere</h3>
+                                <p class="muted small">Capture media with <code>getUserMedia</code>, publish it under a stream ID, and receive remote tracks with the <code>track</code> event. Camera access needs HTTPS or <code>localhost</code>.</p>
+                                <p class="muted small">The published stream can be opened in VDO.Ninja, a scene, or an OBS browser source using the viewer link in the last line.</p>
+                            </div>
+                            <pre><code class="language-javascript">const vdo = new VDONinjaSDK({ salt: 'vdo.ninja', host: 'wss://apibackup.vdo.ninja' });
+
+vdo.addEventListener('track', (event) => {
+    const video = document.getElementById('remoteVideo');
+    if (!video.srcObject) video.srcObject = new MediaStream();
+    video.srcObject.addTrack(event.detail.track);
+});
+
+const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+
+await vdo.connect();
+await vdo.joinRoom({ room: 'videoroom' });
+await vdo.publish(stream, { streamID: 'my_camera' });
+
+// Viewer: https://vdo.ninja/alpha/?view=my_camera&amp;room=videoroom&amp;scene&amp;wss2=apibackup.vdo.ninja</code></pre>
+                        </div>
+                        <p class="tab-foot"><a href="docs/streaming.html">Media and streaming guide →</a></p>
+                    </div>
+
+                    <div class="tab-panel" role="tabpanel" id="panel-node" aria-labelledby="tab-node">
+                        <div class="qs-grid">
+                            <div>
+                                <h3>Install the SDK and a WebRTC runtime</h3>
+                                <pre><code class="language-bash">npm install @vdoninja/sdk @roamhq/wrtc
+# data-only bots can use node-datachannel instead</code></pre>
+                                <p class="muted small">The same API runs in Node.js. Use <code>@roamhq/wrtc</code> for audio and video, or <code>node-datachannel</code> for lightweight data-only peers.</p>
+                            </div>
+                            <pre><code class="language-javascript">const VDONinjaSDK = require('@vdoninja/sdk/node');
+
 const vdo = new VDONinjaSDK();
-vdo.addEventListener('dataReceived', (e) => displayMessage(e.detail.data));
-await vdo.autoConnect('demo-room'); // streamID is auto-generated</code></pre>
-                </div>
-            </div>
-        </div>
-    </section>
 
-    
+vdo.addEventListener('dataReceived', (event) => {
+    console.log('Received:', event.detail.data);
+});
 
-    <section id="revolution" class="section section-revolution">
-        <div class="container">
-            <h2 class="section-title">The Server-Free Revolution</h2>
-            <div class="revolution-content">
-                <div class="revolution-text">
-                    <h3>What if websites could talk directly to each other?</h3>
-                    <p>For decades, web applications have been trapped in a client-server model. Every message, every byte of data, every interaction must pass through a server you pay for, maintain, and scale.</p>
-                    <p><strong>VDO.Ninja SDK breaks this paradigm.</strong></p>
-                    <p>Now, browsers can establish direct, encrypted connections to each other. No middleman. No monthly bills. No data limits. Just pure peer-to-peer communication at the speed of your internet connection.</p>
-
-                    <p><strong>▌Talk to Your Local AI from Anywhere</strong></p>
-                    <ul>
-                        <li>Connect a Chrome extension, web app, or mobile app directly to your locally hosted chatbot without exposing ports.</li>
-                        <li>No port forwarding, static IPs, or reverse proxies — NAT traversal is handled automatically.</li>
-                        <li>Keep prompts and results private: media and data travel peer‑to‑peer with end‑to‑end encryption.</li>
-                    </ul>
-
-                    <p><strong>▌Private, Anonymous, Account‑Free</strong></p>
-                    <ul>
-                        <li>No sign‑ups or API keys — use ephemeral IDs and rotate them anytime.</li>
-                        <li>End‑to‑end encrypted by default (DTLS/SRTP for media, secure data channels for messages).</li>
-                        <li>Works offline on LANs — traffic stays local when peers share a network.</li>
-                    </ul>
-
-                    <p><strong>▌Serverless, Free, and Scalable</strong></p>
-                    <ul>
-                        <li>Eliminate backend hosting and bandwidth bills — scale with users, not servers.</li>
-                        <li>Deploy instantly: share a link and connect — no infrastructure to provision or maintain.</li>
-                        <li>Flexible patterns: one‑to‑one, mesh, broadcast, or pub/sub — all peer‑to‑peer.</li>
-                    </ul>
-                </div>
-                <div class="revolution-examples">
-                    <h3>Real-World Magic</h3>
-                    <div class="magic-grid">
-                        <div class="magic-item">
-                            <h4>🎬 Remote Control OBS from Anywhere</h4>
-                            <p>Control your streaming setup from your phone, no port forwarding, no VPN, no TeamViewer. Just open a webpage.</p>
+await vdo.autoConnect({ room: 'replace_with_your_unique_room' });</code></pre>
                         </div>
-                        <div class="magic-item">
-                            <h4>💸 Free Services That Couldn't Exist</h4>
-                            <p>Like Social Stream Ninja - handles massive chat traffic for free because P2P makes server costs disappear.</p>
-                        </div>
-                        <div class="magic-item">
-                            <h4>🎵 Stream Music to Friends</h4>
-                            <p>Share your Spotify, game audio, or live DJ set directly. No upload bandwidth limits, no server costs.</p>
-                        </div>
-                        <div class="magic-item">
-                            <h4>🎮 Multiplayer Games Without Servers</h4>
-                            <p>Build real-time games where players connect directly. Lower latency than any server could provide.</p>
-                        </div>
-                        <div class="magic-item">
-                            <h4>🤖 AI Assistants with Live Vision</h4>
-                            <p>Give AI bots eyes and ears. Process video/audio in real-time without expensive cloud infrastructure.</p>
-                        </div>
-                        <div class="magic-item">
-                            <h4>📹 Security Cameras Without Cloud</h4>
-                            <p>Stream directly from camera to viewer. No monthly fees, no privacy concerns, no storage limits.</p>
-                        </div>
-                        <div class="magic-item">
-                            <h4>🏢 Corporate Apps Without IT</h4>
-                            <p>Deploy internal tools that work anywhere, no VPN required, no server maintenance, instant global access.</p>
-                        </div>
-                        <div class="magic-item">
-                            <h4>🏠 LAN File Sharing & Streaming</h4>
-                            <p>Share files or stream media to devices on your local network at gigabit speeds. WebRTC detects LAN peers and keeps traffic local - no internet bandwidth used!</p>
-                        </div>
+                        <p class="tab-foot"><a href="https://github.com/steveseguin/ninjasdk/blob/main/README-NODE.md">Node.js setup guide →</a></p>
                     </div>
-                </div>
-            </div>
-            <div class="revolution-cta">
-                <p class="cta-text">Already powering disruptive applications. This is the foundation for a new kind of web.</p>
-                <a href="#quickstart" class="btn btn-primary btn-large">Start Building the Future</a>
-            </div>
-        </div>
-    </section>
 
-    <section id="features" class="section">
-        <div class="container">
-            <h2 class="section-title">The Power of True P2P</h2>
-            <div class="features-grid">
-                <div class="feature-card">
-                    <div class="feature-icon">💰</div>
-                    <h3>Zero Infrastructure Costs</h3>
-                    <p>No servers to rent, no bandwidth to pay for, no scaling concerns. Your users' browsers do all the work.</p>
-                </div>
-                <div class="feature-card">
-                    <div class="feature-icon">⚡</div>
-                    <h3>Lowest Possible Latency</h3>
-                    <p>Direct connections mean data travels the shortest path. When peers are on the same LAN, data stays local - no internet required!</p>
-                </div>
-                <div class="feature-card">
-                    <div class="feature-icon">🔐</div>
-                    <h3>End-to-End Encrypted</h3>
-                    <p>Military-grade encryption on every connection. No middleman. No logs. What happens P2P, stays P2P.</p>
-                </div>
-                <div class="feature-card">
-                    <div class="feature-icon">🌍</div>
-                    <h3>Works Everywhere</h3>
-                    <p>Behind firewalls, across continents, on mobile. If it has a browser, it can connect.</p>
-                </div>
-                <div class="feature-card">
-                    <div class="feature-icon">🚫</div>
-                    <h3>No Accounts Required</h3>
-                    <p>No sign-ups, no API keys, no quotas. Just pick a room name and start communicating.</p>
-                </div>
-                <div class="feature-card">
-                    <div class="feature-icon">∞</div>
-                    <h3>Unlimited Bandwidth</h3>
-                    <p>Stream 4K video, transfer gigabytes. You're only limited by your users' internet connections.</p>
-                </div>
-                <div class="feature-card">
-                    <div class="feature-icon">📤</div>
-                    <h3>WHIP/WHEP Support</h3>
-                    <p>Publish to Twitch, Meshcast, Cloudflare Stream and more using standard WHIP/WHEP protocols.</p>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <section id="whip-whep" class="section section-alt">
-        <div class="container">
-            <h2 class="section-title">📤 WHIP/WHEP - Standard WebRTC Streaming</h2>
-            <p style="text-align: center; max-width: 800px; margin: 0 auto 2rem;">
-                In addition to P2P, the SDK includes standalone WHIP and WHEP clients for publishing to and consuming from standard WebRTC streaming services.
-            </p>
-            <div class="features-grid">
-                <div class="feature-card">
-                    <div class="feature-icon">📡</div>
-                    <h3>WHIP - Publish Anywhere</h3>
-                    <p>Publish your camera or screen to Twitch, Meshcast.io, Cloudflare Stream, Dolby.io, or any WHIP-compatible server.</p>
-                </div>
-                <div class="feature-card">
-                    <div class="feature-icon">👁️</div>
-                    <h3>WHEP - View Anywhere</h3>
-                    <p>Pull streams from any WHEP endpoint with ultra-low latency. Perfect for monitoring or embedding live streams.</p>
-                </div>
-            </div>
-            <div class="code-preview" style="max-width: 800px; margin: 2rem auto;">
-                <pre><code class="language-javascript">// WHIP - Publish to Meshcast
-const whip = new WHIPClient('https://cae1.meshcast.io/whip/mystream');
-await whip.publish(mediaStream);
-// View at: https://meshcast.io/mystream
-
-// WHEP - Watch from Meshcast
-const whep = new WHEPClient('https://cae1.meshcast.io/whep/mystream');
-whep.addEventListener('track', (e) => video.srcObject = e.detail.streams[0]);
-await whep.view();</code></pre>
-            </div>
-            <div style="text-align: center; margin-top: 1.5rem;">
-                <a href="demos/whip-publish-demo.html" class="btn btn-primary">WHIP Demo</a>
-                <a href="demos/whep-view-demo.html" class="btn btn-secondary">WHEP Demo</a>
-            </div>
-        </div>
-    </section>
-
-    <section id="quickstart" class="section section-alt">
-        <div class="container">
-            <h2 class="section-title">Quick Start</h2>
-            <div class="quickstart-options">
-                <div class="quickstart-option">
-                    <h3>Option 1: Simple IFRAME API</h3>
-                    <p>For basic P2P data transfer, you can use the IFRAME API without any SDK:</p>
-                    <div class="code-preview">
-                        <pre><code class="language-html">&lt;iframe id="vdo" src="https://vdo.ninja/?room=my_room&amp;dataonly"&gt;&lt;/iframe&gt;
+                    <div class="tab-panel" role="tabpanel" id="panel-iframe" aria-labelledby="tab-iframe">
+                        <div class="qs-grid">
+                            <div>
+                                <h3>No SDK: embed VDO.Ninja</h3>
+                                <p class="muted small">For simple data exchange you can embed VDO.Ninja in an iframe and talk to it with <code>postMessage</code>. Use the SDK when you want your own interface and full control.</p>
+                                <p class="tab-links">
+                                    <a href="https://vdo.ninja/iframe">iframe demo</a>
+                                    <a href="https://docs.vdo.ninja/guides/iframe-api-documentation/iframe-api-basics">iframe docs</a>
+                                    <a href="https://docs.vdo.ninja/guides/iframe-api-documentation/create-custom-drawing-app">Drawing app example</a>
+                                </p>
+                            </div>
+                            <pre><code class="language-html">&lt;iframe id="vdo" src="https://vdo.ninja/?room=my_room&amp;dataonly"&gt;&lt;/iframe&gt;
 &lt;script&gt;
+const iframe = document.getElementById('vdo');
+
 // Listen for data
 window.addEventListener('message', (e) =&gt; {
+    if (e.source !== iframe.contentWindow) return;
     if (e.data.dataReceived) console.log('Received:', e.data.dataReceived);
 });
+
 // Send data
-iframe.contentWindow.postMessage({ sendData: { msg: "Hello!" }}, '*');
+iframe.contentWindow.postMessage({ sendData: { msg: 'Hello!' }, type: 'pcs' }, '*');
 &lt;/script&gt;</code></pre>
-                    </div>
-                    <button class="expand-btn" onclick="toggleIframeExample(this)">
-                        <span class="expand-text">Show Full Example</span>
-                        <span class="expand-icon">▼</span>
-                    </button>
-                    <div class="expandable-content" style="display: none;">
-                        <pre><code class="language-html">&lt;!-- Create the iframe --&gt;
-&lt;iframe id="vdo" 
+                        </div>
+                        <details class="disclosure">
+                            <summary>Full iframe example with peer tracking and targeted sends</summary>
+                            <div class="disclosure-body">
+                                <pre><code class="language-html">&lt;iframe id="vdo"
         src="https://vdo.ninja/?room=my-data-room&amp;cleanish&amp;dataonly"
         allow="camera;microphone;fullscreen;display-capture;autoplay;"
         style="width: 100%; height: 400px;"&gt;
 &lt;/iframe&gt;
 
 &lt;script&gt;
-// Get iframe reference
 const iframe = document.getElementById('vdo');
-
-// Track connected peers
 const connectedPeers = {};
 
-// Set up event listener for messages from iframe
-window.addEventListener('message', function(e) {
-    // Verify message is from our iframe
+window.addEventListener('message', function (e) {
+    // Only accept messages from our iframe
     if (e.source !== iframe.contentWindow) return;
-    
-    // Handle connection events
-    if (e.data.action === 'guest-connected' && e.data.streamID) {
+
+    if (e.data.action === 'guest-connected' &amp;&amp; e.data.streamID) {
         connectedPeers[e.data.streamID] = e.data.value?.label || 'Guest';
         console.log('Peer connected:', e.data.streamID);
     }
-    
-    // Handle received data
+
     if (e.data.dataReceived) {
         console.log('Data from', e.data.UUID + ':', e.data.dataReceived);
-        
-        // Check for your custom namespace
-        if (e.data.dataReceived.myApp) {
-            handleCustomData(e.data.dataReceived.myApp);
-        }
+        if (e.data.dataReceived.myApp) handleCustomData(e.data.dataReceived.myApp);
     }
 });
 
-// Send data to all peers
+// Send data to all peers (namespace it to avoid conflicts)
 function sendToAll(data) {
-    iframe.contentWindow.postMessage({
-        sendData: {
-            myApp: data  // Use namespace to avoid conflicts
-        },
-        type: 'pcs'  // Use peer connections (most reliable)
-    }, '*');
+    iframe.contentWindow.postMessage({ sendData: { myApp: data }, type: 'pcs' }, '*');
 }
 
-// Send data to specific peer
+// Send data to one peer
 function sendToPeer(data, targetUUID) {
-    iframe.contentWindow.postMessage({
-        sendData: {
-            myApp: data
-        },
-        type: 'pcs',
-        UUID: targetUUID
-    }, '*');
+    iframe.contentWindow.postMessage({ sendData: { myApp: data }, type: 'pcs', UUID: targetUUID }, '*');
 }
 
-// Example: Send a message after iframe loads
-iframe.onload = function() {
-    setTimeout(() => {
-        sendToAll({ 
-            message: 'Hello from P2P!',
-            timestamp: Date.now()
-        });
-    }, 2000);
+iframe.onload = function () {
+    setTimeout(() =&gt; sendToAll({ message: 'Hello from P2P!', timestamp: Date.now() }), 2000);
 };
 
 function handleCustomData(data) {
     console.log('Custom data received:', data);
-    // Your app logic here
 }
 &lt;/script&gt;</code></pre>
-                    </div>
-                    <div class="iframe-links">
-                        <a href="https://vdo.ninja/iframe" target="_blank">Try IFRAME Demo</a>
-                        <a href="https://docs.vdo.ninja/guides/iframe-api-documentation/iframe-api-basics" target="_blank">IFRAME Docs</a>
-                        <a href="https://docs.vdo.ninja/guides/iframe-api-documentation/create-custom-drawing-app" target="_blank">Drawing App Example</a>
+                            </div>
+                        </details>
                     </div>
                 </div>
-                <div class="quickstart-option">
-                    <h3>Option 2: Full SDK (More Control)</h3>
-                    <p>For advanced features, custom UI, and full control:</p>
-            <div class="quickstart-content">
-                <h3>1. Include the SDK</h3>
-                <p><strong>For Browsers:</strong></p>
-                <pre><code class="language-html">&lt;script src="https://cdn.jsdelivr.net/gh/steveseguin/ninjasdk@latest/vdoninja-sdk.min.js"&gt;&lt;/script&gt;</code></pre>
-                
-                <p><strong>For Node.js:</strong></p>
-                <pre><code class="language-bash">npm install @vdoninja/sdk @roamhq/wrtc
-# Then in your code:
-const VDONinjaSDK = require('@vdoninja/sdk/node');</code></pre>
-                <p>See <a href="README-NODE.md">README-NODE.md</a> for detailed Node.js setup instructions.</p>
-                
-                <h3>2. Basic Data Channel Example</h3>
-                <pre><code class="language-javascript">// Create a new VDO.Ninja SDK instance
-const vdo = new VDONinjaSDK();
 
-// Set up data channel handling
-vdo.addEventListener('dataReceived', (event) => {
-    const { data, uuid } = event.detail;
-    console.log(`Received from ${uuid}:`, data);
-});
-
-// Run in two tabs with the same private room name.
-// Wait for a peer's data channel before sending.
-vdo.addEventListener('dataChannelOpen', () => {
-    vdo.sendData({ message: "Hello from this peer!" });
-});
-await vdo.autoConnect({ room: "replace_with_your_unique_room" });</code></pre>
-                <p><a href="docs/connecting.md">Connection guide: complete examples and troubleshooting</a></p>
-
-                <h3>3. Audio/Video Example</h3>
-                <pre><code class="language-javascript">// Create instance for audio/video
-const vdo = new VDONinjaSDK({ salt: "vdo.ninja", host: "wss://apibackup.vdo.ninja" });
-
-// Set up track handling
-vdo.addEventListener('track', (event) => {
-    const { track, streams, uuid } = event.detail;
-    const video = document.getElementById('remoteVideo');
-    if (!video.srcObject) {
-        video.srcObject = new MediaStream();
-    }
-    video.srcObject.addTrack(track);
-});
-
-// Get user media
-const stream = await navigator.mediaDevices.getUserMedia({
-    audio: true,
-    video: true
-});
-
-// Connect, join room, and publish
-await vdo.connect();
-await vdo.joinRoom({ room: "videoroom" });
-await vdo.publish(stream, { streamID: "my_camera" });
-
-// Viewer: https://vdo.ninja/alpha/?view=my_camera&amp;room=videoroom&amp;scene&amp;wss2=apibackup.vdo.ninja</code></pre>
-                </div>
-            </div>
-            </div>
-        </div>
-    </section>
-
-    <section id="examples" class="section">
-        <div class="container">
-            <h2 class="section-title">Live Examples</h2>
-            <p class="section-subtitle">
-                <strong>Node Room Audio Recorder</strong> — Run <code>node demos/node-room-audio-recorder.js [&lt;room&gt;]</code> to auto-join a room, discover every active publisher, and save each remote audio track as its own WAV file.
-            </p>
-            <div class="examples-grid">
-                <a href="demos/vdoninja-sdk-datachannel-demo.html" class="example-card">
-                    <h3>Data Channel Demo</h3>
-                    <p>Real-time bidirectional data communication between peers</p>
-                </a>
-                <a href="demos/vdoninja-sdk-broadcast-demo.html" class="example-card">
-                    <h3>Broadcast Demo</h3>
-                    <p>One-to-many streaming with automatic peer management</p>
-                </a>
-                <a href="demos/vdoninja-sdk-canvas-demo.html" class="example-card">
-                    <h3>Canvas Streaming</h3>
-                    <p>Stream canvas content as video in real-time</p>
-                </a>
-                <a href="demos/vdoninja-sdk-dynamic-media-demo.html" class="example-card">
-                    <h3>Dynamic Media</h3>
-                    <p>Add/remove audio and video streams dynamically</p>
-                </a>
-                <a href="demos/vdoninja-sdk-pubsub-channels.html" class="example-card">
-                    <h3>Pub/Sub Channels</h3>
-                    <p>SDK-managed channels and subscriptions with simple helpers</p>
-                </a>
-                <a href="demos/node-room-audio-recorder.js" class="example-card">
-                    <h3>Node Audio Room Recorder</h3>
-                    <p>CLI sample that records every room participant’s audio track to timestamped WAV files.</p>
-                </a>
-                <a href="docs/tally.html" class="example-card">
-                    <h3>OBS Tally to OSC</h3>
-                    <p>Node samples for browser camera/screen tally, room labels, and VRChat lights. Includes API-only and SDK marker options.</p>
-                </a>
-                <a href="demos/" class="example-card">
-                    <h3>All Demos</h3>
-                    <p>Browse all JavaScript and Node.js samples</p>
-                </a>
-            </div>
-        </div>
-    </section>
-
-    <section id="social-stream-ninja" class="section section-alt">
-        <div class="container">
-            <h2 class="section-title">💬 Social Stream Ninja Integration</h2>
-            <p class="section-subtitle">Two-way live chat with all major social media platforms in one unified stream</p>
-            
-            <div class="ssn-features">
-                <div class="ssn-feature">
-                    <h3>🌐 Supported Platforms</h3>
-                    <div class="platform-grid">
-                        <span class="platform-badge">Twitch</span>
-                        <span class="platform-badge">YouTube</span>
-                        <span class="platform-badge">TikTok</span>
-                        <span class="platform-badge">Kick</span>
-                        <span class="platform-badge">X (Twitter)</span>
-                        <span class="platform-badge">Facebook</span>
-                        <span class="platform-badge">Discord</span>
-                        <span class="platform-badge">Instagram</span>
-                        <span class="platform-badge">And more...</span>
+                <div id="download" class="download-row">
+                    <div class="card">
+                        <h3>CDN</h3>
+                        <p>Load the minified build from jsDelivr. <code>@latest</code> follows the newest release.</p>
+                        <div class="tags"><span class="badge">≈135 KB minified</span><span class="badge">≈32 KB gzipped</span></div>
+                    </div>
+                    <div class="card">
+                        <h3>Download</h3>
+                        <p>Host the files yourself. The full build is readable and commented.</p>
+                        <div class="row download-buttons">
+                            <a href="vdoninja-sdk.min.js" download class="btn btn-secondary btn-sm">vdoninja-sdk.min.js</a>
+                            <a href="vdoninja-sdk.js" download class="btn btn-secondary btn-sm">vdoninja-sdk.js</a>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <h3>npm</h3>
+                        <p>Includes TypeScript types, the Node.js entry point, and standalone WHIP/WHEP clients.</p>
+                        <div class="tags"><a class="badge" href="https://www.npmjs.com/package/@vdoninja/sdk">@vdoninja/sdk</a><span class="badge">MPL-2.0</span></div>
                     </div>
                 </div>
-                
-                <div class="ssn-feature">
-                    <h3>🚀 Simple Integration</h3>
-                    <pre><code class="language-javascript">// Connect to Social Stream Ninja
-const sdk = new VDONinjaSDK({
+            </div>
+        </section>
+
+        <!-- Why / use cases -->
+        <section id="features" class="section section-alt">
+            <div class="container">
+                <div class="section-head">
+                    <p class="section-label">Why the SDK</p>
+                    <h2>Direct connections, without the infrastructure</h2>
+                    <p class="section-lead">A small hosted handshake server introduces peers. After that, media and data travel peer to peer, using a TURN relay only when a direct path is not possible.</p>
+                </div>
+
+                <div class="feature-list">
+                    <div class="feature">
+                        <svg class="feature-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="12" r="3"/><circle cx="18" cy="12" r="3"/><path d="M9 12h6"/></svg>
+                        <div><h3>Peer to peer by default</h3><p>No relay server to scale or pay for. Bandwidth comes from the peers themselves.</p></div>
+                    </div>
+                    <div class="feature">
+                        <svg class="feature-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l7 3v6c0 4.4-3 7.6-7 9-4-1.4-7-4.6-7-9V6z"/><path d="M9 12l2 2 4-4"/></svg>
+                        <div><h3>Encrypted in transit</h3><p>WebRTC encrypts every connection with DTLS and SRTP. The handshake server only exchanges connection setup.</p></div>
+                    </div>
+                    <div class="feature">
+                        <svg class="feature-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 018 0"/></svg>
+                        <div><h3>No accounts or API keys</h3><p>Pick a room name and connect. Add a password to keep the room private.</p></div>
+                    </div>
+                    <div class="feature">
+                        <svg class="feature-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9l3 3-3 3M13 15h4"/></svg>
+                        <div><h3>Browser and Node.js</h3><p>One API in both. Run headless bots, recorders, and bridges next to your web app.</p></div>
+                    </div>
+                    <div class="feature">
+                        <svg class="feature-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l9 5-9 5-9-5z"/><path d="M3 13l9 5 9-5"/></svg>
+                        <div><h3>Works with VDO.Ninja</h3><p>Open your streams in VDO.Ninja's director room, scenes, and OBS browser sources.</p></div>
+                    </div>
+                    <div class="feature">
+                        <svg class="feature-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="2"/><path d="M8 8a6 6 0 000 8M16 8a6 6 0 010 8M5 5a10 10 0 000 14M19 5a10 10 0 010 14"/></svg>
+                        <div><h3>WHIP and WHEP included</h3><p>Standalone clients for publishing to and viewing from Cloudflare Stream, Twitch, Meshcast, and more.</p></div>
+                    </div>
+                </div>
+
+                <h3 id="revolution" class="subhead">What people build with it</h3>
+                <div class="grid grid-3 use-cases">
+                    <div class="card">
+                        <h3>Remote control and dashboards</h3>
+                        <p>Control OBS, stage equipment, or kiosks from a phone. Peers reach each other through NAT without port forwarding or a VPN.</p>
+                    </div>
+                    <div class="card">
+                        <h3>Live video tools</h3>
+                        <p>Publish cameras, screens, or canvas output and show them in your own interface, in OBS, or in VDO.Ninja.</p>
+                    </div>
+                    <div class="card">
+                        <h3>AI with live video and audio</h3>
+                        <p>Stream a camera or microphone to a local model or bot and send results back over the same connection.</p>
+                    </div>
+                    <div class="card">
+                        <h3>Chat and real-time apps</h3>
+                        <p>Low-latency messaging, shared state, and pub/sub channels. Social Stream Ninja uses it to deliver live chat for free.</p>
+                    </div>
+                    <div class="card">
+                        <h3>Local network streaming</h3>
+                        <p>When peers share a LAN, WebRTC keeps traffic on the local network, which suits studios, classrooms, and venues.</p>
+                    </div>
+                    <div class="card">
+                        <h3>Node.js automation</h3>
+                        <p>Record every participant, generate audio, forward tally to OSC, or run bots without a browser.</p>
+                    </div>
+                </div>
+
+                <h3 id="comparison" class="subhead">How it compares</h3>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th scope="col"></th>
+                                <th scope="col" class="col-highlight">VDO.Ninja SDK</th>
+                                <th scope="col">Socket.io</th>
+                                <th scope="col">Firebase Realtime</th>
+                                <th scope="col">Raw WebRTC</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr><th scope="row">Data path</th><td class="col-highlight">Peer to peer, TURN fallback</td><td>Through your server</td><td>Through the cloud service</td><td>Peer to peer</td></tr>
+                            <tr><th scope="row">Servers you run</th><td class="col-highlight">None (hosted signaling)</td><td>WebSocket server</td><td>None (managed)</td><td>Signaling and TURN</td></tr>
+                            <tr><th scope="row">Audio and video</th><td class="col-highlight">Built in</td><td>No</td><td>No</td><td>Yes, manual setup</td></tr>
+                            <tr><th scope="row">NAT traversal</th><td class="col-highlight">Built in (STUN/TURN)</td><td>Not needed</td><td>Not needed</td><td>You configure it</td></tr>
+                            <tr><th scope="row">Accounts and keys</th><td class="col-highlight">None</td><td>Your own auth</td><td>Project and API keys</td><td>Your own</td></tr>
+                            <tr><th scope="row">Cost</th><td class="col-highlight">Free</td><td>Hosting</td><td>Usage based</td><td>Hosting and TURN</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- Demos -->
+        <section id="examples" class="section">
+            <div class="container">
+                <div class="section-head section-head-row">
+                    <div>
+                        <p class="section-label">Demos</p>
+                        <h2>Working examples you can open and copy</h2>
+                    </div>
+                    <a class="btn btn-secondary" href="demos/">Browse all demos</a>
+                </div>
+                <div class="grid grid-3">
+                    <a href="demos/vdoninja-sdk-datachannel-demo.html" class="card">
+                        <span class="badge">Data</span>
+                        <h3>Data channel messaging</h3>
+                        <p>Chat, custom JSON, and targeted messages between two nodes.</p>
+                    </a>
+                    <a href="demos/vdoninja-sdk-broadcast-demo.html" class="card">
+                        <span class="badge">Data</span>
+                        <h3>Broadcast</h3>
+                        <p>One publisher sends to many viewers, and viewers reply.</p>
+                    </a>
+                    <a href="demos/vdoninja-sdk-pubsub-channels.html" class="card">
+                        <span class="badge">Data</span>
+                        <h3>Pub/sub channels</h3>
+                        <p>Subscribe to named channels and publish to them with SDK helpers.</p>
+                    </a>
+                    <a href="demos/vdoninja-sdk-two-way-chat.html" class="card">
+                        <span class="badge">Media</span>
+                        <h3>Two-way video chat</h3>
+                        <p>Bidirectional audio and video using generated canvas and tone sources.</p>
+                    </a>
+                    <a href="demos/vdoninja-sdk-canvas-demo.html" class="card">
+                        <span class="badge">Media</span>
+                        <h3>Canvas and Web Audio</h3>
+                        <p>Stream programmatically drawn video and synthesized audio.</p>
+                    </a>
+                    <a href="demos/whip-publish-demo.html" class="card">
+                        <span class="badge">WHIP</span>
+                        <h3>WHIP publish</h3>
+                        <p>Send your camera or screen to a WHIP service, then watch it with WHEP.</p>
+                    </a>
+                </div>
+                <p class="node-note muted small">Node.js samples: <a href="demos/node-room-audio-recorder.js">room audio recorder</a> (saves each participant's audio as WAV), <a href="demos/node-example.js">minimal data peer</a>, and the <a href="docs/tally.html">OBS tally to OSC bridge</a>.</p>
+            </div>
+        </section>
+
+        <!-- Guides and reference -->
+        <section id="guides" class="section section-alt">
+            <div class="container">
+                <div class="section-head section-head-row">
+                    <div>
+                        <p class="section-label">Guides</p>
+                        <h2>Guides for common tasks</h2>
+                        <p class="section-lead"><a href="docs/guides.html">Not sure where to start?</a> Compare the SDK, iframe, page API, MCP, and WHIP/WHEP options, including which IDs and credentials each needs.</p>
+                    </div>
+                </div>
+                <div class="grid grid-3">
+                    <a href="docs/connecting.html" class="card">
+                        <h3>Connect and publish</h3>
+                        <p>Match rooms, streams, passwords, and signaling hosts. Start with two peers or a custom video publisher.</p>
+                    </a>
+                    <a href="docs/file-transfer.html" class="card">
+                        <h3>File transfer</h3>
+                        <p>Offer and download files, choose native transfer or binary channels, and handle memory and completion.</p>
+                    </a>
+                    <a href="docs/data-messaging.html" class="card">
+                        <h3>Status and shared interfaces</h3>
+                        <p>Dashboards, sensor feeds, and collaborative controls. Routing, acknowledgements, and stale state.</p>
+                    </a>
+                    <a href="docs/agent-network.html" class="card">
+                        <h3>Agent messaging</h3>
+                        <p>Exchange status, jobs, and results with SDK requests or the optional MCP bridge.</p>
+                    </a>
+                    <a href="docs/remote-control.html" class="card">
+                        <h3>Remote control</h3>
+                        <p>Custom SDK commands, iframe controls, or a private page API, with scoped credentials.</p>
+                    </a>
+                    <a href="docs/tally.html" class="card">
+                        <h3>OBS tally and VRChat OSC</h3>
+                        <p>Discover streams with the SDK, read program/preview tally, and forward it to OSC. Tested setup and sample code.</p>
+                    </a>
+                    <a href="docs/recording.html" class="card">
+                        <h3>Recording media</h3>
+                        <p>Record incoming tracks in a browser or a Node.js application.</p>
+                    </a>
+                    <a href="docs/streaming.html" class="card">
+                        <h3>WHIP and WHEP</h3>
+                        <p>Publish to or view a media service through its HTTP endpoint. Tokens, codecs, and how this differs from rooms.</p>
+                    </a>
+                    <a href="docs/reliability-and-recovery.html" class="card">
+                        <h3>Connections and recovery</h3>
+                        <p>Reconnects, ICE recovery, and connection lifecycle events.</p>
+                    </a>
+                </div>
+
+                <div id="docs" class="reference-grid">
+                    <div class="card">
+                        <h3>Core concepts</h3>
+                        <dl class="concepts">
+                            <dt>Room</dt><dd>A named space where peers discover each other. A password changes how the name is hashed, so only peers with it meet.</dd>
+                            <dt>Stream ID</dt><dd>How a peer announces itself so others can view it.</dd>
+                            <dt>Publish and view</dt><dd>Publishing sends media or data; viewing receives it.</dd>
+                            <dt>Handshake server</dt><dd>Exchanges connection setup only. It does not carry your media or messages.</dd>
+                        </dl>
+                        <a class="btn btn-secondary btn-sm" href="docs/api-reference.html">Open the API reference</a>
+                    </div>
+                    <div class="card">
+                        <h3>Connection flow</h3>
+                        <pre><code class="language-javascript">await vdo.connect();                                  // 1. signaling
+await vdo.joinRoom({ room: 'myroom', password: 'optional' }); // 2. room
+
+await vdo.publish(stream, { streamID: 'cam-1' });     // 3a. send media
+await vdo.announce({ streamID: 'bot-1' });           // 3b. or data only
+
+await vdo.view('cam-1', { audio: true, video: true }); // 4. receive
+
+vdo.addEventListener('track', (e) => { /* e.detail.track */ });
+vdo.addEventListener('dataReceived', (e) => { /* e.detail.data */ });</code></pre>
+                    </div>
+                    <div class="card" id="ai-integration">
+                        <h3>For AI coding assistants</h3>
+                        <p>Give your assistant the whole SDK guide in one paste: API, patterns, and pitfalls.</p>
+                        <div class="row">
+                            <button type="button" class="btn btn-primary btn-sm" id="copyAiBtn" onclick="copyAIIntegration(this)">Copy AI guide</button>
+                            <a href="https://github.com/steveseguin/ninjasdk/blob/main/AI-INTEGRATION.md" class="btn btn-secondary btn-sm">Read it</a>
+                            <a href="llms.txt" class="btn btn-ghost btn-sm">llms.txt</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Ecosystem -->
+        <section id="vdo-ecosystem" class="section">
+            <div class="container">
+                <div class="section-head">
+                    <p class="section-label">Ecosystem</p>
+                    <h2>Part of the VDO.Ninja family</h2>
+                    <p class="section-lead">Apps built with the SDK speak the same protocol as VDO.Ninja, so you can reuse its interface and tools instead of building your own.</p>
+                </div>
+
+                <div class="grid grid-2">
+                    <div class="card eco-card">
+                        <h3>VDO.Ninja</h3>
+                        <p>Invite guests, manage rooms, and mix cameras with VDO.Ninja's director and scene layouts. Bring any SDK stream into OBS as a browser source.</p>
+                        <ul class="check-list">
+                            <li>Director room with multi-camera switching</li>
+                            <li>Scene links and layouts for OBS</li>
+                            <li>Recording options</li>
+                        </ul>
+                        <a class="btn btn-secondary btn-sm" href="https://vdo.ninja">Open VDO.Ninja</a>
+                    </div>
+
+                    <div class="card eco-card" id="social-stream-ninja">
+                        <h3>Social Stream Ninja</h3>
+                        <p>Two-way live chat from Twitch, YouTube, TikTok, Kick, X, Facebook, Discord, Instagram, and more, delivered to your app over P2P data channels.</p>
+                        <details class="disclosure">
+                            <summary>Listen to Social Stream Ninja chat</summary>
+                            <div class="disclosure-body">
+                                <pre><code class="language-javascript">const sdk = new VDONinjaSDK({
     host: 'wss://wss.socialstream.ninja',
-    room: 'your-session-id',  // Note: SSN calls this "session ID"
+    room: 'your-session-id',  // Social Stream calls this the session ID
     password: false
 });
 
-// Receive live chat from all platforms
 sdk.on('dataReceived', (event) => {
-    const data = event.detail?.data || event.data;
-    if (data?.overlayNinja) {
-        console.log(`[${data.overlayNinja.type}] ${data.overlayNinja.chatname}: ${data.overlayNinja.chatmessage}`);
-    }
+    const msg = event.detail?.data?.overlayNinja;
+    if (msg) console.log(`[${msg.type}] ${msg.chatname}: ${msg.chatmessage}`);
 });
 
-// Connect as a dock client
 await sdk.connect();
 await sdk.joinRoom();
-await sdk.view('your-session-id', { audio: false, video: false, label: "dock" });</code></pre>
-                </div>
-                
-                <div class="ssn-feature">
-                    <h3>📊 Use Cases</h3>
-                    <ul>
-                        <li>Stream overlays with unified chat</li>
-                        <li>Chat moderation across all platforms</li>
-                        <li>Analytics and sentiment analysis</li>
-                        <li>Interactive chat games and polls</li>
-                        <li>Automated responses and chat bots</li>
-                    </ul>
-                </div>
-            </div>
-            
-            <div class="ssn-cta">
-                <a href="https://socialstream.ninja" target="_blank" class="btn btn-primary">Try Social Stream Ninja</a>
-                <a href="demos/socialstreamninja-listener.js" class="btn btn-secondary">View Example Code</a>
-            </div>
-        </div>
-    </section>
+await sdk.view('your-session-id', { audio: false, video: false, label: 'dock' });</code></pre>
+                            </div>
+                        </details>
+                        <div class="row">
+                            <a class="btn btn-secondary btn-sm" href="https://socialstream.ninja">Social Stream Ninja</a>
+                            <a class="btn btn-ghost btn-sm" href="demos/socialstreamninja-listener.js">Node listener sample</a>
+                        </div>
+                    </div>
 
-    <section id="ai-integration" class="section section-ai">
+                    <div class="card eco-card" id="whip-whep">
+                        <h3>WHIP and WHEP</h3>
+                        <p>Besides rooms, the SDK ships standalone clients for the standard WebRTC HTTP protocols: publish to Twitch, Meshcast, or Cloudflare Stream, and view any WHEP endpoint.</p>
+                        <details class="disclosure">
+                            <summary>Publish and view with Meshcast</summary>
+                            <div class="disclosure-body">
+                                <pre><code class="language-javascript">// Publish
+const whip = new WHIPClient('https://cae1.meshcast.io/whip/mystream');
+await whip.publish(mediaStream);
+
+// View
+const whep = new WHEPClient('https://cae1.meshcast.io/whep/mystream');
+whep.addEventListener('track', (e) =&gt; video.srcObject = e.detail.streams[0]);
+await whep.view();</code></pre>
+                            </div>
+                        </details>
+                        <div class="row">
+                            <a class="btn btn-secondary btn-sm" href="demos/whip-publish-demo.html">WHIP demo</a>
+                            <a class="btn btn-ghost btn-sm" href="demos/whep-view-demo.html">WHEP demo</a>
+                        </div>
+                    </div>
+
+                    <div class="card eco-card" id="mcp">
+                        <h3>MCP add-on for AI agents <span class="badge">Optional</span></h3>
+                        <p><code>@vdoninja/mcp</code> gives AI tools private, encrypted P2P rooms for agent-to-agent collaboration.</p>
+                        <ul class="check-list">
+                            <li>A Claude Code session asking a Codex CLI session for help</li>
+                            <li>OpenClaw bots collaborating in real time</li>
+                            <li>Encrypted group chats for brainstorming and review loops</li>
+                        </ul>
+                        <div class="row">
+                            <a class="btn btn-secondary btn-sm" href="https://www.npmjs.com/package/@vdoninja/mcp">npm</a>
+                            <a class="btn btn-ghost btn-sm" href="https://github.com/steveseguin/ninjamcp">Repository</a>
+                        </div>
+                    </div>
+                </div>
+
+                <p class="platforms muted small">Other platforms: <a href="https://raspberry.ninja">Raspberry.Ninja</a> for Python, and the <a href="https://github.com/steveseguin/vdon_flutter">Flutter sample app</a> for mobile.</p>
+            </div>
+        </section>
+
+        <!-- FAQ -->
+        <section id="faq" class="section section-alt">
+            <div class="container">
+                <div class="section-head">
+                    <p class="section-label">FAQ</p>
+                    <h2>Frequently asked questions</h2>
+                </div>
+                <div class="faq-list">
+                    <details class="disclosure">
+                        <summary>Do I need to run my own server?</summary>
+                        <div class="disclosure-body"><p>No. The SDK uses a free hosted handshake server to set up WebRTC connections. After that, media and data travel peer to peer, or through a TURN relay when a direct path is not possible.</p></div>
+                    </details>
+                    <details class="disclosure">
+                        <summary>Is it really free?</summary>
+                        <div class="disclosure-body"><p>Yes. There are no paid tiers. Because peers carry the traffic, our server costs stay small and we cover them. Please follow the <a href="#usage-guidelines">usage guidelines</a> so it stays that way.</p></div>
+                    </details>
+                    <details class="disclosure">
+                        <summary>How is this different from Socket.io or WebSockets?</summary>
+                        <div class="disclosure-body"><p>WebSockets send every message through a server you run. The SDK connects browsers directly, which lowers latency and removes the relay server and its bandwidth bill.</p></div>
+                    </details>
+                    <details class="disclosure">
+                        <summary>What about firewalls and NAT?</summary>
+                        <div class="disclosure-body"><p>WebRTC uses STUN to find a direct path and falls back to the free TURN relays we provide when it cannot. That works on most networks, including many restrictive ones.</p></div>
+                    </details>
+                    <details class="disclosure">
+                        <summary>Can bots and AI agents use it?</summary>
+                        <div class="disclosure-body"><p>Yes. There is no CAPTCHA, email verification, or account. Connect with a room name and start exchanging data. Automated clients must still follow the usage guidelines.</p></div>
+                    </details>
+                    <details class="disclosure">
+                        <summary>What is the latency like?</summary>
+                        <div class="disclosure-body"><p>Usually just the network distance between peers, often under 50 ms within the same region. Server-relayed systems add an extra hop. On the same LAN it can be a few milliseconds.</p></div>
+                    </details>
+                    <details class="disclosure">
+                        <summary>How many peers can connect?</summary>
+                        <div class="disclosure-body"><p>Rooms are limited to about 80 connections. A full mesh works best with 5 to 10 peers; broadcast layouts can serve 50 or more viewers. Individual streams may also limit viewers. Higher limits are available on request.</p></div>
+                    </details>
+                    <details class="disclosure">
+                        <summary>Is it secure?</summary>
+                        <div class="disclosure-body"><p>WebRTC encrypts every connection: DTLS for data channels and SRTP for media. After setup, the handshake server does not carry your media or messages. Use a room password to keep others out of your room.</p></div>
+                    </details>
+                    <details class="disclosure">
+                        <summary>Can I use it commercially?</summary>
+                        <div class="disclosure-body"><p>Yes. MPL-2.0 permits the SDK to be used and distributed in a larger proprietary application without relicensing the application's separate files. You must preserve the SDK's notices and make its MPL-covered source available as required. If you distribute a modified MPL-covered SDK file, that file and its source remain subject to MPL-2.0.</p></div>
+                    </details>
+                    <details class="disclosure">
+                        <summary>Which platforms are supported?</summary>
+                        <div class="disclosure-body">
+                            <p><strong>Browsers:</strong> Chrome/Edge 80+, Firefox 75+, Safari 14+, and mobile browsers with WebRTC.</p>
+                            <p><strong>Node.js:</strong> full support with <code>@roamhq/wrtc</code> or <code>node-datachannel</code>. See the <a href="https://github.com/steveseguin/ninjasdk/blob/main/README-NODE.md">Node.js guide</a>.</p>
+                            <p><strong>Python:</strong> via <a href="https://raspberry.ninja">Raspberry.Ninja</a>. <strong>Mobile:</strong> the <a href="https://github.com/steveseguin/vdon_flutter">vdon_flutter</a> sample app.</p>
+                        </div>
+                    </details>
+                    <details class="disclosure">
+                        <summary>Can I self-host the handshake server?</summary>
+                        <div class="disclosure-body"><p>Self-hosting support is planned for an upcoming version of the SDK.</p></div>
+                    </details>
+                    <details class="disclosure">
+                        <summary>Does traffic stay on my local network?</summary>
+                        <div class="disclosure-body"><p>Yes, once connected. When two peers share a LAN, WebRTC picks the local path and media and data stay on that network. The initial handshake still needs to reach the signaling server.</p></div>
+                    </details>
+                </div>
+            </div>
+        </section>
+
+        <!-- Usage guidelines -->
+        <section id="usage-guidelines" class="section">
+            <div class="container">
+                <div class="section-head">
+                    <p class="section-label">Usage guidelines</p>
+                    <h2>Using the free handshake server</h2>
+                    <p class="section-lead">The handshake server only helps peers find each other and set up WebRTC. Once peers connect, it is no longer involved. These rules keep it free and reliable for everyone.</p>
+                </div>
+                <div class="grid grid-2 guidelines">
+                    <div class="callout callout-danger">
+                        <h3>Always use the SDK</h3>
+                        <ul>
+                            <li>Direct WebSocket connections that bypass the SDK are not permitted and will be blocked.</li>
+                            <li>The handshake protocol can change without notice; the SDK keeps up with it.</li>
+                        </ul>
+                    </div>
+                    <div class="callout">
+                        <h3>Signaling only</h3>
+                        <ul>
+                            <li>The server exchanges offers, answers, and ICE candidates, and keeps no state after the handshake.</li>
+                            <li>Send all application data over peer-to-peer data channels. Using the handshake server as a data relay is prohibited.</li>
+                        </ul>
+                    </div>
+                    <div class="callout">
+                        <h3>Limits and fair use</h3>
+                        <ul>
+                            <li>Rate limits apply. Rapid reconnects or excessive handshakes are throttled.</li>
+                            <li>Rooms support about 80 connections, and streams may cap viewers.</li>
+                            <li>Planning a launch with high connection rates or a large event? Contact us first for higher limits.</li>
+                        </ul>
+                    </div>
+                    <div class="callout">
+                        <h3>Best practices</h3>
+                        <ul>
+                            <li>Load the official SDK from the CDN or GitHub, and keep it up to date.</li>
+                            <li>Use exponential backoff when reconnecting.</li>
+                            <li>Test your connection patterns before launch.</li>
+                        </ul>
+                    </div>
+                </div>
+                <p class="guidelines-note muted small">This handshake server is a free community service. Abuse affects everyone, so please be a good citizen of the ecosystem.</p>
+            </div>
+        </section>
+    </main>
+
+    <footer class="home-footer">
         <div class="container">
-            <h2 class="section-title">🤖 AI/LLM Integration</h2>
-            <div class="ai-integration-box">
-                <div class="ai-header">
-                    <h3>Complete SDK Knowledge for Vibe Coders</h3>
-                    <p>Everything your AI needs to know about VDO.Ninja SDK in one document</p>
+            <div class="footer-grid">
+                <div class="footer-brand">
+                    <a class="brand" href="./"><img src="favicon.svg" alt="" width="26" height="26"><span>VDO.Ninja SDK</span></a>
+                    <p class="muted small">Open-source peer-to-peer video, audio, and data for browsers and Node.js. SDK core licensed under MPL-2.0.</p>
                 </div>
-                <div class="ai-actions">
-                    <button class="btn btn-primary" onclick="copyAIIntegration()">
-                        <span class="copy-icon">📋</span>
-                        <span class="copy-text">Copy AI Integration Guide</span>
-                    </button>
-                    <a href="AI-INTEGRATION.md" class="btn btn-secondary" target="_blank">
-                        <span>📄</span> View Full Document
-                    </a>
-                </div>
-                <div class="ai-features">
-                    <div class="ai-feature">
-                        <span class="checkmark">✓</span>
-                        <span>Complete API reference with examples</span>
-                    </div>
-                    <div class="ai-feature">
-                        <span class="checkmark">✓</span>
-                        <span>Ready-to-use code patterns</span>
-                    </div>
-                    <div class="ai-feature">
-                        <span class="checkmark">✓</span>
-                        <span>AI-specific implementation guides</span>
-                    </div>
-                    <div class="ai-feature">
-                        <span class="checkmark">✓</span>
-                        <span>No authentication required</span>
-                    </div>
-                </div>
-                <div class="ai-mcp-mini">
-                    <h4>Optional MCP Add-on: Agent Rooms</h4>
-                    <p>
-                        As a small optional add-on, <code>@vdoninja/mcp</code> lets AI tools use private
-                        P2P data-channel rooms for bot-to-bot collaboration.
-                    </p>
-                    <ul class="ai-mcp-list">
-                        <li>Claude Code session asking a Codex CLI session for help</li>
-                        <li>OpenClaw-to-OpenClaw bots collaborating in real time</li>
-                        <li>Encrypted LLM group chats for brainstorming and review loops</li>
-                    </ul>
-                    <div class="ai-actions ai-mcp-actions">
-                        <a href="https://www.npmjs.com/package/@vdoninja/mcp" class="btn btn-secondary" target="_blank">
-                            <span>🧩</span> MCP on npm
-                        </a>
-                        <a href="https://github.com/steveseguin/ninjamcp" class="btn btn-secondary" target="_blank">
-                            <span>🔗</span> MCP Repo
-                        </a>
-                    </div>
-                </div>
-                <div class="ai-preview">
-                    <h4>Quick Example for Your AI:</h4>
-                    <pre><code class="language-javascript">// Minimal AI Bot Setup
-const vdo = new VDONinjaSDK();
-vdo.onDataMessage = (data, uid) => {
-    // AI processes incoming data
-    const response = processWithAI(data);
-    vdo.sendDataTo(uid, response);
-};
-await vdo.connect({ 
-    roomid: "ai-bot", 
-    push: true, 
-    view: true, 
-    datamode: 1  // Data only, no media
-});</code></pre>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <section id="guides" class="section">
-        <div class="container">
-            <h2 class="section-title">Guides</h2>
-            <p class="section-description"><a href="docs/guides.html">Choose the right integration</a>: compare SDK, iframe, page API, MCP, and WHIP/WHEP, including which IDs and credentials each needs.</p>
-            <div class="examples-grid">
-                <a href="docs/connecting.html" class="example-card">
-                    <h3>Connect and Publish</h3>
-                    <p>Match rooms, streams, passwords, and signaling hosts. Start with two peers or a custom video publisher.</p>
-                </a>
-                <a href="docs/file-transfer.html" class="example-card">
-                    <h3>File Transfer</h3>
-                    <p>Offer and download files, choose native transfer versus binary channels, and handle memory and completion correctly.</p>
-                </a>
-                <a href="docs/data-messaging.html" class="example-card">
-                    <h3>Status and Shared Interfaces</h3>
-                    <p>Build dashboards, sensor feeds, or collaborative controls. Understand routing, acknowledgements, and stale state.</p>
-                </a>
-                <a href="docs/agent-network.html" class="example-card">
-                    <h3>Agent Messaging</h3>
-                    <p>Exchange status, jobs, and results using SDK requests or the optional MCP bridge. Understand delivery and authorization limits.</p>
-                </a>
-                <a href="docs/remote-control.html" class="example-card">
-                    <h3>Remote Control</h3>
-                    <p>Choose custom SDK commands, iframe controls, or a private page API. Keep credentials and command permissions scoped.</p>
-                </a>
-                <a href="docs/tally.html" class="example-card">
-                    <h3>OBS Tally and VRChat OSC</h3>
-                    <p>Keep camera operators in their browsers. Discover streams with the SDK, collect alpha API tally, and forward program/preview to OSC. Follow the tested setup and download the sample code.</p>
-                </a>
-                <a href="docs/recording.html" class="example-card">
-                    <h3>Recording Media</h3>
-                    <p>Record incoming tracks in a browser or Node application.</p>
-                </a>
-                <a href="docs/streaming.html" class="example-card">
-                    <h3>WHIP and WHEP</h3>
-                    <p>Publish to or view a media service using its HTTP endpoint. Understand tokens, codecs, and how this differs from rooms.</p>
-                </a>
-                <a href="docs/reliability-and-recovery.html" class="example-card">
-                    <h3>Connections and Recovery</h3>
-                    <p>Understand reconnects, ICE recovery, and connection lifecycle events.</p>
-                </a>
-            </div>
-        </div>
-    </section>
-
-    <section id="docs" class="section section-alt">
-        <div class="container">
-            <h2 class="section-title">Documentation</h2>
-            <div class="docs-content">
-                <div class="docs-section">
-                    <h3>Core Concepts</h3>
-                    <ul>
-                        <li><strong>Rooms:</strong> Virtual spaces where peers connect</li>
-                        <li><strong>Push/View:</strong> Push to send, View to receive</li>
-                        <li><strong>Data Channels:</strong> Low-latency P2P data transfer</li>
-                        <li><strong>Mesh Networks:</strong> Every peer can connect directly to every other peer</li>
-                        <li><strong>End-to-End Encryption:</strong> All data is encrypted between peers using DTLS/SRTP</li>
-                        <li><strong>LAN-Aware:</strong> WebRTC automatically detects and uses local network paths when peers are on the same LAN</li>
-                        <li><strong>Handshake Server:</strong> Minimal WebSocket server that only facilitates initial WebRTC connection setup</li>
-                        <li><strong>Serverless Philosophy:</strong> After handshake, all communication is P2P - no state management, no data relay</li>
-                        <li><strong>SDK Only:</strong> Direct handshake server access is prohibited - always use the SDK</li>
-                    </ul>
-                </div>
-
-                <div class="docs-section">
-                    <h3>Connection Flow</h3>
-                    <pre><code class="language-javascript">// 1. Connect to signaling server
-await vdo.connect();
-
-// 2. Join a room
-await vdo.joinRoom({ 
-    room: "myroom",
-    password: "optional" 
-});
-
-// 3a. Publish media stream
-const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-await vdo.publish(stream, { streamID: "custom-id" });
-
-// 3b. OR announce as data-only
-await vdo.announce({ streamID: "bot-1" });
-
-// 4. View other streams
-await vdo.view("streamID", { audio: true, video: true });</code></pre>
-                </div>
-
-                <div class="docs-section">
-                    <h3>Event Listeners</h3>
-                    <pre><code class="language-javascript">// SDK extends EventTarget - use addEventListener
-vdo.addEventListener('connected', (event) => {
-    console.log('Connected to server');
-});
-
-vdo.addEventListener('track', (event) => {
-    const { track, uuid, streamID } = event.detail;
-    console.log('Track received:', track.kind);
-});
-
-vdo.addEventListener('data', (event) => {
-    const { data, uuid } = event.detail;
-    console.log('Data received:', data);
-});
-
-vdo.addEventListener('error', (event) => {
-    console.error('Error:', event.detail.error);
-});</code></pre>
-                </div>
-
-                <div class="docs-section">
-                    <h3>Alternatives</h3>
-                    <p><strong>VDO.Ninja IFRAME API:</strong> For simpler web-only integration where cross-domain use is allowed.</p>
-                    <p><strong>Platform-Specific:</strong> <a href="https://github.com/steveseguin/vdon_flutter" target="_blank">Flutter app</a> for mobile, <a href="https://raspberry.ninja" target="_blank">Raspberry Ninja</a> for Python SDK support, Node.js support available (see <a href="README-NODE.md">README-NODE.md</a>).</p>
-                </div>
-
-                <div class="docs-section">
-                    <h3>API Reference</h3>
-                    <p>Complete list of SDK methods, helpers, aliases, and events.</p>
-                    <p>
-                        <a href="docs/api-reference.html" class="btn btn-secondary">Open API Reference</a>
-                    </p>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <section class="section" id="vdo-ecosystem">
-        <div class="container">
-            <h2 class="section-title">🎯 Built-in Compatibility with VDO.Ninja</h2>
-            <div class="vdo-integration">
-                <div class="integration-hero">
-                    <h3>Your SDK Apps Work with VDO.Ninja Out of the Box!</h3>
-                    <p>Every app you build with the SDK is automatically compatible with the entire VDO.Ninja ecosystem. This means you get:</p>
-                </div>
-                <div class="integration-benefits">
-                    <div class="benefit-card">
-                        <div class="benefit-icon">🎨</div>
-                        <h4>Pre-Built Professional UI</h4>
-                        <p>Use VDO.Ninja's polished interface to invite guests, manage rooms, and control settings - no UI development needed.</p>
-                    </div>
-                    <div class="benefit-card">
-                        <div class="benefit-icon">🎬</div>
-                        <h4>Free Video Mixer & Layouts</h4>
-                        <p>Access VDO.Ninja's director view with multi-camera switching, scene layouts, and professional mixing tools.</p>
-                    </div>
-                    <div class="benefit-card">
-                        <div class="benefit-icon">📹</div>
-                        <h4>OBS Studio Integration</h4>
-                        <p>Stream your SDK app directly into OBS using VDO.Ninja's proven integration - perfect for Twitch, YouTube, etc.</p>
-                    </div>
-                    <div class="benefit-card">
-                        <div class="benefit-icon">⏺️</div>
-                        <h4>Cloud Recording Options</h4>
-                        <p>Record to your own server or use VDO.Ninja's recording features for next-gen multimedia experiences.</p>
-                    </div>
-                </div>
-                <div class="integration-example">
-                    <h4>Real Example: Social Stream Ninja</h4>
-                    <div class="example-content">
-                        <p><strong>The Challenge:</strong> Social Stream Ninja handles massive amounts of real-time chat data from multiple platforms. Using traditional WebSockets would cost thousands in server bandwidth.</p>
-                        <p><strong>The Solution:</strong> By using VDO.Ninja's P2P infrastructure, Social Stream routes chat data directly between streamers and their tools. The handshake cost is insignificant compared to relaying all that data through servers.</p>
-                        <p><strong>The Result:</strong> A completely free service that would be financially impossible with traditional architecture. This is the power of P2P - turning expensive impossibilities into free realities.</p>
-                    </div>
-                </div>
-                <div class="integration-cta">
-                    <p>Build your app with the SDK, and instantly tap into VDO.Ninja's proven ecosystem</p>
-                    <div class="ecosystem-links">
-                        <a href="https://vdo.ninja" target="_blank" class="btn btn-secondary">Explore VDO.Ninja</a>
-                        <a href="https://socialstream.ninja" target="_blank" class="btn btn-secondary">See Social Stream Ninja</a>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <section id="faq" class="section">
-        <div class="container">
-            <h2 class="section-title">Frequently Asked Questions</h2>
-            <div class="faq-grid">
-                <div class="faq-item">
-                    <h3>Do I need to run my own server?</h3>
-                    <p>No! The SDK uses our free handshake server to establish WebRTC connections. After the initial handshake, all communication is peer-to-peer. You don't need any server infrastructure.</p>
-                </div>
-                <div class="faq-item">
-                    <h3>Is it really free?</h3>
-                    <p>Yes, completely free. No hidden costs, no premium tiers. The P2P architecture means minimal server costs which we cover. Please respect the usage guidelines to keep it free for everyone.</p>
-                </div>
-                <div class="faq-item">
-                    <h3>How is this different from Socket.io or WebSockets?</h3>
-                    <p>WebSockets require a server to relay all messages. VDO.Ninja SDK creates direct P2P connections between browsers, resulting in lower latency and no server costs.</p>
-                </div>
-                <div class="faq-item">
-                    <h3>What about firewalls and NAT?</h3>
-                    <p>We provide free TURN servers that help establish connections even through restrictive firewalls and NAT. It works in most network environments.</p>
-                </div>
-                <div class="faq-item">
-                    <h3>Can AI bots use this without human intervention?</h3>
-                    <p>Absolutely! No CAPTCHA, no email verification, no accounts. Just connect with a room ID and start communicating. Perfect for automated systems.</p>
-                </div>
-                <div class="faq-item">
-                    <h3>What's the latency like?</h3>
-                    <p>Since it's P2P, latency is typically just the network distance between peers - often under 50ms for users in the same region, compared to 100-200ms+ for server-relayed solutions. When peers are on the same LAN, latency can be under 1ms!</p>
-                </div>
-                <div class="faq-item">
-                    <h3>How many peers can connect?</h3>
-                    <p>Rooms are limited to ~80 total connections. For full mesh networks: ~5-10 peers optimal. For broadcast mode: 50+ viewers. Viewer connections to a stream may also be limited. Higher limits available on request.</p>
-                </div>
-                <div class="faq-item">
-                    <h3>Is it secure?</h3>
-                    <p>Yes. All P2P connections use DTLS encryption by default. Data channels are end-to-end encrypted. No data passes through our servers after connection establishment.</p>
-                </div>
-                <div class="faq-item">
-                    <h3>Can I use this commercially?</h3>
-                    <p>Yes. MPL-2.0 permits the SDK to be used and distributed in a larger proprietary application without relicensing the application's separate files. You must preserve the SDK's notices and make its MPL-covered source available as required. If you distribute a modified MPL-covered SDK file, that file and its source remain subject to MPL-2.0.</p>
-                </div>
-                <div class="faq-item">
-                    <h3>What platforms are supported?</h3>
-                    <p><strong>Browsers:</strong> Chrome/Edge 80+, Firefox 75+, Safari 14+. Mobile browsers with WebRTC support.</p>
-                    <p><strong>Node.js:</strong> Full support with WebRTC implementations. See <a href="README-NODE.md">README-NODE.md</a>.</p>
-                    <p><strong>Python:</strong> SDK available via <a href="https://raspberry.ninja" target="_blank">Raspberry.Ninja</a>.</p>
-                    <p><strong>Mobile:</strong> Flutter sample app at <a href="https://github.com/steveseguin/vdon_flutter" target="_blank">vdon_flutter</a>.</p>
-                </div>
-                <div class="faq-item">
-                    <h3>Can I self-host the handshake-server?</h3>
-                    <p>In upcoming versions of the SDK, there will be support for self-hosting.</p>
-                </div>
-                <div class="faq-item">
-                    <h3>Does it work on local networks without internet?</h3>
-                    <p>Yes! If two peers are on the same LAN, data flows directly between them locally - no internet bandwidth used!</p>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <section id="comparison" class="section section-alt">
-        <div class="container">
-            <h2 class="section-title">How VDO.Ninja SDK Compares</h2>
-            <div class="comparison-table">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Feature</th>
-                            <th class="highlight">VDO.Ninja SDK</th>
-                            <th>Socket.io</th>
-                            <th>Firebase</th>
-                            <th>WebRTC (raw)</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td>Server Required</td>
-                            <td class="highlight">❌ No (P2P)</td>
-                            <td>✅ Yes</td>
-                            <td>✅ Yes (Cloud)</td>
-                            <td>❌ No</td>
-                        </tr>
-                        <tr>
-                            <td>Setup Complexity</td>
-                            <td class="highlight">Simple (5 lines)</td>
-                            <td>Moderate</td>
-                            <td>Moderate</td>
-                            <td>Complex</td>
-                        </tr>
-                        <tr>
-                            <td>Latency</td>
-                            <td class="highlight">Lowest (P2P)</td>
-                            <td>Higher (Server relay)</td>
-                            <td>Higher (Cloud relay)</td>
-                            <td>Lowest (P2P)</td>
-                        </tr>
-                        <tr>
-                            <td>Cost</td>
-                            <td class="highlight">Free</td>
-                            <td>Server costs</td>
-                            <td>Usage-based pricing</td>
-                            <td>Free</td>
-                        </tr>
-                        <tr>
-                            <td>Audio/Video</td>
-                            <td class="highlight">✅ Built-in</td>
-                            <td>❌ No</td>
-                            <td>❌ No</td>
-                            <td>✅ Yes</td>
-                        </tr>
-                        <tr>
-                            <td>Data Channels</td>
-                            <td class="highlight">✅ Built-in</td>
-                            <td>✅ Yes</td>
-                            <td>✅ Yes</td>
-                            <td>✅ Yes</td>
-                        </tr>
-                        <tr>
-                            <td>NAT Traversal</td>
-                            <td class="highlight">✅ Automatic</td>
-                            <td>N/A</td>
-                            <td>N/A</td>
-                            <td>Manual setup</td>
-                        </tr>
-                        <tr>
-                            <td>AI Bot Friendly</td>
-                            <td class="highlight">✅ Designed for it</td>
-                            <td>⚠️ Needs auth setup</td>
-                            <td>⚠️ Needs auth setup</td>
-                            <td>⚠️ Complex</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </section>
-
-    <section class="section section-alt">
-        <div class="container">
-            <h2 class="section-title">Value Proposition Checklist</h2>
-            <div class="checklist">
-                <div class="checklist-item">✓ Zero server costs for end users</div>
-                <div class="checklist-item">✓ No user registration or authentication required</div>
-                <div class="checklist-item">✓ End-to-end encrypted by default</div>
-                <div class="checklist-item">✓ Works without SSL for local/development use</div>
-                <div class="checklist-item">✓ AI bot friendly - no CAPTCHA or human verification</div>
-                <div class="checklist-item">✓ Automatic NAT traversal and firewall bypassing</div>
-                <div class="checklist-item">✓ Scales horizontally with P2P architecture</div>
-                <div class="checklist-item">✓ Battle-tested in production with VDO.Ninja</div>
-                <div class="checklist-item">✓ Active development and community support</div>
-                <div class="checklist-item">✓ Multiple platform support: Web browsers, Node.js (full support), Python (via Raspberry.Ninja), Mobile (Flutter app)</div>
-            </div>
-        </div>
-    </section>
-
-    <section id="download" class="section">
-        <div class="container">
-            <h2 class="section-title">Download & Install</h2>
-            <div class="download-grid">
-                <div class="download-option">
-                    <h3>📦 CDN (Recommended)</h3>
-                    <p>Always get the latest version automatically</p>
-                    <pre><code class="language-html">&lt;script src="https://cdn.jsdelivr.net/gh/steveseguin/ninjasdk@latest/vdoninja-sdk.min.js"&gt;&lt;/script&gt;</code></pre>
-                    <div class="download-meta">
-                        <span class="version-badge">Latest</span>
-                        <span class="size-badge">~45KB minified</span>
-                    </div>
-                    <p style="font-size:0.85em;color:#94a3b8;margin-top:0.5rem;">Pin a specific release tag (for example, <code>@vX.Y.Z</code>) when you need reproducible builds.</p>
-                </div>
-                <div class="download-option">
-                    <h3>💾 Direct Download</h3>
-                    <p>Download and host the files yourself</p>
-                    <div class="download-buttons">
-                        <a href="vdoninja-sdk.js" download class="btn btn-secondary">
-                            <span>⬇️</span> SDK (Full)
-                        </a>
-                        <a href="vdoninja-sdk.min.js" download class="btn btn-secondary">
-                            <span>⬇️</span> SDK (Minified)
-                        </a>
-                    </div>
-                    <div class="download-meta">
-                        <span class="version-badge">Current release</span>
-                        <span class="license-badge">MPL-2.0</span>
-                    </div>
-                </div>
-                <div class="download-option">
-                    <h3>📱 Node.js Support</h3>
-                    <p>Full Node.js support with WebRTC implementations</p>
-                    <pre><code class="language-bash"># Install dependencies
-npm install ws @roamhq/wrtc  # or node-datachannel
-
-# Use in your code
-const VDONinjaSDK = require('./vdoninja-sdk-node.js');</code></pre>
-                    <div class="download-meta">
-                        <span class="version-badge">Current release</span>
-                        <a href="README-NODE.md" style="margin-left: 10px;">Node.js Docs</a>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <section id="usage-guidelines" class="section section-alt">
-        <div class="container">
-            <h2 class="section-title">🤝 Handshake Server Usage Guidelines</h2>
-            
-            <div class="handshake-intro">
-                <p>The VDO.Ninja SDK uses a WebSocket handshake server to initiate WebRTC connections between peers. Once the handshake is complete, all communication flows directly peer-to-peer. Understanding and respecting the handshake server's limitations ensures this free service remains available for everyone.</p>
-            </div>
-            
-            <div class="guidelines-content">
-                <div class="guideline-box important">
-                    <h3>🔌 What is the Handshake Server?</h3>
-                    <ul>
-                        <li>A minimal WebSocket server that facilitates the initial WebRTC connection setup</li>
-                        <li>Exchanges offer/answer SDP messages and ICE candidates between peers</li>
-                        <li>Once peers are connected, the handshake server is no longer involved</li>
-                        <li>Does NOT relay application data - only connection establishment</li>
-                        <li>Maintains no state about connections after handshake completion</li>
-                    </ul>
-                </div>
-                
-                <div class="guideline-box important">
-                    <h3>🚫 Direct API Access Prohibited</h3>
-                    <ul>
-                        <li><strong>You MUST use the SDK - direct WebSocket connections are not permitted</strong></li>
-                        <li>The handshake protocol may change without notice</li>
-                        <li>Direct API access bypassing the SDK will result in immediate blocking</li>
-                        <li>The SDK handles protocol changes and ensures proper usage patterns</li>
-                        <li>This policy protects the service from abuse and keeps it free</li>
-                    </ul>
-                </div>
-                
-                <div class="guideline-box">
-                    <h3>📊 Rate Limits & Fair Use</h3>
-                    <ul>
-                        <li>The handshake server implements rate limiting to prevent abuse</li>
-                        <li>Normal SDK usage (connecting, disconnecting, room changes) stays within limits</li>
-                        <li>Rapid connection attempts or excessive handshakes will be throttled</li>
-                        <li>Higher rate limits available on request for legitimate high-volume use cases</li>
-                        <li>Contact us before launching applications expecting high connection rates</li>
-                    </ul>
-                </div>
-                
-                <div class="guideline-box">
-                    <h3>🌐 Connection Capacity</h3>
-                    <ul>
-                        <li>Rooms support approximately 80 concurrent connections</li>
-                        <li>Individual streams may have viewer limits to ensure quality</li>
-                        <li>These limits prevent server overload and ensure reliable handshakes</li>
-                        <li>For events requiring more connections, please contact us in advance</li>
-                    </ul>
-                </div>
-                
-                <div class="guideline-box">
-                    <h3>💭 Serverless Philosophy</h3>
-                    <ul>
-                        <li>The handshake server does the absolute minimum - just WebRTC setup</li>
-                        <li>No message relay, no data storage, no connection state management</li>
-                        <li>All application data MUST flow through P2P connections</li>
-                        <li>Attempting to use the handshake server for data relay is prohibited</li>
-                        <li>This minimal approach keeps the service free and scalable</li>
-                    </ul>
-                </div>
-                
-                <div class="guideline-box">
-                    <h3>✅ Best Practices</h3>
-                    <ul>
-                        <li>Always use the official SDK from the CDN or GitHub</li>
-                        <li>Keep your SDK version updated for compatibility</li>
-                        <li>Implement exponential backoff for reconnection attempts</li>
-                        <li>Use P2P data channels for all application messaging</li>
-                        <li>Test your application's connection patterns before launch</li>
-                    </ul>
-                </div>
-                
-                <div class="guideline-warning">
-                    <strong>Community Service:</strong> This handshake server is provided free of charge to enable serverless P2P applications. Respecting these guidelines ensures it remains available for innovative developers worldwide. Abuse affects everyone - please be a good citizen of the ecosystem.
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <footer class="footer">
-        <div class="container">
-            <div class="footer-content">
-                <div class="footer-section">
-                    <h4>VDO.Ninja SDK</h4>
-                    <p>Free, open-source P2P communication framework</p>
-                    <p class="footer-license">SDK core licensed under MPL-2.0</p>
-                </div>
-                <div class="footer-section">
-                    <h4>Links</h4>
-                    <ul>
-                        <li><a href="https://github.com/steveseguin/ninjasdk">GitHub Repository</a></li>
-                        <li><a href="https://vdo.ninja">VDO.Ninja</a></li>
-                        <li><a href="https://socialstream.ninja">Social Stream Ninja</a></li>
-                        <li><a href="#docs">Documentation</a></li>
-                    </ul>
-                </div>
-                <div class="footer-section">
+                <nav aria-label="Documentation">
+                    <h4>Docs</h4>
+                    <a href="#quickstart">Quick start</a>
+                    <a href="docs/guides.html">Guides</a>
+                    <a href="docs/api-reference.html">API reference</a>
+                    <a href="demos/">Demos</a>
+                </nav>
+                <nav aria-label="Community">
                     <h4>Community</h4>
-                    <ul>
-                        <li><a href="https://discord.vdo.ninja">Discord</a></li>
-                        <li><a href="https://github.com/steveseguin/ninjasdk/issues">Issues</a></li>
-                        <li><a href="https://github.com/steveseguin/ninjasdk/discussions">Discussions</a></li>
-                    </ul>
-                </div>
+                    <a href="https://discord.vdo.ninja">Discord</a>
+                    <a href="https://github.com/steveseguin/ninjasdk/issues">Issues</a>
+                    <a href="https://github.com/steveseguin/ninjasdk/discussions">Discussions</a>
+                    <a href="https://github.com/steveseguin/ninjasdk">GitHub</a>
+                </nav>
+                <nav aria-label="Ecosystem">
+                    <h4>Ecosystem</h4>
+                    <a href="https://vdo.ninja">VDO.Ninja</a>
+                    <a href="https://socialstream.ninja">Social Stream Ninja</a>
+                    <a href="https://raspberry.ninja">Raspberry.Ninja</a>
+                    <a href="https://github.com/steveseguin/ninjamcp">VDO.Ninja MCP</a>
+                </nav>
             </div>
-            <div class="footer-bottom">
-                <p>&copy; 2025-2026 Steve Seguin.</p>
-            </div>
+            <p class="footer-bottom faint small">&copy; 2025-2026 Steve Seguin.</p>
         </div>
     </footer>
 
-    <script src="vdoninja-sdk.js"></script>
+    <script src="vdoninja-sdk.min.js"></script>
     <script>
-        // Smooth scrolling for navigation links
-        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-            anchor.addEventListener('click', function (e) {
-                e.preventDefault();
-                const target = document.querySelector(this.getAttribute('href'));
-                if (target) {
-                    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        // Tabs: all panels are visible without JavaScript; this hides the inactive ones.
+        document.querySelectorAll('[data-tabs]').forEach((tabs) => {
+            const buttons = [...tabs.querySelectorAll('[role="tab"]')];
+            const select = (button, focus) => {
+                buttons.forEach((b) => {
+                    const active = b === button;
+                    b.setAttribute('aria-selected', String(active));
+                    b.tabIndex = active ? 0 : -1;
+                    document.getElementById(b.getAttribute('aria-controls')).hidden = !active;
+                });
+                if (focus) button.focus();
+            };
+            buttons.forEach((button, index) => {
+                button.addEventListener('click', () => select(button));
+                button.addEventListener('keydown', (e) => {
+                    const step = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
+                    if (step) select(buttons[(index + step + buttons.length) % buttons.length], true);
+                });
+            });
+            tabs.classList.add('tabs-ready');
+            select(buttons.find((b) => b.getAttribute('aria-selected') === 'true') || buttons[0]);
+        });
+
+        // Copy buttons for short snippets
+        document.querySelectorAll('[data-copy-target]').forEach((button) => {
+            button.addEventListener('click', async () => {
+                const text = document.getElementById(button.dataset.copyTarget).textContent;
+                const original = button.textContent;
+                try {
+                    await navigator.clipboard.writeText(text);
+                    button.textContent = 'Copied';
+                } catch (err) {
+                    button.textContent = 'Copy failed';
                 }
+                setTimeout(() => { button.textContent = original; }, 1500);
             });
         });
 
-        // Copy AI Integration Guide
-        async function copyAIIntegration() {
-            const button = event.currentTarget;
-            const copyIcon = button.querySelector('.copy-icon');
-            const copyText = button.querySelector('.copy-text');
-            
+        // Copy the full AI integration guide
+        async function copyAIIntegration(button) {
+            const original = 'Copy AI guide';
+            button.disabled = true;
             try {
-                // Fetch the AI integration document
                 const response = await fetch('AI-INTEGRATION.md');
-                const text = await response.text();
-                
-                // Copy to clipboard
-                await navigator.clipboard.writeText(text);
-                
-                // Update button state
-                copyIcon.textContent = '✅';
-                copyText.textContent = 'Copied to Clipboard!';
-                button.classList.add('copied');
-                
-                // Reset after 3 seconds
-                setTimeout(() => {
-                    copyIcon.textContent = '📋';
-                    copyText.textContent = 'Copy AI Integration Guide';
-                    button.classList.remove('copied');
-                }, 3000);
+                if (!response.ok) throw new Error('HTTP ' + response.status);
+                await navigator.clipboard.writeText(await response.text());
+                button.textContent = 'Copied to clipboard';
             } catch (err) {
-                copyIcon.textContent = '❌';
-                copyText.textContent = 'Failed to copy';
                 console.error('Failed to copy:', err);
-                
-                setTimeout(() => {
-                    copyIcon.textContent = '📋';
-                    copyText.textContent = 'Copy AI Integration Guide';
-                }, 3000);
+                button.textContent = 'Copy failed';
             }
+            setTimeout(() => {
+                button.textContent = original;
+                button.disabled = false;
+            }, 2500);
         }
-
-
-        // Mobile navigation
-        function toggleNav() {
-            const navLinks = document.getElementById('navLinks');
-            const navToggle = document.getElementById('navToggle');
-            navLinks.classList.toggle('active');
-            navToggle.classList.toggle('active');
-        }
-
-        // Toggle iframe example
-        function toggleIframeExample(button) {
-            const content = button.nextElementSibling;
-            const text = button.querySelector('.expand-text');
-            const icon = button.querySelector('.expand-icon');
-            
-            if (content.style.display === 'none') {
-                content.style.display = 'block';
-                text.textContent = 'Hide Full Example';
-                icon.style.transform = 'rotate(180deg)';
-            } else {
-                content.style.display = 'none';
-                text.textContent = 'Show Full Example';
-                icon.style.transform = 'rotate(0deg)';
-            }
-        }
-
-        // Handle dropdown click on mobile
-        const dropdownToggle = document.querySelector('.nav-dropdown > a');
-        if (dropdownToggle) {
-            dropdownToggle.addEventListener('click', (e) => {
-                if (window.innerWidth <= 768) {
-                    e.preventDefault();
-                    const dropdown = e.target.parentElement;
-                    dropdown.classList.toggle('open');
-                }
-            });
-        }
-        
-        // Close mobile nav on link click
-        document.querySelectorAll('.nav-links a').forEach(link => {
-            link.addEventListener('click', (e) => {
-                // Don't close on dropdown toggle click
-                if (!e.target.textContent.includes('▼')) {
-                    const navLinks = document.getElementById('navLinks');
-                    const navToggle = document.getElementById('navToggle');
-                    navLinks.classList.remove('active');
-                    navToggle.classList.remove('active');
-                }
-            });
-        });
     </script>
     <script src="./demos/demo.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-javascript.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-bash.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-markup.min.js"></script>
 </body>
 </html>

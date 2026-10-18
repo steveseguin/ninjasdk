@@ -5,8 +5,12 @@
 <link rel="canonical" href="https://sdk.vdo.ninja/docs/validation.html">
 <meta property="og:title" content="Guide validation and limits"><meta property="og:description" content="Guide validation and limits. VDO.Ninja SDK options, practical examples, requirements, and validation limits.">
 <meta property="og:type" content="article"><meta property="og:url" content="https://sdk.vdo.ninja/docs/validation.html">
-<link rel="icon" href="../favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="guide.css"></head>
-<body><a class="skip" href="#content">Skip to content</a><header><nav aria-label="Main"><a href="../index.html">VDO.Ninja SDK</a><a href="guides.html">Choose a guide</a><a href="api-reference.html">API reference</a><a href="../demos/">Demos</a></nav></header>
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../site.css"><link rel="stylesheet" href="guide.css"></head>
+<body><a class="skip-link" href="#content">Skip to content</a>
+<header class="site-header"><div class="site-header-inner"><a class="brand" href="../index.html"><img src="../favicon.svg" alt="" width="26" height="26"><span>VDO.Ninja SDK</span></a><nav class="site-nav" aria-label="Main"><a href="../index.html">Home</a><a href="../demos/">Demos</a><a href="guides.html">Guides</a><a href="api-reference.html">API</a></nav><div class="site-header-actions"><a class="btn btn-secondary btn-sm" href="https://github.com/steveseguin/ninjasdk">GitHub</a></div></div></header>
 <div class="layout"><aside><nav aria-label="On this page"><strong>On this page</strong><a href="#reproduce">Reproduce</a></nav></aside>
 <main id="content"><h1 id="guide-validation-and-limits">Guide validation and limits</h1>
 <p>These guides describe the repository checkout, including unreleased fixes. Published package versions can lag the checkout.</p>
@@ -84,4 +88,4 @@ node demos/sdk-workflows.cjs
 <p>Reviewing the diagnostic examples also exposed an SDK bug: <code>getStats()</code> traversed the previous connection layout and returned empty results. It now returns reports from both current peer directions, with <code>connectionType</code> identifying their source; a regression test covers all-peer and single-UUID queries.</p>
 <p>Live SDK tests (<code>npm test</code>) require a native WebRTC dependency and network access. Browser/OBS tests are opt-in; see the <a href="https://github.com/steveseguin/ninjasdk/blob/main/tests/interop/README.md">interop instructions</a> and <a href="../demos/tally-osc/README.md#validation-and-limits">tally validation</a>. Never run the OBS harness against an on-air instance.</p>
 </main></div>
-<footer><a href="validation.md">Markdown source</a> · <a href="validation.html">Validation and limits</a> · <a href="https://github.com/steveseguin/ninjasdk">Repository</a></footer></body></html>
+<footer class="site-footer"><div class="container"><span>VDO.Ninja SDK guides</span><nav aria-label="Footer"><a href="guides.html">All guides</a><a href="validation.html">Validation and limits</a><a href="validation.md">Markdown source</a><a href="https://github.com/steveseguin/ninjasdk">Repository</a></nav></div></footer></body></html>

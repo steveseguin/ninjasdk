@@ -5,8 +5,12 @@
 <link rel="canonical" href="https://sdk.vdo.ninja/docs/file-transfer.html">
 <meta property="og:title" content="Transfer files between peers"><meta property="og:description" content="Transfer files between peers. VDO.Ninja SDK options, practical examples, requirements, and validation limits.">
 <meta property="og:type" content="article"><meta property="og:url" content="https://sdk.vdo.ninja/docs/file-transfer.html">
-<link rel="icon" href="../favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="guide.css"></head>
-<body><a class="skip" href="#content">Skip to content</a><header><nav aria-label="Main"><a href="../index.html">VDO.Ninja SDK</a><a href="guides.html">Choose a guide</a><a href="api-reference.html">API reference</a><a href="../demos/">Demos</a></nav></header>
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../site.css"><link rel="stylesheet" href="guide.css"></head>
+<body><a class="skip-link" href="#content">Skip to content</a>
+<header class="site-header"><div class="site-header-inner"><a class="brand" href="../index.html"><img src="../favicon.svg" alt="" width="26" height="26"><span>VDO.Ninja SDK</span></a><nav class="site-nav" aria-label="Main"><a href="../index.html">Home</a><a href="../demos/">Demos</a><a href="guides.html">Guides</a><a href="api-reference.html">API</a></nav><div class="site-header-actions"><a class="btn btn-secondary btn-sm" href="https://github.com/steveseguin/ninjasdk">GitHub</a></div></div></header>
 <div class="layout"><aside><nav aria-label="On this page"><strong>On this page</strong><a href="#choose-a-transport">Choose a transport</a><a href="#host-a-file">Host a file</a><a href="#receive-a-selected-file">Receive a selected file</a><a href="#large-files-and-completion">Large files and completion</a><a href="#download-from-a-vdoninja-page">Download from a VDO.Ninja page</a><a href="#troubleshooting">Troubleshooting</a></nav></aside>
 <main id="content"><h1 id="transfer-files-between-peers">Transfer files between peers</h1>
 <p>Use this for exchanging a recording, a report, or a project asset while both peers are connected. Files are served by the sender; the signaling service does not store them for later download.</p>
@@ -108,4 +112,4 @@ await vdo.view('sender_stream', { audio: false, video: false, downloads: true })
 </tbody>
 </table></div>
 </main></div>
-<footer><a href="file-transfer.md">Markdown source</a> · <a href="validation.html">Validation and limits</a> · <a href="https://github.com/steveseguin/ninjasdk">Repository</a></footer></body></html>
+<footer class="site-footer"><div class="container"><span>VDO.Ninja SDK guides</span><nav aria-label="Footer"><a href="guides.html">All guides</a><a href="validation.html">Validation and limits</a><a href="file-transfer.md">Markdown source</a><a href="https://github.com/steveseguin/ninjasdk">Repository</a></nav></div></footer></body></html>
