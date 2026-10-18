@@ -56,19 +56,22 @@ vdo.sendData(["hi": true], uuid: conn?.uuid)            // one peer
 let answer = try await vdo.request("whoami", ["q": 1], to: conn!.uuid)
 
 await vdo.disconnect()
+await vdo.dispose() // when done with the instance: releases the signaling network session
 ```
 
 Every operation has both an `async` form and a completion-handler form. Events arrive on the SDK's serial queue;
 hop to the main thread for UI. Data-only peers call `announce()` instead of `publish()`. `autoConnect(room:)`
 joins, announces and views every other member (half mesh). `view()` throws `SDKError.timeout` when the publisher
-is not online yet; the request stays pending and connects when the stream appears.
+is not online yet; the request stays pending (re-sent every `viewRetryInterval`) and connects when the stream
+appears. `disconnect()` keeps the instance reusable; `dispose()` additionally invalidates the `URLSession` that
+would otherwise retain the SDK, so call it once you are done with the instance.
 
 ## API overview
 
 | Area | Members |
 | --- | --- |
 | Events | `addListener { }`, `on(.type) { }`, `removeListener(token)`; `VDOEventType` cases match the JavaScript SDK names |
-| Lifecycle | `connect()`, `disconnect()`, `connected`, `factory`, `queue` |
+| Lifecycle | `connect()`, `disconnect()`, `dispose()`, `connected`, `factory`, `queue` |
 | Rooms | `joinRoom(room, claim:)` → listing, `leaveRoom()`, `currentRoom` |
 | Publishing | `announce()`, `publish(tracks:streamId:room:)`, `addTrack()`, `replaceTrack()` (camera switch), `stopPublishing()` |
 | Viewing | `view(streamId, options: ViewOptions(audio:video:label:))`, `stopViewing()`, `autoConnect(room:streamId:fullMode:)`; media arrives as `.track` events with an `RTCMediaStreamTrack` |

@@ -32,6 +32,7 @@ public final class SignalingClient: NSObject, URLSessionWebSocketDelegate, @unch
     private var attempts = 0
     private var pendingOpen: ((Error?) -> Void)?
     private var reconnectWork: DispatchWorkItem?
+    private var shutDown = false
 
     public init(url: String, maxReconnectAttempts: Int = 5, reconnectDelay: TimeInterval = 1, clientId: String? = nil,
                 queue: DispatchQueue = DispatchQueue(label: "ninja.vdo.sdk.signaling"), log: ((String) -> Void)? = nil) {
@@ -60,6 +61,15 @@ public final class SignalingClient: NSObject, URLSessionWebSocketDelegate, @unch
     }
 
     private func open(timeout: TimeInterval, reconnect: Bool, completion: @escaping (Error?) -> Void) {
+        if shutDown { return completion(URLError(.cancelled)) }
+        // A connect that is still in flight is superseded: fail it (so its caller does not hang)
+        // and cancel its handshake before replacing it.
+        if let previous = pendingOpen {
+            pendingOpen = nil
+            task?.cancel()
+            task = nil
+            previous(URLError(.cancelled))
+        }
         generation += 1
         let gen = generation
         var request = URLRequest(url: url)
@@ -145,7 +155,11 @@ public final class SignalingClient: NSObject, URLSessionWebSocketDelegate, @unch
             guard let self, !self.intentional else { return }
             self.onReconnecting?(attempt)
             self.open(timeout: 15, reconnect: true) { [weak self] err in
-                if err != nil { self?.log?("reconnect attempt \(attempt) failed"); self?.scheduleReconnect() }
+                guard let self, let err else { return }
+                // `.cancelled` means close() or a new connect() took over; they own what happens next.
+                if (err as? URLError)?.code == .cancelled { return }
+                self.log?("reconnect attempt \(attempt) failed")
+                self.scheduleReconnect()
             }
         }
         reconnectWork = work
@@ -179,6 +193,17 @@ public final class SignalingClient: NSObject, URLSessionWebSocketDelegate, @unch
             self.task = nil
             pending?(URLError(.cancelled))
             if was { self.onClose?(true) }
+        }
+    }
+
+    /// Closes the socket and invalidates the `URLSession`, which otherwise retains this client
+    /// forever. The client cannot connect again afterwards. Call when the SDK is disposed.
+    public func shutdown() {
+        close()
+        queue.async {
+            if self.shutDown { return }
+            self.shutDown = true
+            self.session.invalidateAndCancel()
         }
     }
 }

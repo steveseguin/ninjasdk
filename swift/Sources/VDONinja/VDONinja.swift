@@ -151,7 +151,7 @@ public final class VDONinja {
     private let listenerLock = NSLock()
 
     private var room: String?, roomIntent: String?, roomClaim = false
-    private var roomWaiter: (([ListingEntry]) -> Void)?
+    private var roomWaiter: ((Result<[ListingEntry], Error>) -> Void)?
     public private(set) var streamId: String?
     private var publishing = false
     private var localTracks: [RTCMediaStreamTrack] = []
@@ -290,9 +290,11 @@ public final class VDONinja {
                 self.viewWaiters.removeAll()
                 for (_, p) in self.pendingRequests { p.done(.failure(SDKError.closed)) }
                 self.pendingRequests.removeAll()
+                let roomWaiter = self.roomWaiter
                 self.roomWaiter = nil
+                roomWaiter?(.failure(SDKError.closed))
                 self.room = nil; self.roomIntent = nil
-                self.publishing = false; self.streamId = nil
+                self.publishing = false; self.streamId = nil; self.localTracks = []
                 self.signal.close()
                 completion?()
             }
@@ -302,6 +304,19 @@ public final class VDONinja {
 
     public func disconnect() async {
         await withCheckedContinuation { (c: CheckedContinuation<Void, Never>) in disconnect { c.resume() } }
+    }
+
+    /// Disconnects and releases the signaling client's network session (which otherwise keeps the
+    /// SDK alive). The instance cannot be used afterwards. The factory stays owned by the caller.
+    public func dispose(completion: (() -> Void)? = nil) {
+        disconnect {
+            self.signal.shutdown()
+            completion?()
+        }
+    }
+
+    public func dispose() async {
+        await withCheckedContinuation { (c: CheckedContinuation<Void, Never>) in dispose { c.resume() } }
     }
 
     // MARK: Rooms
@@ -324,10 +339,10 @@ public final class VDONinja {
                 return completion(.success([]))
             }
             var finished = false
-            self.roomWaiter = { entries in
+            self.roomWaiter = { result in
                 if finished { return }
                 finished = true
-                completion(.success(entries))
+                completion(result)
             }
             self.signal.send(msg)
             self.queue.asyncAfter(deadline: .now() + timeout) {
@@ -460,18 +475,23 @@ public final class VDONinja {
         try await withCheckedThrowingContinuation { c in view(streamId, options: options, timeout: timeout) { c.resume(with: $0) } }
     }
 
-    /// Registers the view intent and sends the play request.
+    /// Registers the view intent and sends the play request. Like the JavaScript SDK, a play
+    /// that gets no offer is re-sent every `viewRetryInterval` until the stream appears or
+    /// `stopViewing` is called; the offer cancels the timer.
     @discardableResult
     private func requestView(_ sid: String, _ options: ViewOptions) -> String {
         stoppedViews.remove(sid)
         pendingViews[sid] = options
         viewIntent[sid] = options
         signal.send(["request": "play", "streamID": pw.hashStreamId(sid)])
+        scheduleViewRetry(sid, delay: self.options.viewRetryInterval)
         return sid
     }
 
+    /// (Re)arms the view retry for `sid`; a newer schedule replaces an older one.
     private func scheduleViewRetry(_ sid: String, delay: TimeInterval) {
-        if intentional || stoppedViews.contains(sid) || viewRetries[sid] != nil { return }
+        if intentional || stoppedViews.contains(sid) { return }
+        viewRetries.removeValue(forKey: sid)?.cancel()
         let work = DispatchWorkItem { [weak self] in
             guard let self else { return }
             self.viewRetries[sid] = nil
@@ -816,7 +836,6 @@ public final class VDONinja {
 
     private func recoverConnection(_ c: VDOConnection, reason: String) {
         if c.closed { return }
-        emit(VDOEvent(.connectionFailed, uuid: c.uuid, streamId: c.streamId, connectionType: c.type, message: reason))
         if !c.recovering && (c.type == "publisher" || c.controlOpen) {
             c.recovering = true
             log("ICE restart for \(c.uuid)/\(c.type) (\(reason))")
@@ -831,9 +850,13 @@ public final class VDONinja {
             queue.asyncAfter(deadline: .now() + options.connectionTimeout, execute: work)
             return
         }
+        // Recovery is exhausted (or impossible): tear the connection down. `connectionFailed`
+        // marks the final failure only, preceded by `peerDisconnected` like any other teardown.
         let sid = c.streamId
         removeConnection(c)
         c.close()
+        emit(VDOEvent(.peerDisconnected, uuid: c.uuid, streamId: sid, connectionType: c.type))
+        emit(VDOEvent(.connectionFailed, uuid: c.uuid, streamId: sid, connectionType: c.type, message: reason))
         if c.type == "viewer", let sid, !stoppedViews.contains(sid) { scheduleViewRetry(sid, delay: 2) }
     }
 
@@ -1064,7 +1087,7 @@ public final class VDONinja {
         }
         if let waiter = roomWaiter {
             roomWaiter = nil
-            waiter(entries)
+            waiter(.success(entries))
             emit(VDOEvent(.roomJoined, data: entries.map(\.streamId), raw: msg))
         }
         if transferred { emit(VDOEvent(.transferred, raw: msg)) }
@@ -1126,6 +1149,7 @@ public final class VDONinja {
     private func handleOffer(_ uuid: String, session: String?, msg: JSON, desc: SessionDescription, via: VDOConnection?) {
         let rawSid = msg["streamID"] as? String
         let clean = rawSid.map(pw.stripHash)
+        if let clean { viewRetries.removeValue(forKey: clean)?.cancel() } // the publisher answered; stop re-sending play
         var existing = (via?.type == "viewer" ? via : nil) ?? connectionLocked(uuid, "viewer")
         if let c = existing, let session, c.session != session {
             log("session mismatch for \(uuid); replacing viewer connection")
@@ -1231,7 +1255,8 @@ public final class VDONinja {
         var retry: String?
         for c in [pair?.publisher, pair?.viewer].compactMap({ $0 }) {
             if c.type == "viewer", let sid = c.streamId, !intentional, !stoppedViews.contains(sid) {
-                retry = sid
+                // Only `bye` re-requests the stream (the JavaScript SDK never retries after `hangup`).
+                if type == .bye { retry = sid }
                 streamTable[sid]?.state = "disconnected"
             }
             c.close()

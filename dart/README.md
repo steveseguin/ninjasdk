@@ -46,19 +46,20 @@ vdo.on(VdoEvents.track, (e) {
   final renderer = RTCVideoRenderer(); // from flutter_webrtc
   renderer.initialize().then((_) => renderer.srcObject = e.stream as MediaStream?);
 });
-final conn = await vdo.view('their-stream');
+final conn = await vdo.view('their-stream'); // null only with timeout: Duration.zero
 
 // Data
 vdo.on(VdoEvents.dataReceived, (e) => print('${e.uuid}: ${e.data}'));
 vdo.sendData({'hello': 'world'});                  // every peer
-vdo.sendData({'hello': 'you'}, uuid: conn.uuid);   // one peer
+vdo.sendData({'hello': 'you'}, uuid: conn!.uuid);  // one peer
 
 await vdo.disconnect();
 ```
 
 Data-only peers use `announce()` instead of `publish()`. `autoConnect(room)` joins a room, announces and views every
 other member (half mesh). `view()` throws a `TimeoutException` when the publisher is not online yet; the request stays
-pending and connects when the stream appears.
+pending (re-sent every `viewRetryInterval`) and connects when the stream appears. With `timeout: Duration.zero` it
+returns `null` right away and leaves the request pending.
 
 ## API overview
 

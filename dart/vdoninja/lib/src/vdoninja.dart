@@ -244,12 +244,16 @@ class VdoNinja {
       if (!r.completer.isCompleted) r.completer.completeError(StateError('disconnected'));
     }
     _pendingRequests.clear();
-    _roomWaiter?.completeError(StateError('disconnected'));
+    final roomWaiter = _roomWaiter;
     _roomWaiter = null;
+    if (roomWaiter != null && !roomWaiter.isCompleted) roomWaiter.completeError(StateError('disconnected'));
     _room = null;
     _roomIntent = null;
     _publishing = false;
     _streamId = null;
+    _localStream = null;
+    _localTracks.clear();
+    _senderKinds.clear();
     await _signal.close();
   }
 
@@ -275,13 +279,19 @@ class VdoNinja {
     _roomIntent = clean;
     _roomClaim = claim;
     _room = clean;
-    final waiter = Completer<List<ListingEntry>>();
-    _roomWaiter = waiter;
     final msg = <String, dynamic>{'request': 'joinroom', 'roomid': _pw.hashRoom(clean)};
     if (claim) msg['claim'] = true;
     if (_publishing && _streamId != null) msg['streamID'] = _pw.hashStreamId(_streamId!);
+    if (timeout == Duration.zero) {
+      // Nobody listens for the listing: do not register a waiter that would later
+      // fail without a listener.
+      _roomWaiter = null;
+      _signal.send(msg);
+      return const [];
+    }
+    final waiter = Completer<List<ListingEntry>>();
+    _roomWaiter = waiter;
     _signal.send(msg);
-    if (timeout == Duration.zero) return const [];
     return waiter.future.timeout(timeout, onTimeout: () {
       if (identical(_roomWaiter, waiter)) _roomWaiter = null;
       throw TimeoutException('no listing received for room $clean');
@@ -393,32 +403,39 @@ class VdoNinja {
 
   /// Requests a stream. Resolves with the viewer connection once the
   /// publisher's offer arrives. When the publisher is not online yet the
-  /// request stays pending (and connects later); the future then fails with a
+  /// request stays pending (and connects later, retried every
+  /// `options.viewRetryInterval`); the future then fails with a
   /// [TimeoutException] after [timeout]. `timeout == Duration.zero` returns
-  /// immediately with a pending request (future never resolves).
-  Future<VdoConnection> view(String streamId, {ViewOptions options = const ViewOptions(), Duration timeout = const Duration(seconds: 15)}) {
+  /// `null` immediately with a pending request.
+  Future<VdoConnection?> view(String streamId, {ViewOptions options = const ViewOptions(), Duration timeout = const Duration(seconds: 15)}) {
     if (!connected) throw StateError('not connected');
     final sid = _requestView(sanitizeStreamId(streamId), options);
+    if (timeout == Duration.zero) return Future<VdoConnection?>.value(null);
     final completer = Completer<VdoConnection>();
     (_viewWaiters[sid] ??= []).add(completer);
-    if (timeout == Duration.zero) return completer.future;
     return completer.future.timeout(timeout, onTimeout: () {
       _viewWaiters[sid]?.remove(completer);
       throw TimeoutException('publisher of $sid did not answer; the request stays pending');
     });
   }
 
-  /// Registers the view intent and sends the play request (no waiting).
+  /// Registers the view intent and sends the play request (no waiting). Like
+  /// the JavaScript SDK, a play that gets no offer is re-sent every
+  /// `viewRetryInterval` until the stream appears or [stopViewing] is called;
+  /// the offer cancels the timer.
   String _requestView(String sid, ViewOptions options) {
     _stoppedViews.remove(sid);
     _pendingViews[sid] = options;
     _viewIntent[sid] = options;
     _signal.send({'request': 'play', 'streamID': _pw.hashStreamId(sid)});
+    _scheduleViewRetry(sid, this.options.viewRetryInterval);
     return sid;
   }
 
+  /// (Re)arms the view retry for [sid]; a newer schedule replaces an older one.
   void _scheduleViewRetry(String sid, Duration delay) {
-    if (_intentional || _stoppedViews.contains(sid) || _viewRetries.containsKey(sid)) return;
+    if (_intentional || _stoppedViews.contains(sid)) return;
+    _viewRetries.remove(sid)?.cancel();
     _viewRetries[sid] = Timer(delay, () {
       _viewRetries.remove(sid);
       if (_intentional || _stoppedViews.contains(sid) || !connected) return;
@@ -753,7 +770,6 @@ class VdoNinja {
 
   void _recoverConnection(VdoConnection c, String reason) {
     if (c._closed) return;
-    _emit(VdoEvent(VdoEvents.connectionFailed, uuid: c.uuid, streamId: c.streamId, connectionType: c.type, message: reason));
     if (!c._recovering && (c.type == 'publisher' || c.controlOpen)) {
       c._recovering = true;
       _log('ICE restart for ${c.uuid}/${c.type} ($reason)');
@@ -769,9 +785,13 @@ class VdoNinja {
       });
       return;
     }
+    // Recovery is exhausted (or impossible): tear the connection down. `connectionFailed`
+    // marks the final failure only, preceded by `peerDisconnected` like any other teardown.
     final sid = c.streamId;
     _removeConnection(c);
     unawaited(c._close());
+    _emit(VdoEvent(VdoEvents.peerDisconnected, uuid: c.uuid, streamId: sid, connectionType: c.type));
+    _emit(VdoEvent(VdoEvents.connectionFailed, uuid: c.uuid, streamId: sid, connectionType: c.type, message: reason));
     if (c.type == 'viewer' && sid != null && !_stoppedViews.contains(sid)) _scheduleViewRetry(sid, const Duration(seconds: 2));
   }
 
@@ -1102,6 +1122,7 @@ class VdoNinja {
   Future<void> _handleOffer(String uuid, String? session, Map<String, dynamic> msg, SessionDescription desc, VdoConnection? via) async {
     final rawSid = msg['streamID'];
     final clean = rawSid is String ? _pw.stripHash(rawSid) : null;
+    if (clean != null) _viewRetries.remove(clean)?.cancel(); // the publisher answered; stop re-sending play
     var c = via != null && via.type == 'viewer' ? via : connection(uuid, 'viewer');
     if (c != null && session != null && session.isNotEmpty && c.session != session) {
       _log('session mismatch for $uuid; replacing viewer connection');
@@ -1201,7 +1222,8 @@ class VdoNinja {
     String? retry;
     for (final c in [pair?.publisher, pair?.viewer].whereType<VdoConnection>()) {
       if (c.type == 'viewer' && c.streamId != null && !_intentional && !_stoppedViews.contains(c.streamId)) {
-        retry = c.streamId;
+        // Only `bye` re-requests the stream (the JavaScript SDK never retries after `hangup`).
+        if (type == VdoEvents.bye) retry = c.streamId;
         _setStreamState(c.streamId, 'disconnected');
       }
       unawaited(c._close());

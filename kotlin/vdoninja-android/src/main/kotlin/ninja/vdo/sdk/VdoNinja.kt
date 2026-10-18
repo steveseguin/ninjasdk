@@ -48,19 +48,31 @@ import java.nio.charset.StandardCharsets
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.Executor
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
+import java.util.concurrent.RejectedExecutionException
 import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
 
 /** One WebRTC connection in one direction: `publisher` (we send) or `viewer` (we receive). */
-class VdoConnection internal constructor(val uuid: String, val type: String, val pc: PeerConnection) {
+class VdoConnection internal constructor(
+    val uuid: String,
+    val type: String,
+    val pc: PeerConnection,
+    /** Runs the native dispose off libwebrtc's threads (dispose blocks on the signaling thread). */
+    private val disposer: Executor,
+) {
     var session: String = Crypto.generateSession()
         internal set
     var streamId: String? = null
         internal set
     internal var control: DataChannel? = null
+    internal val reservedChannels = CopyOnWriteArrayList<DataChannel>()
     @Volatile internal var controlOpen = false
     @Volatile internal var closed = false
+    private var disposed = false
     internal var connectedOnce = false
     internal var remoteSet = false
     internal var recovering = false
@@ -92,8 +104,10 @@ class VdoConnection internal constructor(val uuid: String, val type: String, val
     }
 
     internal fun close() {
-        if (closed) return
-        closed = true
+        synchronized(this) {
+            if (closed) return
+            closed = true
+        }
         iceTask?.cancel(false)
         connectTask?.cancel(false)
         graceTask?.cancel(false)
@@ -101,6 +115,25 @@ class VdoConnection internal constructor(val uuid: String, val type: String, val
         controlOpen = false
         try { control?.close() } catch (_: Exception) {}
         try { pc.close() } catch (_: Exception) {}
+        // close() is often called from a libwebrtc observer callback, where dispose() would deadlock,
+        // so the native release runs on the worker. After VdoNinja.dispose() the worker is gone;
+        // a straggler then stays undisposed rather than risk blocking a libwebrtc thread.
+        try { disposer.execute(::dispose) } catch (_: RejectedExecutionException) {}
+    }
+
+    /** Releases the native peer connection and data channels. Never call on a libwebrtc thread. */
+    private fun dispose() {
+        synchronized(this) {
+            if (disposed) return
+            disposed = true
+        }
+        for (dc in reservedChannels + listOfNotNull(control)) {
+            try { dc.unregisterObserver() } catch (_: Exception) {}
+            try { dc.dispose() } catch (_: Exception) {}
+        }
+        reservedChannels.clear()
+        control = null
+        try { pc.dispose() } catch (_: Exception) {}
     }
 }
 
@@ -159,8 +192,13 @@ class VdoNinja @JvmOverloads constructor(
 
     @Volatile private var autoConnect = false
     private var autoFull = false
-    private var iceServers: List<PeerConnection.IceServer>? = null
+    private var iceServers: CompletableFuture<List<PeerConnection.IceServer>>? = null
     @Volatile private var intentional = false
+
+    /** Blocking work (TURN fetch, native dispose, request handlers) stays off the timer and signaling threads. */
+    private val worker: ExecutorService = Executors.newCachedThreadPool { r ->
+        Thread(r, "vdoninja-worker").apply { isDaemon = true }
+    }
 
     init {
         this.factory = factory ?: run {
@@ -218,6 +256,7 @@ class VdoNinja @JvmOverloads constructor(
     fun connect(timeoutMs: Long = 15_000) {
         intentional = false
         signal.connect(timeoutMs)
+        iceServerFuture() // prefetch the TURN list so the first offer does not block on HTTP
     }
 
     private fun restoreIntent() {
@@ -255,16 +294,18 @@ class VdoNinja @JvmOverloads constructor(
             roomIntent = null
             publishing = false
             streamId = null
+            localTracks.clear()
         }
         pendingRequests.values.forEach { it.future.completeExceptionally(IllegalStateException("disconnected")) }
         pendingRequests.clear()
         signal.close()
     }
 
-    /** Disconnects and releases the timer thread. The factory and EGL context stay owned by the caller. */
+    /** Disconnects and releases the timer and worker threads. The factory and EGL context stay owned by the caller. */
     fun dispose() {
         disconnect()
         signal.shutdown()
+        worker.shutdown() // queued native disposes still run
     }
 
     // -------------------------------------------------------------- rooms
@@ -410,7 +451,11 @@ class VdoNinja @JvmOverloads constructor(
         }
     }
 
-    /** Registers the view intent and sends the play request. */
+    /**
+     * Registers the view intent and sends the play request. Like the JavaScript SDK, a
+     * play that gets no offer is re-sent every `viewRetryIntervalMs` until the stream
+     * appears or [stopViewing] is called; the offer cancels the timer.
+     */
     private fun requestView(sid: String, options: ViewOptions): String {
         synchronized(lock) {
             stoppedViews.remove(sid)
@@ -418,12 +463,15 @@ class VdoNinja @JvmOverloads constructor(
             viewIntent[sid] = options
         }
         signal.send(JSONObject().put("request", "play").put("streamID", pw.hashStreamId(sid)))
+        scheduleViewRetry(sid, this.options.viewRetryIntervalMs)
         return sid
     }
 
+    /** (Re)arms the view retry for [sid]; a newer schedule replaces an older one. */
     private fun scheduleViewRetry(sid: String, delayMs: Long) {
         synchronized(lock) {
-            if (intentional || sid in stoppedViews || viewRetries.containsKey(sid)) return
+            if (intentional || sid in stoppedViews) return
+            viewRetries.remove(sid)?.cancel(false)
             viewRetries[sid] = scheduler.schedule({
                 val opts: ViewOptions?
                 synchronized(lock) {
@@ -574,7 +622,7 @@ class VdoNinja @JvmOverloads constructor(
         uuid = uuid,
     )
 
-    /** Registers a request handler `(data, fromUuid) -> response`; null removes it. */
+    /** Registers a request handler `(data, fromUuid) -> response`; null removes it. Handlers run on worker threads. */
     fun onRequest(requestType: String, handler: ((data: Any?, fromUuid: String) -> Any?)?) {
         if (handler == null) requestHandlers.remove(requestType) else requestHandlers[requestType] = handler
     }
@@ -622,8 +670,20 @@ class VdoNinja @JvmOverloads constructor(
         }
     }
 
-    private fun iceServerList(): List<PeerConnection.IceServer> {
-        iceServers?.let { return it }
+    /** Starts (once) the ICE server resolution on a worker thread; `Turn.fetch` blocks for up to 10 s. */
+    private fun iceServerFuture(): CompletableFuture<List<PeerConnection.IceServer>> = synchronized(lock) {
+        iceServers ?: CompletableFuture.supplyAsync({ buildIceServers() }, worker).also { iceServers = it }
+    }
+
+    /** Cached ICE servers; waits for the prefetch only when it has not finished yet. */
+    private fun iceServerList(): List<PeerConnection.IceServer> = try {
+        iceServerFuture().get()
+    } catch (e: java.util.concurrent.ExecutionException) {
+        synchronized(lock) { iceServers = null } // retry next time
+        throw e.cause ?: e
+    }
+
+    private fun buildIceServers(): List<PeerConnection.IceServer> {
         val out = ArrayList<IceServer>()
         for (s in options.stunServers ?: Turn.DEFAULT_STUN) out.add(IceServer(listOf(s)))
         when (options.turnMode) {
@@ -631,14 +691,12 @@ class VdoNinja @JvmOverloads constructor(
             TurnMode.CUSTOM -> out.addAll(options.turnServers)
             TurnMode.AUTO -> out.addAll(Turn.select(Turn.fetch(options.turnUrl), forceTcp = options.forceTcp))
         }
-        val list = out.map { s ->
+        return out.map { s ->
             PeerConnection.IceServer.builder(s.urls).apply {
                 if (s.username != null) setUsername(s.username)
                 if (s.credential != null) setPassword(s.credential)
             }.createIceServer()
         }
-        iceServers = list
-        return list
     }
 
     private fun createConnection(uuid: String, type: String): VdoConnection {
@@ -668,7 +726,7 @@ class VdoNinja @JvmOverloads constructor(
             override fun onAddTrack(receiver: RtpReceiver, streams: Array<out MediaStream>) {}
         }
         val pc = factory.createPeerConnection(config, observer) ?: throw IllegalStateException("createPeerConnection failed")
-        conn = VdoConnection(uuid, type, pc)
+        conn = VdoConnection(uuid, type, pc, worker)
         val old: VdoConnection?
         synchronized(lock) {
             val pair = connections.getOrPut(uuid) { Pair2() }
@@ -791,7 +849,6 @@ class VdoNinja @JvmOverloads constructor(
 
     private fun recoverConnection(c: VdoConnection, reason: String) {
         if (c.closed) return
-        emit(VdoEvent(VdoEvents.CONNECTION_FAILED, uuid = c.uuid, streamId = c.streamId, connectionType = c.type, message = reason))
         if (!c.recovering && (c.type == "publisher" || c.controlOpen)) {
             c.recovering = true
             log("ICE restart for ${c.uuid}/${c.type} ($reason)")
@@ -801,9 +858,13 @@ class VdoNinja @JvmOverloads constructor(
             c.connectTask = scheduler.schedule({ if (!c.closed) recoverConnection(c, "restart_timeout") }, options.connectionTimeoutMs, TimeUnit.MILLISECONDS)
             return
         }
+        // Recovery is exhausted (or impossible): tear the connection down. `connectionFailed`
+        // marks the final failure only, preceded by `peerDisconnected` like any other teardown.
         val sid = c.streamId
         synchronized(lock) { removeConnection(c) }
         c.close()
+        emit(VdoEvent(VdoEvents.PEER_DISCONNECTED, uuid = c.uuid, streamId = sid, connectionType = c.type))
+        emit(VdoEvent(VdoEvents.CONNECTION_FAILED, uuid = c.uuid, streamId = sid, connectionType = c.type, message = reason))
         if (c.type == "viewer" && sid != null && synchronized(lock) { sid !in stoppedViews }) scheduleViewRetry(sid, 2000)
     }
 
@@ -821,6 +882,7 @@ class VdoNinja @JvmOverloads constructor(
             return
         }
         if (label == Protocol.BINARY_CHANNEL || label.startsWith(Protocol.RESERVED_PREFIX)) {
+            c.reservedChannels.add(dc)
             dc.registerObserver(object : DataChannel.Observer {
                 override fun onBufferedAmountChange(previousAmount: Long) {}
                 override fun onStateChange() {}
@@ -969,13 +1031,15 @@ class VdoNinja @JvmOverloads constructor(
                 val rid = pipe.optString("requestId", "")
                 val h = requestHandlers[rt] ?: return true
                 if (rid.isEmpty()) return true
-                scheduler.execute {
-                    try {
-                        respond(rid, h(pipe.opt("data"), c.uuid), c.uuid)
-                    } catch (t: Throwable) {
-                        respond(rid, JSONObject().put("error", t.message ?: t.toString()), c.uuid)
+                try {
+                    worker.execute {
+                        try {
+                            respond(rid, h(pipe.opt("data"), c.uuid), c.uuid)
+                        } catch (t: Throwable) {
+                            respond(rid, JSONObject().put("error", t.message ?: t.toString()), c.uuid)
+                        }
                     }
-                }
+                } catch (_: RejectedExecutionException) {} // disposed
                 return true
             }
             "response" -> {
@@ -1110,6 +1174,7 @@ class VdoNinja @JvmOverloads constructor(
     private fun handleOffer(uuid: String, session: String?, msg: JSONObject, desc: SessionDescription, via: VdoConnection?) {
         val rawSid = msg.optString("streamID", null)
         val clean = rawSid?.let { pw.stripHash(it) }
+        if (clean != null) synchronized(lock) { viewRetries.remove(clean)?.cancel(false) } // the publisher answered; stop re-sending play
         var c = if (via != null && via.type == "viewer") via else connection(uuid, "viewer")
         if (c != null && !session.isNullOrEmpty() && c.session != session) {
             log("session mismatch for $uuid; replacing viewer connection")
@@ -1220,7 +1285,8 @@ class VdoNinja @JvmOverloads constructor(
             for (c in conns) {
                 val sid = c.streamId
                 if (c.type == "viewer" && sid != null && !intentional && sid !in stoppedViews) {
-                    retry = sid
+                    // Only `bye` re-requests the stream (the JavaScript SDK never retries after `hangup`).
+                    if (type == VdoEvents.BYE) retry = sid
                     streams[sid]?.state = "disconnected"
                 }
             }
