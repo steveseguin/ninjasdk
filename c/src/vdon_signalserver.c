@@ -227,8 +227,19 @@ static void ss_handle(vdon_signal_server *s, ss_client *c, cJSON *msg) {
         for (i = 0; room[i]; i++)
             if (room[i] >= 'A' && room[i] <= 'Z')
                 room[i] = (char)(room[i] + 32);
-        if (sid && *sid && !c->stream_id)
+        if (sid && *sid && !c->stream_id) {
+            /* Same live-owner check as seed: joinroom must not take over a stream ID. */
+            ss_client *owner = ss_find_stream(s, sid);
+            if (owner && owner != c) {
+                cJSON *a = cJSON_CreateObject();
+                cJSON_AddStringToObject(a, "request", "alert");
+                cJSON_AddStringToObject(a, "message", "Stream ID is already in use.");
+                ss_send(c, a);
+                cJSON_Delete(a);
+                return;
+            }
             c->stream_id = vdon_strdup(sid);
+        }
         resp = cJSON_CreateObject();
         cJSON_AddStringToObject(resp, "request", "listing");
         director = ss_director_of(s, room);

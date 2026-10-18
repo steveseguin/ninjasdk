@@ -155,10 +155,15 @@ class SignalServer:
     async def join_room(self, uuid: str, room: str, claim: bool, stream_id: str) -> None:
         if not room or uuid in self.rooms:
             return
-        self.rooms[uuid] = room
         if stream_id and uuid not in self.stream_ids:
+            # Same live-owner check as seed: joinroom must not take over a stream ID.
+            owner = self.streams.get(stream_id)
+            if owner and owner != uuid and owner in self.clients:
+                await self._send(uuid, {"request": "alert", "message": "Stream ID is already in use."})
+                return
             self.streams[stream_id] = uuid
             self.stream_ids[uuid] = stream_id
+        self.rooms[uuid] = room
         resp: Dict[str, Any] = {"request": "listing"}
         is_director = False
         if claim:

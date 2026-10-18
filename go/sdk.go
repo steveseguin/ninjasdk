@@ -426,8 +426,10 @@ func (s *SDK) reconnect(gen int) {
 func (s *SDK) restoreIntent() {
 	s.mu.Lock()
 	room := s.intentRoom
-	publishing := s.publishing || s.streamID != ""
-	wasPublishing := s.publishing && s.streamID != ""
+	// readLoop clears publishing when the socket drops; the retained stream ID
+	// is the publish intent (StopPublishing clears it), as _connectionIntent is
+	// in the JavaScript SDK.
+	wasPublishing := s.streamID != ""
 	streamID := s.streamID
 	views := make(map[string]ViewOptions, len(s.viewIntent))
 	for k, v := range s.viewIntent {
@@ -436,7 +438,6 @@ func (s *SDK) restoreIntent() {
 		}
 	}
 	s.mu.Unlock()
-	_ = publishing
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -446,10 +447,12 @@ func (s *SDK) restoreIntent() {
 		}
 	}
 	if wasPublishing {
-		// Re-seed directly: the SDK is still "publishing" and Announce/Publish
-		// refuse a second publish on a connection.
+		// Re-seed directly rather than through Announce/Publish, which refuse a
+		// second publish per connection; publishing goes back on so offerSDP
+		// requests from new viewers are served.
 		s.mu.Lock()
 		hashed := s.hashedStreamID(streamID)
+		s.publishing = true
 		s.mu.Unlock()
 		s.sendWS(map[string]any{"request": "seed", "streamID": hashed})
 	}

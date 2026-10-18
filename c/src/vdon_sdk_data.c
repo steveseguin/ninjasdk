@@ -781,6 +781,21 @@ void vdon__chan_opened_extra(chan_t *ch) {
     }
 }
 
+/* lock held: forget every channel back-reference to a transfer about to be freed,
+ * so a late chunk, EOF or close on a still-open channel cannot touch it. */
+static void inbound_detach(vdon_sdk *s, inbound_t *in) {
+    conn_t *c;
+    chan_t *ch;
+    for (c = s->conns; c; c = c->next)
+        for (ch = c->chans; ch; ch = ch->next)
+            if (ch->inbound == in)
+                ch->inbound = NULL;
+    for (c = s->graveyard; c; c = c->next)
+        for (ch = c->chans; ch; ch = ch->next)
+            if (ch->inbound == in)
+                ch->inbound = NULL;
+}
+
 static void inbound_finish(vdon_sdk *s, chan_t *ch, int err) {
     pthread_mutex_lock(&s->lock);
     if (ch->inbound && !ch->inbound->done) {
@@ -1016,6 +1031,7 @@ int vdon_request_file(vdon_sdk *s, const char *uuid, const char *file_id, int ti
             *pp = in->next;
             break;
         }
+    inbound_detach(s, in);
     pthread_mutex_unlock(&s->lock);
     if (rc == VDON_OK) {
         *out_data = in->buf ? in->buf : (uint8_t *)malloc(1);

@@ -531,7 +531,9 @@ class VDONinja:
             if room:
                 await self.join_room(room["room"], claim=room.get("claim", False))
             if was_publishing and stream_id:
-                # Re-seed directly: announce()/publish() refuse a second publish per connection.
+                # Re-seed directly: announce()/publish() refuse a second publish per
+                # connection. publishing goes back on so offerSDP requests are served.
+                self.publishing = True
                 self._send_ws({"request": "seed", "streamID": self.hashed_stream_id(stream_id)})
         except Exception as exc:  # noqa: BLE001
             log.debug("restore intent failed: %s", exc)

@@ -383,3 +383,39 @@ func TestViewPendingUntilPublished(t *testing.T) {
 	}
 	waitFor(t, open, 15*time.Second, "late data channel")
 }
+
+func TestReconnectRestoresPublish(t *testing.T) {
+	host := startSignal(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+	pub := newTestSDK(t, host, func(o *Options) { o.ReconnectDelay = 100 * time.Millisecond })
+	reconnected := make(chan Event, 1)
+	pub.On(EventReconnected, func(ev Event) { reconnected <- ev })
+	if err := pub.Connect(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pub.Announce(ctx, PublishOptions{StreamID: "resume"}); err != nil {
+		t.Fatal(err)
+	}
+	// Drop the signaling socket underneath the publisher, as a network failure would.
+	pub.mu.Lock()
+	ws := pub.ws
+	pub.mu.Unlock()
+	_ = ws.Close()
+	waitFor(t, reconnected, 20*time.Second, "publisher reconnect")
+
+	// The re-seeded stream must be viewable and the SDK must still count as publishing.
+	view := newTestSDK(t, host, nil)
+	open := make(chan Event, 4)
+	view.On(EventDataChannelOpen, func(ev Event) { open <- ev })
+	if err := view.Connect(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := view.View(ctx, "resume"); err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, open, 15*time.Second, "data channel after reconnect")
+	if _, err := pub.Announce(ctx, PublishOptions{StreamID: "other"}); err != ErrAlreadyPublishing {
+		t.Fatalf("expected ErrAlreadyPublishing after reconnect, got %v", err)
+	}
+}

@@ -207,11 +207,21 @@ impl State {
         if room.is_empty() || self.rooms.contains_key(uuid) {
             return;
         }
-        self.rooms.insert(uuid.into(), room.into());
         if !stream_id.is_empty() && !self.stream_ids.contains_key(uuid) {
+            // Same live-owner check as seed: joinroom must not take over a stream ID.
+            if let Some(owner) = self.streams.get(stream_id) {
+                if owner != uuid && self.clients.contains_key(owner) {
+                    self.send(
+                        uuid,
+                        &json!({"request": "alert", "message": "Stream ID is already in use."}),
+                    );
+                    return;
+                }
+            }
             self.streams.insert(stream_id.into(), uuid.into());
             self.stream_ids.insert(uuid.into(), stream_id.into());
         }
+        self.rooms.insert(uuid.into(), room.into());
         let mut resp = json!({"request": "listing"});
         let mut is_director = false;
         if claim {

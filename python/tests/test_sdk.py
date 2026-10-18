@@ -152,3 +152,22 @@ async def test_no_password_and_pending_view(signal_host):
     finally:
         await pub.disconnect()
         await view.disconnect()
+
+
+async def test_reconnect_restores_publish(signal_host):
+    pub = make(signal_host, reconnect_delay=0.1)
+    view = make(signal_host)
+    try:
+        await pub.connect()
+        await pub.announce("resume")
+        reconnected = asyncio.ensure_future(pub.wait_for("reconnected", timeout=20))
+        # Drop the signaling socket underneath the publisher, as a network failure would.
+        await pub._ws.close()
+        await reconnected
+        opened = asyncio.ensure_future(view.wait_for("dataChannelOpen", timeout=15))
+        await view.connect()
+        await view.view("resume")
+        await opened
+    finally:
+        await pub.disconnect()
+        await view.disconnect()

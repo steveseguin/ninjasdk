@@ -1485,11 +1485,12 @@ static conn_t *conn_create(vdon_sdk *s, const char *uuid, const char *type) {
 
 /* ----------------------------------------------------------- pending ICE */
 
-static void queue_pending_ice(vdon_sdk *s, const char *uuid, const char *type, cJSON *cands) {
+static void queue_pending_ice(vdon_sdk *s, const char *uuid, const char *type, const char *session, cJSON *cands) {
     /* lock held; takes ownership of cands */
     pice_t *p = (pice_t *)calloc(1, sizeof(*p));
     p->uuid = vdon_strdup(uuid);
     p->type = type;
+    p->session = session && *session ? vdon_strdup(session) : NULL;
     p->cands = cands;
     p->next = s->pending_ice;
     s->pending_ice = p;
@@ -1515,8 +1516,10 @@ static void drain_pending_ice(vdon_sdk *s, conn_t *c, const char *type) {
         pice_t *p = *pp;
         if (strcmp(p->uuid, c->uuid) == 0 && p->type == type) {
             cJSON *it;
-            while ((it = cJSON_DetachItemFromArray(p->cands, 0)))
-                cJSON_AddItemToArray(all, it);
+            /* Candidates queued for an earlier session of this peer are dropped. */
+            if (!(p->session && c->session[0] && strcmp(p->session, c->session) != 0))
+                while ((it = cJSON_DetachItemFromArray(p->cands, 0)))
+                    cJSON_AddItemToArray(all, it);
             *pp = p->next;
             cJSON_Delete(p->cands);
             free(p->uuid);
@@ -1702,6 +1705,7 @@ static void handle_remote_candidates(vdon_sdk *s, cJSON *msg, conn_t *via, int s
     cJSON *cands = decode_field(s, msg, single ? "candidate" : "candidates");
     const char *uuid = via ? via->uuid : jstr(msg, "UUID");
     const char *mtype = jstr(msg, "type");
+    const char *session = via ? NULL : jstr(msg, "session");
     const char *want;
     conn_t *c;
     int ready = 0;
@@ -1725,10 +1729,17 @@ static void handle_remote_candidates(vdon_sdk *s, cJSON *msg, conn_t *via, int s
     c = via ? via : vdon__find_conn(s, uuid, want);
     if (c && c->closed)
         c = NULL;
+    if (c && session && *session && c->session[0] && strcmp(c->session, session) != 0) {
+        /* Delayed candidates from a replaced session (same UUID) would corrupt the new ICE agent. */
+        vdon__logf(s, "Session mismatch for %s (%s vs %s): ignoring candidates", uuid, c->session, session);
+        pthread_mutex_unlock(&s->lock);
+        cJSON_Delete(cands);
+        return;
+    }
     if (c && c->remote_set)
         ready = 1;
     if (!ready) {
-        queue_pending_ice(s, uuid, want == TYPE_PUBLISHER ? "remote" : "local", cands);
+        queue_pending_ice(s, uuid, want == TYPE_PUBLISHER ? "remote" : "local", session, cands);
         pthread_mutex_unlock(&s->lock);
         return;
     }

@@ -101,9 +101,10 @@ class SignalingClient(
                 webSocket.close(code, reason)
             }
         }
-        http.newWebSocket(Request.Builder().url(url).build(), listener)
+        val ws = http.newWebSocket(Request.Builder().url(url).build(), listener)
         if (!latch.await(timeoutMs, TimeUnit.MILLISECONDS)) {
             generation.incrementAndGet()
+            ws.cancel() // abort the handshake so it cannot open later as an unobserved socket
             return "connect timeout"
         }
         return if (connected) null else (error ?: "connection failed")

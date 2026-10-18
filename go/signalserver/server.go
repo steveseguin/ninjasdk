@@ -283,11 +283,18 @@ func (s *Server) joinRoom(c *client, room string, claim bool, streamID string) {
 	if _, already := s.rooms[c.uuid]; already {
 		return
 	}
-	s.rooms[c.uuid] = room
 	if streamID != "" && s.streamIDs[c.uuid] == "" {
+		// Same live-owner check as seed: joinroom must not take over a stream ID.
+		if owner, ok := s.streams[streamID]; ok && owner != c.uuid {
+			if _, alive := s.clients[owner]; alive {
+				c.send(map[string]any{"request": "alert", "message": "Stream ID is already in use."})
+				return
+			}
+		}
 		s.streams[streamID] = c.uuid
 		s.streamIDs[c.uuid] = streamID
 	}
+	s.rooms[c.uuid] = room
 	resp := map[string]any{"request": "listing"}
 	isDirector := false
 	if claim {
