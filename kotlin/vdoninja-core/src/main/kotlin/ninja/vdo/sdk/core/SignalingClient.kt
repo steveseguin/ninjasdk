@@ -171,12 +171,16 @@ class SignalingClient(
             attempt = attempts
             reconnectTask = scheduler.schedule({
                 if (intentional || gen != generation.get()) return@schedule
-                onReconnecting?.invoke(attempt)
-                val err = open(15_000, reconnect = true, expectedGeneration = gen)
-                if (err != null) {
-                    log?.invoke("reconnect attempt $attempt failed: $err")
-                    scheduleReconnect()
-                }
+                // open() blocks on the handshake (up to 15 s); the scheduler is also the SDK's
+                // timer thread (ICE bundles, pings, connection timeouts), so run it elsewhere.
+                Thread({
+                    onReconnecting?.invoke(attempt)
+                    val err = open(15_000, reconnect = true, expectedGeneration = gen)
+                    if (err != null) {
+                        log?.invoke("reconnect attempt $attempt failed: $err")
+                        scheduleReconnect()
+                    }
+                }, "vdoninja-reconnect").apply { isDaemon = true }.start()
             }, delay, TimeUnit.MILLISECONDS)
         }
     }

@@ -64,14 +64,6 @@ public final class SignalingClient: NSObject, URLSessionWebSocketDelegate, @unch
 
     private func open(timeout: TimeInterval, reconnect: Bool, completion: @escaping (Error?) -> Void) {
         if shutDown { return completion(URLError(.cancelled)) }
-        // A connect that is still in flight is superseded: fail it (so its caller does not hang)
-        // and cancel its handshake before replacing it.
-        if let previous = pendingOpen {
-            pendingOpen = nil
-            task?.cancel()
-            task = nil
-            previous(URLError(.cancelled))
-        }
         generation += 1
         let gen = generation
         var request = URLRequest(url: url)

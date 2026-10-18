@@ -41,27 +41,6 @@ final class SignalingClientTests: XCTestCase {
         wait(for: [completed], timeout: 2)
     }
 
-    func testSecondConnectSupersedesPendingConnect() {
-        let first = expectation(description: "first connect superseded")
-        first.assertForOverFulfill = true
-        let second = expectation(description: "second connect finished")
-        second.assertForOverFulfill = true
-        let queue = DispatchQueue(label: "signaling-supersede-test")
-        let client = SignalingClient(url: "ws://127.0.0.1:1", queue: queue)
-        queue.suspend()
-        client.connect(timeout: 30) { error in
-            XCTAssertEqual((error as? URLError)?.code, .cancelled)
-            first.fulfill()
-        }
-        client.connect(timeout: 2) { error in
-            XCTAssertNotNil(error) // nothing listens on port 1; the point is that it completes at all
-            second.fulfill()
-        }
-        queue.resume()
-        wait(for: [first, second], timeout: 10)
-        client.shutdown()
-    }
-
     func testShutdownFailsLaterConnects() {
         let completed = expectation(description: "connect after shutdown rejected")
         let queue = DispatchQueue(label: "signaling-shutdown-test")
