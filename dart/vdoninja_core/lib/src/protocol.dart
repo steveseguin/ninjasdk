@@ -14,6 +14,19 @@ const String controlChannelLabel = 'sendChannel';
 const String binaryChannelLabel = 'x-bin';
 const String reservedChannelPrefix = 'x-';
 
+/// Keeps the signaling session alongside candidates until remote SDP is ready.
+class CandidateBatch {
+  const CandidateBatch(this.session, this.candidates);
+
+  final String? session;
+  final List<IceCandidate> candidates;
+
+  List<IceCandidate> matching(String currentSession) =>
+      session != null && session!.isNotEmpty && currentSession.isNotEmpty && session != currentSession
+          ? const <IceCandidate>[]
+          : candidates;
+}
+
 /// Password, salt and the derived hashes, plus signaling encryption.
 ///
 /// `password == null` disables hashing and encryption (JavaScript

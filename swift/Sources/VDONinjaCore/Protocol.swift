@@ -14,6 +14,22 @@ public enum Defaults {
 /// JSON values as produced by `JSONSerialization`: `[String: Any]`, `[Any]`, `String`, `NSNumber`, `NSNull`.
 public typealias JSON = [String: Any]
 
+/// Keeps the signaling session alongside candidates until remote SDP is ready.
+public struct CandidateBatch {
+    public let session: String?
+    public let candidates: [IceCandidate]
+
+    public init(session: String?, candidates: [IceCandidate]) {
+        self.session = session
+        self.candidates = candidates
+    }
+
+    public func matching(_ currentSession: String) -> [IceCandidate] {
+        if let session, !session.isEmpty, !currentSession.isEmpty, session != currentSession { return [] }
+        return candidates
+    }
+}
+
 public enum JSONCodec {
     public static func encode(_ value: Any) -> String? {
         guard JSONSerialization.isValidJSONObject(value) || value is String || value is NSNumber || value is NSNull else {

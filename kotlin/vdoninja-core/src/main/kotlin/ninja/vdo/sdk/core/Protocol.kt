@@ -113,6 +113,13 @@ data class SessionDescription(val type: String, val sdp: String) {
     }
 }
 
+/** Keeps the signaling session alongside candidates until remote SDP is ready. */
+data class CandidateBatch(val session: String?, val candidates: List<IceCandidate>) {
+    fun matching(currentSession: String): List<IceCandidate> =
+        if (!session.isNullOrEmpty() && currentSession.isNotEmpty() && session != currentSession) emptyList()
+        else candidates
+}
+
 /** An ICE candidate as exchanged in `candidates` arrays. */
 data class IceCandidate(val candidate: String, val sdpMid: String?, val sdpMLineIndex: Int?) {
     fun toJson(): JSONObject = JSONObject().apply {

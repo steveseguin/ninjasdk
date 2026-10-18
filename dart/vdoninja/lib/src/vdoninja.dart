@@ -143,7 +143,7 @@ class VdoNinja {
   final Map<String, List<Completer<VdoConnection>>> _viewWaiters = {};
   final Map<String, Timer> _viewRetries = {};
   final Map<String, StreamInfo> _streams = {};
-  final Map<String, List<IceCandidate>> _pendingIce = {};
+  final Map<String, List<CandidateBatch>> _pendingIce = {};
 
   final Set<String> _subscriptions = {};
   final Map<String, Set<String>> _peerSubscriptions = {};
@@ -1170,11 +1170,13 @@ class VdoNinja {
     // "remote" candidates come from viewers (for our publisher pc), "local" from publishers.
     final want = via?.type ?? (msg['type'] == 'remote' ? 'publisher' : 'viewer');
     final c = via ?? connection(uuid, want);
+    final session = msg['session'] is String ? msg['session'] as String : via?.session;
+    final batch = CandidateBatch(session, cands);
     if (c == null || !c._remoteSet) {
-      (_pendingIce['${want == 'publisher' ? 'remote' : 'local'}:$uuid'] ??= []).addAll(cands);
+      (_pendingIce['${want == 'publisher' ? 'remote' : 'local'}:$uuid'] ??= []).add(batch);
       return;
     }
-    await _addCandidates(c, cands);
+    await _addCandidates(c, batch.matching(c.session));
   }
 
   Future<void> _addCandidates(VdoConnection c, List<IceCandidate> cands) async {
@@ -1189,7 +1191,7 @@ class VdoNinja {
 
   Future<void> _drainPendingIce(VdoConnection c, String msgType) async {
     final list = _pendingIce.remove('$msgType:${c.uuid}');
-    if (list != null) await _addCandidates(c, list);
+    if (list != null) await _addCandidates(c, list.expand((batch) => batch.matching(c.session)).toList());
   }
 
   void _handleBye(String? uuid, String type, Map<String, dynamic> msg) {

@@ -162,10 +162,10 @@ public final class VDONinja {
     private var pendingViews: [String: ViewOptions] = [:]
     private var viewIntent: [String: ViewOptions] = [:]
     private var stoppedViews: Set<String> = []
-    private var viewWaiters: [String: [(Result<VDOConnection, Error>) -> Void]] = [:]
+    private let viewWaiters = PendingCallbacks<VDOConnection>()
     private var viewRetries: [String: DispatchWorkItem] = [:]
     private var streamTable: [String: StreamInfo] = [:]
-    private var pendingIce: [String: [IceCandidate]] = [:]
+    private var pendingIce: [String: [CandidateBatch]] = [:]
     private var subscriptions: Set<String> = []
     private var peerSubscriptions: [String: Set<String>] = [:]
     private var requestHandlers: [String: (Any?, String) -> Any?] = [:]
@@ -286,8 +286,7 @@ public final class VDONinja {
                 conns.forEach { $0.close() }
                 self.connections.removeAll(); self.order.removeAll()
                 self.pendingViews.removeAll(); self.viewIntent.removeAll(); self.stoppedViews.removeAll(); self.pendingIce.removeAll()
-                for (_, ws) in self.viewWaiters { ws.forEach { $0(.failure(SDKError.closed)) } }
-                self.viewWaiters.removeAll()
+                self.viewWaiters.completeAll(result: .failure(SDKError.closed))
                 for (_, p) in self.pendingRequests { p.done(.failure(SDKError.closed)) }
                 self.pendingRequests.removeAll()
                 self.roomWaiter = nil
@@ -441,17 +440,12 @@ public final class VDONinja {
             guard self.connected else { return completion(.failure(SDKError.notConnected)) }
             let sid = self.requestView(Sanitize.streamId(streamId), options)
             if timeout <= 0 { return completion(.success(nil)) }
-            var finished = false
-            let waiter: (Result<VDOConnection, Error>) -> Void = { r in
-                if finished { return }
-                finished = true
+            let token = self.viewWaiters.add(sid) { r in
                 completion(r.map { Optional($0) })
             }
-            self.viewWaiters[sid, default: []].append(waiter)
-            self.queue.asyncAfter(deadline: .now() + timeout) {
-                if finished { return }
-                finished = true
-                completion(.failure(SDKError.timeout("publisher of \(sid) did not answer; the request stays pending")))
+            self.queue.asyncAfter(deadline: .now() + timeout) { [weak self] in
+                self?.viewWaiters.complete(sid, token: token, result: .failure(
+                    SDKError.timeout("publisher of \(sid) did not answer; the request stays pending")))
             }
         }
     }
@@ -490,7 +484,7 @@ public final class VDONinja {
             self.pendingViews[sid] = nil
             self.viewIntent[sid] = nil
             self.viewRetries.removeValue(forKey: sid)?.cancel()
-            self.viewWaiters.removeValue(forKey: sid)?.forEach { $0(.failure(SDKError.closed)) }
+            self.viewWaiters.completeAll(sid, result: .failure(SDKError.closed))
             let conns = self.allConnections().filter { $0.type == "viewer" && $0.streamId == sid }
             conns.forEach { self.sendBye($0) }
             self.queue.asyncAfter(deadline: .now() + (conns.isEmpty ? 0 : 0.05)) {
@@ -1156,7 +1150,7 @@ public final class VDONinja {
                                     }
                                     if let clean, !clean.isEmpty {
                                         self.pendingViews[clean] = nil
-                                        self.viewWaiters.removeValue(forKey: clean)?.forEach { $0(.success(c)) }
+                                        self.viewWaiters.completeAll(clean, result: .success(c))
                                     }
                                 }
                             }
@@ -1202,11 +1196,12 @@ public final class VDONinja {
         // "remote" candidates come from viewers (for our publisher pc), "local" from publishers.
         let want = via?.type ?? ((msg["type"] as? String) == "remote" ? "publisher" : "viewer")
         let c = via ?? connectionLocked(uuid, want)
+        let batch = CandidateBatch(session: msg["session"] as? String ?? via?.session, candidates: cands)
         guard let c, c.remoteSet else {
-            pendingIce["\(want == "publisher" ? "remote" : "local"):\(uuid)", default: []] += cands
+            pendingIce["\(want == "publisher" ? "remote" : "local"):\(uuid)", default: []].append(batch)
             return
         }
-        addCandidates(c, cands)
+        addCandidates(c, batch.matching(c.session))
     }
 
     private func addCandidates(_ c: VDOConnection, _ cands: [IceCandidate]) {
@@ -1218,7 +1213,9 @@ public final class VDONinja {
     }
 
     private func drainPendingIce(_ c: VDOConnection, _ msgType: String) {
-        if let list = pendingIce.removeValue(forKey: "\(msgType):\(c.uuid)") { addCandidates(c, list) }
+        if let list = pendingIce.removeValue(forKey: "\(msgType):\(c.uuid)") {
+            addCandidates(c, list.flatMap { $0.matching(c.session) })
+        }
     }
 
     private func handleBye(_ uuid: String?, _ type: VDOEventType, _ msg: JSON) {

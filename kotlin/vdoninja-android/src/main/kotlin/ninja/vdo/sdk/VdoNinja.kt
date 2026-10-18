@@ -11,6 +11,7 @@ package ninja.vdo.sdk
 
 import android.content.Context
 import ninja.vdo.sdk.core.Crypto
+import ninja.vdo.sdk.core.CandidateBatch
 import ninja.vdo.sdk.core.IceCandidate
 import ninja.vdo.sdk.core.IceServer
 import ninja.vdo.sdk.core.ListingEntry
@@ -149,7 +150,7 @@ class VdoNinja @JvmOverloads constructor(
     private val viewWaiters = HashMap<String, MutableList<CompletableFuture<VdoConnection>>>()
     private val viewRetries = HashMap<String, ScheduledFuture<*>>()
     private val streams = LinkedHashMap<String, StreamInfo>()
-    private val pendingIce = HashMap<String, MutableList<IceCandidate>>()
+    private val pendingIce = HashMap<String, MutableList<CandidateBatch>>()
 
     private val subscriptions = HashSet<String>()
     private val peerSubscriptions = HashMap<String, MutableSet<String>>()
@@ -1185,11 +1186,12 @@ class VdoNinja @JvmOverloads constructor(
         // "remote" candidates come from viewers (for our publisher pc), "local" from publishers.
         val want = via?.type ?: if (msg.optString("type") == "remote") "publisher" else "viewer"
         val c = via ?: connection(uuid, want)
+        val batch = CandidateBatch(msg.opt("session") as? String ?: via?.session, cands)
         if (c == null || !c.remoteSet) {
-            synchronized(lock) { pendingIce.getOrPut("${if (want == "publisher") "remote" else "local"}:$uuid") { ArrayList() }.addAll(cands) }
+            synchronized(lock) { pendingIce.getOrPut("${if (want == "publisher") "remote" else "local"}:$uuid") { ArrayList() }.add(batch) }
             return
         }
-        addCandidates(c, cands)
+        addCandidates(c, batch.matching(c.session))
     }
 
     private fun addCandidates(c: VdoConnection, cands: List<IceCandidate>) {
@@ -1204,7 +1206,7 @@ class VdoNinja @JvmOverloads constructor(
 
     private fun drainPendingIce(c: VdoConnection, msgType: String) {
         val list = synchronized(lock) { pendingIce.remove("$msgType:${c.uuid}") } ?: return
-        addCandidates(c, list)
+        addCandidates(c, list.flatMap { it.matching(c.session) })
     }
 
     private fun handleBye(uuid: String?, type: String, msg: JSONObject) {
