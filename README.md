@@ -25,6 +25,7 @@ Browse the [guide chooser](docs/guides.md) for a comparison of SDK, iframe, page
 | Understand reconnect and ICE recovery | [Reliability and recovery](docs/reliability-and-recovery.md) |
 | Upgrade without breaking an integration | [Compatibility contract](docs/compatibility.md) |
 | Use VDO.Ninja from Go, Rust, C or Python | [Native SDKs](docs/native-sdks.md) |
+| Build a Flutter, Android or iOS app | [Flutter](dart/README.md), [Kotlin/Java](kotlin/README.md), [Swift](swift/README.md) SDKs |
 
 The SDK deliberately supports several layers. Media publishing/viewing and generic data use the same VDO.Ninja-compatible WebRTC transport. The optional MCP package presents that data transport as practical tools for agent messaging, file transfer, and shared state. Recording is performed by browser or Node recording APIs after the SDK delivers media.
 
@@ -41,9 +42,9 @@ The SDK deliberately supports several layers. Media publishing/viewing and gener
 
 Use of VDO.Ninja services operated by Steve Seguin is subject to applicable Terms of Service, operational policies, rate limits, and access controls.
 
-## Native SDKs (Go, Rust, C, Python)
+## Native SDKs (Go, Rust, C, Python, Flutter, Android, Swift)
 
-The same protocol is available as native libraries for applications that do not run JavaScript: [Go](go/README.md) (pion/webrtc), [Rust](rust/README.md) (webrtc-rs, Linux-first), [C](c/README.md) (libdatachannel) and [Python](python/README.md) (aiortc). They interoperate with browsers, with this SDK and with each other, share one conformance suite generated from this SDK (`spec/vectors.json`), and each ships a small VDO.Ninja-compatible signaling server for LAN and offline use. See the [native SDK guide](docs/native-sdks.md) for the feature matrix and protocol summary. They are MPL-2.0 licensed like the SDK core, and the same hosted-service usage guidelines above apply to them.
+The same protocol is available as native libraries for applications that do not run JavaScript: [Go](go/README.md) (pion/webrtc), [Rust](rust/README.md) (webrtc-rs, Linux-first), [C](c/README.md) (libdatachannel), [Python](python/README.md) (aiortc), and for mobile apps [Flutter/Dart](dart/README.md) (flutter_webrtc), [Kotlin/Java for Android](kotlin/README.md) (libwebrtc) and [Swift for iOS/macOS](swift/README.md) (WebRTC). They interoperate with browsers, with this SDK and with each other, share one conformance suite generated from this SDK (`spec/vectors.json`), and each ships a small VDO.Ninja-compatible signaling server for LAN and offline use. See the [native SDK guide](docs/native-sdks.md) for the feature matrix and protocol summary. They are MPL-2.0 licensed like the SDK core, and the same hosted-service usage guidelines above apply to them.
 
 ## Installation
 

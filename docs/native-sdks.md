@@ -11,35 +11,45 @@ each other, and use the hosted signaling and TURN infrastructure the same way th
 | Rust | [`rust/`](../rust/README.md) | [webrtc-rs](https://github.com/webrtc-rs/webrtc) | Linux services and desktop apps that need memory safety and low overhead |
 | C | [`c/`](../c/README.md) | [libdatachannel](https://github.com/paullouisageneau/libdatachannel) | embedded devices, encoders, plugins, bindings for other languages |
 | Python | [`python/`](../python/README.md) | [aiortc](https://github.com/aiortc/aiortc) | scripting, prototyping, Raspberry Pi and automation |
+| Dart / Flutter | [`dart/`](../dart/README.md) | [flutter_webrtc](https://pub.dev/packages/flutter_webrtc) | Flutter apps on Android, iOS, desktop and web |
+| Kotlin / Java | [`kotlin/`](../kotlin/README.md) | Google libwebrtc ([stream-webrtc-android](https://github.com/GetStream/webrtc-android)) | native Android apps |
+| Swift | [`swift/`](../swift/README.md) | Google WebRTC ([stasel/WebRTC](https://github.com/stasel/WebRTC)) | native iOS, macOS and tvOS apps |
 
-All four share one conformance suite: [`spec/vectors.json`](../spec/vectors.json) is generated from the JavaScript
+The Flutter, Android and Swift SDKs are the "mobile basics": the same signaling, hashing, encryption,
+publishing, viewing, data channels, pub/sub and request/response as the others, with media supplied by the
+platform's own capture APIs. They deliberately leave out file transfer, resources, reserved-channel helpers, WHIP/WHEP
+and screen capture. Each is split into a protocol core that is unit-tested against the shared vectors without WebRTC
+(`vdoninja_core`, `vdoninja-core`, `VDONinjaCore`) and a thin engine layer.
+
+All of them share one conformance suite: [`spec/vectors.json`](../spec/vectors.json) is generated from the JavaScript
 SDK (`spec/generate-vectors.cjs`) and every native SDK tests its hashing, encryption and sanitization against it.
 [`spec/interop/run_interop.py`](../spec/interop/run_interop.py) runs every publisher/viewer language pair, including
 the Node build of the JavaScript SDK, against a local signaling server.
 
 ## Feature matrix
 
-| Capability | JavaScript | Go | Rust | C | Python |
-| --- | --- | --- | --- | --- | --- |
-| Signaling: connect, reconnect with intent replay, rooms, claim/director | yes | yes | yes | yes | yes |
-| Stream and room hashing, SDP/ICE encryption, `password: false` | yes | yes | yes | yes | yes |
-| Data-only publishing (`announce`) and viewing | yes | yes | yes | yes | yes |
-| Control channel protocol (prefs, info, ping/pong, bye, videoMuted, obsState) | yes | yes | yes | yes | yes |
-| `sendData` targeting (uuid, type, preference, signaling fallback) | yes | yes | yes | yes | yes |
-| Pub/sub channels and request/response | yes | yes | yes | yes | yes |
-| Native file transfer (host, list, request, cancel) | yes | yes | yes | yes | yes |
-| Reserved `x-` channels and the `x-bin` binary lane | yes | yes | yes | yes | yes |
-| Resources channel (receive) | yes | yes | yes | receive | yes |
-| Media publishing | browser tracks | pion tracks (RTP or samples) | sample tracks | RTP or encoded samples (libdatachannel packetizers) | aiortc tracks |
-| Media viewing | browser | RTP packets / recording | RTP packets | RTP packets | aiortc tracks |
-| Keyframe requests (PLI) | n/a | yes | yes | yes (event) | via aiortc |
-| Trickle ICE, ICE candidate bundling | yes | yes | yes | yes | no (aiortc gathers first) |
-| ICE restart | yes | yes | reconnects | reconnects | no |
-| TURN: hosted list by proximity, custom, forced relay | yes | yes | yes | yes (UDP relays) | yes |
-| WHIP / WHEP clients | yes | yes | yes | no | yes |
-| Local signaling server for LAN, offline and tests | — | `vdoninja-signal` | `vdoninja-signal` | `vdoninja-signal` | `python -m vdoninja.signalserver` |
-| autoConnect (half/full mesh) | yes | yes | yes | yes | yes |
-| Statistics | yes | yes | yes | via libdatachannel | yes |
+| Capability | JavaScript | Go | Rust | C | Python | Flutter | Android | Swift |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Signaling: connect, reconnect with intent replay, rooms, claim/director | yes | yes | yes | yes | yes | yes | yes | yes |
+| Stream and room hashing, SDP/ICE encryption, `password: false` | yes | yes | yes | yes | yes | yes | yes | yes |
+| Data-only publishing (`announce`) and viewing | yes | yes | yes | yes | yes | yes | yes | yes |
+| Control channel protocol (prefs, info, ping/pong, bye, videoMuted, obsState) | yes | yes | yes | yes | yes | yes | yes | yes |
+| `sendData` targeting (uuid, type, preference, signaling fallback) | yes | yes | yes | yes | yes | yes | yes | yes |
+| Pub/sub channels and request/response | yes | yes | yes | yes | yes | yes | yes | yes |
+| Native file transfer (host, list, request, cancel) | yes | yes | yes | yes | yes | no | no | no |
+| Reserved `x-` channels and the `x-bin` binary lane | yes | yes | yes | yes | yes | receive | receive | receive |
+| Resources channel (receive) | yes | yes | yes | receive | yes | no | no | no |
+| Media publishing | browser tracks | pion tracks (RTP or samples) | sample tracks | RTP or encoded samples (libdatachannel packetizers) | aiortc tracks | `MediaStream` tracks (getUserMedia) | libwebrtc tracks (camera/mic capturers) | WebRTC tracks (`RTCCameraVideoCapturer`) |
+| Media viewing | browser | RTP packets / recording | RTP packets | RTP packets | aiortc tracks | `track` events → `RTCVideoRenderer` | `track` events → `SurfaceViewRenderer` | `track` events → `RTCMTLVideoView` |
+| Track replacement (camera switch) and viewer audio/video prefs | yes | yes | renegotiates | stops sending | yes | yes | yes | yes |
+| Keyframe requests (PLI) | n/a | yes | yes | yes (event) | via aiortc | engine | engine | engine |
+| Trickle ICE, ICE candidate bundling | yes | yes | yes | yes | no (aiortc gathers first) | yes | yes | yes |
+| ICE restart | yes | yes | reconnects | reconnects | no | yes | yes | yes |
+| TURN: hosted list by proximity, custom, forced relay | yes | yes | yes | yes (UDP relays) | yes | yes | yes | yes |
+| WHIP / WHEP clients | yes | yes | yes | no | yes | no | no | no |
+| Local signaling server for LAN, offline and tests | — | `vdoninja-signal` | `vdoninja-signal` | `vdoninja-signal` | `python -m vdoninja.signalserver` | use another SDK's | use another SDK's | use another SDK's |
+| autoConnect (half/full mesh) | yes | yes | yes | yes | yes | yes | yes | yes |
+| Statistics | yes | yes | yes | via libdatachannel | yes | via `pc.getStats()` | via `pc.getStats()` | via `pc.statistics()` |
 
 "reconnects" means the engine lacks ICE restart, so a failed connection is torn down and re-requested from the
 publisher instead; the application sees `connectionFailed` followed by a fresh `peerConnected`.
@@ -92,7 +102,8 @@ server and to browser peers.
 ## Hosted service and licensing
 
 The native SDKs are licensed under MPL-2.0 (examples and WHIP/WHEP helpers under MIT), the same terms as the
-JavaScript SDK core; see [LICENSING.md](../LICENSING.md). VDO.Ninja itself is AGPL-3.0; these SDKs are independent
+JavaScript SDK core; see [LICENSING.md](../LICENSING.md). The mobile SDKs were written from the JavaScript SDK's
+protocol and verified against the shared vectors; they contain no code from the VDO.Ninja mobile apps. VDO.Ninja itself is AGPL-3.0; these SDKs are independent
 implementations of its client protocol and do not include VDO.Ninja code.
 
 Connecting to `wss.vdo.ninja` and the hosted TURN servers is subject to the VDO.Ninja Terms of Service. The SDKs

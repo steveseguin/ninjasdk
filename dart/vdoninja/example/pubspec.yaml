@@ -1,0 +1,21 @@
+name: vdoninja_example
+description: Minimal VDO.Ninja SDK example for Flutter (run `flutter create .` here once to add platform folders).
+publish_to: none
+version: 0.1.0
+
+environment:
+  sdk: ^3.4.0
+  flutter: ">=3.22.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_webrtc: ^1.0.0
+  vdoninja:
+    path: ..
+
+dev_dependencies:
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true

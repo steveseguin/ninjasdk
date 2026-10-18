@@ -3,9 +3,9 @@ name: Native SDKs
 on:
   push:
     branches: [ main, master ]
-    paths: [ 'go/**', 'rust/**', 'c/**', 'python/**', 'spec/**', '.github/workflows/native-sdks.yml' ]
+    paths: [ 'go/**', 'rust/**', 'c/**', 'python/**', 'dart/**', 'kotlin/**', 'swift/**', 'spec/**', '.github/workflows/native-sdks.yml' ]
   pull_request:
-    paths: [ 'go/**', 'rust/**', 'c/**', 'python/**', 'spec/**', '.github/workflows/native-sdks.yml' ]
+    paths: [ 'go/**', 'rust/**', 'c/**', 'python/**', 'dart/**', 'kotlin/**', 'swift/**', 'spec/**', '.github/workflows/native-sdks.yml' ]
   workflow_dispatch:
 
 jobs:
@@ -64,6 +64,52 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - run: python -m pip install --upgrade pip && pip install -e './python[test]'
       - run: pytest -q python/tests
+
+  dart:
+    name: Dart / Flutter SDK
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - run: dart pub get && dart analyze --fatal-infos && dart test
+        working-directory: dart/vdoninja_core
+      - run: flutter pub get && flutter analyze --fatal-infos
+        working-directory: dart/vdoninja
+      - run: flutter pub get && flutter analyze --fatal-infos
+        working-directory: dart/vdoninja/example
+
+  kotlin:
+    name: Kotlin / Android SDK
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v4
+      - run: ./gradlew :vdoninja-core:test :vdoninja-android:assembleRelease
+        working-directory: kotlin
+
+  swift:
+    name: Swift SDK
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: swift-actions/setup-swift@v2
+        if: runner.os == 'Linux'
+        with:
+          swift-version: '6.1'
+      - run: swift build
+        working-directory: swift
+      - run: swift test
+        working-directory: swift
 
   interop:
     name: Cross-language interop (Go, C, Python, JavaScript)

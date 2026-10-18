@@ -1,0 +1,21 @@
+name: vdoninja
+description: VDO.Ninja SDK for Flutter (Android, iOS, macOS, Windows, Linux, web) built on flutter_webrtc. Publish, view and exchange data with VDO.Ninja peers.
+version: 0.1.0
+repository: https://github.com/steveseguin/ninjasdk
+publish_to: none
+
+environment:
+  sdk: ^3.4.0
+  flutter: ">=3.22.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_webrtc: ^1.0.0
+  vdoninja_core:
+    path: ../vdoninja_core
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0

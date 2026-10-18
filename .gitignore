@@ -89,3 +89,11 @@ c/build/
 python/.venv/
 python/*.egg-info/
 __pycache__/
+dart/**/.dart_tool/
+dart/**/pubspec.lock
+kotlin/.gradle/
+kotlin/**/build/
+kotlin/local.properties
+kotlin/.kotlin/
+swift/.build/
+swift/Package.resolved
