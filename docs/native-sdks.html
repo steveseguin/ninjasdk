@@ -1,0 +1,390 @@
+<!doctype html>
+<!-- Generated from native-sdks.md by npm run docs:build. Edit the Markdown source. -->
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Native SDKs: Go, Rust, C, Python, Flutter, Android and Swift | VDO.Ninja SDK</title><meta name="description" content="Native SDKs: Go, Rust, C, Python, Flutter, Android and Swift. VDO.Ninja SDK options, practical examples, requirements, and validation limits.">
+<link rel="canonical" href="https://sdk.vdo.ninja/docs/native-sdks.html">
+<meta property="og:title" content="Native SDKs: Go, Rust, C, Python, Flutter, Android and Swift"><meta property="og:description" content="Native SDKs: Go, Rust, C, Python, Flutter, Android and Swift. VDO.Ninja SDK options, practical examples, requirements, and validation limits.">
+<meta property="og:type" content="article"><meta property="og:url" content="https://sdk.vdo.ninja/docs/native-sdks.html">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../site.css"><link rel="stylesheet" href="guide.css"></head>
+<body><a class="skip-link" href="#content">Skip to content</a>
+<header class="site-header"><div class="site-header-inner"><a class="brand" href="../index.html"><img src="../favicon.svg" alt="" width="26" height="26"><span>VDO.Ninja SDK</span></a><nav class="site-nav" aria-label="Main"><a href="../index.html#try-live">Live demo</a><a href="../index.html#quickstart">Quick start</a><a href="../index.html#sdks">SDKs</a><a href="../demos/">Demos</a><a href="guides.html">Guides</a><a href="api-reference.html">API</a><a href="../index.html#faq">FAQ</a></nav><div class="site-header-actions"><a class="btn btn-secondary btn-sm" href="https://github.com/steveseguin/ninjasdk">GitHub</a></div></div></header>
+<div class="layout"><aside><nav aria-label="On this page"><strong>On this page</strong><a href="#feature-matrix">Feature matrix</a><a href="#protocol-summary">Protocol summary</a><a href="#hosted-service-and-licensing">Hosted service and licensing</a></nav></aside>
+<main id="content"><h1 id="native-sdks-go-rust-c-python-flutter-android-and-swift">Native SDKs: Go, Rust, C, Python, Flutter, Android and Swift</h1>
+<p>The JavaScript SDK (<code>vdoninja-sdk.js</code>) is the reference implementation of the VDO.Ninja client protocol. This
+repository also ships native SDKs that implement the same protocol on top of established WebRTC engines, so
+applications written in Go, Rust, C or Python, and mobile apps in Flutter, Kotlin/Java or Swift, can publish to and
+view from browsers running VDO.Ninja, talk to each other, and use the hosted signaling and TURN infrastructure the
+same way the JavaScript SDK does.</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Comparison table"><table>
+<thead>
+<tr>
+<th>SDK</th>
+<th>Directory</th>
+<th>WebRTC engine</th>
+<th>Best for</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Go</td>
+<td><a href="https://github.com/steveseguin/ninjasdk/blob/main/go/README.md"><code>go/</code></a></td>
+<td><a href="https://github.com/pion/webrtc">pion/webrtc</a></td>
+<td>servers, bots, recorders, CLI tools, cross-compiled binaries</td>
+</tr>
+<tr>
+<td>Rust</td>
+<td><a href="https://github.com/steveseguin/ninjasdk/blob/main/rust/README.md"><code>rust/</code></a></td>
+<td><a href="https://github.com/webrtc-rs/webrtc">webrtc-rs</a></td>
+<td>Linux services and desktop apps that need memory safety and low overhead</td>
+</tr>
+<tr>
+<td>C</td>
+<td><a href="https://github.com/steveseguin/ninjasdk/blob/main/c/README.md"><code>c/</code></a></td>
+<td><a href="https://github.com/paullouisageneau/libdatachannel">libdatachannel</a></td>
+<td>embedded devices, encoders, plugins, bindings for other languages</td>
+</tr>
+<tr>
+<td>Python</td>
+<td><a href="https://github.com/steveseguin/ninjasdk/blob/main/python/README.md"><code>python/</code></a></td>
+<td><a href="https://github.com/aiortc/aiortc">aiortc</a></td>
+<td>scripting, prototyping, Raspberry Pi and automation</td>
+</tr>
+<tr>
+<td>Dart / Flutter</td>
+<td><a href="https://github.com/steveseguin/ninjasdk/blob/main/dart/README.md"><code>dart/</code></a></td>
+<td><a href="https://pub.dev/packages/flutter_webrtc">flutter_webrtc</a></td>
+<td>Flutter apps on Android, iOS, desktop and web</td>
+</tr>
+<tr>
+<td>Kotlin / Java</td>
+<td><a href="https://github.com/steveseguin/ninjasdk/blob/main/kotlin/README.md"><code>kotlin/</code></a></td>
+<td>Google libwebrtc (<a href="https://github.com/GetStream/webrtc-android">stream-webrtc-android</a>)</td>
+<td>native Android apps</td>
+</tr>
+<tr>
+<td>Swift</td>
+<td><a href="https://github.com/steveseguin/ninjasdk/blob/main/swift/README.md"><code>swift/</code></a></td>
+<td>Google WebRTC (<a href="https://github.com/stasel/WebRTC">stasel/WebRTC</a>)</td>
+<td>native iOS, macOS and tvOS apps</td>
+</tr>
+</tbody>
+</table></div>
+<p>The Flutter, Android and Swift SDKs are the &quot;mobile basics&quot;: the same signaling, hashing, encryption,
+publishing, viewing, data channels, pub/sub and request/response as the others, with media supplied by the
+platform's own capture APIs. They deliberately leave out file transfer, resources, reserved-channel helpers, WHIP/WHEP
+and screen capture. Each is split into a protocol core that is unit-tested against the shared vectors without WebRTC
+(<code>vdoninja_core</code>, <code>vdoninja-core</code>, <code>VDONinjaCore</code>) and a thin engine layer.</p>
+<p>All of them share one conformance suite: <a href="https://github.com/steveseguin/ninjasdk/blob/main/spec/vectors.json"><code>spec/vectors.json</code></a> is generated from the JavaScript
+SDK (<code>spec/generate-vectors.cjs</code>) and every native SDK tests its hashing, encryption and sanitization against it.
+<a href="https://github.com/steveseguin/ninjasdk/blob/main/spec/interop/run_interop.py"><code>spec/interop/run_interop.py</code></a> runs every publisher/viewer language pair, including
+the Node build of the JavaScript SDK, against a local signaling server.</p>
+<h2 id="feature-matrix">Feature matrix</h2>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Comparison table"><table>
+<thead>
+<tr>
+<th>Capability</th>
+<th>JavaScript</th>
+<th>Go</th>
+<th>Rust</th>
+<th>C</th>
+<th>Python</th>
+<th>Flutter</th>
+<th>Android</th>
+<th>Swift</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Signaling: connect, reconnect with intent replay, rooms, claim/director</td>
+<td>yes</td>
+<td>yes</td>
+<td>yes</td>
+<td>yes</td>
+<td>yes</td>
+<td>yes</td>
+<td>yes</td>
+<td>yes</td>
+</tr>
+<tr>
+<td>Stream and room hashing, SDP/ICE encryption, <code>password: false</code></td>
+<td>yes</td>
+<td>yes</td>
+<td>yes</td>
+<td>yes</td>
+<td>yes</td>
+<td>yes</td>
+<td>yes</td>
+<td>yes</td>
+</tr>
+<tr>
+<td>Data-only publishing (<code>announce</code>) and viewing</td>
+<td>yes</td>
+<td>yes</td>
+<td>yes</td>
+<td>yes</td>
+<td>yes</td>
+<td>yes</td>
+<td>yes</td>
+<td>yes</td>
+</tr>
+<tr>
+<td>Control channel protocol (prefs, info, ping/pong, bye, videoMuted, obsState)</td>
+<td>yes</td>
+<td>yes</td>
+<td>yes</td>
+<td>yes</td>
+<td>yes</td>
+<td>yes</td>
+<td>yes</td>
+<td>yes</td>
+</tr>
+<tr>
+<td><code>sendData</code> targeting (uuid, type, preference, signaling fallback)</td>
+<td>yes</td>
+<td>yes</td>
+<td>yes</td>
+<td>yes</td>
+<td>yes</td>
+<td>yes</td>
+<td>yes</td>
+<td>yes</td>
+</tr>
+<tr>
+<td>Pub/sub channels and request/response</td>
+<td>yes</td>
+<td>yes</td>
+<td>yes</td>
+<td>yes</td>
+<td>yes</td>
+<td>yes</td>
+<td>yes</td>
+<td>yes</td>
+</tr>
+<tr>
+<td>Native file transfer (host, list, request, cancel)</td>
+<td>yes</td>
+<td>yes</td>
+<td>yes</td>
+<td>yes</td>
+<td>yes</td>
+<td>no</td>
+<td>no</td>
+<td>no</td>
+</tr>
+<tr>
+<td>Reserved <code>x-</code> channels and the <code>x-bin</code> binary lane</td>
+<td>yes</td>
+<td>yes</td>
+<td>yes</td>
+<td>yes</td>
+<td>yes</td>
+<td>receive</td>
+<td>receive</td>
+<td>receive</td>
+</tr>
+<tr>
+<td>Resources channel (receive)</td>
+<td>yes</td>
+<td>yes</td>
+<td>yes</td>
+<td>receive</td>
+<td>yes</td>
+<td>no</td>
+<td>no</td>
+<td>no</td>
+</tr>
+<tr>
+<td>Media publishing</td>
+<td>browser tracks</td>
+<td>pion tracks (RTP or samples)</td>
+<td>sample tracks</td>
+<td>RTP or encoded samples (libdatachannel packetizers)</td>
+<td>aiortc tracks</td>
+<td><code>MediaStream</code> tracks (getUserMedia)</td>
+<td>libwebrtc tracks (camera/mic capturers)</td>
+<td>WebRTC tracks (<code>RTCCameraVideoCapturer</code>)</td>
+</tr>
+<tr>
+<td>Media viewing</td>
+<td>browser</td>
+<td>RTP packets / recording</td>
+<td>RTP packets</td>
+<td>RTP packets</td>
+<td>aiortc tracks</td>
+<td><code>track</code> events → <code>RTCVideoRenderer</code></td>
+<td><code>track</code> events → <code>SurfaceViewRenderer</code></td>
+<td><code>track</code> events → <code>RTCMTLVideoView</code></td>
+</tr>
+<tr>
+<td>Track replacement (camera switch) and viewer audio/video prefs</td>
+<td>yes</td>
+<td>yes</td>
+<td>renegotiates</td>
+<td>stops sending</td>
+<td>yes</td>
+<td>yes</td>
+<td>yes</td>
+<td>yes</td>
+</tr>
+<tr>
+<td>Keyframe requests (PLI)</td>
+<td>n/a</td>
+<td>yes</td>
+<td>yes</td>
+<td>yes (event)</td>
+<td>via aiortc</td>
+<td>engine</td>
+<td>engine</td>
+<td>engine</td>
+</tr>
+<tr>
+<td>Trickle ICE, ICE candidate bundling</td>
+<td>yes</td>
+<td>yes</td>
+<td>yes</td>
+<td>yes</td>
+<td>no (aiortc gathers first)</td>
+<td>yes</td>
+<td>yes</td>
+<td>yes</td>
+</tr>
+<tr>
+<td>ICE restart</td>
+<td>yes</td>
+<td>yes</td>
+<td>reconnects</td>
+<td>reconnects</td>
+<td>no</td>
+<td>yes</td>
+<td>yes</td>
+<td>yes</td>
+</tr>
+<tr>
+<td>TURN: hosted list by proximity, custom, forced relay</td>
+<td>yes</td>
+<td>yes</td>
+<td>yes</td>
+<td>yes (UDP relays)</td>
+<td>yes</td>
+<td>yes</td>
+<td>yes</td>
+<td>yes</td>
+</tr>
+<tr>
+<td>WHIP / WHEP clients</td>
+<td>yes</td>
+<td>yes</td>
+<td>yes</td>
+<td>no</td>
+<td>yes</td>
+<td>no</td>
+<td>no</td>
+<td>no</td>
+</tr>
+<tr>
+<td>Local signaling server for LAN, offline and tests</td>
+<td>—</td>
+<td><code>vdoninja-signal</code></td>
+<td><code>vdoninja-signal</code></td>
+<td><code>vdoninja-signal</code></td>
+<td><code>python -m vdoninja.signalserver</code></td>
+<td>use another SDK's</td>
+<td>use another SDK's</td>
+<td>use another SDK's</td>
+</tr>
+<tr>
+<td>autoConnect (half/full mesh)</td>
+<td>yes</td>
+<td>yes</td>
+<td>yes</td>
+<td>yes</td>
+<td>yes</td>
+<td>yes</td>
+<td>yes</td>
+<td>yes</td>
+</tr>
+<tr>
+<td>Statistics</td>
+<td>yes</td>
+<td>yes</td>
+<td>yes</td>
+<td>via libdatachannel</td>
+<td>yes</td>
+<td>via <code>pc.getStats()</code></td>
+<td>via <code>pc.getStats()</code></td>
+<td>via <code>pc.statistics()</code></td>
+</tr>
+</tbody>
+</table></div>
+<p>&quot;reconnects&quot; means the engine lacks ICE restart, so a failed connection is torn down and re-requested from the
+publisher instead; the application sees <code>peerDisconnected</code> and <code>connectionFailed</code> followed by a fresh <code>peerConnected</code>.</p>
+<h3 id="connection-lifecycle-all-sdks-as-in-the-javascript-sdk">Connection lifecycle (all SDKs, as in the JavaScript SDK)</h3>
+<ul>
+<li>A peer connection that fails or stays disconnected past the grace period gets one bounded recovery attempt
+(<code>iceRestart</code>: the publisher sends an ICE-restart offer over signaling, a viewer asks the publisher with
+<code>iceRestartRequest</code>). If it is still down after the connection timeout the SDK closes it and emits
+<code>peerDisconnected</code> then <code>connectionFailed</code>; viewers then re-request the stream after 2 s.</li>
+<li><code>bye</code> from a peer closes both directions and, on the viewer side, re-requests the stream after 2 s. <code>hangup</code>
+closes without retrying: the peer ended the session on purpose.</li>
+<li><code>view()</code> of a publisher that is not online yet fails with the SDK's &quot;not yet available&quot; error, keeps the request
+pending (a <code>videoaddedtoroom</code> or <code>someonejoined</code> connects it) and re-sends <code>play</code> every <code>viewRetryInterval</code>
+(15 minutes by default).</li>
+<li><code>disconnect()</code> drops the connection intent (room, publish, views): a later <code>connect()</code> starts clean and an
+unexpected socket drop after it replays nothing. An unexpected drop while connected reconnects with exponential
+backoff and replays room, seed and views; the attempt counter resets on a manual <code>connect()</code>.</li>
+</ul>
+<h3 id="interoperability">Interoperability</h3>
+<p><code>spec/interop/run_interop.py</code> connects every publisher/viewer pair over a local signaling server and exchanges
+data-channel probes and one request/response. All pairs between the JavaScript (Node), Go, C, Rust and Python
+SDKs pass, with one known engine limitation: a <strong>Rust publisher cannot be viewed by the Python SDK</strong>. The rtc crate
+initiates the SCTP association only when it is the DTLS client and aiortc only when it is ICE-controlling; with
+Rust offering, neither side sends the SCTP INIT. Browsers, pion and libdatachannel initiate from either role, so
+every other combination works, including Python publishing to Rust. Use another engine on one side if you need
+that direction. The JavaScript peer in the matrix needs <code>node-datachannel</code> 0.27 or newer (older builds generate
+DTLS certificates that aiortc rejects).</p>
+<h2 id="protocol-summary">Protocol summary</h2>
+<p>The native SDKs implement the routed VDO.Ninja signaling protocol used by <code>wss.vdo.ninja</code> (the &quot;wss2&quot; format).
+Everything below is what the JavaScript SDK does; the native SDKs mirror it so they are indistinguishable to the
+server and to browser peers.</p>
+<ul>
+<li><strong>Sanitization.</strong> Stream IDs: <code>[^A-Za-z0-9_]+</code> runs become <code>_</code>, at most 64 characters, generated (12 random
+alphanumerics) when empty. Rooms: same rule, at most 30 characters. Passwords: trimmed and
+<code>encodeURIComponent</code>-encoded. Labels: line breaks removed, at most 100 characters.</li>
+<li><strong>Hashing.</strong> With a password <code>P</code> and salt <code>S</code> (default <code>vdo.ninja</code>), published stream IDs on the wire are
+<code>streamID + sha256(P+S)[:6]</code> and room IDs are <code>sha256(room+P+S)[:16]</code>. The default password is
+<code>someEncryptionKey123</code>; <code>password: false</code> disables hashing and encryption entirely.</li>
+<li><strong>Encryption.</strong> SDP and ICE candidates are JSON-serialized and encrypted with AES-256-CBC (PKCS#7), key
+<code>sha256(P+S)</code>, random 16-byte IV, both sent as hex (<code>description</code>/<code>candidates</code> plus <code>vector</code>).</li>
+<li><strong>Requests.</strong> <code>joinroom {roomid, claim?, streamID?}</code> → <code>listing {list, director?, claim?}</code>; <code>{leave: true}</code> leaves
+the room; <code>seed {streamID}</code> registers a publisher (one publish per signaling connection; reconnect to change it); <code>play {streamID}</code> asks the server to find the publisher, which receives
+<code>offerSDP {UUID}</code>; room members receive <code>videoaddedtoroom</code> and <code>someonejoined</code>; <code>alert</code>/<code>error</code> carry text.</li>
+<li><strong>Routing.</strong> Any message with a <code>UUID</code> is forwarded to that peer with <code>UUID</code> rewritten to the sender. Offers carry
+<code>{UUID, session (8 chars), streamID (hashed), description, vector}</code>; answers echo <code>session</code> and <code>streamID</code>;
+candidates are <code>{UUID, type: &quot;remote&quot; (viewer → publisher) | &quot;local&quot; (publisher → viewer), candidates, vector, session}</code>, bundled with a 70 ms timer that doubles up to 1 s, and sent over the control channel once it is open.
+<code>bye</code>/<code>hangup</code> end a connection (viewers retry the stream after <code>bye</code>, not after <code>hangup</code>).</li>
+<li><strong>Control channel.</strong> The publisher creates <code>sendChannel</code>. The viewer sends <code>{audio, video, downloads, info:{label}, allowresources}</code>; the publisher sends <code>{info:{label, meta, ...}}</code>. <code>ping</code>/<code>pong</code>, <code>pipe</code>
+(application data), <code>bye</code>, <code>videoMuted</code>, <code>iceRestartRequest</code>, <code>fileList</code>/<code>requestFile</code> and <code>obsState</code> share the
+channel. <code>pipe</code> payloads with <code>type</code> <code>subscribe</code>, <code>unsubscribe</code>, <code>channelMessage</code>, <code>request</code> or <code>response</code>
+implement pub/sub and RPC; everything else is delivered as <code>dataReceived</code>.</li>
+<li><strong>Other channels.</strong> File transfers use a channel labeled with the file ID: a text header
+<code>{type:&quot;filetransfer&quot;, size, filename, id}</code>, 16 KiB binary chunks, then <code>EOF1</code> (complete) or <code>EOF2</code> (cancelled).
+<code>x-</code> labels are reserved for applications (<code>x-bin</code> is the binary lane); <code>resources</code> carries VDO.Ninja overlay
+resources; <code>chunked</code> is VDO.Ninja's own chunked transfer and is reported as unsupported.</li>
+<li><strong>TURN.</strong> <code>GET https://turnservers.vdo.ninja/?ts=…</code> returns <code>{servers:[{username, credential, urls, tz, udp}]}</code>.
+Clients pick the two closest UDP relays and one TCP relay by time-zone distance; a built-in list is the fallback.</li>
+</ul>
+<h2 id="hosted-service-and-licensing">Hosted service and licensing</h2>
+<p>The native SDKs are licensed under MPL-2.0 (examples and WHIP/WHEP helpers under MIT), the same terms as the
+JavaScript SDK core; see <a href="../LICENSING.md">LICENSING.md</a>. The mobile SDKs were written from the JavaScript SDK's
+protocol and verified against the shared vectors; they contain no code from the VDO.Ninja mobile apps. VDO.Ninja itself is AGPL-3.0; these SDKs are independent
+implementations of its client protocol and do not include VDO.Ninja code.</p>
+<p>Connecting to <code>wss.vdo.ninja</code> and the hosted TURN servers is subject to the VDO.Ninja Terms of Service. The SDKs
+are the supported way to use that infrastructure: only WebRTC handshake data may pass through the signaling server,
+application data must travel over peer connections, and rate limits apply. Talking to the hosted servers with a
+custom client that is not one of these SDKs requires permission. For LAN or offline use, run the included
+<code>vdoninja-signal</code> server or <a href="https://github.com/steveseguin/websocket_server">websocket_server</a>.</p>
+</main></div>
+<footer class="site-footer"><div class="container"><span>VDO.Ninja SDK guides</span><nav aria-label="Footer"><a href="guides.html">All guides</a><a href="validation.html">Validation and limits</a><a href="native-sdks.md">Markdown source</a><a href="https://github.com/steveseguin/ninjasdk">Repository</a></nav></div></footer></body></html>

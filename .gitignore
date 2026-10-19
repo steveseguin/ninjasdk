@@ -9,7 +9,7 @@ ffmpeg.exe
 dist/
 build/
 referenceonly/
-vdoninja/
+/vdoninja/
 recordings/
 
 # Misc
@@ -81,3 +81,19 @@ Desktop.ini
 ehthumbs.db
 *.swp
 *~
+
+# Native SDK build outputs
+build-interop/
+rust/target/
+c/build/
+python/.venv/
+python/*.egg-info/
+__pycache__/
+dart/**/.dart_tool/
+dart/**/pubspec.lock
+kotlin/.gradle/
+kotlin/**/build/
+kotlin/local.properties
+kotlin/.kotlin/
+swift/.build/
+swift/Package.resolved

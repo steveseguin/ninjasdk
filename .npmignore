@@ -9,6 +9,17 @@ test-*.js
 *.test.js
 *.spec.js
 
+# Native SDKs (published separately: Go module, crates, CMake, PyPI)
+go/
+rust/
+c/
+python/
+dart/
+kotlin/
+swift/
+spec/
+build-interop/
+
 # Build tools
 scripts/
 run-in-windows.sh

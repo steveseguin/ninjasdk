@@ -312,6 +312,27 @@ a.card .badge { margin-bottom: 12px; }
 
 .platforms { margin: 24px 0 0; }
 
+/* ---------- Languages and platforms ---------- */
+
+.sdk-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); }
+.sdk-card { display: flex; flex-direction: column; gap: 10px; }
+.sdk-card-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.sdk-card-head h3 { margin: 0; font-size: 1rem; }
+.sdk-card p { flex: 1; }
+.sdk-install {
+    display: block;
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 6px 10px;
+    overflow-x: auto;
+    white-space: nowrap;
+}
+.sdk-notes { margin-top: 24px; max-width: 900px; }
+.sdk-notes p { margin: 8px 0 0; }
+
 /* ---------- FAQ ---------- */
 
 .faq-list {

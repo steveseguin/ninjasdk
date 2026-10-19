@@ -1,0 +1,18 @@
+name: vdoninja_core
+description: VDO.Ninja protocol core (hashing, encryption, sanitization, signaling) shared by the Dart/Flutter SDK. No WebRTC dependency.
+version: 0.1.0
+repository: https://github.com/steveseguin/ninjasdk
+publish_to: none
+
+environment:
+  sdk: ^3.4.0
+
+dependencies:
+  crypto: ^3.0.6
+  pointycastle: ^4.0.0
+  web_socket_channel: ^3.0.0
+  http: ^1.3.0
+
+dev_dependencies:
+  test: ^1.25.0
+  lints: ^6.0.0

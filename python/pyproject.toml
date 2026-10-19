@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "vdoninja"
+version = "0.1.0"
+description = "VDO.Ninja SDK for Python: WebRTC audio, video and data with VDO.Ninja-compatible signaling (aiortc)."
+readme = "README.md"
+license = { text = "MPL-2.0" }
+authors = [{ name = "Steve Seguin" }]
+requires-python = ">=3.9"
+keywords = ["webrtc", "vdo.ninja", "p2p", "aiortc", "streaming", "whip", "whep"]
+classifiers = [
+    "License :: OSI Approved :: Mozilla Public License 2.0 (MPL 2.0)",
+    "Programming Language :: Python :: 3",
+    "Topic :: Communications",
+    "Topic :: Multimedia :: Video",
+]
+dependencies = [
+    "aiortc>=1.9",
+    "websockets>=12",
+    "cryptography>=41",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=7", "pytest-asyncio>=0.23"]
+
+[project.urls]
+Homepage = "https://github.com/steveseguin/ninjasdk"
+Documentation = "https://github.com/steveseguin/ninjasdk/tree/main/python"
+
+[tool.setuptools.packages.find]
+include = ["vdoninja*"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
