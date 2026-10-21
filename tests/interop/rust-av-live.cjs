@@ -62,10 +62,14 @@ function nativeControl({ label, value }) {
     checkField(value, 'candidates');
     assert(['local', 'remote'].includes(value.type));
   } else if (Object.hasOwn(value, 'audio')) {
-    keys(value, ['audio', 'video', 'downloads']);
+    keys(value, ['audio', 'video', 'downloads', 'info']);
+    assert.deepEqual(value.info, {});
     assert.equal(value.audio, true);
     assert.equal(value.video, true);
     assert.equal(value.downloads, false);
+  } else if (Object.hasOwn(value, 'info')) {
+    keys(value, ['info']);
+    assert.deepEqual(value.info, {});
   } else if (value.iceRestartRequest === true) {
     keys(value, ['iceRestartRequest']);
   } else {
@@ -121,8 +125,12 @@ async function signalingObserver(password, room, publish, view) {
           assert(description.sdp.startsWith('v=0\r\n'));
           if (description.type === 'offer') {
             assert(incoming.some(m => m.request === 'offerSDP' && m.UUID === message.UUID), 'offer without server offerSDP request');
-            assert(description.sdp.includes('m=application '), 'initial offer missing control data channel');
-            assert(description.sdp.includes('m=video ') && description.sdp.includes('m=audio '));
+          }
+          // ICE restarts can retain media negotiated after the initial exchange.
+          const initial = !messages.some(m => m.description && m.UUID === message.UUID && m.session === message.session);
+          if (initial) {
+            assert(description.sdp.includes('m=application '), 'initial SDP missing control data channel');
+            assert(!/^m=(audio|video) /m.test(description.sdp), 'media appeared before the data handshake');
           }
         } else if (message.candidates) {
           keys(message, ['UUID', 'session', 'type', 'candidates', ...vectorKeys]);
@@ -148,13 +156,13 @@ async function signalingObserver(password, room, publish, view) {
       socket.on('close', () => { sockets.delete(socket); if (other.readyState === WebSocket.OPEN) other.close(); });
     }
   });
-  return { messages, errors, host: 'ws://127.0.0.1:' + server.address().port,
+  return { messages, errors, decrypt, host: 'ws://127.0.0.1:' + server.address().port,
     close: () => { for (const socket of sockets) socket.terminate(); return new Promise(resolve => server.close(resolve)); } };
 }
 
 // Observe real wire messages without replacing the application's handlers.
 function observe() {
-  window.avWire = { ws: [], dc: [] };
+  window.avWire = { ws: [], dc: [], sequence: [] };
   const parse = data => { try { return JSON.parse(data); } catch { return null; } };
   const wsSend = WebSocket.prototype.send;
   WebSocket.prototype.send = function (data) {
@@ -176,8 +184,17 @@ function observe() {
   const channel = dc => {
     dc.addEventListener('message', event => {
       const value = parse(event.data);
-      if (value) avWire.dc.push({ label: dc.label, value });
+      if (value) {
+        avWire.dc.push({ label: dc.label, value });
+        avWire.sequence.push({ direction: 'in', value });
+      }
     });
+    const send = dc.send;
+    dc.send = function(data) {
+      const value = parse(data);
+      if (value) avWire.sequence.push({ direction: 'out', value });
+      return send.call(this, data);
+    };
   };
   const Original = RTCPeerConnection;
   window.RTCPeerConnection = new Proxy(Original, {
@@ -201,6 +218,18 @@ async function stats(page, collection) {
     }
     return values;
   }, collection);
+}
+
+function dataFirst(wire, decrypt, publisherDirection = 'in') {
+  const info = wire.sequence.findIndex(v => v.direction === publisherDirection && Object.hasOwn(v.value, 'info'));
+  const prefs = wire.sequence.findIndex(v => v.direction !== publisherDirection && Object.hasOwn(v.value, 'audio'));
+  const media = wire.sequence.findIndex(v => {
+    if (v.direction !== publisherDirection || !v.value.description) return false;
+    const desc = decrypt(v.value.description, v.value.vector);
+    return desc.type === 'offer' && /^m=video /m.test(desc.sdp) && /^m=audio /m.test(desc.sdp);
+  });
+  assert(info >= 0 && prefs >= 0 && media > info && media > prefs,
+    'media offer must follow native info and viewer preferences on the data channel');
 }
 
 async function main() {
@@ -263,7 +292,10 @@ async function main() {
       assert(wire.dc.some(v => v.label === 'sendChannel'), 'native control channel not observed');
     }
     // The producer must survive a viewer closing while the other direction records.
-    (await viewer.evaluate(() => avWire.dc)).forEach(nativeControl);
+    const firstWire = await viewer.evaluate(() => avWire);
+    firstWire.dc.forEach(nativeControl);
+    dataFirst(firstWire, signaling.decrypt);
+    dataFirst(await publisher.evaluate(() => avWire), signaling.decrypt, 'out');
     await viewer.close();
     const before = log.length;
     await until(() => {
@@ -279,6 +311,7 @@ async function main() {
       return s.some(v => v.kind === 'video' && v.framesDecoded > 30) &&
         s.some(v => v.kind === 'audio' && v.totalSamplesReceived > 48000 && v.totalAudioEnergy > 0);
     }, 'replacement viewer did not receive audio/video');
+    dataFirst(await viewer.evaluate(() => avWire), signaling.decrypt);
     const ping = Date.now();
     await viewer.evaluate(ping => {
       const pc = Object.values(session.rpcs).find(pc => pc.receiveChannel?.readyState === 'open');
@@ -309,7 +342,7 @@ async function main() {
         execFileSync('ffmpeg', ['-v', 'error', '-xerror', '-i', path.join(out, file), '-f', 'null', '-'], { stdio: 'pipe' });
       }
     }
-    console.log('PASS: Rust publishes and receives A/V; native signaling only on WebSocket; password-mode-correct SDP/ICE; viewer replacement; DTLS/SRTP; native ping/pong and bye on sendChannel; decodable finalized recordings.');
+    console.log('PASS: Rust publishes and receives A/V; native signaling only on WebSocket; password-mode-correct SDP/ICE; data-first info/preferences/media ordering; viewer replacement; DTLS/SRTP; native ping/pong and bye on sendChannel; decodable finalized recordings.');
     console.log('Password mode: ' + mode + '; salt: ' + salt);
     console.log('Target: ' + target + '\nArtifacts: ' + out);
   } catch (error) {

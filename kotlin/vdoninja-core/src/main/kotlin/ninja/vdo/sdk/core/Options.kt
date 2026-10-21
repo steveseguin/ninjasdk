@@ -52,7 +52,7 @@ data class ViewOptions(
         put("audio", audio)
         put("video", video)
         put("downloads", downloads)
-        if (!label.isNullOrEmpty()) put("info", org.json.JSONObject().put("label", label))
+        put("info", org.json.JSONObject().apply { if (!label.isNullOrEmpty()) put("label", label) })
         if (allowResources) put("allowresources", true)
     }
 }

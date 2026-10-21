@@ -142,8 +142,11 @@ async def test_media_publish_view(signal_host):
         await view.connect()
         await view.join_room("py-media")
         tracks = []
+        info = []
+        view.on("peerInfo", lambda ev: info.append(ev))
 
-        async def on_track(ev):
+        def on_track(ev):
+            assert info, "media arrived before native publisher info"
             tracks.append(ev.track)
 
         view.on("track", on_track)
@@ -154,12 +157,49 @@ async def test_media_publish_view(signal_host):
             await asyncio.sleep(0.1)
         kinds = {t.kind for t in tracks}
         assert kinds == {"audio", "video"}
+        assert info, "publisher must send info even without a label"
         video = next(t for t in tracks if t.kind == "video")
         frame = await asyncio.wait_for(video.recv(), 10)
         assert frame.width > 0
     finally:
         await pub.disconnect()
         await view.disconnect()
+
+
+async def test_initial_offer_is_data_only():
+    sdk = make("ws://127.0.0.1:1")
+    sdk.publishing = True
+    sdk._data_only = False
+    sdk._local_tracks = [VideoStreamTrack(), AudioStreamTrack()]
+    try:
+        conn = await sdk._create_connection("peer", "publisher")
+        offer = await sdk._create_offer(conn)
+        assert "m=application " in offer.sdp
+        assert "m=video " not in offer.sdp and "m=audio " not in offer.sdp
+        conn.allow_video = True
+        await sdk._update_tracks(conn)
+        await sdk.add_track(VideoStreamTrack())
+        assert not conn.pc.getSenders(), "media attached before info exchange"
+    finally:
+        await sdk.disconnect()
+
+
+async def test_discovery_retries_coalesce_and_stop():
+    from vdoninja.sdk import _ViewOptions
+    sdk = make("ws://127.0.0.1:1")
+    sdk._connected = True
+    sdk._pending_views["late"] = _ViewOptions()
+    sent = []
+    sdk._send_ws = lambda message: sent.append(message) or True
+    try:
+        for _ in range(20):
+            sdk._handle_video_added({"streamID": sdk.hashed_stream_id("late"), "UUID": "peer"})
+        assert len(sdk._view_retry_tasks) == 1
+        await sdk.stop_viewing("late")
+        await asyncio.sleep(0.15)
+        assert not sent and not sdk._view_retry_tasks
+    finally:
+        await sdk.disconnect()
 
 
 async def test_auto_connect_half_mesh(signal_host):

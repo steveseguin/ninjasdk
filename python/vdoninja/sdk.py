@@ -162,8 +162,10 @@ class Connection:
         self.session: Optional[str] = None
         self.info: Dict[str, Any] = {}
         self.obs_state: Dict[str, Any] = {}
-        self.allow_audio = True
-        self.allow_video = True
+        self.info_sent = False
+        self.media_lock = asyncio.Lock()
+        self.allow_audio = False
+        self.allow_video = False
         self.allow_downloads = False
         self.allow_resources = False
         self.view_options = _ViewOptions()
@@ -752,7 +754,7 @@ class VDONinja:
         self._local_tracks.append(track)
         for pair in list(self.connections.values()):
             conn = pair.publisher
-            if not conn:
+            if not conn or not conn.info_sent or not conn.control_open:
                 continue
             if (track.kind == "audio" and not conn.allow_audio) or (track.kind == "video" and not conn.allow_video):
                 continue
@@ -955,11 +957,7 @@ class VDONinja:
         if opts is not None:
             log.debug("re-requesting pending stream %r", clean)
 
-            async def rerequest() -> None:
-                await asyncio.sleep(0.1)
-                await self._view_quiet(clean, opts)
-
-            self._spawn(rerequest())
+            self._schedule_view_retry(clean, opts, 0.1)
         self._emit(Event("videoaddedtoroom", stream_id=clean, uuid=uuid, raw=msg))
 
     async def _handle_peer_join_room(self, msg: Dict[str, Any]) -> None:
@@ -1073,11 +1071,7 @@ class VDONinja:
         return bool(pair) and (pair.publisher is conn or pair.viewer is conn)
 
     async def _create_offer(self, conn: Connection) -> RTCSessionDescription:
-        if conn.type == "publisher" and not conn.senders:
-            for track in self._local_tracks:
-                if (track.kind == "audio" and not conn.allow_audio) or (track.kind == "video" and not conn.allow_video):
-                    continue
-                conn.senders.append(conn.pc.addTrack(track))
+        # Initial negotiation establishes the control channel only.
         offer = await conn.pc.createOffer()
         await conn.pc.setLocalDescription(offer)
         return conn.pc.localDescription
@@ -1428,14 +1422,15 @@ class VDONinja:
             log.debug("control channel open for %s/%s", conn.uuid, conn.type)
             if conn.type == "viewer":
                 o = conn.view_options
-                prefs: Dict[str, Any] = {"audio": o.audio, "video": o.video, "downloads": o.downloads}
+                prefs: Dict[str, Any] = {"audio": o.audio, "video": o.video, "downloads": o.downloads, "info": {}}
                 if o.label:
                     prefs["info"] = {"label": o.label}
                 if o.allowresources:
                     prefs["allowresources"] = True
                 conn.send_control(prefs)
-            elif self.publisher_info:
-                conn.send_control({"info": dict(self.publisher_info)})
+            elif conn.send_control({"info": dict(self.publisher_info)}):
+                conn.info_sent = True
+                self._spawn(self._update_tracks(conn))
             self._start_ping_monitor(conn)
             self._emit(Event("dataChannelOpen", uuid=conn.uuid, stream_id=conn.stream_id, connection_type=conn.type, channel=dc, label=dc.label))
 
@@ -1523,21 +1518,22 @@ class VDONinja:
                 await self._restart_ice(conn, "remote_request")
 
     async def _update_tracks(self, conn: Connection) -> None:
-        if conn.type != "publisher" or not self._local_tracks:
+        if conn.type != "publisher" or not conn.control_open or not conn.info_sent:
             return
-        for sender in conn.senders:
-            kind = sender.kind
-            allow = (kind == "audio" and conn.allow_audio) or (kind == "video" and conn.allow_video)
-            try:
-                if not allow:
-                    await sender.replaceTrack(None)
+        async with conn.media_lock:
+            changed = False
+            for track in self._local_tracks:
+                allowed = conn.allow_audio if track.kind == "audio" else conn.allow_video
+                sender = next((s for s in conn.senders if s.kind == track.kind), None)
+                if sender is None:
+                    if allowed:
+                        conn.senders.append(conn.pc.addTrack(track))
+                        changed = True
                 else:
-                    for track in self._local_tracks:
-                        if track.kind == kind:
-                            await sender.replaceTrack(track)
-                            break
-            except Exception as exc:  # noqa: BLE001
-                log.debug("replaceTrack failed: %s", exc)
+                    # aiortc replaceTrack is synchronous.
+                    sender.replaceTrack(track if allowed else None)
+            if changed:
+                await self._renegotiate(conn)
 
     def _start_ping_monitor(self, conn: Connection) -> None:
         if not self.auto_ping_viewer or conn.type != "viewer":

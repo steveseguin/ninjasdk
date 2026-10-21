@@ -24,6 +24,8 @@ type Connection struct {
 	typ  string // "publisher" | "viewer"
 	pc   *webrtc.PeerConnection
 
+	mediaMu       sync.Mutex
+	infoSent      bool
 	mu            sync.Mutex
 	control       *webrtc.DataChannel
 	channels      map[string]*webrtc.DataChannel
@@ -206,8 +208,8 @@ func (s *SDK) createConnection(uuid, typ string) (*Connection, error) {
 		channels:       map[string]*webrtc.DataChannel{},
 		info:           map[string]any{},
 		obsState:       map[string]any{},
-		allowAudio:     true,
-		allowVideo:     true,
+		allowAudio:     false,
+		allowVideo:     false,
 		iceBundleDelay: 70 * time.Millisecond,
 		advertised:     map[string]bool{},
 		senderKinds:    map[*webrtc.RTPSender]webrtc.RTPCodecType{},
@@ -275,27 +277,8 @@ func (s *SDK) createConnection(uuid, typ string) (*Connection, error) {
 	return c, nil
 }
 
-// createOffer adds local tracks for publisher connections and creates an offer.
+// createOffer establishes the control channel; viewer preferences add media later.
 func (s *SDK) createOffer(c *Connection, iceRestart bool) (webrtc.SessionDescription, error) {
-	if c.typ == "publisher" && len(c.senders) == 0 {
-		s.mu.Lock()
-		tracks := append([]webrtc.TrackLocal(nil), s.localTracks...)
-		s.mu.Unlock()
-		for _, t := range tracks {
-			if (t.Kind() == webrtc.RTPCodecTypeAudio && !c.allowAudio) || (t.Kind() == webrtc.RTPCodecTypeVideo && !c.allowVideo) {
-				continue
-			}
-			sender, err := c.pc.AddTrack(t)
-			if err != nil {
-				return webrtc.SessionDescription{}, err
-			}
-			c.mu.Lock()
-			c.senders = append(c.senders, sender)
-			c.senderKinds[sender] = t.Kind()
-			c.mu.Unlock()
-			go s.drainRTCP(sender)
-		}
-	}
 	var opts *webrtc.OfferOptions
 	if iceRestart {
 		opts = &webrtc.OfferOptions{ICERestart: true}
@@ -975,7 +958,7 @@ func (s *SDK) setupControlChannel(c *Connection, dc *webrtc.DataChannel) {
 			c.mu.Lock()
 			o := c.viewOptions
 			c.mu.Unlock()
-			prefs := map[string]any{"audio": o.audio(), "video": o.video(), "downloads": o.downloads()}
+			prefs := map[string]any{"audio": o.audio(), "video": o.video(), "downloads": o.downloads(), "info": map[string]any{}}
 			if o.Label != "" {
 				prefs["info"] = map[string]any{"label": o.Label}
 			}
@@ -990,8 +973,11 @@ func (s *SDK) setupControlChannel(c *Connection, dc *webrtc.DataChannel) {
 				info[k] = v
 			}
 			s.mu.Unlock()
-			if len(info) > 0 {
-				c.sendControl(map[string]any{"info": info})
+			if c.sendControl(map[string]any{"info": info}) {
+				c.mu.Lock()
+				c.infoSent = true
+				c.mu.Unlock()
+				s.updateTracksForConnection(c)
 			}
 		}
 		s.startPingMonitor(c)
@@ -1141,6 +1127,15 @@ func (s *SDK) updateTracksForConnection(c *Connection) {
 	if c.typ != "publisher" {
 		return
 	}
+	c.mediaMu.Lock()
+	defer c.mediaMu.Unlock()
+	c.mu.Lock()
+	ready := c.infoSent
+	c.mu.Unlock()
+	if !ready || !c.controlOpen() {
+		return
+	}
+
 	s.mu.Lock()
 	tracks := append([]webrtc.TrackLocal(nil), s.localTracks...)
 	s.mu.Unlock()
@@ -1184,6 +1179,42 @@ func (s *SDK) updateTracksForConnection(c *Connection) {
 			}
 		}
 	}
+	changed := false
+	for _, track := range tracks {
+		kind := track.Kind()
+		if (kind == webrtc.RTPCodecTypeAudio && !allowAudio) || (kind == webrtc.RTPCodecTypeVideo && !allowVideo) {
+			continue
+		}
+		found := false
+		c.mu.Lock()
+		for _, k := range c.senderKinds {
+			if k == kind {
+				found = true
+				break
+			}
+		}
+		c.mu.Unlock()
+		if found {
+			continue
+		}
+		sender, err := c.pc.AddTrack(track)
+		if err != nil {
+			s.logf("AddTrack failed: %v", err)
+			continue
+		}
+		c.mu.Lock()
+		c.senders = append(c.senders, sender)
+		c.senderKinds[sender] = kind
+		c.mu.Unlock()
+		go s.drainRTCP(sender)
+		changed = true
+	}
+	if changed {
+		if err := s.renegotiate(c, false, false); err != nil {
+			s.logf("media offer failed: %v", err)
+		}
+	}
+
 }
 
 // ---------------------------------------------------------------------------

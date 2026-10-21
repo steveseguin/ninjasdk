@@ -13,6 +13,12 @@ import kotlin.test.assertTrue
 /** Conformance against spec/vectors.json (generated from the JavaScript SDK). */
 class VectorsTest {
     @Test
+    fun initialPreferencesIncludeInfo() {
+        assertEquals(0, ViewOptions().toPrefs().getJSONObject("info").length())
+        assertEquals("camera", ViewOptions(label = "camera").toPrefs().getJSONObject("info").getString("label"))
+    }
+
+    @Test
     fun sdkPasswordModes() {
         for (c in cases("passwordModes")) {
             val pw = VdoNinjaOptions(password = if (c.isNull("rawPassword")) null else c.getString("rawPassword"),

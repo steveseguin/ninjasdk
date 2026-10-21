@@ -4,6 +4,11 @@ import XCTest
 @testable import VDONinjaCore
 
 final class VectorsTests: XCTestCase {
+    func testInitialPreferencesIncludeInfo() {
+        XCTAssertEqual((ViewOptions().prefs["info"] as? JSON)?.count, 0)
+        XCTAssertEqual((ViewOptions(label: "camera").prefs["info"] as? JSON)?["label"] as? String, "camera")
+    }
+
     static let vectors: JSON = {
         let candidates = [
             ProcessInfo.processInfo.environment["VDON_VECTORS"],

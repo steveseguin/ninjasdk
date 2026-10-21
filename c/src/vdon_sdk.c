@@ -1173,6 +1173,8 @@ void vdon__chan_install_callbacks(chan_t *ch) {
     rtcSetMessageCallback(ch->dc, on_dc_message);
 }
 
+static void update_publisher_tracks(vdon_sdk *s, conn_t *c);
+
 static void control_opened(vdon_sdk *s, conn_t *c, chan_t *ch) {
     cJSON *m = NULL;
     int is_viewer;
@@ -1191,9 +1193,9 @@ static void control_opened(vdon_sdk *s, conn_t *c, chan_t *ch) {
         cJSON_AddBoolToObject(m, "audio", c->vopts.audio);
         cJSON_AddBoolToObject(m, "video", c->vopts.video);
         cJSON_AddBoolToObject(m, "downloads", c->vopts.downloads);
-        if (c->vlabel && *c->vlabel) {
+        {
             cJSON *info = cJSON_AddObjectToObject(m, "info");
-            cJSON_AddStringToObject(info, "label", c->vlabel);
+            if (c->vlabel && *c->vlabel) cJSON_AddStringToObject(info, "label", c->vlabel);
         }
         if (c->vopts.allow_resources)
             cJSON_AddBoolToObject(m, "allowresources", 1);
@@ -1201,15 +1203,21 @@ static void control_opened(vdon_sdk *s, conn_t *c, chan_t *ch) {
             int iv = s->o.auto_ping_interval_ms < 1000 ? 1000 : s->o.auto_ping_interval_ms;
             vdon__schedule(s, JOB_PING, vdon_now_ms() + iv, c, NULL, 0);
         }
-    } else if (s->publisher_info && cJSON_GetArraySize(s->publisher_info) > 0) {
+    } else {
         m = cJSON_CreateObject();
-        cJSON_AddItemToObject(m, "info", cJSON_Duplicate(s->publisher_info, 1));
+        cJSON_AddItemToObject(m, "info", s->publisher_info ? cJSON_Duplicate(s->publisher_info, 1) : cJSON_CreateObject());
     }
     pthread_cond_broadcast(&s->cond);
     pthread_mutex_unlock(&s->lock);
     if (m) {
-        vdon__conn_send_control(s, c, m);
+        int sent = vdon__conn_send_control(s, c, m);
         cJSON_Delete(m);
+        if (!is_viewer && sent) {
+            pthread_mutex_lock(&s->lock);
+            c->info_sent = 1;
+            pthread_mutex_unlock(&s->lock);
+            update_publisher_tracks(s, c);
+        }
     }
     vdon__send_subscriptions(s, c);
     {
@@ -1429,6 +1437,10 @@ static int add_publisher_tracks(vdon_sdk *s, conn_t *c) {
         ptrack_t *t;
         int tr;
         uint32_t ssrc = tp->init.ssrc;
+        if ((tp->init.kind == VDON_MEDIA_AUDIO && !c->allow_audio) ||
+            (tp->init.kind == VDON_MEDIA_VIDEO && !c->allow_video)) continue;
+        for (t = c->tracks; t; t = t->next) if (t->kind == tp->init.kind) break;
+        if (t) continue;
         if (!ssrc)
             vdon_random_bytes((uint8_t *)&ssrc, sizeof(ssrc));
         memset(&init, 0, sizeof(init));
@@ -1485,6 +1497,26 @@ static int add_publisher_tracks(vdon_sdk *s, conn_t *c) {
     return VDON_OK;
 }
 
+static void update_publisher_tracks(vdon_sdk *s, conn_t *c) {
+    ptrack_t *before;
+    int changed, rc;
+    pthread_mutex_lock(&s->lock);
+    if (c->closed || c->type != TYPE_PUBLISHER || !c->info_sent || !c->control || !c->control->open) {
+        pthread_mutex_unlock(&s->lock);
+        return;
+    }
+    before = c->tracks;
+    rc = add_publisher_tracks(s, c);
+    changed = before != c->tracks;
+    pthread_mutex_unlock(&s->lock);
+    if (rc != VDON_OK || (changed && rtcSetLocalDescription(c->pc, "offer") < 0)) {
+        EV(ev, VDON_EVENT_ERROR);
+        ev.uuid = c->uuid;
+        ev.message = "failed to negotiate requested media";
+        vdon__emit(s, &ev);
+    }
+}
+
 /* Creates a peer connection record. lock NOT held. Returns NULL on failure. */
 static conn_t *conn_create(vdon_sdk *s, const char *uuid, const char *type) {
     rtcConfiguration cfg;
@@ -1498,6 +1530,7 @@ static conn_t *conn_create(vdon_sdk *s, const char *uuid, const char *type) {
     cfg.bindAddress = s->o.bind_address;
     cfg.iceTransportPolicy = s->o.force_turn ? RTC_TRANSPORT_POLICY_RELAY : RTC_TRANSPORT_POLICY_ALL;
     cfg.disableAutoNegotiation = true;
+    cfg.forceMediaTransport = true; /* Media is added after the data-channel handshake. */
     pthread_mutex_unlock(&s->lock);
     pc = rtcCreatePeerConnection(&cfg);
     if (pc < 0) {
@@ -1512,7 +1545,7 @@ static conn_t *conn_create(vdon_sdk *s, const char *uuid, const char *type) {
     c->info = cJSON_CreateObject();
     c->obs = cJSON_CreateObject();
     c->advertised = cJSON_CreateArray();
-    c->allow_audio = c->allow_video = 1;
+    c->allow_audio = c->allow_video = 0;
     c->ice_delay_ms = 70;
     c->created_at = vdon_now_ms();
     vdon_view_options_init(&c->vopts);
@@ -1806,7 +1839,6 @@ static void handle_remote_candidates(vdon_sdk *s, cJSON *msg, conn_t *via, int s
 static void handle_offer_request(vdon_sdk *s, const char *uuid, const char *session) {
     conn_t *c, *old;
     char *sid;
-    int rc;
     if (!uuid || !*uuid)
         return;
     pthread_mutex_lock(&s->lock);
@@ -1839,9 +1871,8 @@ static void handle_offer_request(vdon_sdk *s, const char *uuid, const char *sess
         ch = vdon__chan_new(c, dc, CH_CONTROL, VDON_CONTROL_CHANNEL);
         vdon__chan_install_callbacks(ch);
     }
-    rc = add_publisher_tracks(s, c);
     pthread_mutex_unlock(&s->lock);
-    if (rc != VDON_OK || rtcSetLocalDescription(c->pc, "offer") < 0) {
+    if (rtcSetLocalDescription(c->pc, "offer") < 0) {
         EV(ev, VDON_EVENT_ERROR);
         ev.uuid = uuid;
         ev.message = "failed to create offer";
@@ -1968,21 +1999,22 @@ static void handle_listing(vdon_sdk *s, cJSON *msg) {
 
 static void replay_pending_play(vdon_sdk *s, const char *sid) {
     pview_t *pv;
-    int found = 0;
-    char hashed[96];
+    job_t **pp;
     pthread_mutex_lock(&s->lock);
-    for (pv = s->pending_views; pv; pv = pv->next)
-        if (strcmp(pv->sid, sid) == 0)
-            found = 1;
-    if (found)
-        hashed_stream_id(s, sid, hashed, sizeof(hashed));
-    pthread_mutex_unlock(&s->lock);
-    if (found) {
-        cJSON *m = cJSON_CreateObject();
-        cJSON_AddStringToObject(m, "request", "play");
-        cJSON_AddStringToObject(m, "streamID", hashed);
-        ws_send_free(s, m);
+    for (pv = s->pending_views; pv; pv = pv->next) if (strcmp(pv->sid, sid) == 0) break;
+    if (pv && !find_viewer_for_stream(s, sid)) {
+        /* Coalesce discovery notices into the normal cancellable retry. */
+        pp = &s->jobs;
+        while (*pp) {
+            job_t *j = *pp;
+            if (j->type == JOB_VIEW_RETRY && j->str && strcmp(j->str, sid) == 0) {
+                *pp = j->next;
+                job_free(j);
+            } else pp = &j->next;
+        }
+        schedule_view_retry(s, sid, 100);
     }
+    pthread_mutex_unlock(&s->lock);
 }
 
 static void handle_video_added(vdon_sdk *s, cJSON *msg, vdon_event_type type) {
@@ -2173,6 +2205,7 @@ static void handle_control(vdon_sdk *s, conn_t *c, cJSON *msg) {
         if (cJSON_IsBool((v = jget(msg, "video"))))
             c->allow_video = cJSON_IsTrue(v);
         pthread_mutex_unlock(&s->lock);
+        update_publisher_tracks(s, c);
     } else if ((v = jget(msg, "ping"))) {
         cJSON *r = cJSON_CreateObject();
         cJSON_AddItemToObject(r, "pong", cJSON_Duplicate(v, 1));

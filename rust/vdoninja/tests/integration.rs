@@ -303,8 +303,15 @@ async fn media_publish_view() {
         .unwrap();
 
     let mut kinds = std::collections::HashSet::new();
+    let mut info_seen = false;
     while kinds.len() < 2 {
         let ev = wait_for(&mut view_ev, Duration::from_secs(20), |e| {
+            if matches!(e, Event::PeerInfo { .. }) {
+                info_seen = true;
+            }
+            if matches!(e, Event::Track { .. }) {
+                assert!(info_seen, "media arrived before publisher info");
+            }
             matches!(e, Event::Track { .. })
         })
         .await;

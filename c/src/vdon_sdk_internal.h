@@ -92,6 +92,7 @@ struct conn {
     ptrack_t *tracks;
     cJSON *info;
     cJSON *obs;
+    int info_sent;
     int allow_audio, allow_video, allow_download, allow_resource;
     vdon_view_options vopts;
     char *vlabel;

@@ -335,6 +335,60 @@ func TestDataRoundTrip(t *testing.T) {
 	waitFor(t, byeCh, 10*time.Second, "bye")
 }
 
+func TestInitialOfferIsDataOnly(t *testing.T) {
+	s := newTestSDK(t, "", nil)
+	track, err := webrtc.NewTrackLocalStaticSample(webrtc.RTPCodecCapability{MimeType: webrtc.MimeTypeVP8}, "video", "camera")
+	if err != nil {
+		t.Fatal(err)
+	}
+	s.publishing = true
+	s.localTracks = []webrtc.TrackLocal{track}
+	c, err := s.createConnection("peer", "publisher")
+	if err != nil {
+		t.Fatal(err)
+	}
+	offer, err := s.createOffer(c, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(offer.SDP, "m=application ") || strings.Contains(offer.SDP, "m=video ") || strings.Contains(offer.SDP, "m=audio ") {
+		t.Fatal("initial offer must contain only the data connection")
+	}
+	c.mu.Lock()
+	c.allowVideo = true // Preferences alone are not enough; info must be sent.
+	c.mu.Unlock()
+	s.updateTracksForConnection(c)
+	if err := s.AddTrack(track); err != nil {
+		t.Fatal(err)
+	}
+	if len(c.pc.GetSenders()) != 0 {
+		t.Fatal("media attached before the control handshake")
+	}
+}
+
+func TestDiscoveryRetriesCoalesceAndStop(t *testing.T) {
+	s := newTestSDK(t, "", nil)
+	s.connected = true
+	s.pendingViews["late"] = ViewOptions{}
+	msg := map[string]any{"streamID": s.hashedStreamID("late"), "UUID": "peer"}
+	for i := 0; i < 20; i++ {
+		s.handleVideoAddedToRoom(msg)
+	}
+	s.mu.Lock()
+	n := len(s.viewRetryTimers)
+	s.mu.Unlock()
+	if n != 1 {
+		t.Fatalf("wanted one cancellable retry, got %d", n)
+	}
+	s.StopViewing("late")
+	time.Sleep(150 * time.Millisecond)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if len(s.queue) != 0 || len(s.viewRetryTimers) != 0 {
+		t.Fatal("stopped discovery request was replayed")
+	}
+}
+
 func TestMediaPublishView(t *testing.T) {
 	host := startSignal(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -368,7 +422,19 @@ func TestMediaPublishView(t *testing.T) {
 	}()
 
 	tracks := make(chan Event, 4)
-	view.On(EventTrack, func(ev Event) { tracks <- ev })
+	infoReceived := make(chan struct{}, 1)
+	view.On(EventPeerInfo, func(ev Event) {
+		select {
+		case infoReceived <- struct{}{}:
+		default:
+		}
+	})
+	view.On(EventTrack, func(ev Event) {
+		if len(infoReceived) == 0 {
+			t.Error("media arrived before publisher info")
+		}
+		tracks <- ev
+	})
 
 	if err := pub.Connect(ctx); err != nil {
 		t.Fatal(err)

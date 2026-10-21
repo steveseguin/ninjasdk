@@ -218,6 +218,7 @@ struct ConnState {
     session: Option<String>,
     info: Map<String, Value>,
     obs_state: Map<String, Value>,
+    info_sent: bool,
     allow_audio: bool,
     allow_video: bool,
     allow_downloads: bool,
@@ -2045,12 +2046,7 @@ impl Inner {
         };
         if let Some(opts) = pending {
             log::debug!("re-requesting pending stream {clean:?}");
-            let me = self.clone();
-            let sid = clean.clone();
-            tokio::spawn(async move {
-                tokio::time::sleep(Duration::from_millis(100)).await;
-                let _ = me.view(&sid, opts).await;
-            });
+            self.schedule_view_retry(&clean, opts, Duration::from_millis(100));
         }
         self.emit(Event::VideoAddedToRoom {
             stream_id: clean,
@@ -2222,8 +2218,9 @@ impl Inner {
                 session: None,
                 info: Map::new(),
                 obs_state: Map::new(),
-                allow_audio: true,
-                allow_video: true,
+                info_sent: false,
+                allow_audio: false,
+                allow_video: false,
                 allow_downloads: false,
                 allow_resources: false,
                 view_options: ViewOptions::default(),
@@ -2299,23 +2296,7 @@ impl Inner {
         conn: &Arc<Connection>,
         ice_restart: bool,
     ) -> Result<RTCSessionDescription> {
-        if conn.kind == "publisher" && conn.cs.lock().unwrap().senders.is_empty() {
-            let tracks = self.st.lock().unwrap().local_tracks.clone();
-            for t in tracks {
-                let kind = t.kind().await;
-                let (allow_audio, allow_video) = {
-                    let cs = conn.cs.lock().unwrap();
-                    (cs.allow_audio, cs.allow_video)
-                };
-                if (kind == RtpCodecKind::Audio && !allow_audio)
-                    || (kind == RtpCodecKind::Video && !allow_video)
-                {
-                    continue;
-                }
-                let sender = conn.pc.add_track(t).await?;
-                conn.cs.lock().unwrap().senders.push((sender, kind));
-            }
-        }
+        // The initial offer establishes sendChannel; preferences add media later.
         let options = if ice_restart {
             Some(RTCOfferOptions { ice_restart: true })
         } else {
@@ -3135,7 +3116,8 @@ impl Inner {
         log::debug!("control channel open for {}/{}", conn.uuid, conn.kind);
         if conn.kind == "viewer" {
             let o = conn.cs.lock().unwrap().view_options.clone();
-            let mut prefs = json!({"audio": o.audio, "video": o.video, "downloads": o.downloads});
+            let mut prefs =
+                json!({"audio": o.audio, "video": o.video, "downloads": o.downloads, "info": {}});
             if let Some(l) = &o.label {
                 prefs["info"] = json!({"label": l});
             }
@@ -3145,8 +3127,9 @@ impl Inner {
             conn.send_control(&prefs).await;
         } else {
             let info = self.st.lock().unwrap().publisher_info.clone();
-            if !info.is_empty() {
-                conn.send_control(&json!({"info": info})).await;
+            if conn.send_control(&json!({"info": info})).await {
+                conn.cs.lock().unwrap().info_sent = true;
+                self.update_tracks(conn).await;
             }
         }
         self.start_ping_monitor(conn);
@@ -3303,7 +3286,8 @@ impl Inner {
     /// Applies viewer audio/video preferences by removing or re-adding senders
     /// and renegotiating (webrtc-rs has no `replaceTrack(null)`).
     async fn update_tracks(&self, conn: &Arc<Connection>) {
-        if conn.kind != "publisher" {
+        if conn.kind != "publisher" || !conn.is_control_open() || !conn.cs.lock().unwrap().info_sent
+        {
             return;
         }
         let tracks = self.st.lock().unwrap().local_tracks.clone();
@@ -4355,6 +4339,60 @@ fn _assert_send_sync() {
 #[cfg(test)]
 mod protocol_tests {
     use super::*;
+
+    #[tokio::test]
+    async fn initial_offer_is_data_only_even_when_publishing_media() {
+        let sdk = VdoNinja::new(Options {
+            turn: TurnMode::Disabled,
+            stun_servers: vec![],
+            bind_addrs: vec!["127.0.0.1:0".into()],
+            include_loopback: true,
+            ..Default::default()
+        });
+        let video = crate::media::SampleTrack::new("video/VP8", "camera", "video").unwrap();
+        sdk.inner.st.lock().unwrap().local_tracks = vec![video.local()];
+        let conn = sdk
+            .inner
+            .create_connection("peer", "publisher")
+            .await
+            .unwrap();
+        let offer = sdk.inner.create_offer(&conn, false).await.unwrap();
+        assert!(offer.sdp.contains("m=application "));
+        assert!(!offer.sdp.contains("m=video ") && !offer.sdp.contains("m=audio "));
+        assert!(conn.cs.lock().unwrap().senders.is_empty());
+        // Even an early preference callback cannot attach media before info is sent.
+        conn.cs.lock().unwrap().allow_video = true;
+        sdk.inner.update_tracks(&conn).await;
+        assert!(conn.cs.lock().unwrap().senders.is_empty());
+        sdk.disconnect().await;
+    }
+
+    #[tokio::test]
+    async fn discovery_retries_coalesce_and_stop() {
+        let sdk = VdoNinja::new(Options::default());
+        let (tx, mut wire) = mpsc::unbounded_channel();
+        *sdk.inner.ws_tx.lock().unwrap() = Some(tx);
+        {
+            let mut st = sdk.inner.st.lock().unwrap();
+            st.connected = true;
+            st.pending_views
+                .insert("late".into(), ViewOptions::default());
+        }
+        for _ in 0..20 {
+            sdk.inner.handle_video_added(
+                &json!({"streamID": sdk.inner.hashed_stream_id("late"), "UUID":"peer"}),
+            );
+        }
+        assert_eq!(sdk.inner.st.lock().unwrap().view_retry.len(), 1);
+        sdk.stop_viewing("late").await;
+        tokio::time::sleep(Duration::from_millis(150)).await;
+        assert!(
+            wire.try_recv().is_err(),
+            "stopped discovery request was replayed"
+        );
+        assert!(sdk.inner.st.lock().unwrap().view_retry.is_empty());
+        sdk.disconnect().await;
+    }
 
     #[tokio::test]
     async fn password_modes_match_javascript() {

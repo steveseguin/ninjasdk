@@ -31,7 +31,8 @@ public final class VDOConnection {
     var remoteSet = false
     var recovering = false
     var viewOptions = ViewOptions()
-    var allowAudio = true, allowVideo = true
+    var infoSent = false
+    var allowAudio = false, allowVideo = false
     var iceBundle: [IceCandidate] = []
     var iceWork: DispatchWorkItem?
     var iceDelay: TimeInterval = 0.07
@@ -417,6 +418,7 @@ public final class VDONinja {
         queue.async {
             self.localTracks.append(track)
             for c in self.allConnections() where c.type == "publisher" {
+                guard c.infoSent, c.controlOpen, (track.kind == "video" ? c.allowVideo : c.allowAudio) else { continue }
                 if let sender = c.pc.add(track, streamIds: ["vdoninja"]) { c.senders.append((sender, track.kind)) }
                 self.renegotiate(c, iceRestart: false)
             }
@@ -737,12 +739,6 @@ public final class VDONinja {
         }
     }
 
-    private func addLocalTracks(_ c: VDOConnection) {
-        for t in localTracks {
-            if let sender = c.pc.add(t, streamIds: ["vdoninja"]) { c.senders.append((sender, t.kind)) }
-        }
-    }
-
     private func sendDescription(_ c: VDOConnection, _ desc: RTCSessionDescription, includeStreamId: Bool = true) {
         var msg: JSON = ["UUID": c.uuid, "session": c.session]
         if includeStreamId, let sid = c.streamId { msg["streamID"] = pw.hashStreamId(sid) }
@@ -895,8 +891,9 @@ public final class VDONinja {
         if c.type == "viewer" {
             c.sendControl(c.viewOptions.prefs)
             if options.autoPingViewer { startPingMonitor(c) }
-        } else if !publisherInfo.isEmpty {
-            c.sendControl(["info": publisherInfo])
+        } else if c.sendControl(["info": publisherInfo]) {
+            c.infoSent = true
+            updateTracks(c)
         }
         if !subscriptions.isEmpty { c.sendControl(["pipe": ["type": "subscribe", "channels": Array(subscriptions)]]) }
         emit(VDOEvent(.dataChannelOpen, uuid: c.uuid, streamId: c.streamId, connectionType: c.type))
@@ -1030,11 +1027,18 @@ public final class VDONinja {
     }
 
     private func updateTracks(_ c: VDOConnection) {
-        for (sender, kind) in c.senders {
-            let allowed = kind == "video" ? c.allowVideo : c.allowAudio
-            let local = localTracks.first { $0.kind == kind }
-            if !allowed && sender.track != nil { sender.track = nil } else if allowed && sender.track == nil, let local { sender.track = local }
+        guard c.type == "publisher", !c.closed, c.controlOpen, c.infoSent else { return }
+        var changed = false
+        for track in localTracks {
+            let allowed = track.kind == "video" ? c.allowVideo : c.allowAudio
+            if let (sender, _) = c.senders.first(where: { $0.1 == track.kind }) {
+                sender.track = allowed ? track : nil
+            } else if allowed, let sender = c.pc.add(track, streamIds: ["vdoninja"]) {
+                c.senders.append((sender, track.kind))
+                changed = true
+            }
         }
+        if changed { renegotiate(c, iceRestart: false) }
     }
 
     // MARK: Signaling
@@ -1098,7 +1102,7 @@ public final class VDONinja {
         }
         emit(VDOEvent(type, uuid: uuid, streamId: sid, raw: msg))
         if let sid, !sid.isEmpty {
-            if pendingViews[sid] != nil && findViewer(for: sid) == nil { signal.send(["request": "play", "streamID": pw.hashStreamId(sid)]) }
+            if pendingViews[sid] != nil && findViewer(for: sid) == nil { scheduleViewRetry(sid, delay: 0.1) }
             autoConsider(sid)
         }
     }
@@ -1112,7 +1116,6 @@ public final class VDONinja {
                 return
             }
             self.setupControlChannel(c, dc)
-            self.addLocalTracks(c)
             c.pc.offer(for: RTCMediaConstraints(mandatoryConstraints: nil, optionalConstraints: nil)) { offer, err in
                 self.queue.async {
                     guard let offer else { return self.emit(VDOEvent(.error, uuid: uuid, message: "failed to create offer: \(err?.localizedDescription ?? "?")")) }

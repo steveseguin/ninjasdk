@@ -18,6 +18,11 @@ Map<String, dynamic> loadVectors() {
 }
 
 void main() {
+  test('initial preferences include native info even without a label', () {
+    expect(const ViewOptions().toPrefs()['info'], <String, dynamic>{});
+    expect(const ViewOptions(label: 'camera').toPrefs()['info'], {'label': 'camera'});
+  });
+
   final v = loadVectors();
 
   test('SDK password modes match JavaScript', () {

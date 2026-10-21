@@ -862,7 +862,10 @@ func (s *SDK) AddTrack(track webrtc.TrackLocal) error {
 	}
 	s.mu.Unlock()
 	for _, c := range conns {
-		if (track.Kind() == webrtc.RTPCodecTypeAudio && !c.allowAudio) || (track.Kind() == webrtc.RTPCodecTypeVideo && !c.allowVideo) {
+		c.mu.Lock()
+		allowed := c.infoSent && ((track.Kind() == webrtc.RTPCodecTypeAudio && c.allowAudio) || (track.Kind() == webrtc.RTPCodecTypeVideo && c.allowVideo))
+		c.mu.Unlock()
+		if !allowed || !c.controlOpen() {
 			continue
 		}
 		sender, err := c.pc.AddTrack(track)
@@ -1217,10 +1220,7 @@ func (s *SDK) handleVideoAddedToRoom(msg map[string]any) {
 	s.mu.Unlock()
 	if pending {
 		s.logf("Re-requesting pending stream that just became available: %s", clean)
-		go func() {
-			time.Sleep(100 * time.Millisecond)
-			_, _ = s.View(context.Background(), clean, opts)
-		}()
+		s.scheduleViewRetry(clean, opts, 100*time.Millisecond)
 	}
 	s.emit(Event{Type: EventVideoAddedToRoom, StreamID: clean, UUID: uuid, Raw: msg})
 }

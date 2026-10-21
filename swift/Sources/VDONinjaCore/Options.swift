@@ -59,7 +59,7 @@ public struct ViewOptions {
     }
 
     public var prefs: JSON {
-        var p: JSON = ["audio": audio, "video": video, "downloads": downloads]
+        var p: JSON = ["audio": audio, "video": video, "downloads": downloads, "info": JSON()]
         if let label, !label.isEmpty { p["info"] = ["label": label] }
         if allowResources { p["allowresources"] = true }
         return p

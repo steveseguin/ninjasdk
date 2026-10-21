@@ -33,6 +33,77 @@ static int record_candidate(int pc, const char *candidate, const char *mid) {
 
 #define CHECK(expr) do { if (!(expr)) { fprintf(stderr, "FAIL line %d: %s\n", __LINE__, #expr); exit(1); } } while (0)
 
+static void test_data_first_handshake(void) {
+    vdon_options opts;
+    vdon_sdk *s;
+    conn_t *c;
+    static const char *no_stun[1];
+    char sdp[8192];
+    int i, n = -1;
+    vdon_options_init(&opts);
+    opts.turn_mode = VDON_TURN_DISABLED;
+    opts.stun_servers = no_stun;
+    opts.stun_server_count = 0;
+    s = vdon_create(&opts, NULL, NULL); CHECK(s);
+    s->publishing = 1;
+    s->stream_id = vdon_strdup("camera");
+    s->track_count = 1;
+    vdon_track_init_defaults(&s->tracks[0].init, VDON_MEDIA_VIDEO, VDON_CODEC_VP8);
+    strcpy(s->tracks[0].mid, "video");
+    handle_offer_request(s, "viewer", NULL);
+    c = vdon__find_conn(s, "viewer", TYPE_PUBLISHER); CHECK(c);
+    CHECK(!c->tracks);
+    for (i = 0; i < 100; i++) {
+        n = rtcGetLocalDescription(c->pc, sdp, sizeof(sdp));
+        if (n > 0) break;
+        vdon__sleep_ms(10);
+    }
+    CHECK(n > 0 && strstr(sdp, "m=application "));
+    CHECK(!strstr(sdp, "m=video ") && !strstr(sdp, "m=audio "));
+    c->allow_video = 1;
+    update_publisher_tracks(s, c);
+    CHECK(!c->tracks); /* No info/control handshake yet. */
+    vdon_destroy(s);
+}
+
+static void test_empty_info_is_sent(void) {
+    vdon_sdk s = {0};
+    conn_t c = {0};
+    chan_t ch = {0};
+    pthread_mutex_init(&s.lock, NULL);
+    pthread_cond_init(&s.cond, NULL);
+    c.sdk = &s;
+    c.uuid = "peer";
+    c.type = TYPE_PUBLISHER;
+    ch.dc = 7;
+    ch.conn = &c;
+    ch.label = VDON_CONTROL_CHANNEL;
+    messages_sent = 0;
+    control_opened(&s, &c, &ch);
+    CHECK(messages_sent == 1 && strcmp(last_message, "{\"info\":{}}") == 0);
+    CHECK(c.info_sent);
+    pthread_cond_destroy(&s.cond);
+    pthread_mutex_destroy(&s.lock);
+}
+
+static void test_discovery_retries_coalesce(void) {
+    vdon_sdk s = {0};
+    pview_t pv = {0};
+    int i;
+    pthread_mutex_init(&s.lock, NULL);
+    pthread_cond_init(&s.cond, NULL);
+    s.ws = -1;
+    s.pending_views = &pv;
+    pv.sid = "camera";
+    for (i = 0; i < 20; i++) replay_pending_play(&s, "camera");
+    CHECK(s.jobs && s.jobs->type == JOB_VIEW_RETRY && !s.jobs->next);
+    s.intentional = 1;
+    replay_pending_play(&s, "camera");
+    CHECK(!s.jobs);
+    pthread_cond_destroy(&s.cond);
+    pthread_mutex_destroy(&s.lock);
+}
+
 static void test_password_modes(void) {
     FILE *file = fopen(VDON_VECTORS_PATH, "rb");
     long size;
@@ -251,6 +322,9 @@ static void test_sender_lifetime(void) {
 }
 
 int main(void) {
+    test_data_first_handshake();
+    test_empty_info_is_sent();
+    test_discovery_retries_coalesce();
     test_password_modes();
     test_leave_closes_signaling();
     test_bye_uses_control_channel();

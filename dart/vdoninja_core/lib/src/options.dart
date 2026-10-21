@@ -99,7 +99,7 @@ class ViewOptions {
         'audio': audio,
         'video': video,
         'downloads': downloads,
-        if (label != null && label!.isNotEmpty) 'info': {'label': label},
+        'info': {if (label != null && label!.isNotEmpty) 'label': label},
         if (allowResources) 'allowresources': true,
       };
 }

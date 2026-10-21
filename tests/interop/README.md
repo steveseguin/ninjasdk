@@ -1,8 +1,8 @@
 # SDK ↔ VDO.Ninja interop harness
 
 Drives the SDK against a **real VDO.Ninja page** to verify the native data-channel
-protocols. Automated tests (`npm test`) only exercise SDK-to-SDK; this is what proves
-wire compatibility with VDO.Ninja itself.
+protocols. Automated tests (`npm test`) only exercise SDK-to-SDK; this checks the tested flows
+against VDO.Ninja itself.
 
 ## Running
 
@@ -14,72 +14,27 @@ cargo build --manifest-path rust/Cargo.toml --example av
 node tests/interop/rust-av-live.cjs
 ```
 
-This needs FFmpeg and Playwright/Chromium. It runs Rust publishing and receiving
-simultaneously, checks decoded video and audible audio, encrypted SDP/ICE,
-DTLS/SRTP, native ping/pong and bye delivery to both browser peers, then decodes the
-finalized recordings. It uses isolated stream/room IDs and a password containing
-Unicode, spaces and literal percent escapes. Artifacts are kept in a printed
-temporary directory. `PLAYWRIGHT_MODULE`, `BROWSER_CHANNEL`, `RUST_AV_BIN` and
-`VDO_TEST_URL` override their defaults; the native target defaults to
-`https://vdo.ninja/`. No local web server is needed for that target.
-The test starts a loopback WebSocket observer for Rust, forwarding unchanged
-signaling to hosted WSS. It rejects unrecognized outbound fields/messages,
-validates decrypted SDP/ICE, and checks native room/stream hashing and
-`offerSDP` before the initial offer. It sends no custom probe payloads or metadata.
-It also rejects unexpected Rust data-channel messages, including application
-`pipe` payloads: this demo needs only native control messages.
+Requires FFmpeg and Playwright/Chromium. Checks a data-only initial offer, native
+`info`/preferences before media, decoded A/V in both directions, viewer replacement,
+bye and playable recordings. Rejects unexpected signaling/control messages.
+Artifacts are saved to the printed temporary directory.
 
-### Native-port source audit
+`VDO_PASSWORD_MODE` selects `private` (default), `default`, `off`, `literal-false`,
+`literal-0` or `literal-off`; `VDO_TEST_SALT` selects the salt. `PLAYWRIGHT_MODULE`,
+`BROWSER_CHANNEL`, `RUST_AV_BIN`, `VDO_SIGNAL_URL` and `VDO_TEST_URL` override test
+settings. The native page defaults to `https://vdo.ninja/`.
 
-The audit uses the unmodified sibling VDO.Ninja checkout at commit
-`84b23b360bb3375985defd63ebf4a2adc73b4f52`, including `hss/gemini.js`.
-Line numbers below refer to that revision; the source itself is authoritative.
-
-| Wire behavior | VDO.Ninja source evidence |
-| --- | --- |
-| `joinroom`, `seed`, `play` | `hss/gemini.js:1452,1525,1815`; browser `webrtc.js:4307,6660,6688` |
-| Server requests `offerSDP` | `hss/gemini.js:1288,1376,1496`; browser handler `webrtc.js:7894` |
-| Target `UUID` is rewritten to sender when routing SDP/ICE | `hss/gemini.js:1438–1448`; browser handlers `webrtc.js:8501–8515` |
-| Create ordered `sendChannel` before offering | `webrtc.js:12396` and publisher negotiation setup |
-| AES-CBC with SHA-256 password/salt key, random IV, hex ciphertext/vector | `webrtc.js:3193–3230` |
-| Native ping/pong and bye over control channel | `webrtc.js:8796–8811,11754,11872` |
-| Viewer requests audio/video and optional downloads/resources | `webrtc.js:15326–15390` |
-| Optional publisher `info.label`, object `info.meta`, `info.order` | `webrtc.js:9662–9728,12421–12426` |
-| Generic application `pipe` | `webrtc.js:3452,3494,9233,13363`; forwarded to embedding application |
-| Native file transfer | `webrtc.js:9551,15249,15797`; `lib.js:21214` (`filetransfer`, bytes, `EOF1`) |
-| Resources and third-party `x-` channels | `webrtc.js:878–883,15385,23696` |
-
-Removed native-port extensions: WebSocket application-data relay (`__fallback`),
-client-supplied `from`, WebSocket bye fallback, automatic greeting examples, and
-`{leave:true}`. Gemini ignores untargeted messages with no `request`; it has no
-leave command and clears room membership when the socket closes. All seven
-ports now leave by disconnecting, with normal peer bye and cleanup. Rust's
-same-socket room-switch shortcut was removed. Local development servers also
-no longer implement the invented leave command.
-
-The strict live control check also exposed a late-publisher race in Rust, Go and
-Python: a discovery notice removed pending view preferences before the offer
-arrived. Those ports now retain the requested audio/video/download preferences
-until SDP is processed, so the demo does not unexpectedly advertise downloads.
-
-Pub/sub and RPC are **JS SDK application protocols**, not native browser/server
-commands. They remain compatible with the JS SDK inside the supported P2P
-`pipe` envelope and require an SDK/application handler at the other end. Local
-development servers are test subsets, not full replicas of Gemini's admission,
-capacity, takeover or routing policies. Local SDK-to-SDK tests alone do not
-establish hosted-service compatibility.
-
-To verify room departure against an actual Gemini process, start the unmodified
-`hss/gemini.js` with its `ws`, `uuid` and `posix` dependencies available, then run:
+For native URL parsing and local reference-server checks:
 
 ```bash
+node --test tests/interop/native-inputs.test.cjs
+# Start the unmodified sibling vdoninja/hss/gemini.js separately first:
 VDONINJA_REFERENCE_HOST=ws://127.0.0.1:8443 pytest -q python/tests/test_reference_server.py
 ```
 
-This test checks socket closure, released director ownership and room membership,
-and joining another room after reconnecting. It skips unless that environment
-variable is set. The hosted Rust A/V test above independently checks the real
-browser's media and control behavior.
+Set `VDO_SOURCE` for a different VDO.Ninja checkout. The implementation and tests,
+not this README, define the wire behavior. Follow the
+[SDK checklist](../../docs/native-sdks.md#sdk-integration-checklist).
 
 For an automated encrypted media/data check against current alpha:
 

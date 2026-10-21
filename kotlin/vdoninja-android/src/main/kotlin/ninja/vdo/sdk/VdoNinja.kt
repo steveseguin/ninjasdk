@@ -80,8 +80,9 @@ class VdoConnection internal constructor(
     val info = JSONObject()
     val obsState = JSONObject()
     internal var viewOptions = ViewOptions()
-    internal var allowAudio = true
-    internal var allowVideo = true
+    @Volatile internal var infoSent = false
+    internal var allowAudio = false
+    internal var allowVideo = false
     internal val iceBundle = ArrayList<IceCandidate>()
     internal var iceTask: ScheduledFuture<*>? = null
     internal var iceDelayMs = 70L
@@ -387,6 +388,7 @@ class VdoNinja @JvmOverloads constructor(
             conns = allConnections().filter { it.type == "publisher" }
         }
         for (c in conns) {
+            if (!c.infoSent || !c.controlOpen || !(if (track.kind() == "video") c.allowVideo else c.allowAudio)) continue
             val sender = c.pc.addTrack(track, listOf("vdoninja"))
             synchronized(lock) { c.senders.add(sender to track.kind()) }
             renegotiate(c, false)
@@ -738,14 +740,6 @@ class VdoNinja @JvmOverloads constructor(
         return conn
     }
 
-    private fun addLocalTracks(c: VdoConnection) {
-        val tracks = synchronized(lock) { localTracks.toList() }
-        for (t in tracks) {
-            val sender = c.pc.addTrack(t, listOf("vdoninja"))
-            synchronized(lock) { c.senders.add(sender to t.kind()) }
-        }
-    }
-
     private fun sdpObserver(onSuccess: (RtcSessionDescription?) -> Unit, onFailure: (String) -> Unit) = object : SdpObserver {
         override fun onCreateSuccess(desc: RtcSessionDescription?) = onSuccess(desc)
         override fun onSetSuccess() = onSuccess(null)
@@ -909,8 +903,9 @@ class VdoNinja @JvmOverloads constructor(
             if (c.type == "viewer") {
                 c.sendControl(c.viewOptions.toPrefs())
                 if (options.autoPingViewer) startPingMonitor(c)
-            } else if (publisherInfo.length() > 0) {
-                c.sendControl(JSONObject().put("info", publisherInfo))
+            } else if (c.sendControl(JSONObject().put("info", publisherInfo))) {
+                c.infoSent = true
+                updateTracks(c)
             }
             val subs = synchronized(lock) { subscriptions.toList() }
             if (subs.isNotEmpty()) c.sendControl(JSONObject().put("pipe", JSONObject().put("type", "subscribe").put("channels", JSONArray(subs))))
@@ -1054,16 +1049,24 @@ class VdoNinja @JvmOverloads constructor(
     }
 
     private fun updateTracks(c: VdoConnection) {
+        if (c.type != "publisher" || c.closed || !c.controlOpen || !c.infoSent) return
         val local = synchronized(lock) { localTracks.toList() }
-        for ((sender, kind) in c.senders.toList()) {
-            val allowed = if (kind == "video") c.allowVideo else c.allowAudio
-            val track = local.firstOrNull { it.kind() == kind }
-            try {
-                if (!allowed && sender.track() != null) sender.setTrack(null, false)
-                else if (allowed && sender.track() == null && track != null) sender.setTrack(track, false)
-            } catch (e: Exception) {
-                log("setTrack failed: $e")
+        synchronized(c) {
+            var changed = false
+            for (track in local) {
+                val kind = track.kind()
+                val allowed = if (kind == "video") c.allowVideo else c.allowAudio
+                val sender = c.senders.firstOrNull { it.second == kind }?.first
+                if (sender == null) {
+                    if (allowed) {
+                        c.senders.add(c.pc.addTrack(track, listOf("vdoninja")) to kind)
+                        changed = true
+                    }
+                } else {
+                    sender.setTrack(if (allowed) track else null, false)
+                }
             }
+            if (changed) renegotiate(c, false)
         }
     }
 
@@ -1134,7 +1137,7 @@ class VdoNinja @JvmOverloads constructor(
         emit(VdoEvent(type, streamId = sid, uuid = uuid, raw = msg))
         if (sid != null) {
             val replay = synchronized(lock) { pendingViews.containsKey(sid) && findViewerForStream(sid) == null }
-            if (replay) signal.send(JSONObject().put("request", "play").put("streamID", pw.hashStreamId(sid)))
+            if (replay) scheduleViewRetry(sid, 100)
             autoConsider(sid)
         }
     }
@@ -1146,7 +1149,6 @@ class VdoNinja @JvmOverloads constructor(
             c.streamId = streamId
             val dc = c.pc.createDataChannel(Protocol.CONTROL_CHANNEL, DataChannel.Init())
             setupControlChannel(c, dc)
-            addLocalTracks(c)
             c.pc.createOffer(sdpObserver({ offer ->
                 if (offer == null) return@sdpObserver
                 c.pc.setLocalDescription(sdpObserver({ sendDescription(c, offer) }, { log("setLocalDescription failed: $it") }), offer)

@@ -60,113 +60,47 @@ Run it twice, or pair it with the JavaScript `autoConnect` demo in the same room
 
 ### Runnable audio/video demo
 
-[`examples/av.rs`](vdoninja/examples/av.rs) publishes a looping 640×360/30 fps
-VP8 test pattern and a 440 Hz Opus tone, receives a browser stream to files, or
-does both at once. Install FFmpeg with `libvpx` and `libopus` for publishing;
-receiving needs only the Rust executable.
+[`examples/av.rs`](vdoninja/examples/av.rs) publishes a VP8 test pattern and Opus
+tone, receives a browser stream to files, or does both. Publishing requires FFmpeg
+with `libvpx` and `libopus`; receiving needs only the Rust executable.
 
 From this directory:
 
 ```bash
-# Optional private password. Use original text, without URL escaping.
+# Optional private password; pass original text.
 export VDONINJA_PASSWORD='choose your own secret'
 
-# Publish test audio/video. Open the WATCH URL printed by the demo.
-cargo run --example av -- --publish my_rust_camera
+# Open the printed WATCH link.
+cargo run --example av -- --publish my_unique_camera
 
-# Receive browser audio/video. Open the PUBLISH FROM BROWSER URL printed.
-cargo run --example av -- --view my_browser_camera --out received
+# Open the printed PUBLISH FROM BROWSER link.
+cargo run --example av -- --view my_unique_browser --out received
 
-# Both directions, in the same room.
-cargo run --example av -- \
-  --publish my_rust_camera --view my_browser_camera --room my_test_room --out received
+# Both directions.
+cargo run --example av -- --publish my_unique_camera --view my_unique_browser --out received
 ```
 
-Use unique stream/room names. With no arguments the demo generates a random
-publish ID. `--seconds 30` stops automatically; `--host wss://…` selects a
-different signaling server, preserving its path and query in the browser link.
-`--salt custom.example` sets the matching hash/encryption salt on both ends.
-`--no-password` explicitly disables password hashing and SDP/ICE encryption.
-For a local `ws://` observer, set `--browser-host wss://…` to its browser-accessible
-upstream endpoint; VDO.Ninja's `wss2` parser expects WSS.
-The printed URLs include matching signaling, room, salt, codec and password
-settings (and therefore contain the password when set).
-If the browser publisher starts later, the demo keeps its view request pending
-and retries. Allow camera/microphone access in the browser; click the page if
-autoplay needs a gesture.
+Use unique IDs and allow browser camera/microphone access. The demo supports one
+viewing peer at a time; closing and replacing it leaves publishing and recording
+running. Ctrl-C sends native bye and finalizes Opus OGG and VP8/VP9 IVF files.
+This is a basic recorder, not a synchronized A/V player; IVF playback uses 30 fps
+and 640×360 header hints. Play completed files with FFplay.
 
-Use **one viewing peer** for this demo. The current webrtc-rs sample track has
-one binding; attaching it to another peer redirects its output. The generated
-browser publisher link includes an empty `view` parameter so it does not subscribe to
-the Rust stream automatically when joining the room. Open the separate WATCH
-link to receive the Rust stream. Multi-viewer sample-track fan-out is not
-implemented by this example. Closing the viewer leaves the producer and any
-simultaneous recording running; a replacement viewer can connect.
+`--seconds 30` stops automatically. `--room`, `--host`, `--salt` and
+`--no-password` select matching connection settings. For a local `ws://` observer,
+`--browser-host` supplies its browser-accessible WSS endpoint. Printed links
+preserve the endpoint path/query and contain the password when set.
 
-Incoming Opus is saved as OGG, and VP8/VP9 as IVF, with separate filenames for
-each track/reconnection. The example requests periodic keyframes and reports
-packet counts. Play the files after stopping with `ffplay received/<file>.ogg`
-or `ffplay received/<file>.ivf`. This is a basic RTP recorder, not a synchronized
-A/V player or muxer: IVF playback assumes 30 fps with 640×360 header hints;
-the decoder obtains actual dimensions from the bitstream. Other codecs and
-loss-tolerant recording need a suitable media pipeline.
-
-The demo currently follows the JS SDK's implementation below. There is a known
-[data-first ordering gap](../docs/native-sdks.md#known-data-first-implementation-gap):
-VDO.Ninja's intended sequence establishes the data connection and exchanges native
-`info`/preferences before negotiating media. The current SDK includes media in its
-initial offer, so successful playback does not prove compliance with that rule.
-
-1. Connect to WSS and announce the publisher (`seed`); a viewer requests `play`.
-2. On `offerSDP`, the publisher creates the ordered `sendChannel` **before**
-   creating its SDP offer. The Rust publisher includes its media tracks in that
-   offer, as the JS SDK does.
-3. Exchange SDP and trickled ICE with the peer UUID/session, encrypted unless
-   `--no-password` is set. The viewer
-   answers the publisher; it does not create a competing offer or control channel.
-4. Once `sendChannel` opens, the viewer sends `{audio:true, video:true, downloads:false}`.
-   Native VDO.Ninja publishers can then add media through a subsequent offer
-   over that channel. This demo uses only native control messages (including
-   ping/pong); it sends no custom application payloads or metadata.
-5. Ctrl-C, SIGTERM (Unix), a timed stop, or a fatal demo error stops producers,
-   calls `disconnect()` to send `{bye:true}` and drain control buffers before
-   closing WebRTC/signaling, then joins recording tasks and finalizes their files.
-
-Passwords use the existing VDO.Ninja AES-256-CBC SDP/ICE protocol with random IVs
-and the selected salt (default `vdo.ninja`). Media uses DTLS-SRTP and data channels use SCTP over
-DTLS; WSS protects the signaling transport. This does not enable the browser's
-optional insertable-stream media encryption. Omitting `VDONINJA_PASSWORD` uses
-the SDK's shared default password, not a private secret. Empty/whitespace-only
-values also select that default. Environment values `false`, `0` and `off` are
-literal passwords; the generated URLs escape them so the browser does not
-interpret them as disable keywords. See the [password input table](../docs/native-sdks.md#password-inputs).
-
-For a real-browser interoperability check (requires Playwright/Chromium and
-FFmpeg), run from the repository root:
+Follow the [SDK checklist](../docs/native-sdks.md#sdk-integration-checklist).
+The code establishes the control channel and exchanges native information and
+preferences before adding media. The [browser test](../tests/interop/rust-av-live.cjs)
+checks that ordering, A/V in both directions, viewer replacement and shutdown:
 
 ```bash
-npm ci
+# From the repository root; requires Playwright/Chromium and FFmpeg.
 cargo build --manifest-path rust/Cargo.toml --example av
 node tests/interop/rust-av-live.cjs
 ```
-
-`PLAYWRIGHT_MODULE` can point to an existing Playwright installation.
-The test exchanges real audio/video with `https://vdo.ninja/`, checks encrypted
-SDP/ICE, DTLS/SRTP, native ping/pong and bye delivery, and decodes finalized
-recordings with FFmpeg. A test-only loopback WebSocket observer checks every
-Rust outbound message against the existing JS SDK signaling shapes before
-forwarding its unchanged bytes to the hosted WSS server. It also decrypts and
-validates SDP/ICE and checks that an initial offer follows `offerSDP` and includes
-the control channel. Media, ping/pong, media preferences and bye never use the
-signaling socket in this test. It closes and replaces the viewer while receiving
-continues. `VDO_PASSWORD_MODE=off`, `default`, `literal-false`, `literal-0`, or
-`literal-off` selects other password cases; `VDO_TEST_SALT` selects a custom salt.
-`VDO_TEST_URL` selects another native VDO.Ninja build and `VDO_SIGNAL_URL` its
-signaling endpoint. The printed `wss2` parameter is checked without rewriting it.
-
-`node --test tests/interop/native-inputs.test.cjs` (from the repository root)
-also checks generated URLs against the actual input branches in the sibling
-VDO.Ninja `main.js`/`lib.js`. Set `VDO_SOURCE` if that checkout is elsewhere.
 
 `vdoninja::media::SampleTrack` wraps a webrtc-rs `TrackLocalStaticSample` with the codec's SSRC and payload type so encoded frames (VP8/VP9/H264/AV1/Opus) can be written with one call. Any `Arc<dyn TrackLocal>` works too, for example `TrackLocalStaticRTP` to forward RTP from GStreamer or FFmpeg.
 

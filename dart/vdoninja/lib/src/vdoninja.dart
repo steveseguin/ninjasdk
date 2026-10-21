@@ -32,7 +32,9 @@ class VdoConnection {
   final Map<String, dynamic> info = {};
   final Map<String, dynamic> obsState = {};
   ViewOptions viewOptions = const ViewOptions();
-  bool allowAudio = true, allowVideo = true;
+  bool _infoSent = false;
+  Future<void> _mediaUpdate = Future.value();
+  bool allowAudio = false, allowVideo = false;
   final List<IceCandidate> _iceBundle = [];
   Timer? _iceTimer;
   Duration _iceDelay = const Duration(milliseconds: 70);
@@ -356,6 +358,7 @@ class VdoNinja {
     if (!_publishing) throw StateError('not publishing');
     _localTracks.add(track);
     for (final c in _allConnections().where((c) => c.type == 'publisher')) {
+      if (!c._infoSent || !c.controlOpen || !(track.kind == 'video' ? c.allowVideo : c.allowAudio)) continue;
       final sender = await c.pc.addTrack(track, stream ?? _localStream ?? await createLocalMediaStream('vdoninja'));
       c._senders.add(sender);
       _senderKinds[sender] = track.kind ?? 'video'; // needed to resume after a viewer mutes this kind
@@ -675,15 +678,6 @@ class VdoNinja {
     return c;
   }
 
-  Future<void> _addLocalTracks(VdoConnection c) async {
-    final stream = _localStream;
-    for (final t in _localTracks) {
-      final sender = await c.pc.addTrack(t, stream ?? await createLocalMediaStream('vdoninja'));
-      c._senders.add(sender);
-      _senderKinds[sender] = t.kind ?? 'video';
-    }
-  }
-
   Future<void> _sendDescription(VdoConnection c, RTCSessionDescription desc, {bool includeStreamId = true}) async {
     final msg = <String, dynamic>{'UUID': c.uuid, 'session': c.session};
     if (includeStreamId && c.streamId != null) msg['streamID'] = _pw.hashStreamId(c.streamId!);
@@ -824,15 +818,21 @@ class VdoNinja {
 
   void _setupControlChannel(VdoConnection c, RTCDataChannel dc) {
     c._control = dc;
-    void opened() {
+    Future<void> opened() async {
       if (c._closed || c._controlOpen) return;
       c._controlOpen = true;
       _log('control channel open for ${c.uuid}/${c.type}');
       if (c.type == 'viewer') {
         c.sendControl(c.viewOptions.toPrefs());
         if (options.autoPingViewer) _startPingMonitor(c);
-      } else if (_publisherInfo.isNotEmpty) {
-        c.sendControl({'info': _publisherInfo});
+      } else {
+        try {
+          await dc.send(RTCDataChannelMessage(jsonEncode({'info': _publisherInfo})));
+          c._infoSent = true;
+          await _updateTracks(c);
+        } catch (e) {
+          _log('initial info send failed: $e');
+        }
       }
       if (_subscriptions.isNotEmpty) c.sendControl({'pipe': {'type': 'subscribe', 'channels': _subscriptions.toList()}});
       _emit(VdoEvent(VdoEvents.dataChannelOpen, uuid: c.uuid, streamId: c.streamId, connectionType: c.type));
@@ -979,21 +979,30 @@ class VdoNinja {
     return false;
   }
 
-  Future<void> _updateTracks(VdoConnection c) async {
-    for (final s in c._senders) {
-      final kind = _senderKinds[s] ?? s.track?.kind;
+  Future<void> _updateTracks(VdoConnection c) {
+    c._mediaUpdate = c._mediaUpdate.then((_) => _applyTracks(c)).catchError((Object e) {
+      _log('media update failed: $e');
+    });
+    return c._mediaUpdate;
+  }
+
+  Future<void> _applyTracks(VdoConnection c) async {
+    if (c.type != 'publisher' || c._closed || !c.controlOpen || !c._infoSent) return;
+    var changed = false;
+    for (final track in _localTracks.toList()) {
+      final kind = track.kind;
       final allowed = kind == 'video' ? c.allowVideo : c.allowAudio;
-      final local = _localTracks.where((t) => t.kind == kind).firstOrNull;
-      try {
-        if (!allowed && s.track != null) {
-          await s.replaceTrack(null);
-        } else if (allowed && s.track == null && local != null) {
-          await s.replaceTrack(local);
-        }
-      } catch (e) {
-        _log('replaceTrack failed: $e');
+      final sender = c._senders.where((s) => _senderKinds[s] == kind).firstOrNull;
+      if (sender != null) {
+        await sender.replaceTrack(allowed ? track : null);
+      } else if (allowed) {
+        final added = await c.pc.addTrack(track, _localStream ?? await createLocalMediaStream('vdoninja'));
+        c._senders.add(added);
+        _senderKinds[added] = kind ?? 'video';
+        changed = true;
       }
     }
+    if (changed) await _renegotiate(c);
   }
 
   // ---------------------------------------------------------- signaling
@@ -1077,7 +1086,7 @@ class VdoNinja {
     _emit(VdoEvent(type, streamId: sid, uuid: uuid, raw: msg));
     if (sid != null && sid.isNotEmpty) {
       if (_pendingViews.containsKey(sid) && _findViewerForStream(sid) == null) {
-        _signal.send({'request': 'play', 'streamID': _pw.hashStreamId(sid)});
+        _scheduleViewRetry(sid, const Duration(milliseconds: 100));
       }
       _autoConsider(sid);
     }
@@ -1090,7 +1099,6 @@ class VdoNinja {
       c.streamId = _streamId;
       final dc = await c.pc.createDataChannel(controlChannelLabel, RTCDataChannelInit());
       _setupControlChannel(c, dc);
-      await _addLocalTracks(c);
       final offer = await c.pc.createOffer({});
       await c.pc.setLocalDescription(offer);
       await _sendDescription(c, offer);
