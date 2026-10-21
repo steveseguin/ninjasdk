@@ -390,6 +390,20 @@ func TestDiscoveryRetriesCoalesceAndStop(t *testing.T) {
 }
 
 func TestMediaPublishView(t *testing.T) {
+	for _, tc := range []struct {
+		name         string
+		audio, video bool
+	}{
+		{"both", true, true},
+		{"data_then_both", false, false},
+		{"audio_then_both", true, false},
+		{"video_then_both", false, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) { testMediaPublishView(t, tc.audio, tc.video) })
+	}
+}
+
+func testMediaPublishView(t *testing.T, initialAudio, initialVideo bool) {
 	host := startSignal(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -448,23 +462,56 @@ func TestMediaPublishView(t *testing.T) {
 	if err := view.JoinRoom(ctx, "go-media-room"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := view.View(ctx, "gocam"); err != nil {
+	conn, err := view.View(ctx, "gocam", ViewOptions{Audio: &initialAudio, Video: &initialVideo})
+	if err != nil {
 		t.Fatal(err)
 	}
 	kinds := map[webrtc.RTPCodecType]bool{}
+	var received []*webrtc.TrackRemote
+	expected := map[webrtc.RTPCodecType]bool{}
+	if initialAudio {
+		expected[webrtc.RTPCodecTypeAudio] = true
+	}
+	if initialVideo {
+		expected[webrtc.RTPCodecTypeVideo] = true
+	}
+	for len(kinds) < len(expected) {
+		ev := waitFor(t, tracks, 15*time.Second, "requested initial track")
+		if !expected[ev.Track.Kind()] {
+			t.Fatal("received unrequested media", ev.Track.Kind())
+		}
+		kinds[ev.Track.Kind()] = true
+		received = append(received, ev.Track)
+	}
+	select {
+	case ev := <-tracks:
+		t.Fatal("unexpected additional initial track", ev.Track.Kind())
+	case <-time.After(150 * time.Millisecond):
+	}
+	deadline := time.Now().Add(10 * time.Second)
+	for !conn.controlOpen() && time.Now().Before(deadline) {
+		time.Sleep(10 * time.Millisecond)
+	}
+	if !conn.sendControl(map[string]any{"audio": true, "video": true}) {
+		t.Fatal("failed to request both media kinds over the data channel")
+	}
 	for len(kinds) < 2 {
 		ev := waitFor(t, tracks, 15*time.Second, "track")
 		kinds[ev.Track.Kind()] = true
-		if ev.Track.Kind() == webrtc.RTPCodecTypeVideo {
-			ev.Track.SetReadDeadline(time.Now().Add(10 * time.Second))
-			pkt, _, err := ev.Track.ReadRTP()
-			if err != nil {
-				t.Fatalf("ReadRTP: %v", err)
-			}
-			if len(pkt.Payload) == 0 {
-				t.Fatal("empty RTP payload")
-			}
+		received = append(received, ev.Track)
+	}
+	for _, track := range received {
+		track.SetReadDeadline(time.Now().Add(10 * time.Second))
+		pkt, _, err := track.ReadRTP()
+		if err != nil {
+			t.Fatalf("ReadRTP %s: %v", track.Kind(), err)
 		}
+		if len(pkt.Payload) == 0 {
+			t.Fatal("empty RTP payload", track.Kind())
+		}
+	}
+	if view.Connection(conn.UUID(), "viewer") != conn {
+		t.Fatal("media preferences replaced the peer connection")
 	}
 }
 

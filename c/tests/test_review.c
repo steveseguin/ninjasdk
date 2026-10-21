@@ -5,7 +5,7 @@
 static int candidates_added;
 static int messages_sent;
 static int message_channel;
-static char last_message[128];
+static char last_message[1024];
 static int record_message(int id, const char *message, int size) {
     (void)size;
     messages_sent++;
@@ -160,6 +160,33 @@ static void test_bye_uses_control_channel(void) {
     CHECK(messages_sent == 1 && message_channel == 20);
     msg = cJSON_Parse(last_message);
     CHECK(msg && cJSON_GetArraySize(msg) == 1 && cJSON_IsTrue(jget(msg, "bye")));
+    cJSON_Delete(msg);
+    pthread_mutex_destroy(&s.lock);
+}
+
+static void test_data_channel_offer_retains_stream_id(void) {
+    vdon_sdk s = {0};
+    conn_t c = {0};
+    chan_t channel = {0};
+    cJSON *msg;
+    pthread_mutex_init(&s.lock, NULL);
+    s.connected = 1;
+    c.sdk = &s;
+    c.uuid = "peer";
+    strcpy(c.session, "session");
+    c.stream_id = "camera";
+    c.type = TYPE_PUBLISHER;
+    channel.dc = 20;
+    channel.open = 1;
+    c.control = &channel;
+    on_local_description(0, "v=0\r\n", "offer", &c);
+    msg = cJSON_Parse(last_message);
+    CHECK(msg && jstr(msg, "streamID") && strcmp(jstr(msg, "streamID"), "camera") == 0);
+    CHECK(strcmp(jstr(jget(msg, "description"), "type"), "offer") == 0);
+    cJSON_Delete(msg);
+    on_local_description(0, "v=0\r\n", "answer", &c);
+    msg = cJSON_Parse(last_message);
+    CHECK(msg && !jget(msg, "streamID"));
     cJSON_Delete(msg);
     pthread_mutex_destroy(&s.lock);
 }
@@ -328,6 +355,7 @@ int main(void) {
     test_password_modes();
     test_leave_closes_signaling();
     test_bye_uses_control_channel();
+    test_data_channel_offer_retains_stream_id();
     test_ice_sessions();
     test_join_collision();
     test_retired_transfer();

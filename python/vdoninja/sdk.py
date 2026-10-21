@@ -1091,6 +1091,8 @@ class VDONinja:
             msg["description"] = payload
         if not via_signaling and conn.control_open:
             dc_msg = {"description": msg["description"], "session": msg["session"]}
+            if desc.type == "offer" and conn.stream_id:
+                dc_msg["streamID"] = conn.stream_id
             if "vector" in msg:
                 dc_msg["vector"] = msg["vector"]
             if conn.send_control(dc_msg):
@@ -1195,7 +1197,7 @@ class VDONinja:
     async def _renegotiate(self, conn: Connection, via_signaling: bool = False) -> None:
         offer = await conn.pc.createOffer()
         await conn.pc.setLocalDescription(offer)
-        self._send_description(conn, conn.pc.localDescription, include_stream_id=False, via_signaling=via_signaling)
+        self._send_description(conn, conn.pc.localDescription, include_stream_id=True, via_signaling=via_signaling)
 
     async def _restart_ice(self, conn: Connection, reason: str) -> None:
         if conn.type == "viewer":

@@ -184,6 +184,62 @@ async def test_initial_offer_is_data_only():
         await sdk.disconnect()
 
 
+@pytest.mark.parametrize("audio,video", [(False, False), (True, False), (False, True)])
+async def test_media_preferences_then_enable_both(signal_host, audio, video):
+    pub = make(signal_host)
+    view = make(signal_host)
+    tracks = {}
+    view.on("track", lambda ev: tracks.update({ev.track.kind: ev.track}))
+
+    async def until(predicate):
+        async def poll():
+            while not predicate():
+                await asyncio.sleep(0.02)
+        await asyncio.wait_for(poll(), 10)
+
+    try:
+        await pub.connect()
+        await pub.publish([VideoStreamTrack(), AudioStreamTrack()], "preferences")
+        await view.connect()
+        conn = await view.view("preferences", audio=audio, video=video)
+        await until(lambda: conn.control_open and bool(pub.peers()))
+        publisher = pub.connection(pub.peers()[0], "publisher")
+        offers = []
+        send_control = publisher.send_control
+
+        def capture(message):
+            if "description" in message:
+                offers.append(dict(message))
+            return send_control(message)
+
+        publisher.send_control = capture
+        await until(lambda: publisher.info_sent and publisher.allow_audio == audio and publisher.allow_video == video)
+        expected = {kind for kind, enabled in [("audio", audio), ("video", video)] if enabled}
+        await until(lambda: set(tracks) == expected)
+        # Give any wrongly attached/unrequested track time to arrive.
+        await asyncio.sleep(0.15)
+        assert set(tracks) == expected
+        assert {s.kind for s in publisher.senders} == expected
+        assert conn.send_control({"audio": True, "video": True})
+        await until(lambda: set(tracks) == {"audio", "video"})
+        assert offers and all(m.get("streamID") == "preferences" for m in offers)
+        for kind, track in tracks.items():
+            frame = await asyncio.wait_for(track.recv(), 10)
+            assert frame.samples > 0 if kind == "audio" else frame.width > 0
+
+        # Disabling/resuming an existing sender must not create another track.
+        senders = list(publisher.senders)
+        assert conn.send_control({"audio": False, "video": False})
+        await until(lambda: all(s.track is None for s in publisher.senders))
+        assert conn.send_control({"audio": True, "video": True})
+        await until(lambda: all(s.track is not None for s in publisher.senders))
+        assert publisher.senders == senders
+        assert view.connection(conn.uuid, "viewer") is conn
+    finally:
+        await pub.disconnect()
+        await view.disconnect()
+
+
 async def test_discovery_retries_coalesce_and_stop():
     from vdoninja.sdk import _ViewOptions
     sdk = make("ws://127.0.0.1:1")

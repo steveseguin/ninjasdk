@@ -745,6 +745,7 @@ public final class VDONinja {
         pw.encryptInto(&msg, key: "description", value: SessionDescription(type: RTCSessionDescription.string(for: desc.type), sdp: desc.sdp).json)
         if c.controlOpen {
             var dcMsg: JSON = ["description": msg["description"]!, "session": c.session]
+            if desc.type == .offer, let sid = c.streamId { dcMsg["streamID"] = sid }
             if let v = msg["vector"] { dcMsg["vector"] = v }
             if c.sendControl(dcMsg) { return }
         }

@@ -754,6 +754,7 @@ class VdoNinja @JvmOverloads constructor(
         pw.encryptInto(msg, "description", SessionDescription(desc.type.canonicalForm(), desc.description).toJson())
         if (c.controlOpen) {
             val dcMsg = JSONObject().put("description", msg.get("description")).put("session", c.session)
+            if (desc.type == RtcSessionDescription.Type.OFFER && sid != null) dcMsg.put("streamID", sid)
             if (msg.has("vector")) dcMsg.put("vector", msg.get("vector"))
             if (c.sendControl(dcMsg)) return
         }

@@ -1016,12 +1016,13 @@ static void RTC_API on_local_description(int pc, const char *sdp, const char *ty
     } else {
         cJSON_AddItemToObject(msg, "description", desc);
     }
-    (void)is_offer;
     /* Over the control channel when open (renegotiation), else via signaling. */
     {
         cJSON *dcm = cJSON_CreateObject();
         cJSON_AddItemReferenceToObject(dcm, "description", jget(msg, "description"));
         cJSON_AddItemReferenceToObject(dcm, "session", jget(msg, "session"));
+        if (is_offer && c->stream_id && *c->stream_id)
+            cJSON_AddStringToObject(dcm, "streamID", c->stream_id);
         if (jget(msg, "vector"))
             cJSON_AddItemReferenceToObject(dcm, "vector", jget(msg, "vector"));
         if (!vdon__conn_send_control(s, c, dcm))

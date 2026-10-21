@@ -330,6 +330,9 @@ func (s *SDK) sendDescription(c *Connection, desc webrtc.SessionDescription, inc
 	}
 	if !viaSignaling && c.controlOpen() {
 		dcMsg := map[string]any{"description": msg["description"], "session": msg["session"]}
+		if desc.Type == webrtc.SDPTypeOffer && c.StreamID() != "" {
+			dcMsg["streamID"] = c.StreamID()
+		}
 		if v, ok := msg["vector"]; ok {
 			dcMsg["vector"] = v
 		}
@@ -542,7 +545,7 @@ func (s *SDK) renegotiate(c *Connection, iceRestart, viaSignaling bool) error {
 	if err := c.pc.SetLocalDescription(offer); err != nil {
 		return err
 	}
-	s.sendDescription(c, offer, false, viaSignaling)
+	s.sendDescription(c, offer, true, viaSignaling)
 	return nil
 }
 

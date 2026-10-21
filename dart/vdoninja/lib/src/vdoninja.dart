@@ -684,6 +684,7 @@ class VdoNinja {
     _pw.encryptInto(msg, 'description', {'type': desc.type, 'sdp': desc.sdp});
     if (c.controlOpen) {
       final dcMsg = <String, dynamic>{'description': msg['description'], 'session': c.session};
+      if (desc.type == 'offer' && c.streamId != null) dcMsg['streamID'] = c.streamId;
       if (msg.containsKey('vector')) dcMsg['vector'] = msg['vector'];
       if (c.sendControl(dcMsg)) return;
     }

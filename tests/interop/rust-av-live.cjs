@@ -53,7 +53,7 @@ function nativeControl({ label, value }) {
   } else if (value.bye === true) {
     keys(value, ['bye']);
   } else if (value.description) {
-    keys(value, ['description', ...vectorKeys], ['session']);
+    keys(value, ['description', ...vectorKeys], ['session', 'streamID']);
     checkField(value, 'description');
   } else if (value.candidates) {
     // Native anysend/anyrequest can retain the target UUID over the channel
@@ -125,6 +125,7 @@ async function signalingObserver(password, room, publish, view) {
           assert(description.sdp.startsWith('v=0\r\n'));
           if (description.type === 'offer') {
             assert(incoming.some(m => m.request === 'offerSDP' && m.UUID === message.UUID), 'offer without server offerSDP request');
+            assert.equal(message.streamID, publish + (encrypted ? sha(phrase).slice(0, 6) : ''));
           }
           // ICE restarts can retain media negotiated after the initial exchange.
           const initial = !messages.some(m => m.description && m.UUID === message.UUID && m.session === message.session);
@@ -220,7 +221,7 @@ async function stats(page, collection) {
   }, collection);
 }
 
-function dataFirst(wire, decrypt, publisherDirection = 'in') {
+function dataFirst(wire, decrypt, streamID, publisherDirection = 'in') {
   const info = wire.sequence.findIndex(v => v.direction === publisherDirection && Object.hasOwn(v.value, 'info'));
   const prefs = wire.sequence.findIndex(v => v.direction !== publisherDirection && Object.hasOwn(v.value, 'audio'));
   const media = wire.sequence.findIndex(v => {
@@ -230,6 +231,7 @@ function dataFirst(wire, decrypt, publisherDirection = 'in') {
   });
   assert(info >= 0 && prefs >= 0 && media > info && media > prefs,
     'media offer must follow native info and viewer preferences on the data channel');
+  assert.equal(wire.sequence[media].value.streamID, streamID, 'media offer must retain the native stream ID');
 }
 
 async function main() {
@@ -294,8 +296,8 @@ async function main() {
     // The producer must survive a viewer closing while the other direction records.
     const firstWire = await viewer.evaluate(() => avWire);
     firstWire.dc.forEach(nativeControl);
-    dataFirst(firstWire, signaling.decrypt);
-    dataFirst(await publisher.evaluate(() => avWire), signaling.decrypt, 'out');
+    dataFirst(firstWire, signaling.decrypt, token + 'out');
+    dataFirst(await publisher.evaluate(() => avWire), signaling.decrypt, token + 'in', 'out');
     await viewer.close();
     const before = log.length;
     await until(() => {
@@ -311,7 +313,7 @@ async function main() {
       return s.some(v => v.kind === 'video' && v.framesDecoded > 30) &&
         s.some(v => v.kind === 'audio' && v.totalSamplesReceived > 48000 && v.totalAudioEnergy > 0);
     }, 'replacement viewer did not receive audio/video');
-    dataFirst(await viewer.evaluate(() => avWire), signaling.decrypt);
+    dataFirst(await viewer.evaluate(() => avWire), signaling.decrypt, token + 'out');
     const ping = Date.now();
     await viewer.evaluate(ping => {
       const pc = Object.values(session.rpcs).find(pc => pc.receiveChannel?.readyState === 'open');
@@ -348,14 +350,28 @@ async function main() {
   } catch (error) {
     console.error(log);
     for (const error of signaling.errors) console.error('Signaling validation:', error.message);
+    const diagnostics = [];
     for (const context of browser?.contexts() || []) for (const page of context.pages()) {
       console.error('Browser state', await page.evaluate(() => ({
         body: document.body.innerText.slice(-2500),
         peers: Object.keys(window.session?.pcs || {}), viewers: Object.keys(window.session?.rpcs || {}),
         stream: window.session?.streamID, published: window.session?.publishing,
       })).catch(() => ({})));
+      diagnostics.push(await page.evaluate(async () => {
+        const peers = {};
+        for (const group of ['pcs', 'rpcs']) {
+          peers[group] = {};
+          for (const [id, pc] of Object.entries(window.session?.[group] || {})) {
+            peers[group][id] = { state: pc.connectionState, local: pc.localDescription, remote: pc.remoteDescription,
+              stats: [...(await pc.getStats()).values()] };
+          }
+        }
+        return { url: location.href, wire: window.avWire, peers };
+      }).catch(e => ({ error: e.message })));
       await page.screenshot({path: path.join(out, 'failure-' + browser.contexts().indexOf(context) + '.png')}).catch(() => {});
     }
+    fs.writeFileSync(path.join(out, 'failure.json'), JSON.stringify({ error: error.message, signaling: signaling.messages, pages: diagnostics }, null, 2));
+    console.error('Failure artifacts: ' + out);
     throw error;
   } finally {
     if (!exited) {

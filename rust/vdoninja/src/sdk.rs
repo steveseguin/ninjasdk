@@ -2345,6 +2345,11 @@ impl Inner {
         }
         if allow_dc && conn.is_control_open() {
             let mut dc_msg = json!({"description": msg["description"], "session": msg["session"]});
+            if desc.sdp_type == webrtc::peer_connection::RTCSdpType::Offer {
+                if let Some(sid) = conn.stream_id() {
+                    dc_msg["streamID"] = json!(sid);
+                }
+            }
             if let Some(v) = msg.get("vector") {
                 dc_msg["vector"] = v.clone();
             }
@@ -2600,8 +2605,7 @@ impl Inner {
         };
         let offer = conn.pc.create_offer(options).await?;
         conn.pc.set_local_description(offer.clone()).await?;
-        self.send_description(conn, &offer, !allow_dc, allow_dc)
-            .await;
+        self.send_description(conn, &offer, true, allow_dc).await;
         Ok(())
     }
 

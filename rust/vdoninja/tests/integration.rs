@@ -256,6 +256,17 @@ async fn data_round_trip() {
 
 #[tokio::test]
 async fn media_publish_view() {
+    media_with_preferences(true, true).await;
+}
+
+#[tokio::test]
+async fn media_preference_transitions() {
+    for (audio, video) in [(false, false), (true, false), (false, true)] {
+        media_with_preferences(audio, video).await;
+    }
+}
+
+async fn media_with_preferences(initial_audio: bool, initial_video: bool) {
     let _ = env_logger::try_init();
     let server = bind_server().await;
     let host = server.url();
@@ -297,14 +308,50 @@ async fn media_publish_view() {
         .unwrap();
     view_sdk.connect().await.unwrap();
     view_sdk.join_room("rs-media").await.unwrap();
-    view_sdk
-        .view("rscam", ViewOptions::default())
+    let conn = view_sdk
+        .view(
+            "rscam",
+            ViewOptions {
+                audio: initial_audio,
+                video: initial_video,
+                ..Default::default()
+            },
+        )
         .await
         .unwrap();
 
     let mut kinds = std::collections::HashSet::new();
     let mut info_seen = false;
+    let mut tracks = vec![];
+    let initial_count = usize::from(initial_audio) + usize::from(initial_video);
+    let mut preferences_sent = false;
     while kinds.len() < 2 {
+        if kinds.len() == initial_count && !preferences_sent {
+            // Allow unexpected initial tracks to surface, including data-only mode.
+            let deadline = tokio::time::Instant::now() + Duration::from_millis(150);
+            while let Ok(Ok(ev)) = tokio::time::timeout_at(deadline, view_ev.recv()).await {
+                assert!(
+                    !matches!(ev, Event::Track { .. }),
+                    "unrequested initial media"
+                );
+                if matches!(ev, Event::PeerInfo { .. }) {
+                    info_seen = true;
+                }
+            }
+            tokio::time::timeout(Duration::from_secs(10), async {
+                while !conn.is_control_open() {
+                    tokio::time::sleep(Duration::from_millis(10)).await;
+                }
+            })
+            .await
+            .unwrap();
+            conn.control_channel()
+                .unwrap()
+                .send_text(r#"{"audio":true,"video":true}"#)
+                .await
+                .unwrap();
+            preferences_sent = true;
+        }
         let ev = wait_for(&mut view_ev, Duration::from_secs(20), |e| {
             if matches!(e, Event::PeerInfo { .. }) {
                 info_seen = true;
@@ -317,24 +364,36 @@ async fn media_publish_view() {
         .await;
         if let Event::Track { track, .. } = ev {
             let kind = track.kind().await;
-            kinds.insert(format!("{kind:?}"));
-            if format!("{kind:?}").to_lowercase().contains("video") {
-                let t = track.clone();
-                let packet = tokio::time::timeout(Duration::from_secs(10), async move {
-                    while let Some(ev) = t.poll().await {
-                        if let TrackRemoteEvent::OnRtpPacket(p) = ev {
-                            return Some(p);
-                        }
-                    }
-                    None
-                })
-                .await
-                .expect("rtp packet timeout")
-                .expect("track ended");
-                assert!(!packet.payload.is_empty());
+            if !preferences_sent {
+                let video = format!("{kind:?}").to_lowercase().contains("video");
+                assert!(
+                    if video { initial_video } else { initial_audio },
+                    "received unrequested media"
+                );
             }
+            kinds.insert(format!("{kind:?}"));
+            tracks.push(track);
         }
     }
+    for track in tracks {
+        let t = track.clone();
+        let packet = tokio::time::timeout(Duration::from_secs(10), async move {
+            while let Some(ev) = t.poll().await {
+                if let TrackRemoteEvent::OnRtpPacket(p) = ev {
+                    return Some(p);
+                }
+            }
+            None
+        })
+        .await
+        .expect("rtp packet timeout")
+        .expect("track ended");
+        assert!(!packet.payload.is_empty());
+    }
+    assert!(Arc::ptr_eq(
+        &view_sdk.connection(&conn.uuid, "viewer").unwrap(),
+        &conn
+    ));
     feeder.abort();
     pub_sdk.disconnect().await;
     view_sdk.disconnect().await;
