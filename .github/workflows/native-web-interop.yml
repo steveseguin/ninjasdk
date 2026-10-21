@@ -21,16 +21,30 @@ jobs:
           binary="$(swift build --show-bin-path --triple "$triple" --sdk "$sdk")/BrowserPeer"
           echo "VDON_SWIFT_SIMULATOR_BINARY=$binary" >> "$GITHUB_ENV"
       - name: Boot iOS simulator
+        timeout-minutes: 6
         run: |
           xcrun simctl list devices available -j > "$RUNNER_TEMP/devices.json"
           device="$(node -e 'const d=require(process.env.RUNNER_TEMP+"/devices.json"); console.log(Object.values(d.devices).flat().find(v=>v.name.startsWith("iPhone")).udid)')"
-          xcrun simctl boot "$device"
-          xcrun simctl bootstatus "$device" -b
           echo "VDON_SWIFT_SIMULATOR_DEVICE=$device" >> "$GITHUB_ENV"
+          xcrun simctl boot "$device"
+          # This command-line fixture only needs launchd, not SpringBoard/UI startup.
+          python3 - "$device" <<'PYCODE'
+          import subprocess, sys, time
+          for attempt in range(24):
+              try:
+                  subprocess.run(['xcrun', 'simctl', 'spawn', sys.argv[1], 'launchctl', 'list'],
+                                 stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, check=True, timeout=10)
+                  break
+              except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
+                  time.sleep(2)
+          else:
+              raise RuntimeError('simulator launchd did not become ready')
+          PYCODE
       - run: npm ci && npm install --no-save playwright && npx playwright install chromium
       - run: brew install ffmpeg
       - run: node tests/interop/native-av-live.cjs
         env:
+          TMPDIR: ${{ runner.temp }}
           VDO_NATIVE_PORT: swift
           VDON_SWIFT_BROWSER_PEER: tests/interop/swift-simulator-peer.cjs
       - uses: actions/upload-artifact@v4

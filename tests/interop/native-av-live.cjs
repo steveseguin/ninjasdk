@@ -6,7 +6,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const {chromium} = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
-const {observe, stats, until, dataFirst, signalingObserver} = require('./rust-av-live.cjs');
+const {observe, stats, until, dataFirst, signalingObserver, nativeControl} = require('./rust-av-live.cjs');
 const root = path.resolve(__dirname, '../..');
 const port = process.env.VDO_NATIVE_PORT || 'python';
 const dataOnly = port === 'rust-data';
@@ -95,6 +95,10 @@ async function main() {
       await new Promise(r=>setTimeout(r,8000));
     }
     if (!dataOnly) {
+      for(const page of [viewer,publisher]) {
+        const wire=await page.evaluate(()=>avWire);
+        wire.dc.forEach(nativeControl);
+      }
       dataFirst(await viewer.evaluate(()=>avWire),signaling.decrypt,token+'out');
       dataFirst(await publisher.evaluate(()=>avWire),signaling.decrypt,token+'in','out');
     }
@@ -125,7 +129,11 @@ async function main() {
     const recordings=fs.readdirSync(out).filter(f=>f.startsWith('received.')&&/\.(mkv|webm|ivf|ogg|wav|ppm)$/.test(f));
     if(['flutter','kotlin','swift'].includes(port)) assert(fs.existsSync(path.join(out,'received-stats.json')));
     else if (!dataOnly) assert(recordings.length,'no recordings');
-    for(const file of recordings)execFileSync('ffmpeg',['-v','error','-xerror','-i',path.join(out,file),'-f','null','-']);
+    for(const file of recordings) {
+      const probe=JSON.parse(execFileSync('ffprobe',['-v','error','-count_frames','-show_streams','-of','json',path.join(out,file)]));
+      assert(probe.streams.length && probe.streams.every(s=>Number(s.nb_read_frames)>0),'empty recorded media: '+file);
+      execFileSync('ffmpeg',['-v','error','-xerror','-i',path.join(out,file),'-f','null','-']);
+    }
     const container=recordings.find(f=>/\.(mkv|webm)$/.test(f));
     if(container){
       const probe=JSON.parse(execFileSync('ffprobe',['-v','error','-show_streams','-of','json',path.join(out,container)]));

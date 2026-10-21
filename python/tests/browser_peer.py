@@ -16,6 +16,7 @@ async def main():
     player = MediaPlayer(env["VDO_MEDIA"], loop=True)
     stopped = asyncio.Event()
     tasks = []
+    failures = []
     for sig in (signal.SIGINT, signal.SIGTERM):
         asyncio.get_running_loop().add_signal_handler(sig, stopped.set)
 
@@ -55,7 +56,8 @@ async def main():
         task = asyncio.create_task(consume(ev.track))
         tasks.append(task)
         def completed(task):
-            if not task.cancelled() and task.exception():
+            if not task.cancelled() and task.exception() and not stopped.is_set():
+                failures.append(task.exception())
                 traceback.print_exception(task.exception())
                 stopped.set()
         task.add_done_callback(completed)
@@ -73,12 +75,14 @@ async def main():
             pass
         await stopped.wait()
     finally:
-        await sdk.disconnect()
         for task in tasks:
             task.cancel()
         await asyncio.gather(*tasks, return_exceptions=True)
+        await sdk.disconnect()
         for source in (player.video, player.audio):
             source.stop()
+    if failures:
+        raise failures[0]
     print("STOPPED", flush=True)
 
 

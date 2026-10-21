@@ -73,7 +73,7 @@ function nativeControl({ label, value }) {
   } else if (value.iceRestartRequest === true) {
     keys(value, ['iceRestartRequest']);
   } else {
-    throw new Error('unexpected Rust control message: ' + JSON.stringify(value));
+    throw new Error('unexpected SDK control message: ' + JSON.stringify(value));
   }
 }
 
@@ -146,7 +146,7 @@ async function signalingObserver(password, room, publish, view) {
         } else if (message.iceRestartRequest === true) {
           keys(message, ['UUID', 'iceRestartRequest']);
         } else {
-          throw new Error('non-signaling message on Rust WebSocket: ' + Object.keys(message).join(', '));
+          throw new Error('non-signaling message on SDK WebSocket: ' + Object.keys(message).join(', '));
         }
         messages.push(message);
         if (upstream.readyState === WebSocket.OPEN) upstream.send(data, { binary: false });
