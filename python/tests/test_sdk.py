@@ -196,13 +196,19 @@ async def test_reconnect_restores_publish(signal_host):
         await view.disconnect()
 
 
-async def test_disconnect_clears_intent(signal_host):
+@pytest.mark.parametrize("leave_room", [False, True])
+async def test_disconnect_clears_intent(signal_host, leave_room):
     sdk = make(signal_host, reconnect_delay=0.1)
     try:
         await sdk.connect()
         await sdk.join_room("old-room")
         await sdk.announce("stale")
-        await sdk.disconnect()
+        if leave_room:
+            await sdk.leave_room()
+            assert not sdk.connected
+            assert sdk.room == ""
+        else:
+            await sdk.disconnect()
         # A fresh session with no room or stream, then an unexpected drop: the old
         # intent must not be replayed by the reconnect.
         await sdk.connect()
@@ -214,3 +220,38 @@ async def test_disconnect_clears_intent(signal_host):
         assert not sdk.room_joined
     finally:
         await sdk.disconnect()
+
+
+async def test_data_requires_peer_channel(monkeypatch):
+    """A connected signaling socket is never an application-data transport."""
+    from vdoninja.sdk import _PeerPair
+
+    sdk = make("ws://unused")
+    sdk._connected = True
+    sdk.connections["unopened-peer"] = _PeerPair()
+    sent = []
+    monkeypatch.setattr(sdk, "_send_ws", lambda msg: sent.append(msg) or True)
+    assert not sdk.send_data("payload", "unopened-peer")
+    # An obsolete caller option must not re-enable the removed relay path.
+    assert not sdk.send_data("payload", {"uuid": "unopened-peer", "allowFallback": True})
+    assert not sdk.send_ping("unopened-peer")
+    sdk.subscribe("updates")
+    sdk.unsubscribe("updates")
+    assert sent == []
+
+    events = []
+    sdk.on("dataReceived", events.append)
+    await sdk._handle_signaling({"UUID": "unopened-peer", "__fallback": True, "pipe": "payload"})
+    assert events == []
+    sdk._connected = False
+
+
+async def test_stream_notice_preserves_view_preferences():
+    from vdoninja.sdk import _ViewOptions
+
+    sdk = make("ws://unused")
+    prefs = _ViewOptions(audio=False, video=False, downloads=False)
+    sdk._pending_views["late"] = prefs
+    sdk._handle_video_added({"streamID": sdk.hashed_stream_id("late"), "UUID": "publisher"})
+    assert sdk._pending_views.get("late") is prefs, "offer arriving before retry lost preferences"
+    await sdk.disconnect()

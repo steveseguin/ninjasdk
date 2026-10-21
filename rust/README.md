@@ -1,5 +1,11 @@
 # VDO.Ninja SDK for Rust
 
+Signaling uses the existing VDO.Ninja protocol. Application data and native `ping`/`pong`/`bye` messages use peer data channels; there is no WebSocket application-data fallback or client-supplied `from` field. Wait for the control channel to open before sending data.
+
+Pub/sub and request/response helpers preserve the JS SDK application protocol inside native `pipe` messages. They require a compatible SDK/application at the other end; the VDO.Ninja page forwards generic `pipe` data to its embedding application and does not implement those helpers itself.
+
+Leaving a room disconnects its peers and signaling socket: the handshake server has no `leave` command. Reconnect before joining another room or publishing again. Await the leave operation in asynchronous APIs (Rust, Python, Dart and Swift).
+
 [![crates.io](https://img.shields.io/crates/v/vdoninja.svg)](https://crates.io/crates/vdoninja)
 
 Rust implementation of the VDO.Ninja SDK, built on [webrtc-rs](https://webrtc.rs) 0.21 (the sans-I/O `rtc` core with a tokio driver) and `rustls`. It speaks the same wire protocol as the [JavaScript SDK](../README.md) and VDO.Ninja browser pages, so a Rust program can publish to, view, message and exchange files with any VDO.Ninja peer.
@@ -37,7 +43,7 @@ async fn main() -> vdoninja::Result<()> {
     while let Ok(ev) = events.recv().await {
         match ev {
             Event::DataChannelOpen { uuid, .. } => {
-                sdk.send_data_to(&uuid, serde_json::json!({"message": "Hello from Rust"})).await;
+                sdk.send_ping(&uuid).await;
             }
             Event::DataReceived { uuid, data, .. } => println!("{uuid}: {data}"),
             _ => {}
@@ -51,6 +57,94 @@ async fn main() -> vdoninja::Result<()> {
 Run it twice, or pair it with the JavaScript `autoConnect` demo in the same room.
 
 ## Publish media
+
+### Runnable audio/video demo
+
+[`examples/av.rs`](vdoninja/examples/av.rs) publishes a looping 640×360/30 fps
+VP8 test pattern and a 440 Hz Opus tone, receives a browser stream to files, or
+does both at once. Install FFmpeg with `libvpx` and `libopus` for publishing;
+receiving needs only the Rust executable.
+
+From this directory:
+
+```bash
+# Optional private password. Use original text, without URL escaping.
+export VDONINJA_PASSWORD='choose your own secret'
+
+# Publish test audio/video. Open the WATCH URL printed by the demo.
+cargo run --example av -- --publish my_rust_camera
+
+# Receive browser audio/video. Open the PUBLISH FROM BROWSER URL printed.
+cargo run --example av -- --view my_browser_camera --out received
+
+# Both directions, in the same room.
+cargo run --example av -- \
+  --publish my_rust_camera --view my_browser_camera --room my_test_room --out received
+```
+
+Use unique stream/room names. With no arguments the demo generates a random
+publish ID. `--seconds 30` stops automatically; `--host wss://…` selects a
+different signaling server. The printed browser URLs include matching signaling,
+room, codec and password settings (and therefore contain the password when set).
+If the browser publisher starts later, the demo keeps its view request pending
+and retries. Allow camera/microphone access in the browser; click the page if
+autoplay needs a gesture.
+
+Use **one viewing peer** for this demo. The current webrtc-rs sample track has
+one binding; attaching it to another peer redirects its output. The generated
+browser publisher link includes an empty `view` parameter so it does not subscribe to
+the Rust stream automatically when joining the room. Open the separate WATCH
+link to receive the Rust stream. Multi-viewer sample-track fan-out is not
+implemented by this example.
+
+Incoming Opus is saved as OGG, and VP8/VP9 as IVF, with separate filenames for
+each track/reconnection. The example requests periodic keyframes and reports
+packet counts. Play the files after stopping with `ffplay received/<file>.ogg`
+or `ffplay received/<file>.ivf`. This is a basic RTP recorder, not a synchronized
+A/V player or muxer: IVF playback assumes 30 fps with 640×360 header hints;
+the decoder obtains actual dimensions from the bitstream. Other codecs and
+loss-tolerant recording need a suitable media pipeline.
+
+The demo uses the SDK's normal VDO.Ninja handshake, matching the JS SDK:
+
+1. Connect to WSS and announce the publisher (`seed`); a viewer requests `play`.
+2. On `offerSDP`, the publisher creates the ordered `sendChannel` **before**
+   creating its SDP offer. The Rust publisher includes its media tracks in that
+   offer, as the JS SDK does.
+3. Exchange encrypted SDP and trickled ICE with the peer UUID/session. The viewer
+   answers the publisher; it does not create a competing offer or control channel.
+4. Once `sendChannel` opens, the viewer sends `{audio:true, video:true}`.
+   Native VDO.Ninja publishers can then add media through a subsequent offer
+   over that channel. This demo uses only native control messages (including
+   ping/pong); it sends no custom application payloads or metadata.
+5. Ctrl-C, SIGTERM (Unix), a timed stop, or a fatal demo error stops producers,
+   calls `disconnect()` to send `{bye:true}` and drain control buffers before
+   closing WebRTC/signaling, then joins recording tasks and finalizes their files.
+
+Passwords use the existing VDO.Ninja AES-256-CBC SDP/ICE protocol with random IVs
+and the `vdo.ninja` salt. Media uses DTLS-SRTP and data channels use SCTP over
+DTLS; WSS protects the signaling transport. This does not enable the browser's
+optional insertable-stream media encryption. Omitting `VDONINJA_PASSWORD` uses
+the SDK's shared default password, not a private secret.
+
+For a real-browser interoperability check (requires Playwright/Chromium and
+FFmpeg), run from the repository root:
+
+```bash
+npm ci
+cargo build --manifest-path rust/Cargo.toml --example av
+node tests/interop/rust-av-live.cjs
+```
+
+`PLAYWRIGHT_MODULE` can point to an existing Playwright installation.
+The test exchanges real audio/video with `https://vdo.ninja/`, checks encrypted
+SDP/ICE, DTLS/SRTP, native ping/pong and bye delivery, and decodes finalized
+recordings with FFmpeg. A test-only loopback WebSocket observer checks every
+Rust outbound message against the existing JS SDK signaling shapes before
+forwarding its unchanged bytes to the hosted WSS server. It also decrypts and
+validates SDP/ICE and checks that an initial offer follows `offerSDP` and includes
+the control channel. Media, ping/pong, media preferences and bye never use the
+signaling socket in this test. `VDO_TEST_URL` selects another native VDO.Ninja build.
 
 `vdoninja::media::SampleTrack` wraps a webrtc-rs `TrackLocalStaticSample` with the codec's SSRC and payload type so encoded frames (VP8/VP9/H264/AV1/Opus) can be written with one call. Any `Arc<dyn TrackLocal>` works too, for example `TrackLocalStaticRTP` to forward RTP from GStreamer or FFmpeg.
 
@@ -118,7 +212,6 @@ Events are an enum received from a `tokio::sync::broadcast` channel; variant nam
 | `stun_servers` | Google + Cloudflare | Empty disables STUN. |
 | `bind_addrs` | `["0.0.0.0:0"]` | Local UDP bind addresses; the wildcard expands to all interfaces. `include_loopback` adds `127.0.0.1` candidates (tests). |
 | `auto_ping_viewer` | off | Viewer pings every `auto_ping_interval`; two misses trigger an ICE restart request. |
-| `client_id` | unset | Adds a `from` field for the legacy fan-out signaling servers. |
 
 Reconnection: after an unexpected socket loss the SDK reconnects with exponential backoff and replays the room join, publish/announce and pending views.
 

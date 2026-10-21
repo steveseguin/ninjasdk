@@ -104,7 +104,6 @@ class VdoNinja {
       options.host,
       maxReconnectAttempts: options.maxReconnectAttempts,
       reconnectDelay: options.reconnectDelay,
-      clientId: options.clientId,
       log: _log,
     )
       ..onOpen = _onSocketOpen
@@ -306,12 +305,13 @@ class VdoNinja {
     }
   }
 
-  void leaveRoom() {
+  /// Leaves by disconnecting peers and signaling. Reconnect before joining again.
+  Future<void> leaveRoom() async {
     final room = _room;
     _room = null;
     _roomIntent = null;
     if (room == null) return;
-    _signal.send({'leave': true}); // the JavaScript SDK sends this too
+    await disconnect();
     _emit(VdoEvent(VdoEvents.roomLeft, data: room));
   }
 
@@ -515,7 +515,7 @@ class VdoNinja {
 
   /// Sends application data (any JSON-encodable value) as `{"pipe": data}`.
   /// [uuid] null = every peer; [preference] any|publisher|viewer|all.
-  bool sendData(Object? data, {String? uuid, String? type, String preference = 'any', bool allowFallback = false}) {
+  bool sendData(Object? data, {String? uuid, String? type, String preference = 'any'}) {
     final text = jsonEncode({'pipe': data});
     var sent = false;
     for (final entry in _connections.entries) {
@@ -543,11 +543,6 @@ class VdoNinja {
         default:
           sent = (trySend(pair.publisher) || trySend(pair.viewer)) || sent;
       }
-    }
-    if (sent || !allowFallback || !connected) return sent;
-    final targets = uuid != null ? [uuid] : _connections.keys.toList();
-    for (final t in targets) {
-      if (_signal.send({'__fallback': true, 'UUID': t, 'pipe': data})) sent = true;
     }
     return sent;
   }
@@ -796,7 +791,7 @@ class VdoNinja {
   }
 
   void _sendBye(VdoConnection c) {
-    if (!c.sendControl({'bye': true})) _signal.send({'bye': true, 'UUID': c.uuid});
+    c.sendControl({'bye': true});
   }
 
   // ------------------------------------------------------ data channels
@@ -1041,8 +1036,6 @@ class VdoNinja {
       _handleBye(msg['UUID'] as String?, VdoEvents.bye, msg);
     } else if (msg.containsKey('hangup')) {
       _handleBye(msg['UUID'] as String?, VdoEvents.hangup, msg);
-    } else if (msg.containsKey('pipe') && msg.containsKey('__fallback')) {
-      _emit(VdoEvent(VdoEvents.dataReceived, uuid: msg['UUID'] as String?, data: msg['pipe'], fallback: true, raw: msg));
     } else if (msg.containsKey('rejected') || msg.containsKey('approved')) {
       _emit(VdoEvent(VdoEvents.alert, message: msg.containsKey('rejected') ? 'connection rejected' : 'connection approved', raw: msg));
     } else if (msg.containsKey('iceRestartRequest')) {

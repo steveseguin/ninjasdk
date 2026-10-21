@@ -111,11 +111,6 @@ type Options struct {
 	AutoPingViewer   bool
 	AutoPingInterval time.Duration
 
-	// ClientID, when set, is sent as the "from" field on every signaling message.
-	// The hosted service assigns IDs itself; this is only for the legacy
-	// fan-out servers in steveseguin/websocket_server that require it.
-	ClientID string
-
 	// API lets callers supply a pion API with a custom MediaEngine or
 	// SettingEngine (codecs, port ranges, loopback candidates, ...).
 	API *webrtc.API
@@ -222,7 +217,4 @@ type DataTarget struct {
 	// Preference is "any" (publisher channel first, then viewer; default),
 	// "publisher", "viewer" or "all" (both channels, may duplicate).
 	Preference string
-	// AllowFallback permits relaying through the signaling server when no data
-	// channel is open. Off by default; the hosted service only allows handshake data.
-	AllowFallback bool
 }

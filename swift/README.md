@@ -1,5 +1,11 @@
 # VDO.Ninja SDK for Swift (iOS, macOS, tvOS)
 
+Signaling uses the existing VDO.Ninja protocol. Application data and native `ping`/`pong`/`bye` messages use peer data channels; there is no WebSocket application-data fallback or client-supplied `from` field. Wait for the control channel to open before sending data.
+
+Pub/sub and request/response helpers preserve the JS SDK application protocol inside native `pipe` messages. They require a compatible SDK/application at the other end; the VDO.Ninja page forwards generic `pipe` data to its embedding application and does not implement those helpers itself.
+
+Leaving a room disconnects its peers and signaling socket: the handshake server has no `leave` command. Reconnect before joining another room or publishing again. Await the leave operation in asynchronous APIs (Rust, Python, Dart and Swift).
+
 A Swift package with two products:
 
 | Product | What it is | Depends on |
@@ -51,8 +57,7 @@ let streamId = try await vdo.publish(tracks: [audio, video], streamId: "my-iphon
 
 // View someone else
 let conn = try await vdo.view("their-stream")
-vdo.sendData(["hello": "world"])                       // every peer
-vdo.sendData(["hi": true], uuid: conn?.uuid)            // one peer
+vdo.sendPing(conn?.uuid) // native control-channel ping/pong
 let answer = try await vdo.request("whoami", ["q": 1], to: conn!.uuid)
 
 await vdo.disconnect()
@@ -75,7 +80,7 @@ would otherwise retain the SDK, so call it once you are done with the instance.
 | Rooms | `joinRoom(room, claim:)` → listing, `leaveRoom()`, `currentRoom` |
 | Publishing | `announce()`, `publish(tracks:streamId:room:)`, `addTrack()`, `replaceTrack()` (camera switch), `stopPublishing()` |
 | Viewing | `view(streamId, options: ViewOptions(audio:video:label:))`, `stopViewing()`, `autoConnect(room:streamId:fullMode:)`; media arrives as `.track` events with an `RTCMediaStreamTrack` |
-| Data | `sendData(data, uuid:type:preference:allowFallback:)`, `sendPing()` → `.peerLatency` |
+| Data | `sendData(data, uuid:type:preference:)`, `sendPing()` → `.peerLatency` |
 | Pub/sub | `subscribe()`, `unsubscribe()`, `publishToChannel()` → `.channelMessage` |
 | RPC | `onRequest(type) { data, from in }`, `request(type, data, to:)`, `respond()` |
 | Introspection | `peers()`, `connection(uuid, type:)` (exposes the `RTCPeerConnection`), `streams()` |

@@ -1,5 +1,11 @@
 # VDO.Ninja SDK for C
 
+Signaling uses the existing VDO.Ninja protocol. Application data and native `ping`/`pong`/`bye` messages use peer data channels; there is no WebSocket application-data fallback or client-supplied `from` field. Wait for the control channel to open before sending data.
+
+Pub/sub and request/response helpers preserve the JS SDK application protocol inside native `pipe` messages. They require a compatible SDK/application at the other end; the VDO.Ninja page forwards generic `pipe` data to its embedding application and does not implement those helpers itself.
+
+Leaving a room disconnects its peers and signaling socket: the handshake server has no `leave` command. Reconnect before joining another room or publishing again. Await the leave operation in asynchronous APIs (Rust, Python, Dart and Swift).
+
 A C99 implementation of the VDO.Ninja SDK built on [libdatachannel](https://github.com/paullouisageneau/libdatachannel)
 (MPL-2.0). It speaks the same signaling protocol, hashing and encryption as the JavaScript SDK, so a C program can
 publish to and view from browsers running VDO.Ninja, and interoperate with the Go, Rust and Python SDKs in this
@@ -41,7 +47,7 @@ static void on_event(vdon_sdk *sdk, const vdon_event *ev, void *user) {
     if (ev->type == VDON_EVENT_DATA_RECEIVED)
         printf("%s says %s\n", ev->uuid, ev->json);
     else if (ev->type == VDON_EVENT_DATA_CHANNEL_OPEN)
-        vdon_send_data(sdk, "{\"hello\":\"world\"}", ev->uuid);
+        vdon_send_ping(sdk, ev->uuid);
 }
 
 int main(void) {

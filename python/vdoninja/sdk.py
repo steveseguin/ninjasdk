@@ -258,7 +258,6 @@ class VDONinja:
         view_retry_interval: float = 900.0,
         auto_ping_viewer: bool = False,
         auto_ping_interval: float = 10.0,
-        client_id: Optional[str] = None,
     ) -> None:
         """
         :param host: signaling WebSocket URL.
@@ -268,7 +267,6 @@ class VDONinja:
         :param turn: ``"auto"`` fetches the hosted TURN list, ``False`` disables TURN,
             or pass a list of :class:`aiortc.RTCIceServer`.
         :param stun_servers: STUN URLs; ``[]`` disables STUN.
-        :param client_id: adds a ``from`` field for the legacy fan-out signaling servers.
         """
         self.host = host
         self.salt = salt
@@ -290,7 +288,6 @@ class VDONinja:
         self.view_retry_interval = view_retry_interval
         self.auto_ping_viewer = auto_ping_viewer
         self.auto_ping_interval = max(1.0, auto_ping_interval)
-        self.client_id = client_id
 
         self.publisher_info: Dict[str, Any] = {}
         self._set_publisher_info(label, meta, order, info)
@@ -627,8 +624,6 @@ class VDONinja:
             await conn.close()
 
     def _send_ws(self, msg: Dict[str, Any]) -> bool:
-        if self.client_id:
-            msg["from"] = self.client_id
         text = json.dumps(msg, separators=(",", ":"))
         log.debug("-> WS %s", text[:300])
         ws = self._ws
@@ -685,14 +680,14 @@ class VDONinja:
         self.room_joined = True
         self._emit(Event("roomJoined", data=room))
 
-    def leave_room(self) -> None:
-        """Send the leave message (as the JavaScript SDK does) and forget the room."""
+    async def leave_room(self) -> None:
+        """Disconnect peers and signaling to leave; reconnect before joining again."""
         room = self.room
         self.room = ""
         self.room_joined = False
         self._intent_room = None
         if room:
-            self._send_ws({"leave": True})
+            await self.disconnect()
             self._emit(Event("roomLeft", data=room))
 
     # ------------------------------------------------------------ publishing
@@ -909,11 +904,6 @@ class VDONinja:
             await self._handle_bye(msg.get("UUID"), "bye", msg)
         elif msg.get("hangup"):
             await self._handle_bye(msg.get("UUID"), "hangup", msg)
-        elif "pipe" in msg and msg.get("__fallback"):
-            pipe = msg["pipe"]
-            if isinstance(pipe, dict) and pipe.get("type") in ("subscribe", "unsubscribe"):
-                self._handle_data_message(pipe, msg.get("UUID"))
-            self._emit(Event("dataReceived", uuid=msg.get("UUID"), data=pipe, fallback=True, raw=msg))
 
     def _handle_listing(self, msg: Dict[str, Any]) -> None:
         waiters, self._room_waiters = self._room_waiters, []
@@ -957,7 +947,9 @@ class VDONinja:
             info["lastSeen"] = now
             if uuid:
                 info["uuid"] = uuid
-        opts = self._pending_views.pop(clean, None) if clean else None
+        # The server can offer immediately, before our delayed play retry.
+        # Retain the caller's preferences until that offer is processed.
+        opts = self._pending_views.get(clean) if clean else None
         if opts is not None:
             log.debug("re-requesting pending stream %r", clean)
 
@@ -1581,7 +1573,7 @@ class VDONinja:
             for conn in (pair.publisher, pair.viewer):
                 if conn:
                     conn.pending_ping = ts
-        return self._send_data_internal({"ping": ts}, uuid, None, "any", False)
+        return self._send_data_internal({"ping": ts}, uuid, None, "any")
 
     # ------------------------------------------------------------------ data
 
@@ -1590,13 +1582,13 @@ class VDONinja:
 
         ``target`` may be a peer UUID or a dict with ``uuid``, ``type``
         (``publisher``/``viewer``), ``streamID``, ``preference``
-        (``any``/``publisher``/``viewer``/``all``) and ``allowFallback``.
+        (``any``/``publisher``/``viewer``/``all``).
         """
         msg = {"pipe": data}
         if target is None:
-            return self._send_data_internal(msg, None, None, "any", False)
+            return self._send_data_internal(msg, None, None, "any")
         if isinstance(target, str):
-            return self._send_data_internal(msg, target, None, "any", False)
+            return self._send_data_internal(msg, target, None, "any")
         t = dict(target)
         uuid = t.get("uuid") or t.get("UUID")
         pref = t.get("preference") or t.get("channel") or t.get("prefer") or "any"
@@ -1604,20 +1596,19 @@ class VDONinja:
         kind = {"pcs": "publisher", "rpcs": "viewer"}.get(t.get("type"), t.get("type"))
         if kind not in ("publisher", "viewer"):
             kind = None
-        fallback = bool(t.get("allowFallback", False))
         stream_id = t.get("streamID") or t.get("stream_id")
         if stream_id and not uuid:
             sent = False
             for pid, pair in list(self.connections.items()):
                 for conn in (pair.publisher, pair.viewer):
                     if conn and (kind is None or conn.type == kind) and conn.stream_id == stream_id:
-                        if self._send_data_internal(msg, pid, kind, pref, fallback):
+                        if self._send_data_internal(msg, pid, kind, pref):
                             sent = True
                         break
             return sent
-        return self._send_data_internal(msg, uuid, kind, pref, fallback)
+        return self._send_data_internal(msg, uuid, kind, pref)
 
-    def _send_data_internal(self, msg: Any, uuid: Optional[str], kind: Optional[str], preference: str, allow_fallback: bool) -> bool:
+    def _send_data_internal(self, msg: Any, uuid: Optional[str], kind: Optional[str], preference: str) -> bool:
         text = json.dumps(msg, separators=(",", ":"))
         sent = False
 
@@ -1642,13 +1633,6 @@ class VDONinja:
                 sent |= attempt(pair.viewer)
             else:
                 sent |= attempt(pair.publisher) or attempt(pair.viewer)
-        if sent or not allow_fallback or not self._connected or not isinstance(msg, dict):
-            return sent
-        for target in ([uuid] if uuid else list(self.connections.keys())):
-            if target:
-                fallback = dict(msg)
-                fallback.update({"__fallback": True, "UUID": target})
-                sent |= self._send_ws(fallback)
         return sent
 
     def _send_raw_control(self, uuid: str, msg: Dict[str, Any]) -> bool:
@@ -1665,12 +1649,12 @@ class VDONinja:
     def subscribe(self, *channels: str) -> None:
         self._subscriptions.update(channels)
         if self._connected:
-            self.send_data({"type": "subscribe", "channels": list(channels)}, {"allowFallback": True})
+            self.send_data({"type": "subscribe", "channels": list(channels)})
 
     def unsubscribe(self, *channels: str) -> None:
         self._subscriptions.difference_update(channels)
         if self._connected:
-            self.send_data({"type": "unsubscribe", "channels": list(channels)}, {"allowFallback": True})
+            self.send_data({"type": "unsubscribe", "channels": list(channels)})
 
     def subscriptions(self) -> List[str]:
         return sorted(self._subscriptions)

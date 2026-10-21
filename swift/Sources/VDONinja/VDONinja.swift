@@ -203,7 +203,7 @@ public final class VDONinja {
         publisherInfo = info
         let log: ((String) -> Void)? = options.debug ? { print("[vdoninja] \($0)") } : nil
         signal = SignalingClient(url: options.host, maxReconnectAttempts: options.maxReconnectAttempts, reconnectDelay: options.reconnectDelay,
-                                 clientId: options.clientId, queue: queue, log: log)
+                                 queue: queue, log: log)
         signal.onOpen = { [weak self] reconnect in
             guard let self else { return }
             self.emit(VDOEvent(reconnect ? .reconnected : .connected))
@@ -357,14 +357,19 @@ public final class VDONinja {
         try await withCheckedThrowingContinuation { c in joinRoom(room, claim: claim, timeout: timeout) { c.resume(with: $0) } }
     }
 
-    public func leaveRoom() {
+    /// Leaves by disconnecting peers and signaling. Reconnect before joining again.
+    public func leaveRoom(completion: (() -> Void)? = nil) {
         queue.async {
-            guard let room = self.room else { return }
-            self.room = nil
-            self.roomIntent = nil
-            self.signal.send(["leave": true]) // the JavaScript SDK sends this too
-            self.emit(VDOEvent(.roomLeft, data: room))
+            guard let room = self.room else { completion?(); return }
+            self.disconnect {
+                self.emit(VDOEvent(.roomLeft, data: room))
+                completion?()
+            }
         }
+    }
+
+    public func leaveRoom() async {
+        await withCheckedContinuation { (c: CheckedContinuation<Void, Never>) in leaveRoom { c.resume() } }
     }
 
     // MARK: Publishing
@@ -558,11 +563,11 @@ public final class VDONinja {
     /// Sends application data (any JSON-encodable value) as `{"pipe": data}`.
     /// `uuid` nil = every peer; `preference` any|publisher|viewer|all.
     @discardableResult
-    public func sendData(_ data: Any, uuid: String? = nil, type: String? = nil, preference: String = "any", allowFallback: Bool = false) -> Bool {
-        onQueue { sendDataLocked(data, uuid: uuid, type: type, preference: preference, allowFallback: allowFallback) }
+    public func sendData(_ data: Any, uuid: String? = nil, type: String? = nil, preference: String = "any") -> Bool {
+        onQueue { sendDataLocked(data, uuid: uuid, type: type, preference: preference) }
     }
 
-    private func sendDataLocked(_ data: Any, uuid: String?, type: String?, preference: String, allowFallback: Bool) -> Bool {
+    private func sendDataLocked(_ data: Any, uuid: String?, type: String?, preference: String) -> Bool {
         guard let text = JSONCodec.encode(["pipe": data]) else { return false }
         let buf = RTCDataBuffer(data: Data(text.utf8), isBinary: false)
         var sent = false
@@ -582,10 +587,6 @@ public final class VDONinja {
             default: r = trySend(pair.publisher) || trySend(pair.viewer)
             }
             sent = r || sent
-        }
-        if sent || !allowFallback || !connected { return sent }
-        for t in (uuid.map { [$0] } ?? order) {
-            if signal.send(["__fallback": true, "UUID": t, "pipe": data]) { sent = true }
         }
         return sent
     }
@@ -607,14 +608,14 @@ public final class VDONinja {
     public func subscribe(_ channels: [String]) {
         queue.async {
             self.subscriptions.formUnion(channels)
-            _ = self.sendDataLocked(["type": "subscribe", "channels": channels], uuid: nil, type: nil, preference: "all", allowFallback: false)
+            _ = self.sendDataLocked(["type": "subscribe", "channels": channels], uuid: nil, type: nil, preference: "all")
         }
     }
 
     public func unsubscribe(_ channels: [String]) {
         queue.async {
             self.subscriptions.subtract(channels)
-            _ = self.sendDataLocked(["type": "unsubscribe", "channels": channels], uuid: nil, type: nil, preference: "all", allowFallback: false)
+            _ = self.sendDataLocked(["type": "unsubscribe", "channels": channels], uuid: nil, type: nil, preference: "all")
         }
     }
 
@@ -640,7 +641,7 @@ public final class VDONinja {
                     cont.resume(with: r)
                 })
                 let payload: JSON = ["type": "request", "requestType": requestType, "requestId": id, "data": data]
-                if !self.sendDataLocked(payload, uuid: targetUuid, type: nil, preference: "any", allowFallback: false) {
+                if !self.sendDataLocked(payload, uuid: targetUuid, type: nil, preference: "any") {
                     self.pendingRequests[id] = nil
                     finished = true
                     return cont.resume(throwing: SDKError.noChannel(targetUuid))
@@ -855,7 +856,7 @@ public final class VDONinja {
     }
 
     private func sendBye(_ c: VDOConnection) {
-        if !c.sendControl(["bye": true]) { signal.send(["bye": true, "UUID": c.uuid]) }
+        _ = c.sendControl(["bye": true])
     }
 
     // MARK: Data channels
@@ -1012,7 +1013,7 @@ public final class VDONinja {
         case "request":
             guard let rt = pipe["requestType"] as? String, let rid = pipe["requestId"] as? String, let h = requestHandlers[rt] else { return true }
             let result = h(pipe["data"], c.uuid)
-            _ = sendDataLocked(["type": "response", "requestId": rid, "data": result ?? NSNull()], uuid: c.uuid, type: nil, preference: "any", allowFallback: false)
+            _ = sendDataLocked(["type": "response", "requestId": rid, "data": result ?? NSNull()], uuid: c.uuid, type: nil, preference: "any")
             return true
         case "response":
             guard let rid = pipe["requestId"] as? String, let p = pendingRequests[rid], p.target == nil || p.target == c.uuid else { return true }
@@ -1062,9 +1063,6 @@ public final class VDONinja {
         }
         if msg["bye"] != nil { return handleBye(msg["UUID"] as? String, .bye, msg) }
         if msg["hangup"] != nil { return handleBye(msg["UUID"] as? String, .hangup, msg) }
-        if msg["pipe"] != nil && msg["__fallback"] != nil {
-            return emit(VDOEvent(.dataReceived, uuid: msg["UUID"] as? String, data: msg["pipe"], fallback: true, raw: msg))
-        }
         if msg["rejected"] != nil || msg["approved"] != nil {
             return emit(VDOEvent(.alert, message: msg["rejected"] != nil ? "connection rejected" : "connection approved", raw: msg))
         }

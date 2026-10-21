@@ -93,7 +93,6 @@ typedef struct vdon_options {
     int view_retry_interval_ms;/* default 900000 */
     int auto_ping_viewer;      /* viewer-side keepalive pings */
     int auto_ping_interval_ms; /* default 10000 */
-    const char *client_id;     /* adds a "from" field (legacy fan-out servers only) */
     int debug;                 /* log to stderr */
 } vdon_options;
 
@@ -197,6 +196,7 @@ VDON_API int vdon_is_connected(vdon_sdk *sdk);
 
 /* Joins a room (hashed with password and salt). password NULL keeps the current one. */
 VDON_API int vdon_join_room(vdon_sdk *sdk, const char *room, const char *password, int claim, int timeout_ms);
+/* Disconnects peers and signaling to leave. Reconnect before joining again. */
 VDON_API void vdon_leave_room(vdon_sdk *sdk);
 /* Copies the joined room into out (empty string if none). */
 VDON_API int vdon_room(vdon_sdk *sdk, char *out, size_t out_size);
@@ -289,7 +289,6 @@ typedef struct vdon_data_target {
     const char *connection_type; /* "publisher" | "viewer" | NULL */
     const char *stream_id;
     const char *preference;      /* "any" (default) | "publisher" | "viewer" | "all" */
-    int allow_fallback;          /* relay through signaling when no channel is open (off) */
 } vdon_data_target;
 
 VDON_API int vdon_send_data_ex(vdon_sdk *sdk, const char *json, const vdon_data_target *target);

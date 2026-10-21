@@ -3,6 +3,16 @@
 #include "vdon_sdk_internal.h"
 
 static int candidates_added;
+static int messages_sent;
+static int message_channel;
+static char last_message[128];
+static int record_message(int id, const char *message, int size) {
+    (void)size;
+    messages_sent++;
+    message_channel = id;
+    snprintf(last_message, sizeof(last_message), "%s", message);
+    return 0;
+}
 static int record_candidate(int pc, const char *candidate, const char *mid) {
     (void)pc;
     (void)mid;
@@ -15,11 +25,62 @@ static int record_candidate(int pc, const char *candidate, const char *mid) {
 }
 
 #define rtcAddRemoteCandidate record_candidate
+#define rtcSendMessage record_message
 #include "../src/vdon_sdk.c"
 #undef rtcAddRemoteCandidate
 #include "../src/vdon_signalserver.c"
+#undef rtcSendMessage
 
 #define CHECK(expr) do { if (!(expr)) { fprintf(stderr, "FAIL line %d: %s\n", __LINE__, #expr); exit(1); } } while (0)
+
+static void test_bye_uses_control_channel(void) {
+    vdon_sdk s = {0};
+    conn_t c = {0};
+    chan_t channel = {0};
+    cJSON *msg;
+    pthread_mutex_init(&s.lock, NULL);
+    s.connected = 1;
+    s.ws = 10;
+    c.uuid = "peer";
+    c.type = TYPE_PUBLISHER;
+    messages_sent = 0;
+    conn_bye(&s, &c);
+    CHECK(messages_sent == 0); /* No control channel: no signaling fallback. */
+    channel.dc = 20;
+    channel.open = 1;
+    c.control = &channel;
+    conn_bye(&s, &c);
+    CHECK(messages_sent == 1 && message_channel == 20);
+    msg = cJSON_Parse(last_message);
+    CHECK(msg && cJSON_GetArraySize(msg) == 1 && cJSON_IsTrue(jget(msg, "bye")));
+    cJSON_Delete(msg);
+    pthread_mutex_destroy(&s.lock);
+}
+
+static void test_leave_closes_signaling(void) {
+    vdon_sdk s = {0};
+    vdon_signal_server server = {0};
+    ss_client client = {0};
+    cJSON *msg = cJSON_Parse("{\"leave\":true}");
+    client.room = "room";
+    ss_handle(&server, &client, msg);
+    CHECK(client.room && strcmp(client.room, "room") == 0);
+    cJSON_Delete(msg);
+
+    pthread_mutex_init(&s.lock, NULL);
+    pthread_cond_init(&s.cond, NULL);
+    s.ws = -1;
+    s.connected = 1;
+    s.room = vdon_strdup("room");
+    s.room_intent = vdon_strdup("room");
+    s.room_joined = 1;
+    messages_sent = 0;
+    vdon_leave_room(&s);
+    CHECK(!s.connected && !s.room && !s.room_intent && s.intentional);
+    CHECK(messages_sent == 0);
+    pthread_cond_destroy(&s.cond);
+    pthread_mutex_destroy(&s.lock);
+}
 
 static void test_ice_sessions(void) {
     vdon_sdk s = {0};
@@ -154,6 +215,8 @@ static void test_sender_lifetime(void) {
 }
 
 int main(void) {
+    test_leave_closes_signaling();
+    test_bye_uses_control_channel();
     test_ice_sessions();
     test_join_collision();
     test_retired_transfer();

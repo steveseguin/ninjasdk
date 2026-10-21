@@ -154,10 +154,6 @@ func str(v any) string {
 func (s *Server) handle(c *client, msg map[string]any) {
 	request := str(msg["request"])
 	if request == "" {
-		if _, ok := msg["leave"]; ok {
-			s.leaveRoom(c)
-			return
-		}
 		// Direct routing: UUID names the target; rewrite it to the sender.
 		target := str(msg["UUID"])
 		if target == "" {
@@ -170,7 +166,6 @@ func (s *Server) handle(c *client, msg map[string]any) {
 			return
 		}
 		msg["UUID"] = c.uuid
-		delete(msg, "from")
 		t.send(msg)
 		return
 	}
@@ -252,31 +247,6 @@ func (s *Server) seed(c *client, streamID string) {
 		if len(watchers) == 0 {
 			delete(s.waiting, streamID)
 		}
-	}
-}
-
-// leaveRoom drops the client's room membership ({"leave": true}).
-func (s *Server) leaveRoom(c *client) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	room, ok := s.rooms[c.uuid]
-	if !ok {
-		return
-	}
-	delete(s.rooms, c.uuid)
-	if s.directors[room] == c.uuid {
-		delete(s.directors, room)
-	}
-	members := s.roomList[room][:0:0]
-	for _, m := range s.roomList[room] {
-		if m != c.uuid {
-			members = append(members, m)
-		}
-	}
-	if len(members) == 0 {
-		delete(s.roomList, room)
-	} else {
-		s.roomList[room] = members
 	}
 }
 

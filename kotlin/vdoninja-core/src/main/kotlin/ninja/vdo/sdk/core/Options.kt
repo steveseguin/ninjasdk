@@ -35,8 +35,6 @@ data class VdoNinjaOptions(
     val viewRetryIntervalMs: Long = 900_000,
     val autoPingViewer: Boolean = false,
     val autoPingIntervalMs: Long = 10_000,
-    /** Adds a `from` field (legacy fan-out servers only). */
-    val clientId: String? = null,
     val debug: Boolean = false,
 ) {
     fun passwordContext(): PasswordContext = PasswordContext.from(password, noPassword, salt)

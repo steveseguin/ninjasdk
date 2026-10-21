@@ -211,7 +211,7 @@ class VdoNinja @JvmOverloads constructor(
                 .setVideoDecoderFactory(DefaultVideoDecoderFactory(eglBase.eglBaseContext))
                 .createPeerConnectionFactory()
         }
-        signal = SignalingClient(options.host, options.maxReconnectAttempts, options.reconnectDelayMs, options.clientId, ::log).apply {
+        signal = SignalingClient(options.host, options.maxReconnectAttempts, options.reconnectDelayMs, log = ::log).apply {
             onOpen = { reconnect ->
                 emit(VdoEvent(if (reconnect) VdoEvents.RECONNECTED else VdoEvents.CONNECTED))
                 if (reconnect) restoreIntent()
@@ -342,9 +342,10 @@ class VdoNinja @JvmOverloads constructor(
         }
     }
 
+    /** Leaves by disconnecting peers and signaling. Reconnect before joining again. */
     fun leaveRoom() {
         val left = synchronized(lock) { val r = room; room = null; roomIntent = null; r } ?: return
-        signal.send(JSONObject().put("leave", true)) // the JavaScript SDK sends this too
+        disconnect()
         emit(VdoEvent(VdoEvents.ROOM_LEFT, data = left))
     }
 
@@ -563,7 +564,7 @@ class VdoNinja @JvmOverloads constructor(
      * [preference] any|publisher|viewer|all.
      */
     @JvmOverloads
-    fun sendData(data: Any?, uuid: String? = null, type: String? = null, preference: String = "any", allowFallback: Boolean = false): Boolean {
+    fun sendData(data: Any?, uuid: String? = null, type: String? = null, preference: String = "any"): Boolean {
         val text = JSONObject().put("pipe", data ?: JSONObject.NULL).toString()
         val buf = text.toByteArray(StandardCharsets.UTF_8)
         var sent = false
@@ -584,11 +585,6 @@ class VdoNinja @JvmOverloads constructor(
                 "all" -> { val a = trySend(pub); val b = trySend(view); a || b }
                 else -> trySend(pub) || trySend(view)
             } || sent
-        }
-        if (sent || !allowFallback || !connected) return sent
-        val targets = if (uuid != null) listOf(uuid) else peers()
-        for (t in targets) {
-            if (signal.send(JSONObject().put("__fallback", true).put("UUID", t).put("pipe", data ?: JSONObject.NULL))) sent = true
         }
         return sent
     }
@@ -870,7 +866,7 @@ class VdoNinja @JvmOverloads constructor(
     }
 
     private fun sendBye(c: VdoConnection) {
-        if (!c.sendControl(JSONObject().put("bye", true))) signal.send(JSONObject().put("bye", true).put("UUID", c.uuid))
+        c.sendControl(JSONObject().put("bye", true))
     }
 
     // ------------------------------------------------------ data channels
@@ -1098,8 +1094,6 @@ class VdoNinja @JvmOverloads constructor(
             }
             msg.has("bye") -> handleBye(msg.optString("UUID", null), VdoEvents.BYE, msg)
             msg.has("hangup") -> handleBye(msg.optString("UUID", null), VdoEvents.HANGUP, msg)
-            msg.has("pipe") && msg.has("__fallback") ->
-                emit(VdoEvent(VdoEvents.DATA_RECEIVED, uuid = msg.optString("UUID", null), data = msg.opt("pipe"), fallback = true, raw = msg))
             msg.has("rejected") || msg.has("approved") ->
                 emit(VdoEvent(VdoEvents.ALERT, message = if (msg.has("rejected")) "connection rejected" else "connection approved", raw = msg))
             msg.has("iceRestartRequest") -> connection(msg.optString("UUID", ""), "publisher")?.let { renegotiate(it, true) }

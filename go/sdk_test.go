@@ -532,3 +532,66 @@ func TestDisconnectClearsIntent(t *testing.T) {
 		t.Fatalf("stale intent replayed: publishing=%v streamID=%q roomJoined=%v", publishing, sid, joined)
 	}
 }
+
+// Application sends must never use signaling, even with a known peer whose
+// control channel has not opened yet.
+func TestDataRequiresPeerChannel(t *testing.T) {
+	s := New(Options{TURN: TURNDisabled, STUNServers: []string{}})
+	s.connected = true
+	s.connections["unopened-peer"] = &peerPair{}
+	if s.SendDataTo("unopened-peer", "payload") || s.SendPing("unopened-peer") {
+		t.Fatal("send succeeded without a data channel")
+	}
+	s.Subscribe("updates")
+	s.Unsubscribe("updates")
+	if len(s.queue) != 0 {
+		t.Fatal("application data was queued on signaling")
+	}
+	events := make(chan Event, 1)
+	s.On(EventDataReceived, func(ev Event) { events <- ev })
+	s.handleSignalingMessage(map[string]any{"UUID": "unopened-peer", "__fallback": true, "pipe": "payload"})
+	select {
+	case <-events:
+		t.Fatal("application data accepted from signaling")
+	default:
+	}
+}
+
+func TestLeaveRoomDisconnects(t *testing.T) {
+	host := startSignal(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	s := newTestSDK(t, host, nil)
+	if err := s.Connect(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.JoinRoom(ctx, "old-room"); err != nil {
+		t.Fatal(err)
+	}
+	s.LeaveRoom()
+	if s.Connected() || s.Room() != "" {
+		t.Fatal("leave did not disconnect")
+	}
+	if err := s.Connect(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.JoinRoom(ctx, "new-room"); err != nil {
+		t.Fatal(err)
+	}
+	if s.Room() != "new_room" {
+		t.Fatal("reconnected into the wrong room")
+	}
+}
+
+func TestStreamNoticePreservesViewPreferences(t *testing.T) {
+	s := New(Options{TURN: TURNDisabled, STUNServers: []string{}})
+	s.pendingViews["late"] = ViewOptions{Audio: Bool(false), Video: Bool(false), Downloads: Bool(false)}
+	s.handleVideoAddedToRoom(map[string]any{"streamID": "late" + s.passwordHash, "UUID": "publisher"})
+	s.mu.Lock()
+	opts, ok := s.pendingViews["late"]
+	s.mu.Unlock()
+	if !ok || opts.audio() || opts.video() || opts.downloads() {
+		t.Fatal("offer arriving before retry lost the requested preferences")
+	}
+	s.Disconnect()
+}

@@ -363,8 +363,6 @@ int vdon__ws_send(vdon_sdk *s, cJSON *msg) {
     int rc;
     pthread_mutex_lock(&s->lock);
     ws = s->connected ? s->ws : -1;
-    if (ws >= 0 && s->o.client_id && !jget(msg, "from"))
-        cJSON_AddStringToObject(msg, "from", s->o.client_id);
     pthread_mutex_unlock(&s->lock);
     if (ws < 0)
         return 0;
@@ -803,10 +801,7 @@ static stream_t *stream_touch(vdon_sdk *s, const char *sid, const char *uuid) {
 static void conn_bye(vdon_sdk *s, conn_t *c) {
     cJSON *m = cJSON_CreateObject();
     cJSON_AddBoolToObject(m, "bye", 1);
-    if (!vdon__conn_send_control(s, c, m)) {
-        cJSON_AddStringToObject(m, "UUID", c->uuid);
-        vdon__ws_send(s, m);
-    }
+    vdon__conn_send_control(s, c, m);
     cJSON_Delete(m);
 }
 
@@ -2066,14 +2061,6 @@ static void handle_signal(vdon_sdk *s, cJSON *msg) {
         handle_bye(s, jstr(msg, "UUID"), VDON_EVENT_BYE, msg);
     } else if (jget(msg, "hangup")) {
         handle_bye(s, jstr(msg, "UUID"), VDON_EVENT_HANGUP, msg);
-    } else if (jget(msg, "pipe") && jget(msg, "__fallback")) {
-        char *text = vdon__json_text(jget(msg, "pipe"));
-        EV(ev, VDON_EVENT_DATA_RECEIVED);
-        ev.uuid = jstr(msg, "UUID");
-        ev.json = text;
-        ev.flag = 1;
-        vdon__emit(s, &ev);
-        free(text);
     } else if (jget(msg, "rejected") || jget(msg, "approved")) {
         EV(ev, VDON_EVENT_ALERT);
         ev.message = jget(msg, "rejected") ? "connection rejected" : "connection approved";
@@ -2468,11 +2455,7 @@ void vdon_leave_room(vdon_sdk *s) {
     pthread_mutex_unlock(&s->lock);
     if (!had_room)
         return;
-    {
-        cJSON *m = cJSON_CreateObject(); /* the JavaScript SDK sends this too */
-        cJSON_AddBoolToObject(m, "leave", 1);
-        ws_send_free(s, m);
-    }
+    vdon_disconnect(s);
     {
         EV(ev, VDON_EVENT_ROOM_LEFT);
         vdon__emit(s, &ev);
@@ -2981,7 +2964,6 @@ vdon_sdk *vdon_create(const vdon_options *opts, vdon_event_callback cb, void *us
     s->o.label = vdon_strdup(opts->label);
     s->o.meta_json = vdon_strdup(opts->meta_json);
     s->o.bind_address = vdon_strdup(opts->bind_address);
-    s->o.client_id = vdon_strdup(opts->client_id);
     if (opts->turn_servers && opts->turn_server_count > 0) {
         s->turn_copy = (char **)calloc((size_t)opts->turn_server_count, sizeof(char *));
         for (i = 0; i < opts->turn_server_count; i++)
@@ -3224,7 +3206,6 @@ void vdon_destroy(vdon_sdk *s) {
     free((char *)s->o.label);
     free((char *)s->o.meta_json);
     free((char *)s->o.bind_address);
-    free((char *)s->o.client_id);
     free(s->password);
     free(s->salt);
     free(s->phrase);

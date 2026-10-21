@@ -1266,5 +1266,5 @@ func (s *SDK) SendPing(uuid string) bool {
 		c.pendingPing = ts
 		c.mu.Unlock()
 	}
-	return s.sendDataInternal(map[string]any{"ping": ts}, uuid, "", "any", false)
+	return s.sendDataInternal(map[string]any{"ping": ts}, uuid, "", "any")
 }

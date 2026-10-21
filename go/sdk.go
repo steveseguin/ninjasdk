@@ -616,11 +616,8 @@ func (s *SDK) writeWS(b []byte) bool {
 	return true
 }
 
-// sendWS marshals and sends a signaling message, adding ClientID as "from" when configured.
+// sendWS marshals and sends a native signaling message.
 func (s *SDK) sendWS(msg map[string]any) bool {
-	if s.opts.ClientID != "" {
-		msg["from"] = s.opts.ClientID
-	}
 	b, err := json.Marshal(msg)
 	if err != nil {
 		return false
@@ -724,8 +721,8 @@ func (s *SDK) removeRoomWaiter(w chan struct{}) {
 	}
 }
 
-// LeaveRoom sends the leave message (as the JavaScript SDK does) and forgets
-// the room locally.
+// LeaveRoom disconnects peers and signaling to leave the room. The server has
+// no leave message; call Connect before joining another room or publishing again.
 func (s *SDK) LeaveRoom() {
 	s.mu.Lock()
 	room := s.room
@@ -736,7 +733,7 @@ func (s *SDK) LeaveRoom() {
 	if room == "" {
 		return
 	}
-	s.sendWS(map[string]any{"leave": true})
+	s.Disconnect()
 	s.emit(Event{Type: EventRoomLeft, Data: room})
 }
 
@@ -1125,8 +1122,6 @@ func (s *SDK) handleSignalingMessage(msg map[string]any) {
 		s.handleBye(getString(msg, "UUID"), EventBye, msg)
 	case msg["hangup"] != nil:
 		s.handleBye(getString(msg, "UUID"), EventHangup, msg)
-	case msg["pipe"] != nil && msg["__fallback"] != nil:
-		s.handleFallbackData(msg)
 	}
 }
 
@@ -1218,9 +1213,7 @@ func (s *SDK) handleVideoAddedToRoom(msg map[string]any) {
 		}
 	}
 	opts, pending := s.pendingViews[clean]
-	if pending {
-		delete(s.pendingViews, clean)
-	}
+	// Keep preferences until SDP arrives, including before the delayed play retry.
 	s.mu.Unlock()
 	if pending {
 		s.logf("Re-requesting pending stream that just became available: %s", clean)
@@ -1340,15 +1333,4 @@ func (s *SDK) handleBye(uuid string, typ EventType, msg map[string]any) {
 	}
 	s.emit(Event{Type: typ, UUID: uuid, Raw: msg})
 	s.emit(Event{Type: EventPeerDisconnected, UUID: uuid})
-}
-
-func (s *SDK) handleFallbackData(msg map[string]any) {
-	uuid := getString(msg, "UUID")
-	pipe := msg["pipe"]
-	if m, ok := pipe.(map[string]any); ok {
-		if t, _ := m["type"].(string); t == "subscribe" || t == "unsubscribe" {
-			s.handleDataChannelMessage(m, uuid)
-		}
-	}
-	s.emit(Event{Type: EventDataReceived, UUID: uuid, Data: pipe, Fallback: true, Raw: msg})
 }

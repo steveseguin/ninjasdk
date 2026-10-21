@@ -6,6 +6,18 @@ import websockets
 from vdoninja.signalserver import SignalServer
 
 
+async def test_leave_is_not_a_server_command():
+    server = SignalServer()
+    server.rooms["peer"] = "room"
+    server.room_list["room"] = ["peer"]
+    server.directors["room"] = "peer"
+    await server.handle("peer", {"leave": True})
+    assert server.rooms["peer"] == "room"
+    assert server.directors["room"] == "peer"
+    server.cleanup("peer")
+    assert not server.rooms and not server.room_list and not server.directors
+
+
 async def test_join_room_cannot_steal_stream(signal_host):
     async with websockets.connect(signal_host) as owner, websockets.connect(signal_host) as other:
         async def send(ws, **message):

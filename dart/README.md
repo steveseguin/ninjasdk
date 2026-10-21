@@ -1,5 +1,11 @@
 # VDO.Ninja SDK for Dart and Flutter
 
+Signaling uses the existing VDO.Ninja protocol. Application data and native `ping`/`pong`/`bye` messages use peer data channels; there is no WebSocket application-data fallback or client-supplied `from` field. Wait for the control channel to open before sending data.
+
+Pub/sub and request/response helpers preserve the JS SDK application protocol inside native `pipe` messages. They require a compatible SDK/application at the other end; the VDO.Ninja page forwards generic `pipe` data to its embedding application and does not implement those helpers itself.
+
+Leaving a room disconnects its peers and signaling socket: the handshake server has no `leave` command. Reconnect before joining another room or publishing again. Await the leave operation in asynchronous APIs (Rust, Python, Dart and Swift).
+
 Two packages:
 
 | Package | What it is | Depends on |
@@ -50,8 +56,7 @@ final conn = await vdo.view('their-stream'); // null only with timeout: Duration
 
 // Data
 vdo.on(VdoEvents.dataReceived, (e) => print('${e.uuid}: ${e.data}'));
-vdo.sendData({'hello': 'world'});                  // every peer
-vdo.sendData({'hello': 'you'}, uuid: conn!.uuid);  // one peer
+vdo.sendPing(conn!.uuid); // native control-channel ping/pong
 
 await vdo.disconnect();
 ```
@@ -70,7 +75,7 @@ returns `null` right away and leaves the request pending.
 | Rooms | `joinRoom(room:, claim:)` → listing, `leaveRoom()`, `room` |
 | Publishing | `announce(streamId:, room:)`, `publish(MediaStream, streamId:, room:)`, `addTrack()`, `replaceTrack()` (camera switch), `stopPublishing()` |
 | Viewing | `view(streamId, options: ViewOptions(audio:, video:, label:))`, `stopViewing()`, `autoConnect(room, fullMode:)` ; media arrives as `track` events with `track` and `stream` |
-| Data | `sendData(data, uuid:, type:, preference:, allowFallback:)`, `sendPing()` → `peerLatency` |
+| Data | `sendData(data, uuid:, type:, preference:)`, `sendPing()` → `peerLatency` |
 | Pub/sub | `subscribe(channels)`, `unsubscribe()`, `publishToChannel(channel, data)` → `channelMessage` |
 | RPC | `onRequest(type, handler)`, `request(type, data, uuid)`, `respond()` |
 | Introspection | `peers`, `connection(uuid, type)` (exposes the `RTCPeerConnection`), `streams` |

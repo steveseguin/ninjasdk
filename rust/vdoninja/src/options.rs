@@ -64,8 +64,6 @@ pub struct Options {
     pub view_retry_interval: Duration,
     pub auto_ping_viewer: bool,
     pub auto_ping_interval: Duration,
-    /// Sent as `from` on every signaling message (legacy fan-out servers only).
-    pub client_id: Option<String>,
 }
 
 impl Default for Options {
@@ -98,7 +96,6 @@ impl Default for Options {
             view_retry_interval: Duration::from_secs(900),
             auto_ping_viewer: false,
             auto_ping_interval: Duration::from_secs(10),
-            client_id: None,
         }
     }
 }
@@ -162,8 +159,6 @@ pub struct DataTarget {
     pub stream_id: Option<String>,
     /// "any" (default), "publisher", "viewer" or "all".
     pub preference: Option<String>,
-    /// Permit the signaling relay when no channel is open (off by default).
-    pub allow_fallback: bool,
 }
 
 /// Options for `auto_connect`.

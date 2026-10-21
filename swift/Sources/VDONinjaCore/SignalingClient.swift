@@ -14,7 +14,6 @@ public final class SignalingClient: NSObject, URLSessionWebSocketDelegate, @unch
     public let queue: DispatchQueue
     private let maxReconnectAttempts: Int
     private let reconnectDelay: TimeInterval
-    private let clientId: String?
     private let log: ((String) -> Void)?
 
     public var onOpen: ((_ reconnect: Bool) -> Void)?
@@ -34,13 +33,12 @@ public final class SignalingClient: NSObject, URLSessionWebSocketDelegate, @unch
     private var reconnectWork: DispatchWorkItem?
     private var shutDown = false
 
-    public init(url: String, maxReconnectAttempts: Int = 5, reconnectDelay: TimeInterval = 1, clientId: String? = nil,
+    public init(url: String, maxReconnectAttempts: Int = 5, reconnectDelay: TimeInterval = 1,
                 queue: DispatchQueue = DispatchQueue(label: "ninja.vdo.sdk.signaling"), log: ((String) -> Void)? = nil) {
         self.url = URL(string: url) ?? URL(string: Defaults.host)!
         self.queue = queue
         self.maxReconnectAttempts = maxReconnectAttempts
         self.reconnectDelay = reconnectDelay
-        self.clientId = clientId
         self.log = log
         super.init()
         let opQueue = OperationQueue()
@@ -163,10 +161,8 @@ public final class SignalingClient: NSObject, URLSessionWebSocketDelegate, @unch
     /// Sends a JSON object. Returns false when the socket is not open. Safe from any thread.
     @discardableResult
     public func send(_ message: JSON) -> Bool {
-        var msg = message
         guard connected, let t = task else { return false }
-        if let clientId, msg["from"] == nil { msg["from"] = clientId }
-        guard let text = JSONCodec.encode(msg) else { return false }
+        guard let text = JSONCodec.encode(message) else { return false }
         log?("-> WS \(text.prefix(300))")
         t.send(.string(text)) { [weak self] err in if let err { self?.log?("send failed: \(err)") } }
         return true

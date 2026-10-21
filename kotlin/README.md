@@ -1,5 +1,11 @@
 # VDO.Ninja SDK for Kotlin and Java (Android)
 
+Signaling uses the existing VDO.Ninja protocol. Application data and native `ping`/`pong`/`bye` messages use peer data channels; there is no WebSocket application-data fallback or client-supplied `from` field. Wait for the control channel to open before sending data.
+
+Pub/sub and request/response helpers preserve the JS SDK application protocol inside native `pipe` messages. They require a compatible SDK/application at the other end; the VDO.Ninja page forwards generic `pipe` data to its embedding application and does not implement those helpers itself.
+
+Leaving a room disconnects its peers and signaling socket: the handshake server has no `leave` command. Reconnect before joining another room or publishing again. Await the leave operation in asynchronous APIs (Rust, Python, Dart and Swift).
+
 Two Gradle modules:
 
 | Module | What it is | Depends on |
@@ -54,8 +60,7 @@ thread {
 
     // View someone else (blocks until the offer arrives)
     val conn = vdo.view("their-stream")
-    vdo.sendData(JSONObject().put("hello", "world"))          // every peer
-    vdo.sendData(JSONObject().put("hi", true), uuid = conn?.uuid)
+    vdo.sendPing(conn?.uuid) // native control-channel ping/pong
 }
 ```
 
@@ -72,7 +77,7 @@ and connects when the stream appears (`timeoutMs = 0` returns immediately).
 | Rooms | `joinRoom(room, claim, timeoutMs)` → listing, `leaveRoom()`, `currentRoom` |
 | Publishing | `announce()`, `publish(tracks, streamId, room)`, `addTrack()`, `replaceTrack()` (camera switch), `stopPublishing()` |
 | Viewing | `view(streamId, ViewOptions(audio, video, label), timeoutMs)`, `stopViewing()`, `autoConnect(room, streamId, fullMode)`; media arrives as `TRACK` events with an `org.webrtc.MediaStreamTrack` |
-| Data | `sendData(data, uuid, type, preference, allowFallback)`, `sendPing()` → `PEER_LATENCY` |
+| Data | `sendData(data, uuid, type, preference)`, `sendPing()` → `PEER_LATENCY` |
 | Pub/sub | `subscribe()`, `unsubscribe()`, `publishToChannel()` → `CHANNEL_MESSAGE` |
 | RPC | `onRequest(type) { data, from -> }`, `request(type, data, uuid)` (blocking), `respond()` |
 | Introspection | `peers()`, `connection(uuid, type)` (exposes the `PeerConnection`), `streams()` |

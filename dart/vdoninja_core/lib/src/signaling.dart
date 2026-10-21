@@ -16,14 +16,12 @@ class SignalingClient {
     this.url, {
     this.maxReconnectAttempts = 5,
     this.reconnectDelay = const Duration(seconds: 1),
-    this.clientId,
     this.log,
   });
 
   final String url;
   final int maxReconnectAttempts;
   final Duration reconnectDelay;
-  final String? clientId;
   final void Function(String message)? log;
 
   void Function(bool reconnect)? onOpen;
@@ -131,7 +129,6 @@ class SignalingClient {
   bool send(Map<String, dynamic> message) {
     final ch = _channel;
     if (ch == null || !_connected) return false;
-    if (clientId != null && !message.containsKey('from')) message = {...message, 'from': clientId};
     final text = jsonEncode(message);
     log?.call('-> WS ${text.length > 300 ? text.substring(0, 300) : text}');
     try {

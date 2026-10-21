@@ -64,6 +64,26 @@ where
 }
 
 #[tokio::test]
+async fn leave_room_disconnects() {
+    let server = bind_server().await;
+    let sdk = VdoNinja::new(opts(&server.url()));
+    sdk.connect().await.unwrap();
+    sdk.join_room("old-room").await.unwrap();
+    assert!(matches!(
+        sdk.join_room("new-room").await,
+        Err(Error::AlreadyInRoom)
+    ));
+    assert_eq!(sdk.room().as_deref(), Some("old_room"));
+    sdk.leave_room().await;
+    assert!(!sdk.connected());
+    assert!(sdk.room().is_none());
+    sdk.connect().await.unwrap();
+    sdk.join_room("new-room").await.unwrap();
+    assert_eq!(sdk.room().as_deref(), Some("new_room"));
+    sdk.disconnect().await;
+}
+
+#[tokio::test]
 async fn data_round_trip() {
     let _ = env_logger::try_init();
     let server = bind_server().await;

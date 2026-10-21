@@ -1,5 +1,11 @@
 # VDO.Ninja SDK for Python
 
+Signaling uses the existing VDO.Ninja protocol. Application data and native `ping`/`pong`/`bye` messages use peer data channels; there is no WebSocket application-data fallback or client-supplied `from` field. Wait for the control channel to open before sending data.
+
+Pub/sub and request/response helpers preserve the JS SDK application protocol inside native `pipe` messages. They require a compatible SDK/application at the other end; the VDO.Ninja page forwards generic `pipe` data to its embedding application and does not implement those helpers itself.
+
+Leaving a room disconnects its peers and signaling socket: the handshake server has no `leave` command. Reconnect before joining another room or publishing again. Await the leave operation in asynchronous APIs (Rust, Python, Dart and Swift).
+
 An asyncio implementation of the VDO.Ninja SDK on top of [aiortc](https://github.com/aiortc/aiortc). It speaks the
 same signaling protocol, hashing and encryption as the JavaScript SDK, so Python programs can publish audio, video
 and data to browsers running VDO.Ninja, view streams from them, and interoperate with the Go, Rust and C SDKs in this
@@ -30,7 +36,7 @@ from vdoninja import VDONinja
 async def main():
     sdk = VDONinja(password="mysecret")          # password=False disables hashing/encryption
     sdk.on("dataReceived", lambda ev: print(ev.uuid, ev.data))
-    sdk.on("dataChannelOpen", lambda ev: sdk.send_data({"hello": "world"}, ev.uuid))
+    sdk.on("dataChannelOpen", lambda ev: sdk.send_ping(ev.uuid))
     await sdk.connect()
     stream_id = await sdk.announce("my-python-stream")   # data-only publisher
     print("viewers can open https://vdo.ninja/?view=%s&password=mysecret" % stream_id)
@@ -88,7 +94,7 @@ await recorder.start()
 | Rooms | `join_room(room, password=None, claim=False)`, `leave_room()` |
 | Publishing | `announce(stream_id=None, room=...)` (data only), `publish(tracks, stream_id=None, ...)`, `add_track(track)`, `stop_publishing()` |
 | Viewing | `view(stream_id, audio=True, video=True, label="", downloads=True, allowresources=False, timeout=15)`, `stop_viewing(stream_id)`, `auto_connect(room, mode="half"|"full", ...)` |
-| Data | `send_data(data, target=None)` (target: UUID or `{"uuid","type","streamID","preference","allowFallback"}`), `send_ping(uuid=None)` |
+| Data | `send_data(data, target=None)` (target: UUID or `{"uuid","type","streamID","preference"}`), `send_ping(uuid=None)` |
 | Pub/sub | `subscribe(*channels)`, `unsubscribe(*channels)`, `publish_to_channel(channel, data, target="all")` |
 | RPC | `on_request(type, handler)` (sync or async `(data, from_uuid) -> result`), `await request(type, data, uuid, timeout=5)`, `respond(request_id, data, uuid)` |
 | Binary | `await send_binary(uuid, bytes)` (reserved `x-bin` lane), `await open_channel(uuid, "x-label", ...)` returns an `RTCDataChannel` |
@@ -101,7 +107,7 @@ await recorder.start()
 
 `VDONinja(host="wss://wss.vdo.ninja", *, room=None, password=None, salt="vdo.ninja", label="", meta=None,
 turn="auto"|False|[RTCIceServer], force_tcp=False, stun_servers=None, max_reconnect_attempts=5,
-reconnect_delay=1.0, connection_timeout=20.0, view_retry_interval=900.0, auto_ping_viewer=False, client_id=None)`
+reconnect_delay=1.0, connection_timeout=20.0, view_retry_interval=900.0, auto_ping_viewer=False)`
 
 `password=None` uses the shared default password, `password=False` disables hashing and encryption (JavaScript
 `password: false`).

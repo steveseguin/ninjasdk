@@ -25,7 +25,7 @@
 //!     while let Ok(ev) = events.recv().await {
 //!         match ev {
 //!             Event::DataChannelOpen { uuid, .. } => {
-//!                 sdk.send_data_to(&uuid, serde_json::json!({"message": "Hello from Rust"})).await;
+//!                 sdk.send_ping(&uuid).await;
 //!             }
 //!             Event::DataReceived { uuid, data, .. } => println!("{uuid}: {data}"),
 //!             _ => {}
@@ -62,6 +62,8 @@ pub enum Error {
     NotConnected,
     #[error("room name is required")]
     RoomRequired,
+    #[error("already in a room; leave and reconnect before joining another room")]
+    AlreadyInRoom,
     #[error("room join timeout")]
     RoomJoinTimeout,
     #[error("stream not available yet; the view request stays pending")]

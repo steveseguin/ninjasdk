@@ -1,5 +1,11 @@
 # VDO.Ninja SDK for Go
 
+Signaling uses the existing VDO.Ninja protocol. Application data and native `ping`/`pong`/`bye` messages use peer data channels; there is no WebSocket application-data fallback or client-supplied `from` field. Wait for the control channel to open before sending data.
+
+Pub/sub and request/response helpers preserve the JS SDK application protocol inside native `pipe` messages. They require a compatible SDK/application at the other end; the VDO.Ninja page forwards generic `pipe` data to its embedding application and does not implement those helpers itself.
+
+Leaving a room disconnects its peers and signaling socket: the handshake server has no `leave` command. Reconnect before joining another room or publishing again. Await the leave operation in asynchronous APIs (Rust, Python, Dart and Swift).
+
 [![Go Reference](https://pkg.go.dev/badge/github.com/steveseguin/ninjasdk/go.svg)](https://pkg.go.dev/github.com/steveseguin/ninjasdk/go)
 
 Go implementation of the VDO.Ninja SDK, built on [pion/webrtc](https://github.com/pion/webrtc). It speaks the same wire protocol as the [JavaScript SDK](../README.md) and VDO.Ninja browser pages, so a Go process can publish to, view, message and exchange files with any VDO.Ninja peer.
@@ -35,7 +41,7 @@ func main() {
 		log.Printf("from %s: %v", ev.UUID, ev.Data)
 	})
 	sdk.On(vdoninja.EventDataChannelOpen, func(ev vdoninja.Event) {
-		sdk.SendDataTo(ev.UUID, map[string]any{"message": "Hello from Go"})
+		sdk.SendPing(ev.UUID)
 	})
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -119,7 +125,6 @@ Events carry the same names as the JavaScript SDK (`dataReceived`, `peerInfo`, `
 | `STUNServers` | Google + Cloudflare | Empty slice disables STUN. |
 | `API` | default pion API | Supply a `webrtc.API` with your own `MediaEngine`/`SettingEngine` (codec selection, port ranges, loopback candidates). |
 | `AutoPingViewer` | off | Viewer pings every `AutoPingInterval`; two misses trigger an ICE restart request. |
-| `ClientID` | unset | Adds a `from` field for the legacy fan-out signaling servers. |
 
 Reconnection: after an unexpected socket loss the SDK reconnects with exponential backoff (`MaxReconnectAttempts`, `ReconnectDelay`) and replays the room join, publish/announce and pending views.
 

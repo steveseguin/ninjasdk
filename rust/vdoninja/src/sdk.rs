@@ -519,8 +519,9 @@ impl VdoNinja {
         self.inner.clone().join_room(room, password, claim).await
     }
 
-    /// Forgets the room locally (the protocol has no leave message).
-    pub fn leave_room(&self) {
+    /// Leaves by disconnecting peers and signaling; the server has no leave message.
+    /// Call connect() before joining another room or publishing again.
+    pub async fn leave_room(&self) {
         let room = {
             let mut st = self.inner.st.lock().unwrap();
             st.room_joined = false;
@@ -528,8 +529,7 @@ impl VdoNinja {
             std::mem::take(&mut st.room)
         };
         if !room.is_empty() {
-            // The JavaScript SDK sends this too.
-            self.inner.send_ws(json!({"leave": true}));
+            self.disconnect().await;
             self.inner.emit(Event::RoomLeft { room });
         }
     }
@@ -664,10 +664,7 @@ impl VdoNinja {
             self.inner
                 .send_data_with(
                     json!({"type": "subscribe", "channels": list}),
-                    DataTarget {
-                        allow_fallback: true,
-                        ..Default::default()
-                    },
+                    DataTarget::default(),
                 )
                 .await;
         }
@@ -687,10 +684,7 @@ impl VdoNinja {
             self.inner
                 .send_data_with(
                     json!({"type": "unsubscribe", "channels": list}),
-                    DataTarget {
-                        allow_fallback: true,
-                        ..Default::default()
-                    },
+                    DataTarget::default(),
                 )
                 .await;
         }
@@ -1478,10 +1472,7 @@ impl Inner {
         });
     }
 
-    fn send_ws(&self, mut msg: Value) -> bool {
-        if let Some(id) = &self.opts.client_id {
-            msg["from"] = json!(id);
-        }
+    fn send_ws(&self, msg: Value) -> bool {
         let text = msg.to_string();
         log::debug!("-> WS {}", truncate(&text, 300));
         let tx = self.ws_tx.lock().unwrap().clone();
@@ -1510,7 +1501,7 @@ impl Inner {
         password: Option<&str>,
         claim: bool,
     ) -> Result<()> {
-        let (hashed, room, rx, generation, leave) = {
+        let (hashed, room, rx, generation) = {
             let mut st = self.st.lock().unwrap();
             if !st.connected {
                 return Err(Error::NotConnected);
@@ -1522,14 +1513,11 @@ impl Inner {
             if r.is_empty() {
                 return Err(Error::RoomRequired);
             }
-            let mut leave = false;
             if st.room_joined {
                 if st.room == r {
                     return Ok(());
                 }
-                // Another room: leave the current one and join afresh (one room per socket).
-                leave = true;
-                st.room_joined = false;
+                return Err(Error::AlreadyInRoom);
             }
             if let Some(pw) = password {
                 if !pw.is_empty() {
@@ -1555,11 +1543,8 @@ impl Inner {
             };
             let (tx, rx) = oneshot::channel();
             st.room_waiters.push(tx);
-            (hashed, r, rx, st.generation, leave)
+            (hashed, r, rx, st.generation)
         };
-        if leave {
-            self.send_ws(json!({"leave": true}));
-        }
         let mut msg = json!({"request": "joinroom", "roomid": hashed});
         if claim {
             msg["claim"] = json!(true);
@@ -1960,20 +1945,6 @@ impl Inner {
             if let Some(u) = uuid {
                 self.handle_bye(&u, "hangup", msg.clone()).await;
             }
-        } else if msg.get("pipe").is_some() && msg.get("__fallback").is_some() {
-            let pipe = msg["pipe"].clone();
-            if let Some(t) = pipe.get("type").and_then(|t| t.as_str()) {
-                if t == "subscribe" || t == "unsubscribe" {
-                    self.handle_data_message(&pipe, uuid.clone().unwrap_or_default())
-                        .await;
-                }
-            }
-            self.emit(Event::DataReceived {
-                uuid: uuid.unwrap_or_default(),
-                stream_id: None,
-                data: pipe,
-                fallback: true,
-            });
         }
     }
 
@@ -2058,7 +2029,9 @@ impl Inner {
                     info.uuid = uuid.clone();
                 }
             }
-            st.pending_views.remove(&clean)
+            // Keep preferences until SDP arrives: the server may immediately
+            // wake a waiting viewer before our delayed play retry runs.
+            st.pending_views.get(&clean).cloned()
         };
         if let Some(opts) = pending {
             log::debug!("re-requesting pending stream {clean:?}");
@@ -3419,7 +3392,6 @@ impl Inner {
             if uuid.is_empty() { None } else { Some(uuid) },
             None,
             "any",
-            false,
         )
         .await
     }
@@ -3459,7 +3431,7 @@ impl Inner {
             let mut sent = false;
             for u in uuids {
                 if self
-                    .send_data_internal(msg.clone(), Some(&u), kind, &pref, t.allow_fallback)
+                    .send_data_internal(msg.clone(), Some(&u), kind, &pref)
                     .await
                 {
                     sent = true;
@@ -3467,7 +3439,7 @@ impl Inner {
             }
             return sent;
         }
-        self.send_data_internal(msg, t.uuid.as_deref(), kind, &pref, t.allow_fallback)
+        self.send_data_internal(msg, t.uuid.as_deref(), kind, &pref)
             .await
     }
 
@@ -3477,7 +3449,6 @@ impl Inner {
         uuid: Option<&str>,
         kind: Option<&str>,
         preference: &str,
-        allow_fallback: bool,
     ) -> bool {
         type PeerPair = (String, Option<Arc<Connection>>, Option<Arc<Connection>>);
         let text = msg.to_string();
@@ -3506,22 +3477,6 @@ impl Inner {
                     }
                 }
             }
-        }
-        if sent || !allow_fallback || !self.st.lock().unwrap().connected {
-            return sent;
-        }
-        let Value::Object(map) = msg else {
-            return false;
-        };
-        let targets: Vec<String> = match uuid {
-            Some(u) => vec![u.to_string()],
-            None => pairs.iter().map(|(k, _, _)| k.clone()).collect(),
-        };
-        for target in targets {
-            let mut fallback = map.clone();
-            fallback.insert("__fallback".into(), json!(true));
-            fallback.insert("UUID".into(), json!(target));
-            sent |= self.send_ws(Value::Object(fallback));
         }
         sent
     }
@@ -3616,7 +3571,6 @@ impl Inner {
                         Some(&uuid),
                         None,
                         "any",
-                        false,
                     )
                     .await;
                 });
@@ -4382,4 +4336,78 @@ fn _assert_send_sync() {
     fn check<T: Send + Sync>() {}
     check::<VdoNinja>();
     check::<Event>();
+}
+
+#[cfg(test)]
+mod protocol_tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn stream_notice_preserves_view_preferences() {
+        let sdk = VdoNinja::new(Options::default());
+        sdk.inner.st.lock().unwrap().pending_views.insert(
+            "late".into(),
+            ViewOptions {
+                audio: false,
+                video: false,
+                downloads: false,
+                ..Default::default()
+            },
+        );
+        sdk.inner.handle_video_added(
+            &json!({"streamID": sdk.inner.hashed_stream_id("late"), "UUID": "publisher"}),
+        );
+        {
+            let st = sdk.inner.st.lock().unwrap();
+            let prefs = st
+                .pending_views
+                .get("late")
+                .expect("offer arriving before retry must retain preferences");
+            assert!(!prefs.audio && !prefs.video && !prefs.downloads);
+        }
+        sdk.disconnect().await;
+    }
+
+    #[tokio::test]
+    async fn data_requires_peer_channel() {
+        let sdk = VdoNinja::new(Options {
+            turn: TurnMode::Disabled,
+            stun_servers: vec![],
+            bind_addrs: vec!["127.0.0.1:0".into()],
+            include_loopback: true,
+            ..Default::default()
+        });
+        let (tx, mut wire) = mpsc::unbounded_channel();
+        *sdk.inner.ws_tx.lock().unwrap() = Some(tx);
+        sdk.inner.st.lock().unwrap().connected = true;
+        sdk.inner
+            .create_connection("unopened-peer", "publisher")
+            .await
+            .unwrap();
+        assert!(!sdk.send_data_to("unopened-peer", json!("payload")).await);
+        assert!(!sdk.send_ping("unopened-peer").await);
+        sdk.subscribe(&["updates"]).await;
+        sdk.unsubscribe(&["updates"]).await;
+        assert!(
+            wire.try_recv().is_err(),
+            "application data sent on signaling"
+        );
+
+        let mut events = sdk.events();
+        sdk.inner
+            .clone()
+            .handle_signaling(json!({
+                "UUID": "unopened-peer", "__fallback": true, "pipe": "payload"
+            }))
+            .await;
+        assert!(
+            events.try_recv().is_err(),
+            "application data accepted from signaling"
+        );
+        sdk.disconnect().await;
+        assert!(
+            wire.try_recv().is_err(),
+            "bye sent on signaling without a control channel"
+        );
+    }
 }
