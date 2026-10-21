@@ -2,6 +2,7 @@
 // VDO.Ninja SDK for Swift
 // Copyright (c) 2025-2026 Steve Seguin. SPDX-License-Identifier: MPL-2.0
 import PackageDescription
+import Foundation
 
 let package = Package(
     name: "VDONinja",
@@ -27,7 +28,7 @@ var browserTestTargets: [Target] { [] }
 var webrtcDependencies: [Package.Dependency] { [] }
 var webrtcProduct: [Target.Dependency] { [] }
 #else
-var browserTestTargets: [Target] { [.executableTarget(name: "BrowserPeer", dependencies: ["VDONinja"] + webrtcProduct, path: "Tests/BrowserPeer")] }
+var browserTestTargets: [Target] { ProcessInfo.processInfo.environment["VDON_BROWSER_TEST"] == "1" ? [.executableTarget(name: "BrowserPeer", dependencies: ["VDONinja"] + webrtcProduct, path: "Tests/BrowserPeer")] : [] }
 var webrtcDependencies: [Package.Dependency] { [.package(url: "https://github.com/stasel/WebRTC.git", from: "137.0.0")] }
 var webrtcProduct: [Target.Dependency] { [.product(name: "WebRTC", package: "WebRTC")] }
 #endif

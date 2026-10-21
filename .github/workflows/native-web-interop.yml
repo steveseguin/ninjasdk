@@ -10,15 +10,34 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: '22'
-      - run: swift build --product BrowserPeer
+      - name: Build Swift iOS simulator peer
         working-directory: swift
+        env:
+          VDON_BROWSER_TEST: '1'
+        run: |
+          sdk="$(xcrun --sdk iphonesimulator --show-sdk-path)"
+          triple="$(uname -m)-apple-ios18.0-simulator"
+          swift build --product BrowserPeer --triple "$triple" --sdk "$sdk"
+          binary="$(swift build --show-bin-path --triple "$triple" --sdk "$sdk")/BrowserPeer"
+          echo "VDON_SWIFT_SIMULATOR_BINARY=$binary" >> "$GITHUB_ENV"
+      - name: Boot iOS simulator
+        run: |
+          xcrun simctl list devices available -j > "$RUNNER_TEMP/devices.json"
+          device="$(node -e 'const d=require(process.env.RUNNER_TEMP+"/devices.json"); console.log(Object.values(d.devices).flat().find(v=>v.name.startsWith("iPhone")).udid)')"
+          xcrun simctl boot "$device"
+          xcrun simctl bootstatus "$device" -b
+          echo "VDON_SWIFT_SIMULATOR_DEVICE=$device" >> "$GITHUB_ENV"
       - run: npm ci && npm install --no-save playwright && npx playwright install chromium
       - run: brew install ffmpeg
       - run: node tests/interop/native-av-live.cjs
         env:
           VDO_NATIVE_PORT: swift
+          VDON_SWIFT_BROWSER_PEER: tests/interop/swift-simulator-peer.cjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: swift-web-evidence
           path: ${{ runner.temp }}/ninjasdk-swift-web-*
+      - name: Shut down simulator
+        if: always() && env.VDON_SWIFT_SIMULATOR_DEVICE != ''
+        run: xcrun simctl shutdown "$VDON_SWIFT_SIMULATOR_DEVICE"

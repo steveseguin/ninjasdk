@@ -55,10 +55,10 @@ Feed a test tone using `android-emulator-audio.py --emulator-dir <sdk>/emulator
 emulator microphone injection, not the host microphone. Physical-device capture
 and Flutter mobile capture remain separate checks.
 
-On macOS, run `cd swift && swift build --product BrowserPeer`, then
-`VDO_NATIVE_PORT=swift node tests/interop/native-av-live.cjs` from the repo root.
-The manual **Native SDK live web interoperability** workflow runs this on macOS;
-its synthetic audio device and video frames need no microphone/camera permissions.
+The manual **Native SDK live web interoperability** workflow builds and runs the
+Swift peer in an iOS simulator on macOS. Its synthetic audio device and video
+frames need no microphone/camera permissions. `VDON_BROWSER_TEST=1` enables the
+fixture target; the workflow contains the simulator build/run commands.
 `VDON_PYTHON`, `VDON_GO_BROWSER_PEER`, `VDON_C_BROWSER_PEER`, `VDON_SWIFT_BROWSER_PEER`
 and `VDON_FLUTTER_WEB` override fixture locations. Live tests are opt-in to avoid
 unnecessary hosted signaling traffic.

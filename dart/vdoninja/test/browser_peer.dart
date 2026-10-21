@@ -1,3 +1,4 @@
+// ignore_for_file: avoid_print
 // Test-only peer for tests/interop/native-av-live.cjs.
 import 'dart:async';
 import 'dart:js_interop';
