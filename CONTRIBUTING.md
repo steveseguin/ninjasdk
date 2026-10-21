@@ -35,6 +35,8 @@ npm run build
 3. **Keep PRs focused.** One feature or fix per PR makes review easier.
 
 4. **Include tests if applicable.** The test suite is in `run-all-tests.js`.
+   For ports, wrappers and demos, review the [SDK integration checklist](docs/native-sdks.md#sdk-integration-checklist)
+   and its test criteria for signaling boundaries, password modes, retries and teardown.
 
 5. **Run `npm test` and `npm run build` before submitting** to make sure
    everything passes and the minified output is up to date.

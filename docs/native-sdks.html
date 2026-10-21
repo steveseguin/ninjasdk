@@ -11,7 +11,7 @@
 <link rel="stylesheet" href="../site.css"><link rel="stylesheet" href="guide.css"></head>
 <body><a class="skip-link" href="#content">Skip to content</a>
 <header class="site-header"><div class="site-header-inner"><a class="brand" href="../index.html"><img src="../favicon.svg" alt="" width="26" height="26"><span>VDO.Ninja SDK</span></a><nav class="site-nav" aria-label="Main"><a href="../index.html#try-live">Live demo</a><a href="../index.html#quickstart">Quick start</a><a href="../index.html#sdks">SDKs</a><a href="../demos/">Demos</a><a href="guides.html">Guides</a><a href="api-reference.html">API</a><a href="../index.html#faq">FAQ</a></nav><div class="site-header-actions"><a class="btn btn-secondary btn-sm" href="https://github.com/steveseguin/ninjasdk">GitHub</a></div></div></header>
-<div class="layout"><aside><nav aria-label="On this page"><strong>On this page</strong><a href="#feature-matrix">Feature matrix</a><a href="#protocol-summary">Protocol summary</a><a href="#hosted-service-and-licensing">Hosted service and licensing</a></nav></aside>
+<div class="layout"><aside><nav aria-label="On this page"><strong>On this page</strong><a href="#feature-matrix">Feature matrix</a><a href="#sdk-integration-checklist">SDK integration checklist</a><a href="#password-inputs">Password inputs</a><a href="#hosted-service-and-licensing">Hosted service and licensing</a></nav></aside>
 <main id="content"><h1 id="native-sdks-go-rust-c-python-flutter-android-and-swift">Native SDKs: Go, Rust, C, Python, Flutter, Android and Swift</h1>
 <p>The JavaScript SDK (<code>vdoninja-sdk.js</code>) is the reference implementation of the VDO.Ninja client protocol. This
 repository also ships native SDKs that implement the same protocol on top of established WebRTC engines, so
@@ -81,6 +81,7 @@ and screen capture. Each is split into a protocol core that is unit-tested again
 SDK (<code>spec/generate-vectors.cjs</code>) and every native SDK tests its hashing, encryption and sanitization against it.
 <a href="https://github.com/steveseguin/ninjasdk/blob/main/spec/interop/run_interop.py"><code>spec/interop/run_interop.py</code></a> runs every publisher/viewer language pair, including
 the Node build of the JavaScript SDK, against a local signaling server.</p>
+<p>Review the <a href="native-sdks.html#sdk-integration-checklist">SDK integration checklist</a> before implementing a port, wrapper or demo.</p>
 <h2 id="feature-matrix">Feature matrix</h2>
 <div class="table-scroll" tabindex="0" role="region" aria-label="Comparison table"><table>
 <thead>
@@ -142,7 +143,7 @@ the Node build of the JavaScript SDK, against a local signaling server.</p>
 <td>yes</td>
 </tr>
 <tr>
-<td><code>sendData</code> targeting (uuid, type, preference, signaling fallback)</td>
+<td><code>sendData</code> targeting over peer data channels (uuid, type, preference)</td>
 <td>yes</td>
 <td>yes</td>
 <td>yes</td>
@@ -321,21 +322,6 @@ the Node build of the JavaScript SDK, against a local signaling server.</p>
 </table></div>
 <p>&quot;reconnects&quot; means the engine lacks ICE restart, so a failed connection is torn down and re-requested from the
 publisher instead; the application sees <code>peerDisconnected</code> and <code>connectionFailed</code> followed by a fresh <code>peerConnected</code>.</p>
-<h3 id="connection-lifecycle-all-sdks-as-in-the-javascript-sdk">Connection lifecycle (all SDKs, as in the JavaScript SDK)</h3>
-<ul>
-<li>A peer connection that fails or stays disconnected past the grace period gets one bounded recovery attempt
-(<code>iceRestart</code>: the publisher sends an ICE-restart offer over signaling, a viewer asks the publisher with
-<code>iceRestartRequest</code>). If it is still down after the connection timeout the SDK closes it and emits
-<code>peerDisconnected</code> then <code>connectionFailed</code>; viewers then re-request the stream after 2 s.</li>
-<li><code>bye</code> from a peer closes both directions and, on the viewer side, re-requests the stream after 2 s. <code>hangup</code>
-closes without retrying: the peer ended the session on purpose.</li>
-<li><code>view()</code> of a publisher that is not online yet fails with the SDK's &quot;not yet available&quot; error, keeps the request
-pending (a <code>videoaddedtoroom</code> or <code>someonejoined</code> connects it) and re-sends <code>play</code> every <code>viewRetryInterval</code>
-(15 minutes by default).</li>
-<li><code>disconnect()</code> drops the connection intent (room, publish, views): a later <code>connect()</code> starts clean and an
-unexpected socket drop after it replays nothing. An unexpected drop while connected reconnects with exponential
-backoff and replays room, seed and views; the attempt counter resets on a manual <code>connect()</code>.</li>
-</ul>
 <h3 id="interoperability">Interoperability</h3>
 <p><code>spec/interop/run_interop.py</code> connects every publisher/viewer pair over a local signaling server and exchanges
 data-channel probes and one request/response. All pairs between the JavaScript (Node), Go, C, Rust and Python
@@ -345,37 +331,265 @@ Rust offering, neither side sends the SCTP INIT. Browsers, pion and libdatachann
 every other combination works, including Python publishing to Rust. Use another engine on one side if you need
 that direction. The JavaScript peer in the matrix needs <code>node-datachannel</code> 0.27 or newer (older builds generate
 DTLS certificates that aiortc rejects).</p>
-<h2 id="protocol-summary">Protocol summary</h2>
-<p>The native SDKs implement the routed VDO.Ninja signaling protocol used by <code>wss.vdo.ninja</code> (the &quot;wss2&quot; format).
-Everything below is what the JavaScript SDK does; the native SDKs mirror it so they are indistinguishable to the
-server and to browser peers.</p>
+<h2 id="sdk-integration-checklist">SDK integration checklist</h2>
+<p>VDO.Ninja is designed around serverless, peer-to-peer communication. Keep media and
+application state at the peers; use signaling to establish and recover their connections.
+This checklist covers features implemented by the JavaScript SDK and their native ports.
+It is a review checklist, not a catalogue of VDO.Ninja's advanced APIs.
+The SDK is a basic connector for publishing, receiving and peer communication, not a
+replacement for the VDO.Ninja application. Generic WebRTC capabilities do not expand
+that scope. The rules below describe the intended contract; known implementation
+gaps are called out separately.</p>
+<h3 id="purpose-and-transport-boundaries">Purpose and transport boundaries</h3>
 <ul>
-<li><strong>Sanitization.</strong> Stream IDs: <code>[^A-Za-z0-9_]+</code> runs become <code>_</code>, at most 64 characters, generated (12 random
-alphanumerics) when empty. Rooms: same rule, at most 30 characters. Passwords: trimmed and
-<code>encodeURIComponent</code>-encoded. Labels: line breaks removed, at most 100 characters.</li>
-<li><strong>Hashing.</strong> With a password <code>P</code> and salt <code>S</code> (default <code>vdo.ninja</code>), published stream IDs on the wire are
-<code>streamID + sha256(P+S)[:6]</code> and room IDs are <code>sha256(room+P+S)[:16]</code>. The default password is
-<code>someEncryptionKey123</code>; <code>password: false</code> disables hashing and encryption entirely.</li>
-<li><strong>Encryption.</strong> SDP and ICE candidates are JSON-serialized and encrypted with AES-256-CBC (PKCS#7), key
-<code>sha256(P+S)</code>, random 16-byte IV, both sent as hex (<code>description</code>/<code>candidates</code> plus <code>vector</code>).</li>
-<li><strong>Requests.</strong> <code>joinroom {roomid, claim?, streamID?}</code> → <code>listing {list, director?, claim?}</code>; <code>{leave: true}</code> leaves
-the room; <code>seed {streamID}</code> registers a publisher (one publish per signaling connection; reconnect to change it); <code>play {streamID}</code> asks the server to find the publisher, which receives
-<code>offerSDP {UUID}</code>; room members receive <code>videoaddedtoroom</code> and <code>someonejoined</code>; <code>alert</code>/<code>error</code> carry text.</li>
-<li><strong>Routing.</strong> Any message with a <code>UUID</code> is forwarded to that peer with <code>UUID</code> rewritten to the sender. Offers carry
-<code>{UUID, session (8 chars), streamID (hashed), description, vector}</code>; answers echo <code>session</code> and <code>streamID</code>;
-candidates are <code>{UUID, type: &quot;remote&quot; (viewer → publisher) | &quot;local&quot; (publisher → viewer), candidates, vector, session}</code>, bundled with a 70 ms timer that doubles up to 1 s, and sent over the control channel once it is open.
-<code>bye</code>/<code>hangup</code> end a connection (viewers retry the stream after <code>bye</code>, not after <code>hangup</code>).</li>
-<li><strong>Control channel.</strong> The publisher creates <code>sendChannel</code>. The viewer sends <code>{audio, video, downloads, info:{label}, allowresources}</code>; the publisher sends <code>{info:{label, meta, ...}}</code>. <code>ping</code>/<code>pong</code>, <code>pipe</code>
-(application data), <code>bye</code>, <code>videoMuted</code>, <code>iceRestartRequest</code>, <code>fileList</code>/<code>requestFile</code> and <code>obsState</code> share the
-channel. <code>pipe</code> payloads with <code>type</code> <code>subscribe</code>, <code>unsubscribe</code>, <code>channelMessage</code>, <code>request</code> or <code>response</code>
-implement pub/sub and RPC; everything else is delivered as <code>dataReceived</code>.</li>
-<li><strong>Other channels.</strong> File transfers use a channel labeled with the file ID: a text header
-<code>{type:&quot;filetransfer&quot;, size, filename, id}</code>, 16 KiB binary chunks, then <code>EOF1</code> (complete) or <code>EOF2</code> (cancelled).
-<code>x-</code> labels are reserved for applications (<code>x-bin</code> is the binary lane); <code>resources</code> carries VDO.Ninja overlay
-resources; <code>chunked</code> is VDO.Ninja's own chunked transfer and is reported as unsupported.</li>
-<li><strong>TURN.</strong> <code>GET https://turnservers.vdo.ninja/?ts=…</code> returns <code>{servers:[{username, credential, urls, tz, udp}]}</code>.
-Clients pick the two closest UDP relays and one TCP relay by time-zone distance; a built-in list is the fallback.</li>
+<li><strong>Participate, do not scrape.</strong> Never connect to a room, read <code>listing</code>, then disconnect
+solely to collect a list of users, even as a one-off lookup. Do not wrap that sequence
+in a polling loop or expose it as a room-status endpoint. Discovery events serve an
+actual participating SDK connection; they are not a user-directory API.</li>
+<li><strong>Use the page interfaces for page/room status integrations.</strong> Start with the
+<a href="https://docs.vdo.ninja/advanced-settings/api-and-midi-parameters/api">VDO.Ninja <code>?api</code> option</a>
+and <a href="https://docs.vdo.ninja/guides/iframe-api-documentation">iframe documentation</a>,
+including its <a href="https://docs.vdo.ninja/guides/iframe-api-documentation/iframe-api-basics">connection events</a>.
+These references identify the appropriate integration surface; their command sets
+are outside this SDK checklist.</li>
+<li><strong>Keep the handshake WebSocket for SDK signaling.</strong> No media, files, chat, telemetry,
+presence polling, application RPC, custom greetings or custom goodbye messages.
+A server's ability to route a JSON object does not make that payload appropriate.
+Do not enable an application-data WebSocket fallback when a peer channel is unavailable.</li>
+<li><strong>Keep application messages on peer channels.</strong> Wait for channel readiness and handle
+unavailable peers explicitly. SDK pub/sub and request/response require compatible
+application handlers at the other end; a native VDO.Ninja page is not automatically
+an SDK RPC responder. Do not treat signaling as an application relay or state store.</li>
 </ul>
+<h3 id="message-shape-and-connection-flow">Message shape and connection flow</h3>
+<ul>
+<li><strong>Verify both producer and consumer.</strong> Compare a port with the JS SDK implementation,
+the matching native VDO.Ninja handler and, for signaling, <code>hss/gemini.js</code>. Do not
+invent fields, values, envelopes, channel labels or client identity. Unrecognized
+metadata being ignored by a server is not evidence of compatibility.</li>
+<li><strong>Preserve wire types.</strong> Keep booleans, numbers, strings, objects and arrays as the
+reference expects. Distinguish an absent optional field from <code>null</code>, <code>false</code>, <code>0</code>
+and an empty string. Use the shared sanitization vectors for IDs, rooms and labels;
+keep the full supported signaling URL, including its path and query.</li>
+<li><strong>Establish the data connection before media.</strong> Connect and join the intended room, if any;
+announce the publisher with <code>seed</code>, and request a view with <code>play</code>. The publisher
+handles <code>offerSDP</code> and creates the ordered <code>sendChannel</code> for the initial data-only
+negotiation; the viewer answers. Wait for the channel to open, exchange the native
+<code>info</code> object and media preferences, then negotiate the requested media with the
+publisher retaining offer ownership. Creating a channel object beside media tracks
+in the first offer does not satisfy this ordering. Legacy connections without a
+data channel are outside SDK scope.</li>
+<li><strong>Use the native initial information exchange.</strong> Send the existing <code>info</code> envelope
+over the peer control channel before media setup, with the supported fields and
+types. Optional values may be absent; do not replace the exchange with a custom
+greeting or invent metadata, acknowledgement fields or another handshake protocol.</li>
+<li><strong>Keep the media baseline small.</strong> Target one audio track and one primary video
+track. Stereo channels within one audio track are not multiple audio tracks.
+Accepting an array of tracks does not establish interoperable multiple-audio or
+secondary-screen-share support. Do not advertise the native page's second screen
+track as an SDK feature without an explicit JS SDK contract and matching tests;
+it is outside this checklist's supported baseline.</li>
+<li><strong>Match the peer, direction and session.</strong> Use server-assigned peer UUIDs and the
+negotiated session. Queue early ICE only within bounded limits, apply it after
+matching remote SDP, and discard stale-session candidates. Keep publishing and
+viewing directions separate; retain the requested preferences on replacement.</li>
+<li><strong>Treat discovery as incomplete.</strong> A room listing or stream announcement is not
+proof of an open data channel, playable media, a complete user profile or authorization
+to issue application commands. Do not assume labels or UUIDs are present in every event.</li>
+<li><strong>Use native teardown.</strong> Send <code>{bye:true}</code> over an open peer control channel and
+allow delivery before closing. Do not invent a WebSocket bye fallback or a room
+<code>leave</code> command. Native ports leave by closing their room signaling connection;
+reconnect before joining another room. Cancel pending work and finalize recordings.
+One viewer leaving must not terminate a live publisher or unrelated receiving work.</li>
+</ul>
+<h3 id="passwords-salt-and-encryption">Passwords, salt and encryption</h3>
+<ul>
+<li><strong>Keep default, disabled and literal passwords distinct.</strong> Follow the
+<a href="native-sdks.html#password-inputs">input table below</a>. Omitted/empty SDK passwords select the shared
+default; explicit disable flags turn password protection off. SDK strings <code>&quot;false&quot;</code>,
+<code>&quot;0&quot;</code> and <code>&quot;off&quot;</code> are literal passwords, although those values disable protection
+in ordinary browser password URLs. Never use a generic truthiness conversion.</li>
+<li><strong>Normalize once and use one effective password.</strong> Supply original text to the SDK,
+trim and URI-component encode it once, and use the same effective password and salt
+for stream hashing, room hashing and SDP/ICE encryption. Room joins, retries and
+reconnects must not encode it again. Refresh cached hashes after a supported override.</li>
+<li><strong>Check both encrypted and disabled paths.</strong> With a password, use the reference
+AES-256-CBC format and fresh random IVs in <code>vector</code>. Encryption failure must stop
+the send, never fall back to plaintext. With protection explicitly disabled, send
+plain JSON SDP/ICE without <code>vector</code> and use unhashed stream/room IDs. DTLS-SRTP,
+SCTP over DTLS and WSS still apply; the shared default is not a private secret.</li>
+</ul>
+<h3 id="retries-limits-and-cancellation">Retries, limits and cancellation</h3>
+<ul>
+<li><strong>Let one SDK recovery loop own retries.</strong> Do not add tight <code>connect</code>, <code>joinroom</code>,
+<code>seed</code> or <code>play</code> loops around it. Keep one pending retry per stream and bound queues;
+repeated discovery notifications must not multiply connection attempts or timers.</li>
+<li><strong>Preserve the JS reference pacing.</strong> Signaling reconnects default to five attempts,
+starting at 1 second with exponential backoff capped at 30 seconds. The regular
+unavailable-stream retry interval is 15 minutes. A short retry used by a specific
+recovery path is not permission to poll an absent publisher every few seconds.
+These are client defaults, not server quotas or guaranteed allowances.</li>
+<li><strong>Respect service limits.</strong> Treat throttling, capacity errors and exhausted retries
+as failures to handle, not reasons to increase request frequency. Do not open more
+sockets, rotate identities, reset attempt counters or reconnect repeatedly to bypass
+limits. Server queue/drain constants are not a client request-rate budget. Use local
+servers for burst, outage and load tests; agree higher hosted-service limits separately.</li>
+<li><strong>Cancel before replay.</strong> Explicit disconnect/stop must remove the relevant intent,
+timers and pending waits. Late callbacks must not resurrect it. On an unexpected
+signaling reconnect, replay only current intent in room → publish → view order,
+without duplicate offers, old ICE or re-sanitized passwords. Do not reset healthy
+peer connections merely to refresh discovery information.</li>
+</ul>
+<h3 id="tests-to-require-when-these-paths-change">Tests to require when these paths change</h3>
+<p>These are acceptance criteria, not a claim that every port already has every test.
+Adapt the existing JS regressions and shared vectors; use local fixtures for failures
+and pacing, and a controlled native-browser run for interoperability.</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Comparison table"><table>
+<thead>
+<tr>
+<th>Check</th>
+<th>Required assertion</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>WebSocket boundary</td>
+<td>Capture outbound traffic through setup, use and shutdown; reject unexpected fields/shapes and any application payload, greeting or bye fallback.</td>
+</tr>
+<tr>
+<td>Room-status integration</td>
+<td>Exercise the status/list-users UI or wrapper with a spy/fake SDK; it must not join/list/disconnect or poll handshake rooms to obtain a roster. Review examples for the same anti-pattern.</td>
+</tr>
+<tr>
+<td>Retry pacing</td>
+<td>With fake time and a failing local endpoint, assert delay progression, attempt limits, one timer per stream and no request burst after repeated discovery events.</td>
+</tr>
+<tr>
+<td>Stop/reconnect races</td>
+<td>Disconnect during hashing, room setup, ICE or a retry; late completion must not send, reopen or restore stopped intent.</td>
+</tr>
+<tr>
+<td>Password matrix</td>
+<td>Cover omitted/null/empty/whitespace, disabled, literal keywords, supported numeric/boolean inputs, Unicode/percent text, default/custom/empty salt, joins and reconnects.</td>
+</tr>
+<tr>
+<td>Encryption failures</td>
+<td>Assert no plaintext fallback on encryption failure, no negotiation after a wrong password/salt, and no IV or hashed IDs in disabled mode.</td>
+</tr>
+<tr>
+<td>Native URL parsing</td>
+<td>Feed generated links through VDO.Ninja's parser; preserve keyword literals, prompting/default distinctions, salt and the complete signaling endpoint.</td>
+</tr>
+<tr>
+<td>Data-first handshake</td>
+<td>Assert initial data-only negotiation → open control channel → native <code>info</code>/preferences exchange → media negotiation. Reject early media, missing information exchange and custom greeting/acknowledgement messages.</td>
+</tr>
+<tr>
+<td>SDP/ICE sequencing</td>
+<td>Assert correct offerer/answerer, session/direction matching, early candidate handling and stale candidate rejection.</td>
+</tr>
+<tr>
+<td>Media scope</td>
+<td>Verify one audio track and one primary video track, including audio-only/video-only preferences; do not infer extra-track roles or support from an engine accepting them.</td>
+</tr>
+<tr>
+<td>Real media and teardown</td>
+<td>Verify decoded video and audible audio in both directions, late publisher arrival, viewer close/replacement, retained preferences, native bye and finalized playable recordings.</td>
+</tr>
+</tbody>
+</table></div>
+<p>Existing starting points: <a href="../tests/sdk-review.test.js">JS review tests</a>,
+<a href="../tests/sdk-reconnect-cancellation.test.js">JS cancellation tests</a>,
+<a href="../spec/vectors.json">shared vectors</a>,
+<a href="../python/tests/test_native_protocol_contract.py">native protocol guards</a>,
+<a href="../python/tests/test_reference_server.py">reference-server tests</a>,
+<a href="../tests/interop/native-inputs.test.cjs">native URL tests</a> and
+<a href="../tests/interop/rust-av-live.cjs">Rust/native-browser A/V tests</a>.
+Record which engines, password modes and failure paths actually ran; a local server
+accepting a message or a data channel opening alone does not establish native A/V compatibility.</p>
+<h3 id="known-data-first-implementation-gap">Known data-first implementation gap</h3>
+<p>The current JS SDK <code>_createOffer</code> and Rust SDK <code>create_offer</code> add publisher media
+tracks to the initial offer. They create the control channel first, but do not wait
+for it to open and exchange <code>info</code> before negotiating media. Publisher <code>info</code> is
+also conditional on configured fields. These paths therefore do not yet meet the
+data-first rule above. The existing Rust live test expects media in that first
+offer: its passing result proves A/V interoperability, not this ordering contract.
+Track these as implementation/test gaps, not permitted exceptions or a reason to
+copy the behavior into further ports. This documentation change does not alter
+the JS SDK or claim those gaps have been fixed.</p>
+<h2 id="password-inputs">Password inputs</h2>
+<p>Constructor options and browser URL parameters have different input semantics:</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Comparison table"><table>
+<thead>
+<tr>
+<th>Input</th>
+<th>SDK constructor</th>
+<th>VDO.Ninja URL</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Omitted</td>
+<td>Shared default <code>someEncryptionKey123</code></td>
+<td>Shared site default</td>
+</tr>
+<tr>
+<td>Null / absent optional string</td>
+<td>Shared default</td>
+<td>URLs have no null type</td>
+</tr>
+<tr>
+<td>Empty string</td>
+<td>Shared default</td>
+<td><code>?password=</code> prompts for a password</td>
+</tr>
+<tr>
+<td>Whitespace string</td>
+<td>Shared default after trimming</td>
+<td>Native URL processing trims after testing disable keywords; do not use whitespace to select the default</td>
+</tr>
+<tr>
+<td>Boolean <code>false</code> / explicit no-password option</td>
+<td>No password hashing or SDP/ICE encryption</td>
+<td><code>?password=false</code>, <code>?password=0</code>, <code>?password=off</code>, or <code>?nopassword</code> disables it</td>
+</tr>
+<tr>
+<td>String <code>&quot;false&quot;</code>, <code>&quot;0&quot;</code>, <code>&quot;off&quot;</code></td>
+<td>Literal password; hashing/encryption enabled</td>
+<td>Unescaped values disable it; literal values require escaping described below</td>
+</tr>
+</tbody>
+</table></div>
+<p>Rust, Go, C, Kotlin, Swift and Dart accept typed password strings with a separate
+<code>no_password</code> / <code>NoPassword</code> / <code>noPassword</code> flag. Python accepts <code>password=False</code>.
+JS and Python also accept boolean <code>true</code> and numeric <code>0</code>, coercing them to the
+literal strings <code>&quot;true&quot;</code> and <code>&quot;0&quot;</code>; typed ports should receive those strings.
+Do not coerce a string disable keyword to a boolean in an SDK wrapper.</p>
+<p>The Rust demo emits <code>password=%2566alse</code>, <code>password=%2530</code>, or <code>password=%256Fff</code>
+for those three literal passwords. URL parsing removes one escape level;
+<code>main.js</code> checks disable keywords, then calls <code>decodeURIComponent</code> before
+sanitizing the password. <code>--no-password</code> instead emits <code>password=false</code>.
+The link tests execute these native source branches, including the prompt case.</p>
+<p>Pass original password text into SDK options. It is trimmed and URI-component
+encoded once. Salt is appended to that sanitized value for both hashing and the
+AES key derivation. Omitted/empty salt selects <code>vdo.ninja</code>; a custom salt must
+match on both peers. The shared default still enables encryption, but is public.
+Disabling the password sends plain JSON SDP/ICE without <code>vector</code> and uses raw
+stream/room IDs. WebRTC DTLS-SRTP, SCTP over DTLS, and WSS remain in use.</p>
+<p>Room operations inherit the existing password when no override is provided;
+they must not encode it again. Python <code>None</code> and Rust <code>None</code> mean inherit for
+these operations. Python <code>False</code> disables it; Python/Rust explicit empty strings
+reset the default. C's null password pointer inherits, while an explicit empty
+string resets the default. Go's zero-value <code>JoinOptions.Password</code> means inherit; use
+constructor options to select the desired mode before joining. Mobile ports
+configure password mode on the instance.</p>
+<p><code>spec/vectors.json</code> includes 33 constructor password/salt cases generated by the
+unchanged JS SDK. Every native port consumes those cases in its tests. The optional
+Python reference-server tests additionally route hashed room/stream IDs and
+encrypted or plaintext offers through an unmodified <code>hss/gemini.js</code> process:</p>
+<pre><code class="language-bash">cd python
+VDONINJA_REFERENCE_HOST=ws://127.0.0.1:8443 pytest -q tests/test_reference_server.py
+</code></pre>
 <h2 id="hosted-service-and-licensing">Hosted service and licensing</h2>
 <p>The native SDKs are licensed under MPL-2.0 (examples and WHIP/WHEP helpers under MIT), the same terms as the
 JavaScript SDK core; see <a href="../LICENSING.md">LICENSING.md</a>. The mobile SDKs were written from the JavaScript SDK's

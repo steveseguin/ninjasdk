@@ -27,6 +27,8 @@ SDK (`spec/generate-vectors.cjs`) and every native SDK tests its hashing, encryp
 [`spec/interop/run_interop.py`](https://github.com/steveseguin/ninjasdk/blob/main/spec/interop/run_interop.py) runs every publisher/viewer language pair, including
 the Node build of the JavaScript SDK, against a local signaling server.
 
+Review the [SDK integration checklist](#sdk-integration-checklist) before implementing a port, wrapper or demo.
+
 ## Feature matrix
 
 | Capability | JavaScript | Go | Rust | C | Python | Flutter | Android | Swift |
@@ -35,7 +37,7 @@ the Node build of the JavaScript SDK, against a local signaling server.
 | Stream and room hashing, SDP/ICE encryption, `password: false` | yes | yes | yes | yes | yes | yes | yes | yes |
 | Data-only publishing (`announce`) and viewing | yes | yes | yes | yes | yes | yes | yes | yes |
 | Control channel protocol (prefs, info, ping/pong, bye, videoMuted, obsState) | yes | yes | yes | yes | yes | yes | yes | yes |
-| `sendData` targeting (uuid, type, preference, signaling fallback) | yes | yes | yes | yes | yes | yes | yes | yes |
+| `sendData` targeting over peer data channels (uuid, type, preference) | yes | yes | yes | yes | yes | yes | yes | yes |
 | Pub/sub channels and request/response | yes | yes | yes | yes | yes | yes | yes | yes |
 | Native file transfer (host, list, request, cancel) | yes | yes | yes | yes | yes | no | no | no |
 | Reserved `x-` channels and the `x-bin` binary lane | yes | yes | yes | yes | yes | receive | receive | receive |
@@ -55,21 +57,6 @@ the Node build of the JavaScript SDK, against a local signaling server.
 "reconnects" means the engine lacks ICE restart, so a failed connection is torn down and re-requested from the
 publisher instead; the application sees `peerDisconnected` and `connectionFailed` followed by a fresh `peerConnected`.
 
-### Connection lifecycle (all SDKs, as in the JavaScript SDK)
-
-* A peer connection that fails or stays disconnected past the grace period gets one bounded recovery attempt
-  (`iceRestart`: the publisher sends an ICE-restart offer over signaling, a viewer asks the publisher with
-  `iceRestartRequest`). If it is still down after the connection timeout the SDK closes it and emits
-  `peerDisconnected` then `connectionFailed`; viewers then re-request the stream after 2 s.
-* `bye` from a peer closes both directions and, on the viewer side, re-requests the stream after 2 s. `hangup`
-  closes without retrying: the peer ended the session on purpose.
-* `view()` of a publisher that is not online yet fails with the SDK's "not yet available" error, keeps the request
-  pending (a `videoaddedtoroom` or `someonejoined` connects it) and re-sends `play` every `viewRetryInterval`
-  (15 minutes by default).
-* `disconnect()` drops the connection intent (room, publish, views): a later `connect()` starts clean and an
-  unexpected socket drop after it replays nothing. An unexpected drop while connected reconnects with exponential
-  backoff and replays room, seed and views; the attempt counter resets on a manual `connect()`.
-
 ### Interoperability
 
 `spec/interop/run_interop.py` connects every publisher/viewer pair over a local signaling server and exchanges
@@ -81,43 +68,158 @@ every other combination works, including Python publishing to Rust. Use another 
 that direction. The JavaScript peer in the matrix needs `node-datachannel` 0.27 or newer (older builds generate
 DTLS certificates that aiortc rejects).
 
-## Protocol summary
+## SDK integration checklist
 
-The native SDKs implement the routed VDO.Ninja signaling protocol used by `wss.vdo.ninja` (the "wss2" format).
-The following describes the shared signaling/control flow. Application-level
-helpers are identified separately from messages handled by VDO.Ninja itself.
+VDO.Ninja is designed around serverless, peer-to-peer communication. Keep media and
+application state at the peers; use signaling to establish and recover their connections.
+This checklist covers features implemented by the JavaScript SDK and their native ports.
+It is a review checklist, not a catalogue of VDO.Ninja's advanced APIs.
+The SDK is a basic connector for publishing, receiving and peer communication, not a
+replacement for the VDO.Ninja application. Generic WebRTC capabilities do not expand
+that scope. The rules below describe the intended contract; known implementation
+gaps are called out separately.
 
-* **Sanitization.** Stream IDs: `[^A-Za-z0-9_]+` runs become `_`, at most 64 characters, generated (12 random
-  alphanumerics) when empty. Rooms: same rule, at most 30 characters. Passwords: trimmed and
-  `encodeURIComponent`-encoded. Labels: line breaks removed, at most 100 characters.
-* **Hashing.** With a password `P` and salt `S` (default `vdo.ninja`), published stream IDs on the wire are
-  `streamID + sha256(P+S)[:6]` and room IDs are `sha256(room+P+S)[:16]`. The default password is
-  `someEncryptionKey123`; `password: false` disables identifier hashing and password-layer SDP/ICE encryption.
-* **Encryption.** SDP and ICE candidates are JSON-serialized and encrypted with AES-256-CBC (PKCS#7), key
-  `sha256(P+S)`, random 16-byte IV, both sent as hex (`description`/`candidates` plus `vector`).
-* **Requests.** `joinroom {roomid, claim?, streamID?}` → `listing {list, director?, claim?}`.
-  Leaving disconnects peers and the signaling socket; Gemini has no `leave` request.
-  `seed {streamID}` registers a publisher (one publish per signaling connection; reconnect to change it); `play {streamID}` asks the server to find the publisher, which receives
-  `offerSDP {UUID}`; room members receive `videoaddedtoroom` and `someonejoined`; `alert`/`error` carry text.
-* **Routing.** Any message with a `UUID` is forwarded to that peer with `UUID` rewritten to the sender. Offers carry
-  `{UUID, session (8 chars), streamID (hashed), description, vector}`; answers echo `session` and `streamID`;
-  candidates are `{UUID, type: "remote" (viewer → publisher) | "local" (publisher → viewer), candidates, vector,
-  session}`, bundled with a 70 ms timer that doubles up to 1 s, and sent over the control channel once it is open.
-  `bye`/`hangup` end a connection (viewers retry the stream after `bye`, not after `hangup`).
-* **Control channel.** The publisher creates `sendChannel`. The viewer sends `{audio, video, downloads,
-  info:{label}, allowresources}`; the publisher sends `{info:{label, meta, ...}}`. `ping`/`pong`, `pipe`
-  (application data), `bye`, `videoMuted`, `iceRestartRequest`, `fileList`/`requestFile` and `obsState` share the
-  channel. `pipe` payloads with `type` `subscribe`, `unsubscribe`, `channelMessage`, `request` or `response`
-  implement the JS SDK's application-level pub/sub and RPC protocol. The native
-  VDO.Ninja page forwards `pipe` data to its embedding application; it does not
-  implement those helpers itself. None of these application messages use the
-  signaling WebSocket.
-* **Other channels.** File transfers use a channel labeled with the file ID: a text header
-  `{type:"filetransfer", size, filename, id}`, 16 KiB binary chunks, then `EOF1` (complete) or `EOF2` (cancelled).
-  `x-` labels are reserved for applications (`x-bin` is the binary lane); `resources` carries VDO.Ninja overlay
-  resources; `chunked` is VDO.Ninja's own chunked transfer and is reported as unsupported.
-* **TURN.** `GET https://turnservers.vdo.ninja/?ts=…` returns `{servers:[{username, credential, urls, tz, udp}]}`.
-  Clients pick the two closest UDP relays and one TCP relay by time-zone distance; a built-in list is the fallback.
+### Purpose and transport boundaries
+
+- **Participate, do not scrape.** Never connect to a room, read `listing`, then disconnect
+  solely to collect a list of users, even as a one-off lookup. Do not wrap that sequence
+  in a polling loop or expose it as a room-status endpoint. Discovery events serve an
+  actual participating SDK connection; they are not a user-directory API.
+- **Use the page interfaces for page/room status integrations.** Start with the
+  [VDO.Ninja `?api` option](https://docs.vdo.ninja/advanced-settings/api-and-midi-parameters/api)
+  and [iframe documentation](https://docs.vdo.ninja/guides/iframe-api-documentation),
+  including its [connection events](https://docs.vdo.ninja/guides/iframe-api-documentation/iframe-api-basics).
+  These references identify the appropriate integration surface; their command sets
+  are outside this SDK checklist.
+- **Keep the handshake WebSocket for SDK signaling.** No media, files, chat, telemetry,
+  presence polling, application RPC, custom greetings or custom goodbye messages.
+  A server's ability to route a JSON object does not make that payload appropriate.
+  Do not enable an application-data WebSocket fallback when a peer channel is unavailable.
+- **Keep application messages on peer channels.** Wait for channel readiness and handle
+  unavailable peers explicitly. SDK pub/sub and request/response require compatible
+  application handlers at the other end; a native VDO.Ninja page is not automatically
+  an SDK RPC responder. Do not treat signaling as an application relay or state store.
+
+### Message shape and connection flow
+
+- **Verify both producer and consumer.** Compare a port with the JS SDK implementation,
+  the matching native VDO.Ninja handler and, for signaling, `hss/gemini.js`. Do not
+  invent fields, values, envelopes, channel labels or client identity. Unrecognized
+  metadata being ignored by a server is not evidence of compatibility.
+- **Preserve wire types.** Keep booleans, numbers, strings, objects and arrays as the
+  reference expects. Distinguish an absent optional field from `null`, `false`, `0`
+  and an empty string. Use the shared sanitization vectors for IDs, rooms and labels;
+  keep the full supported signaling URL, including its path and query.
+- **Establish the data connection before media.** Connect and join the intended room, if any;
+  announce the publisher with `seed`, and request a view with `play`. The publisher
+  handles `offerSDP` and creates the ordered `sendChannel` for the initial data-only
+  negotiation; the viewer answers. Wait for the channel to open, exchange the native
+  `info` object and media preferences, then negotiate the requested media with the
+  publisher retaining offer ownership. Creating a channel object beside media tracks
+  in the first offer does not satisfy this ordering. Legacy connections without a
+  data channel are outside SDK scope.
+- **Use the native initial information exchange.** Send the existing `info` envelope
+  over the peer control channel before media setup, with the supported fields and
+  types. Optional values may be absent; do not replace the exchange with a custom
+  greeting or invent metadata, acknowledgement fields or another handshake protocol.
+- **Keep the media baseline small.** Target one audio track and one primary video
+  track. Stereo channels within one audio track are not multiple audio tracks.
+  Accepting an array of tracks does not establish interoperable multiple-audio or
+  secondary-screen-share support. Do not advertise the native page's second screen
+  track as an SDK feature without an explicit JS SDK contract and matching tests;
+  it is outside this checklist's supported baseline.
+- **Match the peer, direction and session.** Use server-assigned peer UUIDs and the
+  negotiated session. Queue early ICE only within bounded limits, apply it after
+  matching remote SDP, and discard stale-session candidates. Keep publishing and
+  viewing directions separate; retain the requested preferences on replacement.
+- **Treat discovery as incomplete.** A room listing or stream announcement is not
+  proof of an open data channel, playable media, a complete user profile or authorization
+  to issue application commands. Do not assume labels or UUIDs are present in every event.
+- **Use native teardown.** Send `{bye:true}` over an open peer control channel and
+  allow delivery before closing. Do not invent a WebSocket bye fallback or a room
+  `leave` command. Native ports leave by closing their room signaling connection;
+  reconnect before joining another room. Cancel pending work and finalize recordings.
+  One viewer leaving must not terminate a live publisher or unrelated receiving work.
+
+### Passwords, salt and encryption
+
+- **Keep default, disabled and literal passwords distinct.** Follow the
+  [input table below](#password-inputs). Omitted/empty SDK passwords select the shared
+  default; explicit disable flags turn password protection off. SDK strings `"false"`,
+  `"0"` and `"off"` are literal passwords, although those values disable protection
+  in ordinary browser password URLs. Never use a generic truthiness conversion.
+- **Normalize once and use one effective password.** Supply original text to the SDK,
+  trim and URI-component encode it once, and use the same effective password and salt
+  for stream hashing, room hashing and SDP/ICE encryption. Room joins, retries and
+  reconnects must not encode it again. Refresh cached hashes after a supported override.
+- **Check both encrypted and disabled paths.** With a password, use the reference
+  AES-256-CBC format and fresh random IVs in `vector`. Encryption failure must stop
+  the send, never fall back to plaintext. With protection explicitly disabled, send
+  plain JSON SDP/ICE without `vector` and use unhashed stream/room IDs. DTLS-SRTP,
+  SCTP over DTLS and WSS still apply; the shared default is not a private secret.
+
+### Retries, limits and cancellation
+
+- **Let one SDK recovery loop own retries.** Do not add tight `connect`, `joinroom`,
+  `seed` or `play` loops around it. Keep one pending retry per stream and bound queues;
+  repeated discovery notifications must not multiply connection attempts or timers.
+- **Preserve the JS reference pacing.** Signaling reconnects default to five attempts,
+  starting at 1 second with exponential backoff capped at 30 seconds. The regular
+  unavailable-stream retry interval is 15 minutes. A short retry used by a specific
+  recovery path is not permission to poll an absent publisher every few seconds.
+  These are client defaults, not server quotas or guaranteed allowances.
+- **Respect service limits.** Treat throttling, capacity errors and exhausted retries
+  as failures to handle, not reasons to increase request frequency. Do not open more
+  sockets, rotate identities, reset attempt counters or reconnect repeatedly to bypass
+  limits. Server queue/drain constants are not a client request-rate budget. Use local
+  servers for burst, outage and load tests; agree higher hosted-service limits separately.
+- **Cancel before replay.** Explicit disconnect/stop must remove the relevant intent,
+  timers and pending waits. Late callbacks must not resurrect it. On an unexpected
+  signaling reconnect, replay only current intent in room → publish → view order,
+  without duplicate offers, old ICE or re-sanitized passwords. Do not reset healthy
+  peer connections merely to refresh discovery information.
+
+### Tests to require when these paths change
+
+These are acceptance criteria, not a claim that every port already has every test.
+Adapt the existing JS regressions and shared vectors; use local fixtures for failures
+and pacing, and a controlled native-browser run for interoperability.
+
+| Check | Required assertion |
+| --- | --- |
+| WebSocket boundary | Capture outbound traffic through setup, use and shutdown; reject unexpected fields/shapes and any application payload, greeting or bye fallback. |
+| Room-status integration | Exercise the status/list-users UI or wrapper with a spy/fake SDK; it must not join/list/disconnect or poll handshake rooms to obtain a roster. Review examples for the same anti-pattern. |
+| Retry pacing | With fake time and a failing local endpoint, assert delay progression, attempt limits, one timer per stream and no request burst after repeated discovery events. |
+| Stop/reconnect races | Disconnect during hashing, room setup, ICE or a retry; late completion must not send, reopen or restore stopped intent. |
+| Password matrix | Cover omitted/null/empty/whitespace, disabled, literal keywords, supported numeric/boolean inputs, Unicode/percent text, default/custom/empty salt, joins and reconnects. |
+| Encryption failures | Assert no plaintext fallback on encryption failure, no negotiation after a wrong password/salt, and no IV or hashed IDs in disabled mode. |
+| Native URL parsing | Feed generated links through VDO.Ninja's parser; preserve keyword literals, prompting/default distinctions, salt and the complete signaling endpoint. |
+| Data-first handshake | Assert initial data-only negotiation → open control channel → native `info`/preferences exchange → media negotiation. Reject early media, missing information exchange and custom greeting/acknowledgement messages. |
+| SDP/ICE sequencing | Assert correct offerer/answerer, session/direction matching, early candidate handling and stale candidate rejection. |
+| Media scope | Verify one audio track and one primary video track, including audio-only/video-only preferences; do not infer extra-track roles or support from an engine accepting them. |
+| Real media and teardown | Verify decoded video and audible audio in both directions, late publisher arrival, viewer close/replacement, retained preferences, native bye and finalized playable recordings. |
+
+Existing starting points: [JS review tests](../tests/sdk-review.test.js),
+[JS cancellation tests](../tests/sdk-reconnect-cancellation.test.js),
+[shared vectors](../spec/vectors.json),
+[native protocol guards](../python/tests/test_native_protocol_contract.py),
+[reference-server tests](../python/tests/test_reference_server.py),
+[native URL tests](../tests/interop/native-inputs.test.cjs) and
+[Rust/native-browser A/V tests](../tests/interop/rust-av-live.cjs).
+Record which engines, password modes and failure paths actually ran; a local server
+accepting a message or a data channel opening alone does not establish native A/V compatibility.
+
+### Known data-first implementation gap
+
+The current JS SDK `_createOffer` and Rust SDK `create_offer` add publisher media
+tracks to the initial offer. They create the control channel first, but do not wait
+for it to open and exchange `info` before negotiating media. Publisher `info` is
+also conditional on configured fields. These paths therefore do not yet meet the
+data-first rule above. The existing Rust live test expects media in that first
+offer: its passing result proves A/V interoperability, not this ordering contract.
+Track these as implementation/test gaps, not permitted exceptions or a reason to
+copy the behavior into further ports. This documentation change does not alter
+the JS SDK or claim those gaps have been fixed.
 
 ## Password inputs
 

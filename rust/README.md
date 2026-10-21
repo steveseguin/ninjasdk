@@ -111,7 +111,11 @@ A/V player or muxer: IVF playback assumes 30 fps with 640×360 header hints;
 the decoder obtains actual dimensions from the bitstream. Other codecs and
 loss-tolerant recording need a suitable media pipeline.
 
-The demo uses the SDK's normal VDO.Ninja handshake, matching the JS SDK:
+The demo currently follows the JS SDK's implementation below. There is a known
+[data-first ordering gap](../docs/native-sdks.md#known-data-first-implementation-gap):
+VDO.Ninja's intended sequence establishes the data connection and exchanges native
+`info`/preferences before negotiating media. The current SDK includes media in its
+initial offer, so successful playback does not prove compliance with that rule.
 
 1. Connect to WSS and announce the publisher (`seed`); a viewer requests `play`.
 2. On `offerSDP`, the publisher creates the ordered `sendChannel` **before**
