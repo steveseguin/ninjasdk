@@ -24,6 +24,45 @@ Artifacts are saved to the printed temporary directory.
 `BROWSER_CHANNEL`, `RUST_AV_BIN`, `VDO_SIGNAL_URL` and `VDO_TEST_URL` override test
 settings. The native page defaults to `https://vdo.ninja/`.
 
+For the other native media peers (test fixtures, not extra SDK APIs):
+
+```bash
+(cd go && go build -o ../build-interop/go-browser-peer ./examples/browser-test)
+VDO_NATIVE_PORT=go node tests/interop/native-av-live.cjs
+pip install -e ./python numpy
+VDO_NATIVE_PORT=python node tests/interop/native-av-live.cjs
+# Build C with VDON_BUILD_TESTS=ON; set VDON_C_BROWSER_PEER if needed.
+VDO_NATIVE_PORT=c node tests/interop/native-av-live.cjs
+bash tests/interop/build-flutter-peer.sh
+VDO_NATIVE_PORT=flutter node tests/interop/native-av-live.cjs
+cargo build --manifest-path rust/Cargo.toml --example browser-data-test
+VDO_NATIVE_PORT=rust-data node tests/interop/native-av-live.cjs
+```
+
+These use unique rooms/streams and explicit `pipe` probes on both peer roles.
+They require decoded A/V, native info/preferences before media, valid signaling
+fields, DTLS/SRTP, and bye. Rust application-data checks complement its A/V test.
+C exposes raw RTP; its test decoder unwraps standard RED packets before FFmpeg.
+Flutter is tested on Chromium; this does not establish mobile platform coverage.
+
+For Android, build the opt-in fixture with
+`cd kotlin && ./gradlew -PbrowserTest :browser-test:assembleDebug`, install its APK
+with `adb install -r -g`, then run `VDO_NATIVE_PORT=kotlin node tests/interop/native-av-live.cjs`.
+The emulator uses `10.0.2.2` for the test proxy. Set `ANDROID_SERIAL` and optionally
+`VDON_ADB`; `VDO_TEST_TIMEOUT_MS=180000` accommodates software emulation.
+Feed a test tone using `android-emulator-audio.py --emulator-dir <sdk>/emulator
+--discovery-file <emulator-discovery.ini>` (requires `grpcio-tools`). This uses
+emulator microphone injection, not the host microphone. Physical-device capture
+and Flutter mobile capture remain separate checks.
+
+On macOS, run `cd swift && swift build --product BrowserPeer`, then
+`VDO_NATIVE_PORT=swift node tests/interop/native-av-live.cjs` from the repo root.
+The manual **Native SDK live web interoperability** workflow runs this on macOS;
+its synthetic audio device and video frames need no microphone/camera permissions.
+`VDON_PYTHON`, `VDON_GO_BROWSER_PEER`, `VDON_C_BROWSER_PEER`, `VDON_SWIFT_BROWSER_PEER`
+and `VDON_FLUTTER_WEB` override fixture locations. Live tests are opt-in to avoid
+unnecessary hosted signaling traffic.
+
 For native URL parsing and local reference-server checks:
 
 ```bash

@@ -139,7 +139,8 @@ async function signalingObserver(password, room, publish, view) {
           const candidates = decrypt(message.candidates, message.vector);
           assert(Array.isArray(candidates) && candidates.length);
           for (const candidate of candidates) {
-            keys(candidate, ['candidate'], ['sdpMid', 'sdpMLineIndex']);
+            // RTCIceCandidate.toJSON() includes this standard field in browsers/Pion.
+            keys(candidate, ['candidate'], ['sdpMid', 'sdpMLineIndex', 'usernameFragment']);
             assert.equal(typeof candidate.candidate, 'string');
           }
         } else if (message.iceRestartRequest === true) {
@@ -164,6 +165,7 @@ async function signalingObserver(password, room, publish, view) {
 // Observe real wire messages without replacing the application's handlers.
 function observe() {
   window.avWire = { ws: [], dc: [], sequence: [] };
+  window.avPeerConnections = [];
   const parse = data => { try { return JSON.parse(data); } catch { return null; } };
   const wsSend = WebSocket.prototype.send;
   WebSocket.prototype.send = function (data) {
@@ -201,6 +203,7 @@ function observe() {
   window.RTCPeerConnection = new Proxy(Original, {
     construct(Type, args) {
       const pc = new Type(...args);
+      avPeerConnections.push(pc);
       pc.addEventListener('datachannel', event => channel(event.channel));
       const create = pc.createDataChannel;
       pc.createDataChannel = function (...args) { const dc = create.apply(this, args); channel(dc); return dc; };
@@ -383,4 +386,5 @@ async function main() {
     await signaling.close();
   }
 }
-main().catch(error => { console.error(error); process.exitCode = 1; });
+module.exports = { observe, stats, until, dataFirst, signalingObserver, nativeControl };
+if (require.main === module) main().catch(error => { console.error(error); process.exitCode = 1; });

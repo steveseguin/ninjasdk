@@ -17,15 +17,17 @@ let package = Package(
         .target(name: "VDONinjaCore", dependencies: []),
         .target(name: "VDONinja", dependencies: ["VDONinjaCore"] + webrtcProduct),
         .testTarget(name: "VDONinjaCoreTests", dependencies: ["VDONinjaCore"]),
-    ]
+    ] + browserTestTargets
 )
 
 // The WebRTC binary package only exists for Apple platforms. On Linux the
 // package still builds (core + tests); the VDONinja target compiles to nothing.
 #if os(Linux)
+var browserTestTargets: [Target] { [] }
 var webrtcDependencies: [Package.Dependency] { [] }
 var webrtcProduct: [Target.Dependency] { [] }
 #else
+var browserTestTargets: [Target] { [.executableTarget(name: "BrowserPeer", dependencies: ["VDONinja"] + webrtcProduct, path: "Tests/BrowserPeer")] }
 var webrtcDependencies: [Package.Dependency] { [.package(url: "https://github.com/stasel/WebRTC.git", from: "137.0.0")] }
 var webrtcProduct: [Target.Dependency] { [.product(name: "WebRTC", package: "WebRTC")] }
 #endif

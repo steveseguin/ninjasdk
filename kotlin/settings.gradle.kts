@@ -29,3 +29,6 @@ if (sdkDir != null && file(sdkDir).exists()) {
 } else {
     logger.lifecycle("ANDROID_HOME not set: skipping :vdoninja-android")
 }
+
+// Opt-in live browser interoperability fixture; excluded from normal SDK builds.
+if (providers.gradleProperty("browserTest").isPresent) include(":browser-test")

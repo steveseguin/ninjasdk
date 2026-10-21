@@ -1,0 +1,24 @@
+name: Native SDK live web interoperability
+on:
+  workflow_dispatch:
+jobs:
+  swift-web:
+    runs-on: macos-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+      - run: swift build --product BrowserPeer
+        working-directory: swift
+      - run: npm ci && npm install --no-save playwright && npx playwright install chromium
+      - run: brew install ffmpeg
+      - run: node tests/interop/native-av-live.cjs
+        env:
+          VDO_NATIVE_PORT: swift
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: swift-web-evidence
+          path: ${{ runner.temp }}/ninjasdk-swift-web-*
