@@ -10,9 +10,20 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/pion/webrtc/v4"
 )
 
 type vectors struct {
+	PasswordModes []struct {
+		Name                                       string
+		RawPassword                                *string
+		NoPassword                                 bool
+		Salt, EffectiveSalt                        string
+		EffectivePassword                          *string
+		Encrypted                                  bool
+		StreamID, Room, HashedStreamID, HashedRoom string
+	}
 	Hash []struct {
 		Input    string `json:"input"`
 		Length   int    `json:"length"`
@@ -45,6 +56,53 @@ type vectors struct {
 	SanitizeRoom     []struct{ Input, Expected string } `json:"sanitizeRoom"`
 	SanitizePassword []struct{ Input, Expected string } `json:"sanitizePassword"`
 	SanitizeLabel    []struct{ Input, Expected string } `json:"sanitizeLabel"`
+}
+
+func TestPasswordModes(t *testing.T) {
+	for _, c := range loadVectors(t).PasswordModes {
+		t.Run(c.Name+"/"+c.Salt, func(t *testing.T) {
+			o := Options{NoPassword: c.NoPassword, Salt: c.Salt, TURN: TURNDisabled}
+			if c.RawPassword != nil {
+				o.Password = *c.RawPassword
+			}
+			s := New(o)
+			password, enabled := s.effectivePassword()
+			if enabled != c.Encrypted || s.salt != c.EffectiveSalt {
+				t.Fatal("password mode/salt mismatch")
+			}
+			if enabled && password != *c.EffectivePassword {
+				t.Fatal("effective password mismatch")
+			}
+			if s.hashedStreamID(c.StreamID) != c.HashedStreamID {
+				t.Fatal("stream hash mismatch")
+			}
+			room := c.Room
+			if enabled {
+				room = HashRoom(room, password, s.salt)
+			}
+			if room != c.HashedRoom {
+				t.Fatal("room hash mismatch")
+			}
+			desc := webrtc.SessionDescription{Type: webrtc.SDPTypeOffer, SDP: "v=0\r\n"}
+			s.sendDescription(&Connection{uuid: "peer", session: "session", streamID: "camera"}, desc, true, true)
+			var wire map[string]any
+			if len(s.queue) != 1 {
+				t.Fatal("missing SDP")
+			}
+			if err := json.Unmarshal(s.queue[0], &wire); err != nil {
+				t.Fatal(err)
+			}
+			_, hasIV := wire["vector"]
+			_, ciphertext := wire["description"].(string)
+			if hasIV != c.Encrypted || ciphertext != c.Encrypted {
+				t.Fatal("wrong SDP encryption mode")
+			}
+			decoded, ok := s.decodeDescription(wire)
+			if !ok || decoded.SDP != desc.SDP {
+				t.Fatal("SDP did not round trip")
+			}
+		})
+	}
 }
 
 func loadVectors(t *testing.T) vectors {

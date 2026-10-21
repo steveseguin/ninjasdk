@@ -22,6 +22,32 @@ final class VectorsTests: XCTestCase {
     func cases(_ key: String) -> [JSON] { Self.vectors[key] as! [JSON] }
     func str(_ c: JSON, _ k: String) -> String { c[k] as! String }
 
+    func testSDKPasswordModes() {
+        for c in cases("passwordModes") {
+            var options = VDONinjaOptions(password: c["rawPassword"] as? String, noPassword: c["noPassword"] as! Bool)
+            options.salt = str(c, "salt")
+            let pw = options.passwordContext()
+            XCTAssertEqual(pw.password, c["effectivePassword"] as? String, str(c, "name"))
+            XCTAssertEqual(pw.enabled, c["encrypted"] as! Bool)
+            XCTAssertEqual(pw.salt, str(c, "effectiveSalt"))
+            XCTAssertEqual(pw.hashStreamId("camera"), str(c, "hashedStreamID"))
+            XCTAssertEqual(pw.hashRoom("room"), str(c, "hashedRoom"))
+            for field in ["description", "candidates"] {
+                let value: Any
+                if field == "description" {
+                    value = ["type": "offer", "sdp": "v=0\r\n"]
+                } else {
+                    value = [JSON]()
+                }
+                var message: JSON = [:]
+                pw.encryptInto(&message, key: field, value: value)
+                XCTAssertEqual(message["vector"] != nil, pw.enabled)
+                XCTAssertEqual(message[field] is String, pw.enabled)
+                XCTAssertNotNil(pw.decodeField(message, key: field))
+            }
+        }
+    }
+
     func testHash() {
         for c in cases("hash") {
             XCTAssertEqual(Crypto.generateHash(str(c, "input"), length: c["length"] as! Int), str(c, "expected"))

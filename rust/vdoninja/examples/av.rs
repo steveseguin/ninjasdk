@@ -44,6 +44,9 @@ struct Args {
     room: Option<String>,
     out: PathBuf,
     host: String,
+    browser_host: Option<String>,
+    salt: String,
+    no_password: bool,
     seconds: Option<u64>,
 }
 
@@ -55,17 +58,26 @@ impl Args {
             room: None,
             out: "received".into(),
             host: Options::default().host,
+            browser_host: None,
+            salt: Options::default().salt,
+            no_password: false,
             seconds: None,
         };
         let mut args = std::env::args().skip(1);
         while let Some(key) = args.next() {
             if key == "--help" || key == "-h" {
-                println!("av [--publish ID] [--view ID] [--room ROOM] [--out DIR] [--host WSS_URL] [--seconds N]\n\
+                println!("av [--publish ID] [--view ID] [--room ROOM] [--out DIR] [--host WS_URL] [--browser-host WSS_URL] [--salt TEXT] [--no-password] [--seconds N]\n\
                     No mode specified: publish a randomly named test stream. Both modes may be combined.\n\
                     Set VDONINJA_PASSWORD to an original, unescaped password (default: SDK shared password).\n\
+                    --no-password disables password hashing and signaling encryption, even if the environment is set.\n\
+                    --browser-host selects a browser-accessible WSS endpoint when --host uses a local WS proxy.\n\
                     Publishing requires ffmpeg with libvpx/libopus. Receiving writes VP8/VP9 IVF and Opus OGG.\n\
                     Ctrl-C / SIGTERM sends bye, closes WebRTC, and finalizes recordings.");
                 return Ok(None);
+            }
+            if key == "--no-password" {
+                result.no_password = true;
+                continue;
             }
             let value = args
                 .next()
@@ -76,6 +88,8 @@ impl Args {
                 "--room" => result.room = Some(sanitize_room(&value)),
                 "--out" => result.out = value.into(),
                 "--host" => result.host = value,
+                "--browser-host" => result.browser_host = Some(value),
+                "--salt" => result.salt = value,
                 "--seconds" => {
                     result.seconds = Some(
                         value
@@ -211,15 +225,30 @@ async fn feed(
             _ = tick.tick() => {
                 match track.write(samples[i].clone(), duration).await {
                     Ok(()) => {},
-                    // webrtc-rs has no track binding until a viewer negotiates
-                    // (and unbinds when it leaves). This is normal for a live source.
-                    Err(Error::WebRtc(message)) if message.lines().all(|line| line == "bind failed") => {},
+                    // A live source outlives individual viewer transports. The
+                    // next viewer binds this track again; keep advancing samples.
+                    Err(ref e) if viewer_teardown(e) => {},
                     Err(e) => return Err(e.into()),
                 }
                 i = (i + 1) % samples.len();
             }
         }
     }
+}
+
+fn viewer_teardown(error: &Error) -> bool {
+    let Error::WebRtc(message) = error else {
+        return false;
+    };
+    // webrtc-rs 0.21 flattens per-packet errors into newline-separated strings.
+    // Its static RTP track reports a closed driver queue as SendError(SenderRtp).
+    // Do not swallow codec, packetization, or other media errors.
+    !message.is_empty()
+        && message.lines().all(|line| {
+            line == "bind failed"
+                || line == "track is not binding yet"
+                || (line.starts_with("SendError(SenderRtp(") && line.ends_with("))"))
+        })
 }
 
 async fn receive(
@@ -305,14 +334,15 @@ async fn receive(
 
 fn browser_url(args: &Args, mode: &str, id: &str, password: Option<&str>) -> Result<String> {
     let mut url = reqwest::Url::parse("https://vdo.ninja/")?;
-    let host = reqwest::Url::parse(&args.host)?;
-    let authority = host.host_str().ok_or("signaling URL needs a host")?;
-    let authority = match host.port() {
-        Some(port) => format!("{authority}:{port}"),
-        None => authority.into(),
-    };
+    let host = reqwest::Url::parse(args.browser_host.as_deref().unwrap_or(&args.host))?;
+    if host.scheme() != "wss" || host.host_str().is_none() {
+        return Err("VDO.Ninja browser links require WSS; use --browser-host wss://… with a local ws:// --host".into());
+    }
     let mut query = url.query_pairs_mut();
-    query.append_pair(mode, id).append_pair("wss2", &authority);
+    query
+        .append_pair(mode, id)
+        .append_pair("wss2", host.as_str());
+    query.append_pair("salt", &args.salt);
     if let Some(room) = &args.room {
         query.append_pair("room", room);
     }
@@ -329,8 +359,16 @@ fn browser_url(args: &Args, mode: &str, id: &str, password: Option<&str>) -> Res
     }
     // VDO.Ninja decodes the parsed query value again; URL serialization supplies
     // the outer escaping. SDK Options.password always receives the original text.
-    if let Some(password) = password {
-        query.append_pair("password", &encode_uri_component(password));
+    if args.no_password {
+        query.append_pair("password", "false");
+    } else if let Some(password) = password.filter(|p| !p.trim().is_empty()) {
+        let mut encoded = encode_uri_component(password.trim());
+        // main.js checks disable keywords BEFORE its extra decodeURIComponent.
+        // Escape their first byte so literal SDK strings stay literal passwords.
+        if matches!(encoded.as_str(), "false" | "0" | "off") {
+            encoded = format!("%{:02X}{}", encoded.as_bytes()[0], &encoded[1..]);
+        }
+        query.append_pair("password", &encoded);
     }
     drop(query);
     Ok(url.to_string())
@@ -453,9 +491,8 @@ async fn main() -> Result<()> {
         return Ok(());
     };
     let password = std::env::var("VDONINJA_PASSWORD").ok();
-    if matches!(password.as_deref(), Some("" | "false" | "0" | "off")) {
-        return Err("VDONINJA_PASSWORD must be nonempty and not a browser password-disable keyword (false, 0, off)".into());
-    }
+    // Validate browser configuration before starting producers or connecting.
+    browser_url(&args, "view", "check", password.as_deref())?;
     let media = if args.publish.is_some() {
         println!("Generating 640x360 VP8 test pattern + 440 Hz Opus tone...");
         println!("Use one WATCH peer at a time (sample-track backend limit).");
@@ -466,7 +503,8 @@ async fn main() -> Result<()> {
     let sdk = VdoNinja::new(Options {
         host: args.host.clone(),
         password: password.clone(),
-        salt: "vdo.ninja".into(),
+        salt: args.salt.clone(),
+        no_password: args.no_password,
         auto_ping_viewer: true,
         ..Default::default()
     });
@@ -500,4 +538,85 @@ async fn main() -> Result<()> {
     }
     println!("STOPPED");
     result
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn args() -> Args {
+        Args {
+            publish: Some("camera".into()),
+            view: None,
+            room: Some("room".into()),
+            out: "received".into(),
+            host: "wss://example.com:8443/signaling?token=abc%26def&route=1".into(),
+            browser_host: None,
+            salt: "custom.example".into(),
+            no_password: false,
+            seconds: None,
+        }
+    }
+
+    #[test]
+    fn links_preserve_signaling_endpoint_and_password_mode() {
+        for mode in ["view", "push"] {
+            for (password, expected) in [
+                (None, None),
+                (Some(""), None),
+                (Some("  "), None),
+                (Some("false"), Some("%66alse")),
+                (Some("0"), Some("%30")),
+                (Some("off"), Some("%6Fff")),
+                (
+                    Some(" café & literal%20 "),
+                    Some("caf%C3%A9%20%26%20literal%2520"),
+                ),
+            ] {
+                let a = args();
+                let url = reqwest::Url::parse(&browser_url(&a, mode, "camera", password).unwrap())
+                    .unwrap();
+                let query: std::collections::HashMap<_, _> =
+                    url.query_pairs().into_owned().collect();
+                assert_eq!(query["wss2"], a.host);
+                assert_eq!(query["salt"], a.salt);
+                assert_eq!(query.get("password").map(String::as_str), expected);
+            }
+        }
+        let mut a = args();
+        a.no_password = true;
+        let url = browser_url(&a, "view", "camera", Some("private")).unwrap();
+        assert!(reqwest::Url::parse(&url)
+            .unwrap()
+            .query_pairs()
+            .any(|(k, v)| k == "password" && v == "false"));
+        a.host = "ws://127.0.0.1:8080/signaling?token=abc".into();
+        assert!(browser_url(&a, "view", "camera", None).is_err());
+        a.browser_host = Some("wss://example.com/signaling?token=abc".into());
+        let url = reqwest::Url::parse(&browser_url(&a, "view", "camera", None).unwrap()).unwrap();
+        assert!(url
+            .query_pairs()
+            .any(|(k, v)| k == "wss2" && v == a.browser_host.as_deref().unwrap()));
+    }
+
+    #[test]
+    fn only_expected_viewer_transport_errors_are_recoverable() {
+        for text in [
+            "bind failed",
+            "track is not binding yet",
+            "SendError(SenderRtp(1, Packet { payload: [] }))",
+            "bind failed\nSendError(SenderRtp(1, Packet { payload: [] }))",
+        ] {
+            assert!(viewer_teardown(&Error::WebRtc(text.into())));
+        }
+        for text in [
+            "",
+            "codec not found",
+            "bind failed\ninvalid packet",
+            "SendError(Other)",
+        ] {
+            assert!(!viewer_teardown(&Error::WebRtc(text.into())));
+        }
+        assert!(!viewer_teardown(&Error::Other("bind failed".into())));
+    }
 }

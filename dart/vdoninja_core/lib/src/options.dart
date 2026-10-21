@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MPL-2.0
 
 import 'protocol.dart';
+import 'sanitize.dart';
 import 'turn.dart';
 
 enum TurnMode { auto, disabled, custom }
@@ -78,9 +79,10 @@ class VdoNinjaOptions {
 
   /// The effective password context.
   PasswordContext passwordContext() {
-    if (noPassword) return PasswordContext(password: null, salt: salt);
-    final p = (password == null || password!.isEmpty) ? defaultPassword : password!;
-    return PasswordContext(password: p, salt: salt);
+    final effectiveSalt = salt.isEmpty ? defaultSalt : salt;
+    if (noPassword) return PasswordContext(password: null, salt: effectiveSalt);
+    final p = sanitizePassword(password ?? '').isEmpty ? defaultPassword : password!;
+    return PasswordContext(password: p, salt: effectiveSalt);
   }
 }
 

@@ -14,6 +14,30 @@ def make(host, **kwargs):
     return VDONinja(host, **kwargs)
 
 
+@pytest.mark.parametrize("override", [None, "", " \t ", False, "false", "0", "off", "café & literal%20"])
+async def test_room_password_override_and_reconnect(signal_host, override):
+    from vdoninja.crypto import hash_room
+    sdk = make(signal_host, password="old %20 password")
+    expected = VDONinja(password="old %20 password" if override is None else override)
+    sent = []
+    send = sdk._send_ws
+    sdk._send_ws = lambda message: sent.append(dict(message)) or send(message)
+    try:
+        await sdk.connect()
+        await sdk.join_room("password_room", password=override)
+        for _ in range(2):
+            pw = expected._effective_password()
+            assert sdk._effective_password() == pw
+            assert sdk.hashed_stream_id("camera") == expected.hashed_stream_id("camera")
+            room = "password_room" if pw is None else hash_room("password_room", pw, sdk.salt)
+            assert [m for m in sent if m.get("request") == "joinroom"][-1]["roomid"] == room
+            await sdk.leave_room()
+            await sdk.connect()
+            await sdk.join_room("password_room")
+    finally:
+        await sdk.disconnect()
+
+
 @pytest.mark.parametrize("media", [False, True])
 async def test_publishing_survives_signaling_reconnect(signal_host, media):
     pub = make(signal_host, reconnect_delay=0.05)

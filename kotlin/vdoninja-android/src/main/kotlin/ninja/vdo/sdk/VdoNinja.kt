@@ -1184,7 +1184,7 @@ class VdoNinja @JvmOverloads constructor(
                 if (!session.isNullOrEmpty()) conn.session = session
                 conn.streamId = clean
                 synchronized(lock) {
-                    if (clean != null) pendingViews[clean]?.let { conn.viewOptions = it }
+                    if (clean != null) (pendingViews[clean] ?: viewIntent[clean])?.let { conn.viewOptions = it }
                     if (!clean.isNullOrEmpty()) streams.getOrPut(clean) { StreamInfo(clean, uuid) }.uuid = uuid
                 }
             } else {

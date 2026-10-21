@@ -186,11 +186,11 @@ func (s *SDK) logf(format string, args ...any) {
 
 // refreshPasswordHash must be called with s.mu held or before the SDK is shared.
 func (s *SDK) refreshPasswordHash() {
-	if s.noPassword {
+	if password, enabled := s.effectivePassword(); enabled {
+		s.passwordHash = StreamHashSuffix(password, s.salt)
+	} else {
 		s.passwordHash = ""
-		return
 	}
-	s.passwordHash = StreamHashSuffix(s.password, s.salt)
 }
 
 // effectivePassword returns the sanitized password or "" and false when encryption is disabled.

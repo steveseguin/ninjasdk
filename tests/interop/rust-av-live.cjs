@@ -12,6 +12,20 @@ const { WebSocket, WebSocketServer } = require('ws');
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const target = process.env.VDO_TEST_URL || 'https://vdo.ninja/';
 const binary = process.env.RUST_AV_BIN || path.resolve(__dirname, '../../rust/target/debug/examples/av');
+const mode = process.env.VDO_PASSWORD_MODE || 'private';
+const encrypted = mode !== 'off';
+const salt = process.env.VDO_TEST_SALT || 'vdo.ninja';
+const upstreamHost = process.env.VDO_SIGNAL_URL || 'wss://wss.vdo.ninja';
+const vectorKeys = encrypted ? ['vector'] : [];
+function checkField(message, field) {
+  if (encrypted) {
+    assert.equal(typeof message[field], 'string');
+    assert.match(message.vector, /^[a-f0-9]{32}$/i);
+  } else {
+    assert.equal(typeof message[field], 'object');
+    assert(!Object.hasOwn(message, 'vector'), 'disabled password still sent an encryption IV');
+  }
+}
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 async function until(check, message, timeout = 60000) {
   const end = Date.now() + timeout;
@@ -39,15 +53,13 @@ function nativeControl({ label, value }) {
   } else if (value.bye === true) {
     keys(value, ['bye']);
   } else if (value.description) {
-    keys(value, ['description', 'vector'], ['session']);
-    assert.equal(typeof value.description, 'string');
-    assert.match(value.vector, /^[a-f0-9]{32}$/i);
+    keys(value, ['description', ...vectorKeys], ['session']);
+    checkField(value, 'description');
   } else if (value.candidates) {
     // Native anysend/anyrequest can retain the target UUID over the channel
     // (native ICE bundling); the receiver knows its peer from the channel.
-    keys(value, ['candidates', 'vector', 'type', 'session'], ['UUID']);
-    assert.equal(typeof value.candidates, 'string');
-    assert.match(value.vector, /^[a-f0-9]{32}$/i);
+    keys(value, ['candidates', 'type', 'session', ...vectorKeys], ['UUID']);
+    checkField(value, 'candidates');
     assert(['local', 'remote'].includes(value.type));
   } else if (Object.hasOwn(value, 'audio')) {
     keys(value, ['audio', 'video', 'downloads']);
@@ -66,9 +78,10 @@ function nativeControl({ label, value }) {
 // the upstream socket still uses TLS to the normal hosted signaling server.
 async function signalingObserver(password, room, publish, view) {
   const sha = text => createHash('sha256').update(text).digest('hex');
-  const phrase = encodeURIComponent(password) + 'vdo.ninja';
+  const phrase = encodeURIComponent(password.trim()) + salt;
   const key = Buffer.from(sha(phrase), 'hex');
   const decrypt = (ciphertext, vector) => {
+    if (!encrypted) { assert.equal(vector, undefined); return ciphertext; }
     assert.equal(typeof ciphertext, 'string');
     assert.match(ciphertext, /^(?:[a-f0-9]{32})+$/i);
     assert.match(vector, /^[a-f0-9]{32}$/i);
@@ -82,7 +95,7 @@ async function signalingObserver(password, room, publish, view) {
   const server = new WebSocketServer({ host: '127.0.0.1', port: 0 });
   await new Promise((resolve, reject) => { server.once('listening', resolve); server.once('error', reject); });
   server.on('connection', local => {
-    const upstream = new WebSocket('wss://wss.vdo.ninja');
+    const upstream = new WebSocket(upstreamHost);
     sockets.add(local); sockets.add(upstream);
     let pending = [];
     upstream.on('open', () => { for (const data of pending) upstream.send(data, { binary: false }); pending = []; });
@@ -96,12 +109,12 @@ async function signalingObserver(password, room, publish, view) {
         const message = JSON.parse(data.toString());
         if (message.request === 'joinroom') {
           keys(message, ['request', 'roomid']);
-          assert.equal(message.roomid, sha(room + phrase).slice(0, 16));
+          assert.equal(message.roomid, encrypted ? sha(room + phrase).slice(0, 16) : room);
         } else if (message.request === 'seed' || message.request === 'play') {
           keys(message, ['request', 'streamID']);
-          assert.equal(message.streamID, (message.request === 'seed' ? publish : view) + sha(phrase).slice(0, 6));
+          assert.equal(message.streamID, (message.request === 'seed' ? publish : view) + (encrypted ? sha(phrase).slice(0, 6) : ''));
         } else if (message.description) {
-          keys(message, ['UUID', 'session', 'description', 'vector'], ['streamID']);
+          keys(message, ['UUID', 'session', 'description', ...vectorKeys], ['streamID']);
           const description = decrypt(message.description, message.vector);
           keys(description, ['type', 'sdp']);
           assert(['offer', 'answer'].includes(description.type));
@@ -112,7 +125,7 @@ async function signalingObserver(password, room, publish, view) {
             assert(description.sdp.includes('m=video ') && description.sdp.includes('m=audio '));
           }
         } else if (message.candidates) {
-          keys(message, ['UUID', 'session', 'type', 'candidates', 'vector']);
+          keys(message, ['UUID', 'session', 'type', 'candidates', ...vectorKeys]);
           assert(['local', 'remote'].includes(message.type));
           const candidates = decrypt(message.candidates, message.vector);
           assert(Array.isArray(candidates) && candidates.length);
@@ -193,12 +206,14 @@ async function stats(page, collection) {
 async function main() {
   const out = fs.mkdtempSync(path.join(os.tmpdir(), 'ninjasdk-rust-av-'));
   const token = 'rs' + Date.now().toString(36);
-  const password = 'Rust café & literal%20secret';
+  const password = mode === 'default' ? 'someEncryptionKey123' : mode.startsWith('literal-') ? mode.slice(8) : 'Rust café & literal%20secret';
   const signaling = await signalingObserver(password, token, token + 'out', token + 'in');
   let log = '';
   let exited = false;
-  const rust = spawn(binary, ['--host', signaling.host, '--publish', token + 'out', '--view', token + 'in', '--room', token, '--out', out], {
-    env: { ...process.env, VDONINJA_PASSWORD: password }, stdio: ['ignore', 'pipe', 'pipe']
+  const env = { ...process.env, VDONINJA_PASSWORD: password };
+  if (mode === 'default') delete env.VDONINJA_PASSWORD;
+  const rust = spawn(binary, ['--host', signaling.host, '--browser-host', upstreamHost, '--salt', salt, ...(encrypted ? [] : ['--no-password']), '--publish', token + 'out', '--view', token + 'in', '--room', token, '--out', out], {
+    env, stdio: ['ignore', 'pipe', 'pipe']
   });
   const capture = data => { log += data; fs.appendFileSync(path.join(out, 'rust.log'), data); };
   rust.stdout.on('data', capture);
@@ -216,11 +231,11 @@ async function main() {
       const printed = new URL(log.match(new RegExp('^' + prefix + ' (https://.*)$', 'm'))[1]);
       const result = new URL(target);
       result.search = printed.search;
-      // Only Rust uses the local wire observer. Browser peers use hosted WSS.
-      result.searchParams.set('wss2', 'wss.vdo.ninja');
+      // Use the printed endpoint verbatim: no rewriting that could hide URL bugs.
+      assert.equal(result.searchParams.get('wss2'), new URL(upstreamHost).href);
       return result.href;
     };
-    const viewer = await browser.newPage();
+    let viewer = await browser.newPage();
     const publisher = await browser.newPage();
     await viewer.addInitScript(observe);
     await publisher.addInitScript(observe);
@@ -241,12 +256,29 @@ async function main() {
       const wire = await page.evaluate(() => avWire);
       const descriptions = wire.ws.filter(v => v.description);
       assert(descriptions.length, 'no SDP on signaling socket');
-      assert(descriptions.every(v => typeof v.description === 'string' && /^[a-f0-9]{32}$/i.test(v.vector)), 'SDP must be encrypted with an IV');
+      descriptions.forEach(v => checkField(v, 'description'));
       const candidates = wire.ws.filter(v => v.candidates);
       assert(candidates.length, 'no ICE on signaling socket');
-      assert(candidates.every(v => typeof v.candidates === 'string' && /^[a-f0-9]{32}$/i.test(v.vector)), 'ICE must be encrypted with an IV');
+      candidates.forEach(v => checkField(v, 'candidates'));
       assert(wire.dc.some(v => v.label === 'sendChannel'), 'native control channel not observed');
     }
+    // The producer must survive a viewer closing while the other direction records.
+    (await viewer.evaluate(() => avWire.dc)).forEach(nativeControl);
+    await viewer.close();
+    const before = log.length;
+    await until(() => {
+      assert(!exited, 'closing the viewer terminated Rust: ' + log);
+      return /RTP video\/vp8 packets=/.test(log.slice(before)) && /RTP audio\/opus packets=/.test(log.slice(before));
+    }, 'receiving stopped when the viewing browser closed', 20000);
+    viewer = await browser.newPage();
+    await viewer.addInitScript(observe);
+    await viewer.goto(url('WATCH'), { waitUntil: 'domcontentloaded' });
+    await until(async () => {
+      assert(!exited, 'Rust exited before the replacement viewer connected');
+      const s = await stats(viewer, 'rpcs');
+      return s.some(v => v.kind === 'video' && v.framesDecoded > 30) &&
+        s.some(v => v.kind === 'audio' && v.totalSamplesReceived > 48000 && v.totalAudioEnergy > 0);
+    }, 'replacement viewer did not receive audio/video');
     const ping = Date.now();
     await viewer.evaluate(ping => {
       const pc = Object.values(session.rpcs).find(pc => pc.receiveChannel?.readyState === 'open');
@@ -277,7 +309,8 @@ async function main() {
         execFileSync('ffmpeg', ['-v', 'error', '-xerror', '-i', path.join(out, file), '-f', 'null', '-'], { stdio: 'pipe' });
       }
     }
-    console.log('PASS: Rust publishes and receives A/V; native signaling only on WebSocket; encrypted SDP/ICE; DTLS/SRTP; native ping/pong and bye on sendChannel; decodable finalized recordings.');
+    console.log('PASS: Rust publishes and receives A/V; native signaling only on WebSocket; password-mode-correct SDP/ICE; viewer replacement; DTLS/SRTP; native ping/pong and bye on sendChannel; decodable finalized recordings.');
+    console.log('Password mode: ' + mode + '; salt: ' + salt);
     console.log('Target: ' + target + '\nArtifacts: ' + out);
   } catch (error) {
     console.error(log);

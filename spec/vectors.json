@@ -303,6 +303,566 @@
       "ciphertextHex": "65f2fd4872b9e760270565efc3955690"
     }
   ],
+  "passwordModes": [
+    {
+      "name": "omitted",
+      "options": {
+        "salt": "vdo.ninja"
+      },
+      "rawPassword": null,
+      "noPassword": false,
+      "salt": "vdo.ninja",
+      "effectiveSalt": "vdo.ninja",
+      "effectivePassword": "someEncryptionKey123",
+      "encrypted": true,
+      "streamID": "camera",
+      "room": "room",
+      "hashedStreamID": "camera808d64",
+      "hashedRoom": "50aab7d004271263"
+    },
+    {
+      "name": "null",
+      "options": {
+        "password": null,
+        "salt": "vdo.ninja"
+      },
+      "rawPassword": null,
+      "noPassword": false,
+      "salt": "vdo.ninja",
+      "effectiveSalt": "vdo.ninja",
+      "effectivePassword": "someEncryptionKey123",
+      "encrypted": true,
+      "streamID": "camera",
+      "room": "room",
+      "hashedStreamID": "camera808d64",
+      "hashedRoom": "50aab7d004271263"
+    },
+    {
+      "name": "empty",
+      "options": {
+        "password": "",
+        "salt": "vdo.ninja"
+      },
+      "rawPassword": "",
+      "noPassword": false,
+      "salt": "vdo.ninja",
+      "effectiveSalt": "vdo.ninja",
+      "effectivePassword": "someEncryptionKey123",
+      "encrypted": true,
+      "streamID": "camera",
+      "room": "room",
+      "hashedStreamID": "camera808d64",
+      "hashedRoom": "50aab7d004271263"
+    },
+    {
+      "name": "whitespace",
+      "options": {
+        "password": " \t\n ",
+        "salt": "vdo.ninja"
+      },
+      "rawPassword": " \t\n ",
+      "noPassword": false,
+      "salt": "vdo.ninja",
+      "effectiveSalt": "vdo.ninja",
+      "effectivePassword": "someEncryptionKey123",
+      "encrypted": true,
+      "streamID": "camera",
+      "room": "room",
+      "hashedStreamID": "camera808d64",
+      "hashedRoom": "50aab7d004271263"
+    },
+    {
+      "name": "disabled",
+      "options": {
+        "password": false,
+        "salt": "vdo.ninja"
+      },
+      "rawPassword": null,
+      "noPassword": true,
+      "salt": "vdo.ninja",
+      "effectiveSalt": "vdo.ninja",
+      "effectivePassword": null,
+      "encrypted": false,
+      "streamID": "camera",
+      "room": "room",
+      "hashedStreamID": "camera",
+      "hashedRoom": "room"
+    },
+    {
+      "name": "literal-false",
+      "options": {
+        "password": "false",
+        "salt": "vdo.ninja"
+      },
+      "rawPassword": "false",
+      "noPassword": false,
+      "salt": "vdo.ninja",
+      "effectiveSalt": "vdo.ninja",
+      "effectivePassword": "false",
+      "encrypted": true,
+      "streamID": "camera",
+      "room": "room",
+      "hashedStreamID": "camerabcefac",
+      "hashedRoom": "3bb7f7fabba0e860"
+    },
+    {
+      "name": "literal-zero",
+      "options": {
+        "password": "0",
+        "salt": "vdo.ninja"
+      },
+      "rawPassword": "0",
+      "noPassword": false,
+      "salt": "vdo.ninja",
+      "effectiveSalt": "vdo.ninja",
+      "effectivePassword": "0",
+      "encrypted": true,
+      "streamID": "camera",
+      "room": "room",
+      "hashedStreamID": "camera0385ca",
+      "hashedRoom": "8700df80ae821046"
+    },
+    {
+      "name": "literal-off",
+      "options": {
+        "password": "off",
+        "salt": "vdo.ninja"
+      },
+      "rawPassword": "off",
+      "noPassword": false,
+      "salt": "vdo.ninja",
+      "effectiveSalt": "vdo.ninja",
+      "effectivePassword": "off",
+      "encrypted": true,
+      "streamID": "camera",
+      "room": "room",
+      "hashedStreamID": "camera48eb64",
+      "hashedRoom": "4942d815961cd7ac"
+    },
+    {
+      "name": "boolean-true",
+      "options": {
+        "password": true,
+        "salt": "vdo.ninja"
+      },
+      "rawPassword": "true",
+      "noPassword": false,
+      "salt": "vdo.ninja",
+      "effectiveSalt": "vdo.ninja",
+      "effectivePassword": "true",
+      "encrypted": true,
+      "streamID": "camera",
+      "room": "room",
+      "hashedStreamID": "camera106b8d",
+      "hashedRoom": "7450bd458762923a"
+    },
+    {
+      "name": "number-zero",
+      "options": {
+        "password": 0,
+        "salt": "vdo.ninja"
+      },
+      "rawPassword": "0",
+      "noPassword": false,
+      "salt": "vdo.ninja",
+      "effectiveSalt": "vdo.ninja",
+      "effectivePassword": "0",
+      "encrypted": true,
+      "streamID": "camera",
+      "room": "room",
+      "hashedStreamID": "camera0385ca",
+      "hashedRoom": "8700df80ae821046"
+    },
+    {
+      "name": "unicode-percent",
+      "options": {
+        "password": " café & literal%20 ",
+        "salt": "vdo.ninja"
+      },
+      "rawPassword": " café & literal%20 ",
+      "noPassword": false,
+      "salt": "vdo.ninja",
+      "effectiveSalt": "vdo.ninja",
+      "effectivePassword": "caf%C3%A9%20%26%20literal%2520",
+      "encrypted": true,
+      "streamID": "camera",
+      "room": "room",
+      "hashedStreamID": "camera7f9a3b",
+      "hashedRoom": "0fb409f7e795f484"
+    },
+    {
+      "name": "omitted",
+      "options": {
+        "salt": "example.com"
+      },
+      "rawPassword": null,
+      "noPassword": false,
+      "salt": "example.com",
+      "effectiveSalt": "example.com",
+      "effectivePassword": "someEncryptionKey123",
+      "encrypted": true,
+      "streamID": "camera",
+      "room": "room",
+      "hashedStreamID": "camerab59479",
+      "hashedRoom": "9469db3527e26bd7"
+    },
+    {
+      "name": "null",
+      "options": {
+        "password": null,
+        "salt": "example.com"
+      },
+      "rawPassword": null,
+      "noPassword": false,
+      "salt": "example.com",
+      "effectiveSalt": "example.com",
+      "effectivePassword": "someEncryptionKey123",
+      "encrypted": true,
+      "streamID": "camera",
+      "room": "room",
+      "hashedStreamID": "camerab59479",
+      "hashedRoom": "9469db3527e26bd7"
+    },
+    {
+      "name": "empty",
+      "options": {
+        "password": "",
+        "salt": "example.com"
+      },
+      "rawPassword": "",
+      "noPassword": false,
+      "salt": "example.com",
+      "effectiveSalt": "example.com",
+      "effectivePassword": "someEncryptionKey123",
+      "encrypted": true,
+      "streamID": "camera",
+      "room": "room",
+      "hashedStreamID": "camerab59479",
+      "hashedRoom": "9469db3527e26bd7"
+    },
+    {
+      "name": "whitespace",
+      "options": {
+        "password": " \t\n ",
+        "salt": "example.com"
+      },
+      "rawPassword": " \t\n ",
+      "noPassword": false,
+      "salt": "example.com",
+      "effectiveSalt": "example.com",
+      "effectivePassword": "someEncryptionKey123",
+      "encrypted": true,
+      "streamID": "camera",
+      "room": "room",
+      "hashedStreamID": "camerab59479",
+      "hashedRoom": "9469db3527e26bd7"
+    },
+    {
+      "name": "disabled",
+      "options": {
+        "password": false,
+        "salt": "example.com"
+      },
+      "rawPassword": null,
+      "noPassword": true,
+      "salt": "example.com",
+      "effectiveSalt": "example.com",
+      "effectivePassword": null,
+      "encrypted": false,
+      "streamID": "camera",
+      "room": "room",
+      "hashedStreamID": "camera",
+      "hashedRoom": "room"
+    },
+    {
+      "name": "literal-false",
+      "options": {
+        "password": "false",
+        "salt": "example.com"
+      },
+      "rawPassword": "false",
+      "noPassword": false,
+      "salt": "example.com",
+      "effectiveSalt": "example.com",
+      "effectivePassword": "false",
+      "encrypted": true,
+      "streamID": "camera",
+      "room": "room",
+      "hashedStreamID": "camera735b11",
+      "hashedRoom": "b0fd48945b019f37"
+    },
+    {
+      "name": "literal-zero",
+      "options": {
+        "password": "0",
+        "salt": "example.com"
+      },
+      "rawPassword": "0",
+      "noPassword": false,
+      "salt": "example.com",
+      "effectiveSalt": "example.com",
+      "effectivePassword": "0",
+      "encrypted": true,
+      "streamID": "camera",
+      "room": "room",
+      "hashedStreamID": "camera57bb18",
+      "hashedRoom": "75778a169eead1af"
+    },
+    {
+      "name": "literal-off",
+      "options": {
+        "password": "off",
+        "salt": "example.com"
+      },
+      "rawPassword": "off",
+      "noPassword": false,
+      "salt": "example.com",
+      "effectiveSalt": "example.com",
+      "effectivePassword": "off",
+      "encrypted": true,
+      "streamID": "camera",
+      "room": "room",
+      "hashedStreamID": "camera086420",
+      "hashedRoom": "dd003c55a5ddfcec"
+    },
+    {
+      "name": "boolean-true",
+      "options": {
+        "password": true,
+        "salt": "example.com"
+      },
+      "rawPassword": "true",
+      "noPassword": false,
+      "salt": "example.com",
+      "effectiveSalt": "example.com",
+      "effectivePassword": "true",
+      "encrypted": true,
+      "streamID": "camera",
+      "room": "room",
+      "hashedStreamID": "camera237d10",
+      "hashedRoom": "b0b32337ddc8a35c"
+    },
+    {
+      "name": "number-zero",
+      "options": {
+        "password": 0,
+        "salt": "example.com"
+      },
+      "rawPassword": "0",
+      "noPassword": false,
+      "salt": "example.com",
+      "effectiveSalt": "example.com",
+      "effectivePassword": "0",
+      "encrypted": true,
+      "streamID": "camera",
+      "room": "room",
+      "hashedStreamID": "camera57bb18",
+      "hashedRoom": "75778a169eead1af"
+    },
+    {
+      "name": "unicode-percent",
+      "options": {
+        "password": " café & literal%20 ",
+        "salt": "example.com"
+      },
+      "rawPassword": " café & literal%20 ",
+      "noPassword": false,
+      "salt": "example.com",
+      "effectiveSalt": "example.com",
+      "effectivePassword": "caf%C3%A9%20%26%20literal%2520",
+      "encrypted": true,
+      "streamID": "camera",
+      "room": "room",
+      "hashedStreamID": "camerac610d3",
+      "hashedRoom": "5b2480b779624bc8"
+    },
+    {
+      "name": "omitted",
+      "options": {
+        "salt": ""
+      },
+      "rawPassword": null,
+      "noPassword": false,
+      "salt": "",
+      "effectiveSalt": "vdo.ninja",
+      "effectivePassword": "someEncryptionKey123",
+      "encrypted": true,
+      "streamID": "camera",
+      "room": "room",
+      "hashedStreamID": "camera808d64",
+      "hashedRoom": "50aab7d004271263"
+    },
+    {
+      "name": "null",
+      "options": {
+        "password": null,
+        "salt": ""
+      },
+      "rawPassword": null,
+      "noPassword": false,
+      "salt": "",
+      "effectiveSalt": "vdo.ninja",
+      "effectivePassword": "someEncryptionKey123",
+      "encrypted": true,
+      "streamID": "camera",
+      "room": "room",
+      "hashedStreamID": "camera808d64",
+      "hashedRoom": "50aab7d004271263"
+    },
+    {
+      "name": "empty",
+      "options": {
+        "password": "",
+        "salt": ""
+      },
+      "rawPassword": "",
+      "noPassword": false,
+      "salt": "",
+      "effectiveSalt": "vdo.ninja",
+      "effectivePassword": "someEncryptionKey123",
+      "encrypted": true,
+      "streamID": "camera",
+      "room": "room",
+      "hashedStreamID": "camera808d64",
+      "hashedRoom": "50aab7d004271263"
+    },
+    {
+      "name": "whitespace",
+      "options": {
+        "password": " \t\n ",
+        "salt": ""
+      },
+      "rawPassword": " \t\n ",
+      "noPassword": false,
+      "salt": "",
+      "effectiveSalt": "vdo.ninja",
+      "effectivePassword": "someEncryptionKey123",
+      "encrypted": true,
+      "streamID": "camera",
+      "room": "room",
+      "hashedStreamID": "camera808d64",
+      "hashedRoom": "50aab7d004271263"
+    },
+    {
+      "name": "disabled",
+      "options": {
+        "password": false,
+        "salt": ""
+      },
+      "rawPassword": null,
+      "noPassword": true,
+      "salt": "",
+      "effectiveSalt": "vdo.ninja",
+      "effectivePassword": null,
+      "encrypted": false,
+      "streamID": "camera",
+      "room": "room",
+      "hashedStreamID": "camera",
+      "hashedRoom": "room"
+    },
+    {
+      "name": "literal-false",
+      "options": {
+        "password": "false",
+        "salt": ""
+      },
+      "rawPassword": "false",
+      "noPassword": false,
+      "salt": "",
+      "effectiveSalt": "vdo.ninja",
+      "effectivePassword": "false",
+      "encrypted": true,
+      "streamID": "camera",
+      "room": "room",
+      "hashedStreamID": "camerabcefac",
+      "hashedRoom": "3bb7f7fabba0e860"
+    },
+    {
+      "name": "literal-zero",
+      "options": {
+        "password": "0",
+        "salt": ""
+      },
+      "rawPassword": "0",
+      "noPassword": false,
+      "salt": "",
+      "effectiveSalt": "vdo.ninja",
+      "effectivePassword": "0",
+      "encrypted": true,
+      "streamID": "camera",
+      "room": "room",
+      "hashedStreamID": "camera0385ca",
+      "hashedRoom": "8700df80ae821046"
+    },
+    {
+      "name": "literal-off",
+      "options": {
+        "password": "off",
+        "salt": ""
+      },
+      "rawPassword": "off",
+      "noPassword": false,
+      "salt": "",
+      "effectiveSalt": "vdo.ninja",
+      "effectivePassword": "off",
+      "encrypted": true,
+      "streamID": "camera",
+      "room": "room",
+      "hashedStreamID": "camera48eb64",
+      "hashedRoom": "4942d815961cd7ac"
+    },
+    {
+      "name": "boolean-true",
+      "options": {
+        "password": true,
+        "salt": ""
+      },
+      "rawPassword": "true",
+      "noPassword": false,
+      "salt": "",
+      "effectiveSalt": "vdo.ninja",
+      "effectivePassword": "true",
+      "encrypted": true,
+      "streamID": "camera",
+      "room": "room",
+      "hashedStreamID": "camera106b8d",
+      "hashedRoom": "7450bd458762923a"
+    },
+    {
+      "name": "number-zero",
+      "options": {
+        "password": 0,
+        "salt": ""
+      },
+      "rawPassword": "0",
+      "noPassword": false,
+      "salt": "",
+      "effectiveSalt": "vdo.ninja",
+      "effectivePassword": "0",
+      "encrypted": true,
+      "streamID": "camera",
+      "room": "room",
+      "hashedStreamID": "camera0385ca",
+      "hashedRoom": "8700df80ae821046"
+    },
+    {
+      "name": "unicode-percent",
+      "options": {
+        "password": " café & literal%20 ",
+        "salt": ""
+      },
+      "rawPassword": " café & literal%20 ",
+      "noPassword": false,
+      "salt": "",
+      "effectiveSalt": "vdo.ninja",
+      "effectivePassword": "caf%C3%A9%20%26%20literal%2520",
+      "encrypted": true,
+      "streamID": "camera",
+      "room": "room",
+      "hashedStreamID": "camera7f9a3b",
+      "hashedRoom": "0fb409f7e795f484"
+    }
+  ],
   "sanitizeStreamID": [
     {
       "input": "mystream",

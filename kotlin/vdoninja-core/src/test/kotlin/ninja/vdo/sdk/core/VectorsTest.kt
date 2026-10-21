@@ -12,6 +12,26 @@ import kotlin.test.assertTrue
 
 /** Conformance against spec/vectors.json (generated from the JavaScript SDK). */
 class VectorsTest {
+    @Test
+    fun sdkPasswordModes() {
+        for (c in cases("passwordModes")) {
+            val pw = VdoNinjaOptions(password = if (c.isNull("rawPassword")) null else c.getString("rawPassword"),
+                noPassword = c.getBoolean("noPassword"), salt = c.getString("salt")).passwordContext()
+            assertEquals(if (c.isNull("effectivePassword")) null else c.getString("effectivePassword"), pw.password, c.getString("name"))
+            assertEquals(c.getBoolean("encrypted"), pw.enabled)
+            assertEquals(c.getString("effectiveSalt"), pw.salt)
+            assertEquals(c.getString("hashedStreamID"), pw.hashStreamId("camera"))
+            assertEquals(c.getString("hashedRoom"), pw.hashRoom("room"))
+            for (field in listOf("description", "candidates")) {
+                val value = if (field == "description") JSONObject().put("type", "offer").put("sdp", "v=0\r\n") else JSONArray()
+                val msg = JSONObject()
+                pw.encryptInto(msg, field, value)
+                assertEquals(pw.enabled, msg.has("vector"))
+                assertEquals(pw.enabled, msg.get(field) is String)
+                assertEquals(value.toString(), pw.decodeField(msg, field).toString())
+            }
+        }
+    }
     private val vectors: JSONObject by lazy {
         val path = System.getProperty("vdon.vectors") ?: "../../spec/vectors.json"
         JSONObject(File(path).readText())

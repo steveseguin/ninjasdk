@@ -431,6 +431,9 @@ func (s *SDK) handleOffer(uuid, session string, msg map[string]any, desc webrtc.
 	havePending := false
 	if c == nil && hasStream {
 		opts, havePending = s.pendingViews[clean]
+		if !havePending {
+			opts, havePending = s.viewIntent[clean]
+		}
 	}
 	s.mu.Unlock()
 

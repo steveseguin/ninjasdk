@@ -49,6 +49,38 @@ func newTestSDK(t *testing.T, host string, extra func(*Options)) *SDK {
 	return s
 }
 
+func TestRoomPasswordOverrideAndReconnect(t *testing.T) {
+	host := startSignal(t)
+	for _, password := range []string{" \t ", "false", "0", "off", "café & literal%20"} {
+		t.Run(password, func(t *testing.T) {
+			s := newTestSDK(t, host, nil)
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			if err := s.Connect(ctx); err != nil {
+				t.Fatal(err)
+			}
+			if err := s.JoinRoom(ctx, "password_room", JoinOptions{Password: password}); err != nil {
+				t.Fatal(err)
+			}
+			expected := New(Options{Password: password, TURN: TURNDisabled})
+			for i := 0; i < 2; i++ {
+				pw, enabled := s.effectivePassword()
+				want, _ := expected.effectivePassword()
+				if !enabled || pw != want || s.hashedStreamID("camera") != expected.hashedStreamID("camera") {
+					t.Fatal("password changed during join/reconnect")
+				}
+				s.LeaveRoom()
+				if err := s.Connect(ctx); err != nil {
+					t.Fatal(err)
+				}
+				if err := s.JoinRoom(ctx, "password_room"); err != nil {
+					t.Fatal(err)
+				}
+			}
+		})
+	}
+}
+
 func waitFor(t *testing.T, ch <-chan Event, timeout time.Duration, what string) Event {
 	t.Helper()
 	select {

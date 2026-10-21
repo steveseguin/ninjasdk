@@ -84,8 +84,13 @@ cargo run --example av -- \
 
 Use unique stream/room names. With no arguments the demo generates a random
 publish ID. `--seconds 30` stops automatically; `--host wss://…` selects a
-different signaling server. The printed browser URLs include matching signaling,
-room, codec and password settings (and therefore contain the password when set).
+different signaling server, preserving its path and query in the browser link.
+`--salt custom.example` sets the matching hash/encryption salt on both ends.
+`--no-password` explicitly disables password hashing and SDP/ICE encryption.
+For a local `ws://` observer, set `--browser-host wss://…` to its browser-accessible
+upstream endpoint; VDO.Ninja's `wss2` parser expects WSS.
+The printed URLs include matching signaling, room, salt, codec and password
+settings (and therefore contain the password when set).
 If the browser publisher starts later, the demo keeps its view request pending
 and retries. Allow camera/microphone access in the browser; click the page if
 autoplay needs a gesture.
@@ -95,7 +100,8 @@ one binding; attaching it to another peer redirects its output. The generated
 browser publisher link includes an empty `view` parameter so it does not subscribe to
 the Rust stream automatically when joining the room. Open the separate WATCH
 link to receive the Rust stream. Multi-viewer sample-track fan-out is not
-implemented by this example.
+implemented by this example. Closing the viewer leaves the producer and any
+simultaneous recording running; a replacement viewer can connect.
 
 Incoming Opus is saved as OGG, and VP8/VP9 as IVF, with separate filenames for
 each track/reconnection. The example requests periodic keyframes and reports
@@ -111,9 +117,10 @@ The demo uses the SDK's normal VDO.Ninja handshake, matching the JS SDK:
 2. On `offerSDP`, the publisher creates the ordered `sendChannel` **before**
    creating its SDP offer. The Rust publisher includes its media tracks in that
    offer, as the JS SDK does.
-3. Exchange encrypted SDP and trickled ICE with the peer UUID/session. The viewer
+3. Exchange SDP and trickled ICE with the peer UUID/session, encrypted unless
+   `--no-password` is set. The viewer
    answers the publisher; it does not create a competing offer or control channel.
-4. Once `sendChannel` opens, the viewer sends `{audio:true, video:true}`.
+4. Once `sendChannel` opens, the viewer sends `{audio:true, video:true, downloads:false}`.
    Native VDO.Ninja publishers can then add media through a subsequent offer
    over that channel. This demo uses only native control messages (including
    ping/pong); it sends no custom application payloads or metadata.
@@ -122,10 +129,13 @@ The demo uses the SDK's normal VDO.Ninja handshake, matching the JS SDK:
    closing WebRTC/signaling, then joins recording tasks and finalizes their files.
 
 Passwords use the existing VDO.Ninja AES-256-CBC SDP/ICE protocol with random IVs
-and the `vdo.ninja` salt. Media uses DTLS-SRTP and data channels use SCTP over
+and the selected salt (default `vdo.ninja`). Media uses DTLS-SRTP and data channels use SCTP over
 DTLS; WSS protects the signaling transport. This does not enable the browser's
 optional insertable-stream media encryption. Omitting `VDONINJA_PASSWORD` uses
-the SDK's shared default password, not a private secret.
+the SDK's shared default password, not a private secret. Empty/whitespace-only
+values also select that default. Environment values `false`, `0` and `off` are
+literal passwords; the generated URLs escape them so the browser does not
+interpret them as disable keywords. See the [password input table](../docs/native-sdks.md#password-inputs).
 
 For a real-browser interoperability check (requires Playwright/Chromium and
 FFmpeg), run from the repository root:
@@ -144,7 +154,15 @@ Rust outbound message against the existing JS SDK signaling shapes before
 forwarding its unchanged bytes to the hosted WSS server. It also decrypts and
 validates SDP/ICE and checks that an initial offer follows `offerSDP` and includes
 the control channel. Media, ping/pong, media preferences and bye never use the
-signaling socket in this test. `VDO_TEST_URL` selects another native VDO.Ninja build.
+signaling socket in this test. It closes and replaces the viewer while receiving
+continues. `VDO_PASSWORD_MODE=off`, `default`, `literal-false`, `literal-0`, or
+`literal-off` selects other password cases; `VDO_TEST_SALT` selects a custom salt.
+`VDO_TEST_URL` selects another native VDO.Ninja build and `VDO_SIGNAL_URL` its
+signaling endpoint. The printed `wss2` parameter is checked without rewriting it.
+
+`node --test tests/interop/native-inputs.test.cjs` (from the repository root)
+also checks generated URLs against the actual input branches in the sibling
+VDO.Ninja `main.js`/`lib.js`. Set `VDO_SOURCE` if that checkout is elsewhere.
 
 `vdoninja::media::SampleTrack` wraps a webrtc-rs `TrackLocalStaticSample` with the codec's SSRC and payload type so encoded frames (VP8/VP9/H264/AV1/Opus) can be written with one call. Any `Arc<dyn TrackLocal>` works too, for example `TrackLocalStaticRTP` to forward RTP from GStreamer or FFmpeg.
 

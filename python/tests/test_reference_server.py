@@ -49,3 +49,37 @@ async def test_reference_room_leave(monkeypatch):
         assert sdk.room_joined
     finally:
         await sdk.disconnect()
+
+
+@pytest.mark.skipif(not os.environ.get("VDONINJA_REFERENCE_HOST"), reason="reference server not configured")
+async def test_reference_password_routing_and_sdp():
+    from pathlib import Path
+    vectors = json.loads((Path(__file__).resolve().parents[2] / "spec/vectors.json").read_text())
+    host = os.environ["VDONINJA_REFERENCE_HOST"]
+    for case in vectors["passwordModes"]:
+        sdk = VDONinja(host, **case["options"], turn=False, stun_servers=[])
+        try:
+            await sdk.connect()
+            await sdk.join_room(case["room"])
+            await sdk.announce(case["streamID"])
+            async with websockets.connect(host) as peer:
+                await peer.send(json.dumps({"request": "joinroom", "roomid": case["hashedRoom"]}))
+                listing = json.loads(await asyncio.wait_for(peer.recv(), 5))
+                assert listing["request"] == "listing", case
+                await peer.send(json.dumps({"request": "play", "streamID": case["hashedStreamID"]}))
+                async def receive_offer():
+                    while True:
+                        message = json.loads(await peer.recv())
+                        if "description" in message:
+                            return message
+                offer = await asyncio.wait_for(receive_offer(), 10)
+                if case["encrypted"]:
+                    assert isinstance(offer["description"], str)
+                    desc = sdk._decrypt(offer["description"], offer["vector"])
+                else:
+                    assert "vector" not in offer
+                    desc = offer["description"]
+                assert desc["type"] == "offer"
+                assert "m=application" in desc["sdp"]
+        finally:
+            await sdk.disconnect()

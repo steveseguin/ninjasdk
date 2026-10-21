@@ -412,12 +412,21 @@ impl VdoNinja {
         let (password, no_password) = if opts.no_password {
             (String::new(), true)
         } else {
+            let password = sanitize_password(opts.password.as_deref().unwrap_or(DEFAULT_PASSWORD));
             (
-                sanitize_password(opts.password.as_deref().unwrap_or(DEFAULT_PASSWORD)),
+                if password.is_empty() {
+                    DEFAULT_PASSWORD.into()
+                } else {
+                    password
+                },
                 false,
             )
         };
-        let salt = opts.salt.clone();
+        let salt = if opts.salt.is_empty() {
+            vdoninja_core::DEFAULT_SALT.into()
+        } else {
+            opts.salt.clone()
+        };
         let password_hash = if no_password {
             String::new()
         } else {
@@ -1520,12 +1529,13 @@ impl Inner {
                 return Err(Error::AlreadyInRoom);
             }
             if let Some(pw) = password {
-                if !pw.is_empty() {
-                    st.password = sanitize_password(pw);
-                    st.no_password = false;
-                    let salt = st.salt.clone();
-                    st.password_hash = stream_hash_suffix(&st.password, &salt);
+                st.password = sanitize_password(pw);
+                if st.password.is_empty() {
+                    st.password = DEFAULT_PASSWORD.into();
                 }
+                st.no_password = false;
+                let salt = st.salt.clone();
+                st.password_hash = stream_hash_suffix(&st.password, &salt);
             }
             st.intent_room = Some(RoomIntent {
                 room: r.clone(),
@@ -2446,9 +2456,13 @@ impl Inner {
                 c
             }
             None => {
-                let opts = clean
-                    .as_ref()
-                    .and_then(|s| self.st.lock().unwrap().pending_views.get(s).cloned());
+                let opts = clean.as_ref().and_then(|s| {
+                    let st = self.st.lock().unwrap();
+                    st.pending_views
+                        .get(s)
+                        .or_else(|| st.view_intent.get(s))
+                        .cloned()
+                });
                 let c = match self.create_connection(uuid, "viewer").await {
                     Ok(c) => c,
                     Err(e) => {
@@ -4341,6 +4355,144 @@ fn _assert_send_sync() {
 #[cfg(test)]
 mod protocol_tests {
     use super::*;
+
+    #[tokio::test]
+    async fn password_modes_match_javascript() {
+        let vectors: Value =
+            serde_json::from_str(include_str!("../../../spec/vectors.json")).unwrap();
+        for c in vectors["passwordModes"].as_array().unwrap() {
+            let sdk = VdoNinja::new(Options {
+                password: c["rawPassword"].as_str().map(String::from),
+                no_password: c["noPassword"].as_bool().unwrap(),
+                salt: c["salt"].as_str().unwrap().into(),
+                turn: TurnMode::Disabled,
+                ..Default::default()
+            });
+            assert_eq!(
+                sdk.inner.effective_password().as_deref(),
+                c["effectivePassword"].as_str(),
+                "{c}"
+            );
+            assert_eq!(
+                sdk.inner.hashed_stream_id("camera"),
+                c["hashedStreamID"].as_str().unwrap(),
+                "{c}"
+            );
+            let st = sdk.inner.st.lock().unwrap();
+            assert_eq!(st.salt, c["effectiveSalt"].as_str().unwrap());
+            let room = if st.no_password {
+                "room".into()
+            } else {
+                hash_room("room", &st.password, &st.salt)
+            };
+            assert_eq!(room, c["hashedRoom"].as_str().unwrap());
+            drop(st);
+            let value = json!({"type":"offer", "sdp":"v=0\r\n"});
+            if c["encrypted"].as_bool().unwrap() {
+                let (ct, iv) = sdk.inner.encrypt(&value).unwrap();
+                assert_eq!(sdk.inner.decrypt(&ct, &iv).unwrap(), value);
+            } else {
+                assert!(matches!(
+                    sdk.inner.encrypt(&value),
+                    Err(Error::EncryptionDisabled)
+                ));
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn room_password_override_and_reconnect() {
+        let server = crate::signalserver::SignalServer::bind("127.0.0.1:0")
+            .await
+            .unwrap();
+        for password in ["", " \t ", "false", "0", "off", "café & literal%20"] {
+            let sdk = VdoNinja::new(Options {
+                host: server.url(),
+                password: Some("old %20 password".into()),
+                turn: TurnMode::Disabled,
+                ..Default::default()
+            });
+            let expected = VdoNinja::new(Options {
+                password: Some(password.into()),
+                ..Default::default()
+            });
+            sdk.connect().await.unwrap();
+            sdk.join_room_with("password_room", Some(password), false)
+                .await
+                .unwrap();
+            for _ in 0..2 {
+                assert_eq!(
+                    sdk.inner.effective_password(),
+                    expected.inner.effective_password()
+                );
+                assert_eq!(
+                    sdk.inner.hashed_stream_id("camera"),
+                    expected.inner.hashed_stream_id("camera")
+                );
+                sdk.leave_room().await;
+                sdk.connect().await.unwrap();
+                sdk.join_room("password_room").await.unwrap();
+            }
+            sdk.disconnect().await;
+        }
+    }
+
+    #[tokio::test]
+    async fn replacement_offer_preserves_view_preferences() {
+        let sdk = VdoNinja::new(Options {
+            turn: TurnMode::Disabled,
+            stun_servers: vec![],
+            bind_addrs: vec!["127.0.0.1:0".into()],
+            include_loopback: true,
+            ..Default::default()
+        });
+        // An established view has already consumed pending_views. A new
+        // publisher session must still use the original requested preferences.
+        sdk.inner.st.lock().unwrap().view_intent.insert(
+            "camera".into(),
+            ViewOptions {
+                audio: false,
+                video: false,
+                downloads: false,
+                ..Default::default()
+            },
+        );
+        let old = sdk
+            .inner
+            .create_connection("publisher", "viewer")
+            .await
+            .unwrap();
+        old.cs.lock().unwrap().session = Some("previous".into());
+        let source = sdk
+            .inner
+            .create_connection("offer-source", "publisher")
+            .await
+            .unwrap();
+        let offer = source.pc.create_offer(None).await.unwrap();
+        sdk.inner
+            .handle_offer(
+                "publisher",
+                Some("replaced".into()),
+                &json!({"streamID": sdk.inner.hashed_stream_id("camera")}),
+                SessionDescription {
+                    kind: "offer".into(),
+                    sdp: offer.sdp,
+                },
+                None,
+            )
+            .await;
+        let replacement = sdk
+            .inner
+            .find_connection("publisher", Some("viewer"))
+            .unwrap();
+        assert!(!Arc::ptr_eq(&old, &replacement));
+        assert!(replacement.remote_set.load(Ordering::Acquire));
+        {
+            let cs = replacement.cs.lock().unwrap();
+            assert!(!cs.view_options.audio && !cs.view_options.video && !cs.view_options.downloads);
+        }
+        sdk.disconnect().await;
+    }
 
     #[tokio::test]
     async fn stream_notice_preserves_view_preferences() {

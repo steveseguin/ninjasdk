@@ -1128,7 +1128,7 @@ class VdoNinja {
         c = await _createConnection(uuid, 'viewer');
         if (session != null && session.isNotEmpty) c.session = session;
         c.streamId = clean;
-        if (clean != null && _pendingViews.containsKey(clean)) c.viewOptions = _pendingViews[clean]!;
+        if (clean != null) c.viewOptions = _pendingViews[clean] ?? _viewIntent[clean] ?? c.viewOptions;
         if (clean != null && clean.isNotEmpty) _streams.putIfAbsent(clean, () => StreamInfo(clean)).uuid = uuid;
       } else {
         if (session != null && session.isNotEmpty) c.session = session;

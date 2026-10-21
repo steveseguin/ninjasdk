@@ -1646,6 +1646,10 @@ static void handle_offer(vdon_sdk *s, const char *uuid, const char *session, cJS
             for (pv = s->pending_views; pv; pv = pv->next)
                 if (strcmp(pv->sid, clean) == 0)
                     break;
+        if (!pv && clean)
+            for (pv = s->view_intent; pv; pv = pv->next)
+                if (strcmp(pv->sid, clean) == 0)
+                    break;
         if (pv) {
             c->vopts = pv->opts;
             free(c->vlabel);
@@ -2390,9 +2394,10 @@ int vdon_join_room(vdon_sdk *s, const char *room, const char *password, int clai
     pthread_mutex_lock(&s->lock);
     if (password) {
         vdon_sanitize_password(password, pw, sizeof(pw));
+        if (!pw[0]) strcpy(pw, VDON_DEFAULT_PASSWORD);
         free(s->password);
         s->password = vdon_strdup(pw);
-        s->has_password = pw[0] != 0;
+        s->has_password = 1;
         refresh_password(s);
     }
     if (s->has_password) {
@@ -2960,7 +2965,7 @@ vdon_sdk *vdon_create(const vdon_options *opts, vdon_event_callback cb, void *us
     s->o.host = vdon_strdup(opts->host ? opts->host : VDON_DEFAULT_HOST);
     s->o.room = vdon_strdup(opts->room);
     s->o.password = vdon_strdup(opts->password);
-    s->o.salt = vdon_strdup(opts->salt ? opts->salt : VDON_DEFAULT_SALT);
+    s->o.salt = vdon_strdup(opts->salt && *opts->salt ? opts->salt : VDON_DEFAULT_SALT);
     s->o.label = vdon_strdup(opts->label);
     s->o.meta_json = vdon_strdup(opts->meta_json);
     s->o.bind_address = vdon_strdup(opts->bind_address);
@@ -2997,8 +3002,9 @@ vdon_sdk *vdon_create(const vdon_options *opts, vdon_event_callback cb, void *us
         s->password = vdon_strdup("");
     } else {
         vdon_sanitize_password(opts->password && *opts->password ? opts->password : VDON_DEFAULT_PASSWORD, pw, sizeof(pw));
+        if (!pw[0]) strcpy(pw, VDON_DEFAULT_PASSWORD);
         s->password = vdon_strdup(pw);
-        s->has_password = pw[0] != 0;
+        s->has_password = 1;
     }
     refresh_password(s);
     s->publisher_info = cJSON_CreateObject();

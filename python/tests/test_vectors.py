@@ -67,3 +67,30 @@ def test_link_header_parsing():
 
     servers = parse_ice_servers_from_link('<stun:stun.example.com>; rel="ice-server", <turn:turn.example.com:3478?transport=udp>; rel="ice-server"; username="u"; credential="c"')
     assert len(servers) == 2 and servers[1].username == "u" and servers[1].credential == "c"
+
+
+def test_sdk_password_modes_match_javascript():
+    from types import SimpleNamespace
+    from aiortc import RTCSessionDescription
+    from vdoninja import VDONinja
+
+    for case in load()["passwordModes"]:
+        sdk = VDONinja(**case["options"], turn=False, stun_servers=[])
+        assert sdk.salt == case["effectiveSalt"], case["name"]
+        assert sdk._effective_password() == case["effectivePassword"], case["name"]
+        assert sdk.hashed_stream_id(case["streamID"]) == case["hashedStreamID"]
+        pw = sdk._effective_password()
+        room = case["room"] if pw is None else crypto.hash_room(case["room"], pw, sdk.salt)
+        assert room == case["hashedRoom"]
+        sent = []
+        sdk._send_ws = lambda message: sent.append(message) or True
+        conn = SimpleNamespace(uuid="peer", session="session", stream_id="camera", control_open=False)
+        desc = RTCSessionDescription(sdp="v=0\r\n", type="offer")
+        sdk._send_description(conn, desc, True)
+        message = sent[0]
+        if case["encrypted"]:
+            assert isinstance(message["description"], str)
+            assert sdk._decrypt(message["description"], message["vector"]) == {"type": "offer", "sdp": desc.sdp}
+        else:
+            assert message["description"] == {"type": "offer", "sdp": desc.sdp}
+            assert "vector" not in message

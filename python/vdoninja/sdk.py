@@ -269,13 +269,13 @@ class VDONinja:
         :param stun_servers: STUN URLs; ``[]`` disables STUN.
         """
         self.host = host
-        self.salt = salt
+        self.salt = salt or DEFAULT_SALT
         self.room: str = sanitize_room(room) if room else ""
         self.no_password = password is False
         if password is False or password is None or password == "":
             self.password = "" if password is False else sanitize_password(DEFAULT_PASSWORD)
         else:
-            self.password = sanitize_password(str(password))
+            self.password = sanitize_password("true" if password is True else str(password))
         self.turn = turn
         self.turn_url = turn_url
         self.turn_cache_ttl = turn_cache_ttl
@@ -644,8 +644,10 @@ class VDONinja:
 
     # ----------------------------------------------------------------- rooms
 
-    async def join_room(self, room: Optional[str] = None, password: Optional[str] = None, claim: bool = False, timeout: float = 10.0) -> None:
-        """Join a room (hashed with password and salt) and wait for the listing."""
+    async def join_room(self, room: Optional[str] = None, password: Union[str, bool, None] = None, claim: bool = False, timeout: float = 10.0) -> None:
+        """Join and wait for the listing. None inherits the instance password;
+        False disables it; empty/whitespace strings reset the shared default.
+        """
         if not self._connected:
             raise VDONinjaError("not connected to signaling server")
         if self.room_joined:
@@ -655,9 +657,9 @@ class VDONinja:
         room = sanitize_room(room) or self.room
         if not room:
             raise VDONinjaError("room name is required")
-        if password:
-            self.password = sanitize_password(password)
-            self.no_password = False
+        if password is not None:
+            self.no_password = password is False
+            self.password = "" if self.no_password else sanitize_password("true" if password is True else str(password))
         self._intent_room = {"room": room, "claim": claim}
         pw = self._effective_password()
         hashed = hash_room(room, pw, self.salt) if pw is not None else room
@@ -692,11 +694,11 @@ class VDONinja:
 
     # ------------------------------------------------------------ publishing
 
-    async def announce(self, stream_id: Optional[str] = None, *, room: Optional[str] = None, password: Optional[str] = None, label: str = "", meta: Any = None, order: str = "", info: Optional[Dict[str, Any]] = None) -> str:
+    async def announce(self, stream_id: Optional[str] = None, *, room: Optional[str] = None, password: Union[str, bool, None] = None, label: str = "", meta: Any = None, order: str = "", info: Optional[Dict[str, Any]] = None) -> str:
         """Register a data-only stream so peers can connect to it. Returns the stream ID."""
         return await self._seed(None, True, stream_id, room, password, label, meta, order, info)
 
-    async def publish(self, tracks: List[MediaStreamTrack], stream_id: Optional[str] = None, *, room: Optional[str] = None, password: Optional[str] = None, label: str = "", meta: Any = None, order: str = "", info: Optional[Dict[str, Any]] = None) -> str:
+    async def publish(self, tracks: List[MediaStreamTrack], stream_id: Optional[str] = None, *, room: Optional[str] = None, password: Union[str, bool, None] = None, label: str = "", meta: Any = None, order: str = "", info: Optional[Dict[str, Any]] = None) -> str:
         """Register a media stream. ``tracks`` are aiortc MediaStreamTrack objects."""
         return await self._seed(tracks, False, stream_id, room, password, label, meta, order, info)
 
@@ -1139,7 +1141,7 @@ class VDONinja:
             await conn.close()
             conn = None
         if conn is None:
-            opts = self._pending_views.get(clean) if clean else None
+            opts = (self._pending_views.get(clean) or self._view_intent.get(clean)) if clean else None
             conn = await self._create_connection(uuid, "viewer")
             conn.session = session
             if has_stream:
@@ -1743,7 +1745,7 @@ class VDONinja:
 
     # ----------------------------------------------------------- auto connect
 
-    async def auto_connect(self, room: str, *, mode: str = "half", view: Optional[Dict[str, Any]] = None, label: str = "", password: Optional[str] = None, stream_id: Optional[str] = None, filter: Optional[Callable[[str, Optional[str]], bool]] = None) -> Dict[str, Any]:
+    async def auto_connect(self, room: str, *, mode: str = "half", view: Optional[Dict[str, Any]] = None, label: str = "", password: Union[str, bool, None] = None, stream_id: Optional[str] = None, filter: Optional[Callable[[str, Optional[str]], bool]] = None) -> Dict[str, Any]:
         """Connect, join ``room``, announce and view peers as they appear.
 
         ``mode="half"`` gives one data channel per pair; ``"full"`` views every

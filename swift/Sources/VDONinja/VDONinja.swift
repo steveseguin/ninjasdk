@@ -1189,7 +1189,7 @@ public final class VDONinja {
             createConnection(uuid, type: "viewer") { c in
                 if let session { c.session = session }
                 c.streamId = clean
-                if let clean, let opts = self.pendingViews[clean] { c.viewOptions = opts }
+                if let clean, let opts = self.pendingViews[clean] ?? self.viewIntent[clean] { c.viewOptions = opts }
                 if let clean, !clean.isEmpty {
                     let info = self.streamTable[clean] ?? StreamInfo(streamId: clean, uuid: uuid)
                     info.uuid = uuid

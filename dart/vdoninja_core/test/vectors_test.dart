@@ -20,6 +20,26 @@ Map<String, dynamic> loadVectors() {
 void main() {
   final v = loadVectors();
 
+  test('SDK password modes match JavaScript', () {
+    for (final c in v['passwordModes'] as List) {
+      final pw = VdoNinjaOptions(password: c['rawPassword'] as String?,
+        noPassword: c['noPassword'] as bool, salt: c['salt'] as String).passwordContext();
+      expect(pw.password, c['effectivePassword'], reason: c['name'] as String);
+      expect(pw.enabled, c['encrypted']);
+      expect(pw.salt, c['effectiveSalt']);
+      expect(pw.hashStreamId('camera'), c['hashedStreamID']);
+      expect(pw.hashRoom('room'), c['hashedRoom']);
+      for (final field in ['description', 'candidates']) {
+        final value = field == 'description' ? {'type': 'offer', 'sdp': 'v=0\r\n'} : <Object>[];
+        final msg = <String, dynamic>{};
+        pw.encryptInto(msg, field, value);
+        expect(msg.containsKey('vector'), pw.enabled);
+        expect(msg[field] is String, pw.enabled);
+        expect(pw.decodeField(msg, field), value);
+      }
+    }
+  });
+
   test('hash', () {
     for (final c in v['hash'] as List) {
       expect(generateHash(c['input'] as String, c['length'] as int), c['expected']);

@@ -93,8 +93,8 @@ class PasswordContext(rawPassword: String?, val salt: String = Protocol.DEFAULT_
         /** The effective context for SDK options: default password unless disabled. */
         @JvmStatic
         fun from(password: String?, noPassword: Boolean, salt: String): PasswordContext =
-            if (noPassword) PasswordContext(null, salt)
-            else PasswordContext(if (password.isNullOrEmpty()) Protocol.DEFAULT_PASSWORD else password, salt)
+            if (noPassword) PasswordContext(null, salt.ifEmpty { Protocol.DEFAULT_SALT })
+            else PasswordContext(if (Sanitize.password(password ?: "").isEmpty()) Protocol.DEFAULT_PASSWORD else password, salt.ifEmpty { Protocol.DEFAULT_SALT })
     }
 }
 

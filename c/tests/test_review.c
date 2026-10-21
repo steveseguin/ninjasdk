@@ -33,6 +33,42 @@ static int record_candidate(int pc, const char *candidate, const char *mid) {
 
 #define CHECK(expr) do { if (!(expr)) { fprintf(stderr, "FAIL line %d: %s\n", __LINE__, #expr); exit(1); } } while (0)
 
+static void test_password_modes(void) {
+    FILE *file = fopen(VDON_VECTORS_PATH, "rb");
+    long size;
+    char *text;
+    cJSON *vectors, *c;
+    CHECK(file);
+    fseek(file, 0, SEEK_END); size = ftell(file); rewind(file);
+    text = calloc((size_t)size + 1, 1);
+    CHECK(text && fread(text, 1, (size_t)size, file) == (size_t)size);
+    fclose(file);
+    vectors = cJSON_Parse(text); free(text); CHECK(vectors);
+    cJSON_ArrayForEach(c, jget(vectors, "passwordModes")) {
+        vdon_options opts;
+        vdon_sdk *s;
+        char stream[128], room[32];
+        vdon_options_init(&opts);
+        opts.password = jstr(c, "rawPassword");
+        opts.no_password = cJSON_IsTrue(jget(c, "noPassword"));
+        opts.salt = jstr(c, "salt");
+        s = vdon_create(&opts, NULL, NULL); CHECK(s);
+        CHECK(s->has_password == cJSON_IsTrue(jget(c, "encrypted")));
+        CHECK(strcmp(s->salt, jstr(c, "effectiveSalt")) == 0);
+        if (s->has_password) CHECK(strcmp(s->password, jstr(c, "effectivePassword")) == 0);
+        hashed_stream_id(s, "camera", stream, sizeof(stream));
+        CHECK(strcmp(stream, jstr(c, "hashedStreamID")) == 0);
+        if (s->has_password) {
+            char phrase[1200];
+            snprintf(phrase, sizeof(phrase), "room%s", s->phrase);
+            vdon_generate_hash(phrase, 16, room);
+        } else strcpy(room, "room");
+        CHECK(strcmp(room, jstr(c, "hashedRoom")) == 0);
+        vdon_destroy(s);
+    }
+    cJSON_Delete(vectors);
+}
+
 static void test_bye_uses_control_channel(void) {
     vdon_sdk s = {0};
     conn_t c = {0};
@@ -215,6 +251,7 @@ static void test_sender_lifetime(void) {
 }
 
 int main(void) {
+    test_password_modes();
     test_leave_closes_signaling();
     test_bye_uses_control_channel();
     test_ice_sessions();

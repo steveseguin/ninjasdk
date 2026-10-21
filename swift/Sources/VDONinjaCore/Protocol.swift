@@ -66,8 +66,9 @@ public struct PasswordContext {
 
     /// The effective context for SDK options: default password unless disabled.
     public static func from(password: String?, noPassword: Bool, salt: String) -> PasswordContext {
+        let salt = salt.isEmpty ? Defaults.salt : salt
         if noPassword { return PasswordContext(rawPassword: nil, salt: salt) }
-        return PasswordContext(rawPassword: (password ?? "").isEmpty ? Defaults.password : password, salt: salt)
+        return PasswordContext(rawPassword: Sanitize.password(password ?? "").isEmpty ? Defaults.password : password, salt: salt)
     }
 
     public var enabled: Bool { !(password ?? "").isEmpty }

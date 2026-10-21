@@ -53,11 +53,39 @@ async function main() {
         streamHash: [],
         roomHash: [],
         encryption: [],
+        passwordModes: [],
         sanitizeStreamID: [],
         sanitizeRoom: [],
         sanitizePassword: [],
         sanitizeLabel: []
     };
+
+    // Exercise constructor semantics, not just the low-level sanitizer.
+    // URL disable keywords belong to main.js, NOT to SDK string passwords.
+    for (const salt of ['vdo.ninja', 'example.com', '']) {
+        for (const [name, options] of [
+            ['omitted', {}], ['null', { password: null }],
+            ['empty', { password: '' }], ['whitespace', { password: ' \t\n ' }],
+            ['disabled', { password: false }], ['literal-false', { password: 'false' }],
+            ['literal-zero', { password: '0' }], ['literal-off', { password: 'off' }],
+            ['boolean-true', { password: true }], ['number-zero', { password: 0 }],
+            ['unicode-percent', { password: ' café & literal%20 ' }],
+        ]) {
+            const s = new SDK({ ...options, salt });
+            const effectivePassword = s._getEffectivePassword();
+            out.passwordModes.push({
+                name, options: { ...options, salt },
+                // Typed ports use a nullable string plus an explicit disable flag.
+                rawPassword: options.password == null || options.password === false ? null : String(options.password),
+                noPassword: options.password === false,
+                salt, effectiveSalt: s.salt, effectivePassword,
+                encrypted: effectivePassword !== null,
+                streamID: 'camera', room: 'room',
+                hashedStreamID: effectivePassword === null ? 'camera' : await s._hashStreamID('camera', effectivePassword),
+                hashedRoom: effectivePassword === null ? 'room' : await s._hashRoom('room', effectivePassword),
+            });
+        }
+    }
 
     const hashInputs = [
         ['someEncryptionKey123vdo.ninja', 6],
