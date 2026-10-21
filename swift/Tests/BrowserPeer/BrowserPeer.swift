@@ -88,6 +88,7 @@ final class VideoSink: NSObject, RTCVideoRenderer {
 @main struct BrowserPeer {
     static func main() async throws {
         setbuf(stdout, nil)
+        print("PID \(getpid())")
         let env = ProcessInfo.processInfo.environment
         RTCInitializeSSL()
         let audio = TestAudio()

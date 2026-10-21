@@ -43,6 +43,7 @@ jobs:
       - run: npm ci && npm install --no-save playwright && npx playwright install chromium
       - run: brew install ffmpeg
       - run: node tests/interop/native-av-live.cjs
+        timeout-minutes: 5
         env:
           TMPDIR: ${{ runner.temp }}
           VDO_NATIVE_PORT: swift

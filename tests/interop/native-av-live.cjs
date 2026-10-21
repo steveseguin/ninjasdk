@@ -29,6 +29,7 @@ async function main() {
   for (const [kind, ext] of [['v','ivf'], ['a','ogg']]) {
     execFileSync('ffmpeg',['-v','error','-i',media,'-map',`0:${kind}`,'-c','copy', ...(kind==='a'?['-page_duration','20000']:[]),media+'.'+ext]);
   }
+  console.log('Testing '+port+' against '+target+'; artifacts: '+out);
   const signaling = await signalingObserver(password, token, token+'out', token+'in');
   const env = {...process.env, VDO_HOST:signaling.host, VDO_PASSWORD:password, VDO_SALT:salt,
     VDO_ROOM:token, VDO_PUBLISH:token+'out', VDO_VIEW:token+'in', VDO_OUT:out, VDO_MEDIA:media};
@@ -63,6 +64,7 @@ async function main() {
   });
   try {
     await until(()=>{assert(!exited,log); return log.includes('READY');},'peer startup failed');
+    console.log(port+': peer ready');
     if(port==='c') {
       const [,video,audio]=log.match(/UDP video=(\d+) audio=(\d+)/);
       ffmpeg('producer',['-v','warning','-re','-stream_loop','-1','-i',media,
@@ -85,6 +87,7 @@ async function main() {
       const s=await stats(viewer,'rpcs');
       return s.some(v=>v.kind==='video'&&v.framesDecoded>30)&&s.some(v=>v.kind==='audio'&&v.totalSamplesReceived>48000&&v.totalAudioEnergy>0);
     },port+' outbound A/V not decoded',timeout);
+    console.log(port+': browser received media / control channel');
     if (!dataOnly) await until(()=>log.includes('RX audio 100')&&log.includes('RX video 100'),port+' did not receive both media kinds',timeout);
     if (port === 'c') {
       const videoPT = log.match(/CODEC video PT=(\d+)/)[1];
@@ -114,6 +117,7 @@ async function main() {
       const s=await stats(page,group);
       assert(s.some(v=>v.type==='transport'&&v.dtlsState==='connected'&&(dataOnly||v.srtpCipher)),'missing DTLS/SRTP');
     }
+    console.log(port+': media and data checks passed; disconnecting');
     peer.kill('SIGINT');
     await until(()=>exited,'native shutdown failed',port==='kotlin'?60000:15000);
     assert.deepEqual(await exit,{code:0,signal:null},log);
@@ -153,6 +157,8 @@ async function main() {
     throw error;
   } finally {
     if(!exited){peer.kill('SIGTERM');await Promise.race([exit,new Promise(r=>setTimeout(r,10000))]);if(!exited)peer.kill('SIGKILL');}
+    // A failed simulator wrapper can leave a child holding inherited stdout open.
+    peer.stdout.destroy(); peer.stderr.destroy();
     await browser?.close(); await signaling.close();
     for(const {child} of auxiliary)if(child.exitCode===null)child.kill('SIGKILL');
   }
