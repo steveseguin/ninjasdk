@@ -6,13 +6,35 @@ const root = path.resolve(__dirname, '..');
 const guides = ['guides', 'connecting', 'data-messaging', 'file-transfer', 'agent-network', 'remote-control', 'recording', 'streaming', 'native-sdks', 'reliability-and-recovery', 'compatibility', 'api-reference', 'validation'];
 const escape = value => String(value).replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
 
+// Collapses the guide's opening paragraph into a single-sentence meta
+// description. Without this every page shipped the same boilerplate, which
+// search engines treat as duplicate metadata and readers see in link previews.
+function pageDescription(source, title) {
+  const body = source.replace(/^# .+$/m, '');
+  const paragraph = body
+    .split(/\n{2,}/)
+    .map(block => block.trim())
+    .find(block => block && !/^[#>|`\-*]/.test(block));
+  if (!paragraph) return title + '. VDO.Ninja SDK guide.';
+  const text = paragraph
+    .replace(/\s+/g, ' ')
+    .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
+    .replace(/[*_`]/g, '')
+    .trim();
+  if (text.length <= 160) return text;
+  const cut = text.slice(0, 157);
+  return cut.slice(0, cut.lastIndexOf(' ')) + '…';
+}
+
 function renderGuide(name) {
   const source = fs.readFileSync(path.join(root, 'docs', name + '.md'), 'utf8');
   const title = source.match(/^# (.+)$/m)[1];
   const md = new MarkdownIt({ html: false, linkify: false });
   const toc = [], ids = new Map();
+  let lastHeading = title;
   md.renderer.rules.heading_open = (tokens, index, options, env, renderer) => {
     const text = tokens[index + 1].content;
+    lastHeading = text;
     const base = text.toLowerCase().replace(/[^\p{L}\p{N}_\s-]/gu, '').trim().replace(/\s+/g, '-');
     const count = ids.get(base) || 0;
     ids.set(base, count + 1);
@@ -30,10 +52,13 @@ function renderGuide(name) {
     }
     return renderer.renderToken(tokens, index, options);
   };
-  md.renderer.rules.table_open = () => '<div class="table-scroll" tabindex="0" role="region" aria-label="Comparison table"><table>\n';
+  // Name the scrollable region after the section it belongs to; a screen reader
+  // announcing "Comparison table" on every table says nothing useful.
+  md.renderer.rules.table_open = () =>
+    `<div class="table-scroll" tabindex="0" role="region" aria-label="${escape(lastHeading)} table"><table>\n`;
   md.renderer.rules.table_close = () => '</table></div>\n';
   const body = md.render(source);
-  const description = title + '. VDO.Ninja SDK options, practical examples, requirements, and validation limits.';
+  const description = pageDescription(source, title);
   const current = page => (page === name ? ' aria-current="page"' : '');
   return `<!doctype html>
 <!-- Generated from ${name}.md by npm run docs:build. Edit the Markdown source. -->

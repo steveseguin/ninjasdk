@@ -1,9 +1,9 @@
 <!doctype html>
 <!-- Generated from connecting.md by npm run docs:build. Edit the Markdown source. -->
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Connect your application to VDO.Ninja | VDO.Ninja SDK</title><meta name="description" content="Connect your application to VDO.Ninja. VDO.Ninja SDK options, practical examples, requirements, and validation limits.">
+<title>Connect your application to VDO.Ninja | VDO.Ninja SDK</title><meta name="description" content="Use the JavaScript SDK for a custom camera viewer, broadcast control panel, browser-to-browser messaging, or Node.js media automation. Use VDO.Ninja&#39;s…">
 <link rel="canonical" href="https://sdk.vdo.ninja/docs/connecting.html">
-<meta property="og:title" content="Connect your application to VDO.Ninja"><meta property="og:description" content="Connect your application to VDO.Ninja. VDO.Ninja SDK options, practical examples, requirements, and validation limits.">
+<meta property="og:title" content="Connect your application to VDO.Ninja"><meta property="og:description" content="Use the JavaScript SDK for a custom camera viewer, broadcast control panel, browser-to-browser messaging, or Node.js media automation. Use VDO.Ninja&#39;s…">
 <meta property="og:type" content="article"><meta property="og:url" content="https://sdk.vdo.ninja/docs/connecting.html">
 <link rel="icon" href="../favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -29,7 +29,7 @@ await vdo.autoConnect({ room: 'replace_with_a_shared_unique_room' });
 </code></pre>
 <p><code>connect()</code> means signaling is open. <code>joinRoom()</code> means the room was joined. Neither means a peer can receive application data yet. Wait for <code>dataChannelOpen</code> and check the boolean returned by <code>sendData</code>. Application data is not queued for offline peers or stored by the signaling service.</p>
 <h2 id="choose-discovery-and-network-options">Choose discovery and network options</h2>
-<div class="table-scroll" tabindex="0" role="region" aria-label="Comparison table"><table>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Choose discovery and network options table"><table>
 <thead>
 <tr>
 <th>Option</th>
@@ -116,7 +116,7 @@ console.log('Open in the viewer browser:', viewer.href);
 <h2 id="requests-and-responses">Requests and responses</h2>
 <p><code>request</code>, <code>respond</code>, and <code>onRequest</code> are SDK application messages, not native VDO.Ninja remote-control commands. The responding peer must implement the SDK request handler. A request resolves only for a reply from its target UUID; handler errors reject it. Disconnecting cancels outstanding requests. Use the iframe API or documented remote-control API to control a VDO.Ninja page.</p>
 <h2 id="troubleshooting">Troubleshooting</h2>
-<div class="table-scroll" tabindex="0" role="region" aria-label="Comparison table"><table>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Troubleshooting table"><table>
 <thead>
 <tr>
 <th>Symptom</th>

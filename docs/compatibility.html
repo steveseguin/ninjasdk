@@ -1,9 +1,9 @@
 <!doctype html>
 <!-- Generated from compatibility.md by npm run docs:build. Edit the Markdown source. -->
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>SDK Compatibility Contract | VDO.Ninja SDK</title><meta name="description" content="SDK Compatibility Contract. VDO.Ninja SDK options, practical examples, requirements, and validation limits.">
+<title>SDK Compatibility Contract | VDO.Ninja SDK</title><meta name="description" content="The SDK is intended to remain compatible with earlier SDK releases and with VDO.Ninja peers. Compatibility has three separate boundaries.">
 <link rel="canonical" href="https://sdk.vdo.ninja/docs/compatibility.html">
-<meta property="og:title" content="SDK Compatibility Contract"><meta property="og:description" content="SDK Compatibility Contract. VDO.Ninja SDK options, practical examples, requirements, and validation limits.">
+<meta property="og:title" content="SDK Compatibility Contract"><meta property="og:description" content="The SDK is intended to remain compatible with earlier SDK releases and with VDO.Ninja peers. Compatibility has three separate boundaries.">
 <meta property="og:type" content="article"><meta property="og:url" content="https://sdk.vdo.ninja/docs/compatibility.html">
 <link rel="icon" href="../favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -29,7 +29,7 @@
 <h3 id="channel-labels">Channel labels</h3>
 <p>VDO.Ninja opens up to four kinds of data channel per peer and dispatches incoming
 channels <strong>by label</strong>. The SDK matches that dispatch exactly.</p>
-<div class="table-scroll" tabindex="0" role="region" aria-label="Comparison table"><table>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Channel labels table"><table>
 <thead>
 <tr>
 <th>Label</th>
@@ -121,7 +121,7 @@ channel, as VDO.Ninja does.</p>
 <p>Capabilities travel <strong>viewer to publisher</strong>, in the viewer's preferences message — not in
 the publisher's info payload. The publisher then decides what to open
 (<code>webrtc.js:12889-12894</code>):</p>
-<div class="table-scroll" tabindex="0" role="region" aria-label="Comparison table"><table>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Capability negotiation table"><table>
 <thead>
 <tr>
 <th>Viewer advertises</th>

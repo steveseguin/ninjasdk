@@ -1,9 +1,9 @@
 <!doctype html>
 <!-- Generated from file-transfer.md by npm run docs:build. Edit the Markdown source. -->
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Transfer files between peers | VDO.Ninja SDK</title><meta name="description" content="Transfer files between peers. VDO.Ninja SDK options, practical examples, requirements, and validation limits.">
+<title>Transfer files between peers | VDO.Ninja SDK</title><meta name="description" content="Use this for exchanging a recording, a report, or a project asset while both peers are connected. Files are served by the sender; the signaling service does…">
 <link rel="canonical" href="https://sdk.vdo.ninja/docs/file-transfer.html">
-<meta property="og:title" content="Transfer files between peers"><meta property="og:description" content="Transfer files between peers. VDO.Ninja SDK options, practical examples, requirements, and validation limits.">
+<meta property="og:title" content="Transfer files between peers"><meta property="og:description" content="Use this for exchanging a recording, a report, or a project asset while both peers are connected. Files are served by the sender; the signaling service does…">
 <meta property="og:type" content="article"><meta property="og:url" content="https://sdk.vdo.ninja/docs/file-transfer.html">
 <link rel="icon" href="../favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -15,7 +15,7 @@
 <main id="content"><h1 id="transfer-files-between-peers">Transfer files between peers</h1>
 <p>Use this for exchanging a recording, a report, or a project asset while both peers are connected. Files are served by the sender; the signaling service does not store them for later download.</p>
 <h2 id="choose-a-transport">Choose a transport</h2>
-<div class="table-scroll" tabindex="0" role="region" aria-label="Comparison table"><table>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Choose a transport table"><table>
 <thead>
 <tr>
 <th>Option</th>
@@ -81,7 +81,7 @@ await vdo.view('sender_stream', { audio: false, video: false, downloads: true })
 <p>Open a viewer with the sender's room, stream ID, password, salt, and signaling host; enable its chat button with <code>&amp;cb</code>. The offer appears in chat with a native download action. See <a href="connecting.html#publish-video-to-a-vdoninja-viewer">matching viewer URLs</a>.</p>
 <p>For a complete tested Node example, run <code>node demos/sdk-workflows.cjs</code>. For native browser interoperability, use the <a href="https://github.com/steveseguin/ninjasdk/blob/main/tests/interop/README.md">interop harness instructions</a>. The native file protocol is separate from the MCP package's resumable transfer tools.</p>
 <h2 id="troubleshooting">Troubleshooting</h2>
-<div class="table-scroll" tabindex="0" role="region" aria-label="Comparison table"><table>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Troubleshooting table"><table>
 <thead>
 <tr>
 <th>Symptom</th>
