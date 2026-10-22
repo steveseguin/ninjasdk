@@ -20,10 +20,17 @@ endif()
 find_package(Threads REQUIRED)
 
 # --- libdatachannel (MPL-2.0) ---------------------------------------------
-find_package(LibDataChannel QUIET)
+# The RTP packetizer setters this SDK calls (rtcSetPCMAPacketizer,
+# rtcSetPCMUPacketizer, rtcSetG722Packetizer) arrived in 0.23.0. Without the
+# floor, an older system install satisfies find_package and the build only fails
+# much later with undefined references at link time.
+set(VDON_LIBDATACHANNEL_MIN_VERSION 0.23.0)
+find_package(LibDataChannel ${VDON_LIBDATACHANNEL_MIN_VERSION} QUIET)
 if(NOT TARGET LibDataChannel::LibDataChannel)
   if(NOT VDON_FETCH_LIBDATACHANNEL)
-    message(FATAL_ERROR "libdatachannel not found. Install it or enable VDON_FETCH_LIBDATACHANNEL.")
+    message(FATAL_ERROR
+      "libdatachannel ${VDON_LIBDATACHANNEL_MIN_VERSION} or newer not found. "
+      "Install it or enable VDON_FETCH_LIBDATACHANNEL to build ${VDON_LIBDATACHANNEL_TAG} locally.")
   endif()
   include(FetchContent)
   set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
