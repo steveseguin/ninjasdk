@@ -84,7 +84,9 @@ try {
     };
 }
 
-// Initialize WebRTC adapter BEFORE creating context
+// Initialize WebRTC adapter BEFORE creating context. Detection never throws, so
+// this module stays importable without @roamhq/wrtc or node-datachannel; the
+// missing-implementation error is raised when an SDK instance is created.
 const webrtcAdapter = new WebRTCAdapter();
 
 // Create a module context and evaluate the SDK
@@ -156,6 +158,10 @@ const OriginalVDONinjaSDK = sdkModule.exports;
 // Create extended SDK class with WebRTC adapter
 class VDONinjaSDKNode extends OriginalVDONinjaSDK {
     constructor(options = {}) {
+        if (!webrtcAdapter.isAvailable()) {
+            throw new Error(webrtcAdapter.unavailableReason);
+        }
+
         // Call parent constructor
         super(options);
         

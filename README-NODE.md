@@ -25,6 +25,22 @@ npm install node-datachannel   # Option 2: Lightweight data channels only
 npm install node-fetch abort-controller
 ```
 
+### Checking what is installed
+
+Importing the Node entry point never throws, even with no WebRTC implementation
+present, so a program can report the problem itself instead of crashing on
+`require`. Constructing an SDK instance is what fails when none is installed.
+
+```javascript
+const VDONinjaSDK = require('@vdoninja/sdk/node');
+
+for (const impl of VDONinjaSDK.checkWebRTCSupport()) {
+    console.log(impl.name, impl.available ? 'installed' : 'missing', impl.mediaSupport ? '(audio/video)' : '(data only)');
+}
+```
+
+Run the same check from a checkout with `npm run check:webrtc`.
+
 ## Basic Usage
 
 ```javascript

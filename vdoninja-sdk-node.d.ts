@@ -32,6 +32,7 @@ export type {
 
 export interface WebRTCAdapter {
     getImplementation(): string;
+    isAvailable(): boolean;
     hasMediaSupport(): boolean;
     [key: string]: unknown;
 }

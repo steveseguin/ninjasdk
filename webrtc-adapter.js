@@ -14,6 +14,12 @@
  * a consistent API regardless of which library is being used.
  */
 
+const NO_IMPLEMENTATION_MESSAGE =
+    'No WebRTC implementation found. Please install one of:\n' +
+    '- @roamhq/wrtc (recommended)\n' +
+    '- node-datachannel\n' +
+    'Or use this SDK in a browser environment.';
+
 class WebRTCAdapter {
     constructor() {
         this.implementation = null;
@@ -24,10 +30,14 @@ class WebRTCAdapter {
         this.MediaStream = null;
         this.MediaStreamTrack = null;
         this.nonstandard = {};
-        
+        // Reason the adapter is unusable, or null once an implementation loads.
+        // Detection never throws so that callers can import this module purely to
+        // report what is installed (see VDONinjaSDKNode.checkWebRTCSupport).
+        this.unavailableReason = null;
+
         this._detectImplementation();
     }
-    
+
     /**
      * Detect and load available WebRTC implementation
      * @private
@@ -91,13 +101,9 @@ class WebRTCAdapter {
             // node-datachannel not available
         }
         
-        // 5. No WebRTC implementation found
-        throw new Error(
-            'No WebRTC implementation found. Please install one of:\n' +
-            '- @roamhq/wrtc (recommended)\n' +
-            '- node-datachannel\n' +
-            'Or use this SDK in a browser environment.'
-        );
+        // 5. No WebRTC implementation found. Record it instead of throwing; the
+        // error surfaces when something actually needs a peer connection.
+        this.unavailableReason = NO_IMPLEMENTATION_MESSAGE;
     }
     
     /**
@@ -357,25 +363,32 @@ class WebRTCAdapter {
     }
     
     /**
-     * Get the detected implementation name
+     * Get the detected implementation name, or null when none is installed
      */
     getImplementation() {
         return this.implementation;
     }
-    
+
+    /**
+     * Check whether a WebRTC implementation was found
+     */
+    isAvailable() {
+        return this.unavailableReason === null;
+    }
+
     /**
      * Check if media (audio/video) is supported
      */
     hasMediaSupport() {
-        return this.implementation !== 'node-datachannel';
+        return this.isAvailable() && this.implementation !== 'node-datachannel';
     }
-    
+
     /**
      * Create a new RTCPeerConnection with the detected implementation
      */
     createPeerConnection(config) {
         if (!this.RTCPeerConnection) {
-            throw new Error('No WebRTC implementation available');
+            throw new Error(this.unavailableReason || 'No WebRTC implementation available');
         }
         return new this.RTCPeerConnection(config);
     }
