@@ -24,7 +24,12 @@ type Connection struct {
 	typ  string // "publisher" | "viewer"
 	pc   *webrtc.PeerConnection
 
-	mediaMu       sync.Mutex
+	mediaMu sync.Mutex
+	// negMu serializes SDP work on pc. Applying a remote description while a
+	// local one is being set races inside pion and corrupts the negotiation
+	// state, and answers arrive on the data channel reader goroutine while the
+	// caller's thread may be renegotiating. Lock order is mediaMu -> negMu -> mu.
+	negMu         sync.Mutex
 	infoSent      bool
 	mu            sync.Mutex
 	control       *webrtc.DataChannel
@@ -283,6 +288,8 @@ func (s *SDK) createOffer(c *Connection, iceRestart bool) (webrtc.SessionDescrip
 	if iceRestart {
 		opts = &webrtc.OfferOptions{ICERestart: true}
 	}
+	c.negMu.Lock()
+	defer c.negMu.Unlock()
 	offer, err := c.pc.CreateOffer(opts)
 	if err != nil {
 		return offer, err
@@ -457,15 +464,24 @@ func (s *SDK) handleOffer(uuid, session string, msg map[string]any, desc webrtc.
 		c.mu.Unlock()
 	}
 
-	if err := c.pc.SetRemoteDescription(desc); err != nil {
+	// One critical section for the whole offer/answer turn, so a renegotiation
+	// on another goroutine cannot interleave its own description with it.
+	c.negMu.Lock()
+	var answer webrtc.SessionDescription
+	err := c.pc.SetRemoteDescription(desc)
+	remoteFailed := err != nil
+	if err == nil {
+		s.drainPendingICE(c, "local")
+		answer, err = c.pc.CreateAnswer(nil)
+		if err == nil {
+			err = c.pc.SetLocalDescription(answer)
+		}
+	}
+	c.negMu.Unlock()
+	if remoteFailed {
 		s.logf("SetRemoteDescription(offer) failed: %v", err)
 		s.emit(Event{Type: EventError, Err: err, UUID: uuid, Message: "failed to handle offer"})
 		return
-	}
-	s.drainPendingICE(c, "local")
-	answer, err := c.pc.CreateAnswer(nil)
-	if err == nil {
-		err = c.pc.SetLocalDescription(answer)
 	}
 	if err != nil {
 		s.emit(Event{Type: EventError, Err: err, UUID: uuid, Message: "failed to create answer"})
@@ -523,12 +539,16 @@ func (s *SDK) handleAnswer(uuid, session string, desc webrtc.SessionDescription)
 		s.logf("Session mismatch, ignoring answer from %s", uuid)
 		return
 	}
-	if err := c.pc.SetRemoteDescription(desc); err != nil {
+	c.negMu.Lock()
+	err := c.pc.SetRemoteDescription(desc)
+	if err == nil {
+		s.drainPendingICE(c, "remote")
+	}
+	c.negMu.Unlock()
+	if err != nil {
 		s.logf("SetRemoteDescription(answer) failed: %v", err)
 		s.emit(Event{Type: EventError, Err: err, UUID: uuid, Message: "failed to handle answer"})
-		return
 	}
-	s.drainPendingICE(c, "remote")
 }
 
 // renegotiate creates a new offer on a publisher connection (track changes or
@@ -538,13 +558,17 @@ func (s *SDK) renegotiate(c *Connection, iceRestart, viaSignaling bool) error {
 	if iceRestart {
 		opts = &webrtc.OfferOptions{ICERestart: true}
 	}
+	c.negMu.Lock()
 	offer, err := c.pc.CreateOffer(opts)
+	if err == nil {
+		err = c.pc.SetLocalDescription(offer)
+	}
+	c.negMu.Unlock()
 	if err != nil {
 		return err
 	}
-	if err := c.pc.SetLocalDescription(offer); err != nil {
-		return err
-	}
+	// Sending touches the control channel, not pc, so it stays outside negMu;
+	// emitting an error from inside the lock could re-enter through a handler.
 	s.sendDescription(c, offer, true, viaSignaling)
 	return nil
 }
