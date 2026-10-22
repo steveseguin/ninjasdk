@@ -162,9 +162,11 @@ function updatePeerStatus(peerId) {
     connectBtn.classList.toggle('btn-secondary', !!peer.vdo);
     connectBtn.disabled = peer.connecting;
 
-    messageInput.disabled = !ready;
-    sendBtn.disabled = !ready;
-    messageInput.placeholder = ready ? `Message from Peer ${peerId}…` : 'Connect both peers to chat';
+    if (messageInput) {
+        messageInput.disabled = !ready;
+        messageInput.placeholder = ready ? `Message from Peer ${peerId}…` : 'Connect both peers to chat';
+    }
+    if (sendBtn) sendBtn.disabled = !ready;
     if (streamIdEl) streamIdEl.textContent = peer.streamID || '—';
 
     updateConnectionInfo();

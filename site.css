@@ -20,9 +20,13 @@
 
     --text: #e5e9f2;
     --text-muted: #9aa5ba;
-    --text-faint: #6c7790;
+    /* Faint text carries timestamps, stat labels and placeholders, so it still
+       has to clear WCAG AA (4.5:1) on --bg, --bg-alt and --surface. */
+    --text-faint: #8290aa;
 
-    --accent: #6366f1;
+    /* White button and chat-bubble text sits on --accent; this shade keeps that
+       pairing at 4.97:1 instead of the 4.47:1 that AA rejects. */
+    --accent: #5b5ee9;
     --accent-hover: #575ae6;
     --accent-text: #a5b4fc;
     --accent-soft: rgba(99, 102, 241, 0.12);

@@ -966,16 +966,20 @@ await whep.view();</code></pre>
 
         // Copy buttons for short snippets
         document.querySelectorAll('[data-copy-target]').forEach((button) => {
+            // Capture the label once: reading it inside the handler would latch
+            // "Copied" as the label when the button is clicked again mid-reset.
+            const original = button.textContent;
+            let resetTimer = null;
             button.addEventListener('click', async () => {
                 const text = document.getElementById(button.dataset.copyTarget).textContent;
-                const original = button.textContent;
                 try {
                     await navigator.clipboard.writeText(text);
                     button.textContent = 'Copied';
                 } catch (err) {
                     button.textContent = 'Copy failed';
                 }
-                setTimeout(() => { button.textContent = original; }, 1500);
+                clearTimeout(resetTimer);
+                resetTimer = setTimeout(() => { button.textContent = original; }, 1500);
             });
         });
 
