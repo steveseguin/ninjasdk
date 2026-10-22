@@ -478,7 +478,7 @@ function handleCustomData(data) {
                 </div>
 
                 <div class="sdk-notes">
-                    <p class="muted small">Go, Rust, C and Python implement the whole protocol (rooms, encryption, file transfer, reserved <code>x-</code> channels, resources, TURN selection, autoConnect, WHIP/WHEP) and each ships a small VDO.Ninja-compatible signaling server for LAN, offline and test use. The mobile SDKs cover the basics and bring media from the platform's own capture APIs. All of them are checked against one conformance suite generated from the JavaScript SDK and tested against each other and the Node build. <a href="docs/native-sdks.html">Feature matrix and protocol summary →</a></p>
+                    <p class="muted small">Go, Rust, C and Python implement the whole protocol (rooms, encryption, file transfer, reserved <code>x-</code> channels, resources, TURN selection, autoConnect, WHIP/WHEP) and each ships a small VDO.Ninja-compatible signaling server for LAN, offline and test use. The mobile SDKs cover the basics and bring media from the platform's own capture APIs. Every native SDK checks its protocol core against shared test vectors generated from the JavaScript SDK. CI tests interoperability between Go, C, Python and Node.js; see the feature matrix for mobile coverage and known engine limitations. <a href="docs/native-sdks.html">Feature matrix and protocol summary →</a></p>
                     <p class="muted small">Every SDK is MPL-2.0 like the JavaScript core, and the <a href="#usage-guidelines">handshake server guidelines</a> apply to all of them.</p>
                 </div>
             </div>
