@@ -752,14 +752,12 @@ class VDONinja:
         if not self.publishing or self._data_only:
             raise VDONinjaError("not publishing media")
         self._local_tracks.append(track)
+        # Attach through the shared media path: it holds the per-connection media
+        # lock, so a viewer preference update running at the same time cannot
+        # attach this kind a second time, and it renegotiates once.
         for pair in list(self.connections.values()):
-            conn = pair.publisher
-            if not conn or not conn.info_sent or not conn.control_open:
-                continue
-            if (track.kind == "audio" and not conn.allow_audio) or (track.kind == "video" and not conn.allow_video):
-                continue
-            conn.senders.append(conn.pc.addTrack(track))
-            await self._renegotiate(conn)
+            if pair.publisher:
+                await self._update_tracks(pair.publisher)
 
     # --------------------------------------------------------------- viewing
 

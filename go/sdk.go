@@ -861,26 +861,11 @@ func (s *SDK) AddTrack(track webrtc.TrackLocal) error {
 		}
 	}
 	s.mu.Unlock()
+	// Attach through the shared media path: it holds the per-connection media
+	// lock, so a viewer preference update arriving at the same time cannot
+	// attach this kind a second time, and it renegotiates once.
 	for _, c := range conns {
-		c.mu.Lock()
-		allowed := c.infoSent && ((track.Kind() == webrtc.RTPCodecTypeAudio && c.allowAudio) || (track.Kind() == webrtc.RTPCodecTypeVideo && c.allowVideo))
-		c.mu.Unlock()
-		if !allowed || !c.controlOpen() {
-			continue
-		}
-		sender, err := c.pc.AddTrack(track)
-		if err != nil {
-			s.logf("AddTrack to %s failed: %v", c.uuid, err)
-			continue
-		}
-		c.mu.Lock()
-		c.senders = append(c.senders, sender)
-		c.senderKinds[sender] = track.Kind()
-		c.mu.Unlock()
-		go s.drainRTCP(sender)
-		if err := s.renegotiate(c, false, false); err != nil {
-			s.logf("renegotiate %s failed: %v", c.uuid, err)
-		}
+		s.updateTracksForConnection(c)
 	}
 	return nil
 }

@@ -357,12 +357,13 @@ class VdoNinja {
   Future<void> addTrack(MediaStreamTrack track, [MediaStream? stream]) async {
     if (!_publishing) throw StateError('not publishing');
     _localTracks.add(track);
+    // A data-only publish has no stream of its own; adopt the caller's.
+    _localStream ??= stream;
+    // Attach through the serialized media path: a viewer preference update
+    // running at the same time cannot attach this kind a second time, and it
+    // renegotiates once.
     for (final c in _allConnections().where((c) => c.type == 'publisher')) {
-      if (!c._infoSent || !c.controlOpen || !(track.kind == 'video' ? c.allowVideo : c.allowAudio)) continue;
-      final sender = await c.pc.addTrack(track, stream ?? _localStream ?? await createLocalMediaStream('vdoninja'));
-      c._senders.add(sender);
-      _senderKinds[sender] = track.kind ?? 'video'; // needed to resume after a viewer mutes this kind
-      await _renegotiate(c);
+      await _updateTracks(c);
     }
   }
 

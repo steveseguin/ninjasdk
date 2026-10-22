@@ -375,3 +375,43 @@ async def test_stream_notice_preserves_view_preferences():
     sdk._handle_video_added({"streamID": sdk.hashed_stream_id("late"), "UUID": "publisher"})
     assert sdk._pending_views.get("late") is prefs, "offer arriving before retry lost preferences"
     await sdk.disconnect()
+
+
+async def test_add_track_does_not_duplicate_an_attached_kind(signal_host):
+    """add_track must go through the locked media path, not attach senders itself.
+
+    Attaching directly duplicated a kind the preference path was already
+    attaching: two senders and two renegotiations for one track.
+    """
+    pub = make(signal_host)
+    view = make(signal_host)
+
+    async def until(predicate):
+        async def poll():
+            while not predicate():
+                await asyncio.sleep(0.02)
+        await asyncio.wait_for(poll(), 10)
+
+    def video_senders(conn):
+        return [s for s in conn.pc.getSenders() if s.track is not None and s.track.kind == "video"]
+
+    try:
+        await pub.connect()
+        await pub.publish([AudioStreamTrack()], "dupcam", room="py-dup")
+        await view.connect()
+        await view.join_room("py-dup")
+        conn = await view.view("dupcam", audio=True, video=False)
+        await until(lambda: conn.control_open and bool(pub.peers()))
+        publisher = pub.connection(pub.peers()[0], "publisher")
+        await until(lambda: publisher.info_sent)
+
+        # The viewer wants video from here on.
+        publisher.allow_video = True
+        await pub.add_track(VideoStreamTrack())
+        assert len(video_senders(publisher)) == 1
+
+        await pub.add_track(VideoStreamTrack())
+        assert len(video_senders(publisher)) == 1, "second video track added a duplicate sender"
+    finally:
+        await pub.disconnect()
+        await view.disconnect()

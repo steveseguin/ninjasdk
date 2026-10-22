@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
+	"fmt"
 	"net/http/httptest"
 	"strings"
 	"testing"
@@ -739,4 +740,120 @@ func TestStreamNoticePreservesViewPreferences(t *testing.T) {
 		t.Fatal("offer arriving before retry lost the requested preferences")
 	}
 	s.Disconnect()
+}
+
+// AddTrack used to attach a sender directly, so it could duplicate a kind that
+// the viewer-preference path was attaching at the same moment: two senders and
+// two renegotiations for one track.
+func TestAddTrackDoesNotDuplicateAnAttachedKind(t *testing.T) {
+	host := startSignal(t)
+
+	countAttached := func(c *Connection, kind webrtc.RTPCodecType) int {
+		n := 0
+		for _, sender := range c.pc.GetSenders() {
+			if track := sender.Track(); track != nil && track.Kind() == kind {
+				n++
+			}
+		}
+		return n
+	}
+
+	fixture := 0
+	establish := func(t *testing.T) (*SDK, *Connection) {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		t.Cleanup(cancel)
+		// Each attempt needs its own stream so the room never sees a duplicate.
+		fixture++
+		streamID := fmt.Sprintf("dupcam%d", fixture)
+		room := fmt.Sprintf("go-dup-room%d", fixture)
+		pub := newTestSDK(t, host, nil)
+		view := newTestSDK(t, host, nil)
+		audio, err := webrtc.NewTrackLocalStaticSample(webrtc.RTPCodecCapability{MimeType: webrtc.MimeTypeOpus}, "audio", "gocam")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := pub.Connect(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := pub.Publish(ctx, []webrtc.TrackLocal{audio}, PublishOptions{StreamID: streamID, Room: room}); err != nil {
+			t.Fatal(err)
+		}
+		if err := view.Connect(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if err := view.JoinRoom(ctx, room); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := view.View(ctx, streamID, ViewOptions{Audio: Bool(true), Video: Bool(false)}); err != nil {
+			t.Fatal(err)
+		}
+		deadline := time.Now().Add(20 * time.Second)
+		for time.Now().Before(deadline) {
+			var c *Connection
+			pub.mu.Lock()
+			for _, pair := range pub.connections {
+				if pair.publisher != nil {
+					c = pair.publisher
+				}
+			}
+			pub.mu.Unlock()
+			if c != nil {
+				c.mu.Lock()
+				ready := c.infoSent
+				c.mu.Unlock()
+				// Wait until the preference path has attached the audio the
+				// viewer asked for; that is the state where a second attach of
+				// an already-present kind used to slip through.
+				if ready && c.controlOpen() && countAttached(c, webrtc.RTPCodecTypeAudio) == 1 {
+					// The viewer wants video from here on.
+					c.mu.Lock()
+					c.allowVideo = true
+					c.mu.Unlock()
+					return pub, c
+				}
+			}
+			time.Sleep(25 * time.Millisecond)
+		}
+		t.Fatal("publisher connection never completed the control handshake")
+		return nil, nil
+	}
+
+	newVideo := func(t *testing.T, id string) webrtc.TrackLocal {
+		track, err := webrtc.NewTrackLocalStaticSample(webrtc.RTPCodecCapability{MimeType: webrtc.MimeTypeVP8}, id, "gocam")
+		if err != nil {
+			t.Fatal(err)
+		}
+		return track
+	}
+
+	t.Run("after the preference path attached it", func(t *testing.T) {
+		pub, c := establish(t)
+		if err := pub.AddTrack(newVideo(t, "video")); err != nil {
+			t.Fatal(err)
+		}
+		if got := countAttached(c, webrtc.RTPCodecTypeVideo); got != 1 {
+			t.Fatalf("wanted one video sender after AddTrack, got %d", got)
+		}
+		if err := pub.AddTrack(newVideo(t, "video2")); err != nil {
+			t.Fatal(err)
+		}
+		if got := countAttached(c, webrtc.RTPCodecTypeVideo); got != 1 {
+			t.Fatalf("second video track added a duplicate sender: %d", got)
+		}
+	})
+
+	t.Run("racing the preference path", func(t *testing.T) {
+		for attempt := 0; attempt < 3; attempt++ {
+			pub, c := establish(t)
+			track := newVideo(t, "video")
+			done := make(chan struct{}, 2)
+			go func() { _ = pub.AddTrack(track); done <- struct{}{} }()
+			go func() { pub.updateTracksForConnection(c); done <- struct{}{} }()
+			<-done
+			<-done
+			if got := countAttached(c, webrtc.RTPCodecTypeVideo); got != 1 {
+				t.Fatalf("attempt %d: wanted one video sender, got %d", attempt, got)
+			}
+		}
+	})
 }

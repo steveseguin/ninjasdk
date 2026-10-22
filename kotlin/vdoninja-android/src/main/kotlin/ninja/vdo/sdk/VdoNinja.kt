@@ -387,12 +387,10 @@ class VdoNinja @JvmOverloads constructor(
             localTracks.add(track)
             conns = allConnections().filter { it.type == "publisher" }
         }
-        for (c in conns) {
-            if (!c.infoSent || !c.controlOpen || !(if (track.kind() == "video") c.allowVideo else c.allowAudio)) continue
-            val sender = c.pc.addTrack(track, listOf("vdoninja"))
-            synchronized(lock) { c.senders.add(sender to track.kind()) }
-            renegotiate(c, false)
-        }
+        // Attach through the shared media path: it synchronizes on the connection,
+        // so a viewer preference update arriving at the same time cannot attach
+        // this kind a second time, and it renegotiates once.
+        for (c in conns) updateTracks(c)
     }
 
     /** Replaces the published track of the same kind on every viewer (camera/mic switching), no renegotiation. */

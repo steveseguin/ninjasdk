@@ -417,10 +417,11 @@ public final class VDONinja {
     public func addTrack(_ track: RTCMediaStreamTrack) {
         queue.async {
             self.localTracks.append(track)
+            // Attach through the shared media path: it dedupes by kind, so a
+            // viewer preference update cannot attach this kind a second time,
+            // and it renegotiates once.
             for c in self.allConnections() where c.type == "publisher" {
-                guard c.infoSent, c.controlOpen, (track.kind == "video" ? c.allowVideo : c.allowAudio) else { continue }
-                if let sender = c.pc.add(track, streamIds: ["vdoninja"]) { c.senders.append((sender, track.kind)) }
-                self.renegotiate(c, iceRestart: false)
+                self.updateTracks(c)
             }
         }
     }
