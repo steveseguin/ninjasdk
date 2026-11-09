@@ -11,7 +11,7 @@
 <link rel="stylesheet" href="../site.css"><link rel="stylesheet" href="guide.css"></head>
 <body><a class="skip-link" href="#content">Skip to content</a>
 <header class="site-header"><div class="site-header-inner"><a class="brand" href="../index.html"><img src="../favicon.svg" alt="" width="26" height="26"><span>VDO.Ninja SDK</span></a><nav class="site-nav" aria-label="Main"><a href="../index.html#try-live">Live demo</a><a href="../index.html#quickstart">Quick start</a><a href="../index.html#sdks">SDKs</a><a href="../demos/">Demos</a><a href="guides.html">Guides</a><a href="api-reference.html">API</a><a href="../index.html#faq">FAQ</a></nav><div class="site-header-actions"><a class="btn btn-secondary btn-sm" href="https://github.com/steveseguin/ninjasdk">GitHub</a></div></div></header>
-<div class="layout"><aside><nav aria-label="On this page"><strong>On this page</strong><a href="#validated-issues-and-remedies">Validated issues and remedies</a><a href="#source-evidence">Source evidence</a><a href="#migration">Migration</a><a href="#regression-checks">Regression checks</a><a href="#initial-audit-validation">Initial audit validation</a><a href="#follow-up-correctness-review">Follow-up correctness review</a></nav></aside>
+<div class="layout"><aside><nav aria-label="On this page"><strong>On this page</strong><a href="#validated-issues-and-remedies">Validated issues and remedies</a><a href="#source-evidence">Source evidence</a><a href="#migration">Migration</a><a href="#regression-checks">Regression checks</a><a href="#initial-audit-validation">Initial audit validation</a><a href="#follow-up-correctness-review">Follow-up correctness review</a><a href="#completed-branch-validation">Completed branch validation</a></nav></aside>
 <main id="content"><h1 id="protocol-audit-2026-11-08">Protocol audit: 2026-11-08</h1>
 <p>The source of truth is the <a href="https://github.com/steveseguin/vdo.ninja/tree/3ea79516ff9f96108bff10cffd33fa5fe95a00de">VDO.Ninja application at <code>3ea79516</code></a>.
 The JavaScript SDK, native SDKs, their local signaling servers and their generated vectors are implementations and test aids, not specifications.</p>
@@ -86,7 +86,7 @@ The JavaScript SDK, native SDKs, their local signaling servers and their generat
 <li>Dart core: analyzer and all 10 tests passed. Kotlin core: all 14 tests passed.</li>
 <li>VST: Windows build, vendored-SDK tests, 9 receive scenarios and the 6-case native receive matrix passed. These include data-before-media, conflicting incoming <code>from</code>, native mic-only, video-bearing offers, forced TURN and a TURN-discovery outage.</li>
 </ul>
-<p>Swift and the Flutter/Android/Apple WebRTC wrapper builds were not run locally. Their existing CI jobs remain required before publishing SDK packages. These changes have not been released.</p>
+<p>The subsequent CI validation below includes Swift and the Flutter/Android/Apple WebRTC wrappers. SDK packages have not been published.</p>
 <h2 id="follow-up-correctness-review">Follow-up correctness review</h2>
 <p>Each correction below was checked against the browser implementation or the actual transport library. SDK configuration and local retry scheduling are not additional wire protocol fields.</p>
 <div class="table-scroll" tabindex="0" role="region" aria-label="Comparison table"><table>
@@ -99,11 +99,11 @@ The JavaScript SDK, native SDKs, their local signaling servers and their generat
 <tbody>
 <tr>
 <td>1. Publishers attached audio/video before control preferences.</td>
-<td>All SDKs and the VST now offer <code>sendChannel</code> first. Boolean audio/video preferences enable tracks and a later media offer; an omitted preference preserves the previous choice. Real transport tests cover JS, C, Go, Python, Rust and the plugin. Mobile wrapper builds remain a separate gate.</td>
+<td>All SDKs and the VST now offer <code>sendChannel</code> first. Boolean audio/video preferences enable tracks and a later media offer; an omitted preference preserves the previous choice. Real transport tests cover JS, C, Go, Python, Rust and the plugin. Flutter, Android and Apple wrapper builds passed in CI.</td>
 </tr>
 <tr>
 <td>2. VST data-channel ICE could use a payload UUID to create or target another peer.</td>
-<td>Bind ICE to its source channel and current session. A conflicting UUID test receives audio without creating the fake peer.</td>
+<td>Bind offers, answers and ICE to the channel owner, matching webrtc.js receiveChannel.onmessage. Destination-UUID regression tests cover encrypted browser and plugin-to-plugin renegotiation.</td>
 </tr>
 <tr>
 <td>3. Non-ASCII AES bytes differed from the browser.</td>
@@ -162,5 +162,8 @@ The JavaScript SDK, native SDKs, their local signaling servers and their generat
 <p>The browser recovery reference is <a href="https://github.com/steveseguin/vdo.ninja/blob/3ea79516ff9f96108bff10cffd33fa5fe95a00de/webrtc.js#L23518"><code>webrtc.js</code> connection-state handling</a>. The plugin's libjuice backend explicitly rejects ICE restart, so it recovers with a fresh publisher session through the existing negotiation flow. Healthy media survives signaling reconnects. A peer that has never answered a control ping is not disconnected for ignoring pings; it uses ICE state and connection deadlines instead.</p>
 <p>Follow-up local results include C's three suites, Go's race-enabled package tests, 29 Python tests, Dart core analysis and 11 tests, the six browser-source checks, and BrowserStack Samsung Galaxy S23 / Android 13 Chrome publishing through the unmodified browser checkout into the plugin (received RMS 0.166392). Repeated VST IP changes recovered measured audio in about nine seconds; an older-app fixture without pong support took about 30 seconds. These are controlled test results, not a guarantee for every mobile network.</p>
 <p>Android remains unchanged. In the reviewed <code>social_ninja</code> source, incoming default signaling prefers <code>from</code> at <code>signaling.dart:5402</code>, and <code>_handleDataChannelMessage</code> at <code>signaling.dart:12683</code> lacks the browser's ping/pong handling. Use routed <code>UUID</code> outside explicit fan-out mode and echo a control ping's token on that same channel. Review its existing ICE-restart/session guards when applying those app fixes; no new wire identity is needed.</p>
+<h2 id="completed-branch-validation">Completed branch validation</h2>
+<p><a href="https://github.com/steveseguin/ninjasdk/actions/runs/42543274997">Native SDK CI</a> passed all twelve jobs: C, Go with the race detector, Rust on Linux/macOS/Windows, Python 3.10/3.12, Dart/Flutter, Kotlin/Android, Swift on macOS and Linux, and cross-language interop. <a href="https://github.com/steveseguin/ninjasdk/actions/runs/42543277607">JavaScript CI</a> passed both WebRTC engines on Node 18 and 20. These runs validate commit <code>82bf101</code>; integrating subsequent upstream changes requires another run.</p>
+<p>Real Chrome against the unmodified browser checkout passed encrypted media, special-character password and application-data interoperability. The plugin passed Chrome audio in both directions, owned encrypted live-room audio and destination-UUID media renegotiation.</p>
 </main></div>
 <footer class="site-footer"><div class="container"><span>VDO.Ninja SDK guides</span><nav aria-label="Footer"><a href="guides.html">All guides</a><a href="validation.html">Validation and limits</a><a href="protocol-audit.md">Markdown source</a><a href="https://github.com/steveseguin/ninjasdk">Repository</a></nav></div></footer></body></html>

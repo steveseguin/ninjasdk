@@ -57,7 +57,7 @@ This audit covers signaling identities, request/control envelopes, application-d
 - Dart core: analyzer and all 10 tests passed. Kotlin core: all 14 tests passed.
 - VST: Windows build, vendored-SDK tests, 9 receive scenarios and the 6-case native receive matrix passed. These include data-before-media, conflicting incoming `from`, native mic-only, video-bearing offers, forced TURN and a TURN-discovery outage.
 
-Swift and the Flutter/Android/Apple WebRTC wrapper builds were not run locally. Their existing CI jobs remain required before publishing SDK packages. These changes have not been released.
+The subsequent CI validation below includes Swift and the Flutter/Android/Apple WebRTC wrappers. SDK packages have not been published.
 
 ## Follow-up correctness review
 
@@ -65,8 +65,8 @@ Each correction below was checked against the browser implementation or the actu
 
 | Finding | Correction and focused validation |
 | --- | --- |
-| 1. Publishers attached audio/video before control preferences. | All SDKs and the VST now offer `sendChannel` first. Boolean audio/video preferences enable tracks and a later media offer; an omitted preference preserves the previous choice. Real transport tests cover JS, C, Go, Python, Rust and the plugin. Mobile wrapper builds remain a separate gate. |
-| 2. VST data-channel ICE could use a payload UUID to create or target another peer. | Bind ICE to its source channel and current session. A conflicting UUID test receives audio without creating the fake peer. |
+| 1. Publishers attached audio/video before control preferences. | All SDKs and the VST now offer `sendChannel` first. Boolean audio/video preferences enable tracks and a later media offer; an omitted preference preserves the previous choice. Real transport tests cover JS, C, Go, Python, Rust and the plugin. Flutter, Android and Apple wrapper builds passed in CI. |
+| 2. VST data-channel ICE could use a payload UUID to create or target another peer. | Bind offers, answers and ICE to the channel owner, matching webrtc.js receiveChannel.onmessage. Destination-UUID regression tests cover encrypted browser and plugin-to-plugin renegotiation. |
 | 3. Non-ASCII AES bytes differed from the browser. | Use each UTF-16 code unit's low byte for AES keys and plaintext, and Latin-1 decoding. Hashes remain UTF-8. Execute the real browser conversion in vector tests, including an emoji salt and Latin-1 plaintext. |
 | 4. VST encryption failure could send plaintext. | Fail closed. A separate native test process forces OpenSSL RNG failure and observes no plaintext SDP/ICE. |
 | 5. Relay timezone selection used inconsistent signs or DST rules. | Match `lib.js:getTimezone`, including its historical 1900/1906 baseline. Winter/summer tests execute browser code. Windows C runtimes without pre-1970 dates use the OS standard offset; rare historical timezone differences remain a limitation there. |
@@ -86,3 +86,9 @@ The browser recovery reference is [`webrtc.js` connection-state handling](https:
 Follow-up local results include C's three suites, Go's race-enabled package tests, 29 Python tests, Dart core analysis and 11 tests, the six browser-source checks, and BrowserStack Samsung Galaxy S23 / Android 13 Chrome publishing through the unmodified browser checkout into the plugin (received RMS 0.166392). Repeated VST IP changes recovered measured audio in about nine seconds; an older-app fixture without pong support took about 30 seconds. These are controlled test results, not a guarantee for every mobile network.
 
 Android remains unchanged. In the reviewed `social_ninja` source, incoming default signaling prefers `from` at `signaling.dart:5402`, and `_handleDataChannelMessage` at `signaling.dart:12683` lacks the browser's ping/pong handling. Use routed `UUID` outside explicit fan-out mode and echo a control ping's token on that same channel. Review its existing ICE-restart/session guards when applying those app fixes; no new wire identity is needed.
+
+## Completed branch validation
+
+[Native SDK CI](https://github.com/steveseguin/ninjasdk/actions/runs/42543274997) passed all twelve jobs: C, Go with the race detector, Rust on Linux/macOS/Windows, Python 3.10/3.12, Dart/Flutter, Kotlin/Android, Swift on macOS and Linux, and cross-language interop. [JavaScript CI](https://github.com/steveseguin/ninjasdk/actions/runs/42543277607) passed both WebRTC engines on Node 18 and 20. These runs validate commit `82bf101`; integrating subsequent upstream changes requires another run.
+
+Real Chrome against the unmodified browser checkout passed encrypted media, special-character password and application-data interoperability. The plugin passed Chrome audio in both directions, owned encrypted live-room audio and destination-UUID media renegotiation.
