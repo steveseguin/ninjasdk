@@ -616,7 +616,7 @@ func (s *SDK) writeWS(b []byte) bool {
 	return true
 }
 
-// sendWS marshals and sends a native signaling message.
+// sendWS sends routed signaling; the server supplies the sender UUID on delivery.
 func (s *SDK) sendWS(msg map[string]any) bool {
 	b, err := json.Marshal(msg)
 	if err != nil {

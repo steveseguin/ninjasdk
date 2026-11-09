@@ -8,7 +8,45 @@ import (
 	"net/http/httptest"
 	"reflect"
 	"testing"
+	"time"
 )
+
+// Expected values come from vdo.ninja/lib.js getTimezone(), not SDK selection code.
+func TestBrowserTimezoneWinterAndSummer(t *testing.T) {
+	for _, sample := range []struct {
+		zone     string
+		expected int
+	}{
+		{"America/Toronto", 300}, {"Europe/Berlin", -60},
+		{"Australia/Sydney", -600}, {"Asia/Kolkata", -270},
+	} {
+		zone, err := time.LoadLocation(sample.zone)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, month := range []time.Month{time.January, time.July} {
+			got := browserTimezoneOffset(time.Date(2026, month, 15, 12, 0, 0, 0, zone))
+			if got != sample.expected {
+				t.Errorf("%s %v: got %d, want %d", sample.zone, month, got, sample.expected)
+			}
+		}
+	}
+}
+
+func TestFetchTURNPreservesQuery(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		q := r.URL.Query()
+		if q.Get("region") != "ca" || q.Get("key") != "a+b" || !q.Has("empty") || q.Get("ts") == "" {
+			t.Errorf("query corrupted: %v", q)
+		}
+		fmt.Fprint(w, `{"servers":[{"urls":["turn:fixture.invalid:3478"],"udp":true}]}`)
+	}))
+	defer srv.Close()
+	_, err := FetchTURNServers(context.Background(), srv.Client(), srv.URL+"?region=ca&key=a%2Bb&empty=")
+	if err != nil {
+		t.Fatal(err)
+	}
+}
 
 func TestFetchTURNScalarAndArrayURLs(t *testing.T) {
 	for _, urls := range []string{`"turn:custom.test:3478"`, `["turn:custom.test:3478"]`} {

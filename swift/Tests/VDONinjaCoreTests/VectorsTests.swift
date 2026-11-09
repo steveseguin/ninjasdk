@@ -9,6 +9,11 @@ final class VectorsTests: XCTestCase {
         XCTAssertEqual((ViewOptions(label: "camera").prefs["info"] as? JSON)?["label"] as? String, "camera")
     }
 
+
+    func testTurnDiscoveryPreservesCustomQuery() throws {
+        let url = try XCTUnwrap(Turn.discoveryURL("https://owned.invalid/list?key=a%2Bb&region=one&region=two&empty=&ts=old#part", timestamp: 123))
+        XCTAssertEqual(url.absoluteString, "https://owned.invalid/list?key=a%2Bb&region=one&region=two&empty=&ts=123#part")
+    }
     static let vectors: JSON = {
         let candidates = [
             ProcessInfo.processInfo.environment["VDON_VECTORS"],
@@ -79,7 +84,7 @@ final class VectorsTests: XCTestCase {
     func testEncryption() throws {
         for c in cases("encryption") {
             let phrase = str(c, "phrase")
-            XCTAssertEqual(Crypto.toHex(Crypto.sha256(Array(phrase.utf8))), str(c, "keyHex"))
+            XCTAssertEqual(Crypto.toHex(Crypto.sha256(Crypto.browserAesBytes(phrase))), str(c, "keyHex"))
             let enc = Crypto.encryptMessage(str(c, "plaintext"), phrase: phrase, iv: Crypto.fromHex(str(c, "ivHex")))
             XCTAssertEqual(enc.ciphertext, str(c, "ciphertextHex"))
             XCTAssertEqual(try Crypto.decryptMessage(str(c, "ciphertextHex"), vector: str(c, "ivHex"), phrase: phrase), str(c, "plaintext"))
@@ -143,7 +148,7 @@ final class VectorsTests: XCTestCase {
         let servers = Turn.select(Turn.fallback, tzOffsetMinutes: -60)
         XCTAssertEqual(servers.count, 3)
         XCTAssertEqual(servers.filter { $0.urls[0].hasPrefix("turns:") }.count, 1)
-        XCTAssertTrue(servers.contains { $0.urls == ["turn:turn-eu1.vdo.ninja:3478"] })
+        XCTAssertTrue(servers.contains { $0.urls == ["turn:turn-de3.vdo.ninja:3478"] })
         XCTAssertEqual(Turn.select(Turn.fallback, tzOffsetMinutes: -60, forceTcp: true).count, 1)
         let body = """
         {"servers":[{"username":"u","credential":"c","urls":["turn:a:3478"],"tz":0,"udp":true}]}

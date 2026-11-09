@@ -1,5 +1,5 @@
 {
-  "description": "VDO.Ninja SDK protocol conformance vectors, generated from the JavaScript reference SDK.",
+  "description": "SDK consistency vectors generated from JavaScript; the VDO.Ninja application defines protocol compatibility.",
   "generator": "spec/generate-vectors.cjs",
   "sdkVersion": "1.6.2",
   "defaults": {
@@ -301,6 +301,16 @@
       "ivHex": "00000000000000000000000000000000",
       "plaintext": "",
       "ciphertextHex": "65f2fd4872b9e760270565efc3955690"
+    },
+    {
+      "rawPassword": "owned password",
+      "sanitizedPassword": "owned%20password",
+      "salt": "é日本🔊",
+      "phrase": "owned%20passwordé日本🔊",
+      "keyHex": "10aefdfaaaa8bbdd33aaac00704c0ece9e20dc2917299e1ea6a77c4988824245",
+      "ivHex": "01010101010101010101010101010101",
+      "plaintext": "{\"label\":\"café ÿ\"}",
+      "ciphertextHex": "46c51040cc301671ba77203f7c6d408581566caae504a8c869ee080f6364719f"
     }
   ],
   "passwordModes": [

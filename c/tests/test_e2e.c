@@ -1,6 +1,7 @@
 /* Copyright (c) 2025-2026 Steve Seguin. SPDX-License-Identifier: MPL-2.0 */
 /* End-to-end tests over the built-in signaling server: two SDK instances in one process. */
 #include "vdon_internal.h"
+#include "vdon_sdk_internal.h"
 #include "vdoninja.h"
 
 #include <cJSON.h>
@@ -362,8 +363,25 @@ static void test_media(const char *url) {
     vdon_track_init_defaults(&tracks[1], VDON_MEDIA_AUDIO, VDON_CODEC_OPUS);
     tracks[1].ssrc = 0x55667788;
     CHECK(vdon_publish(a, "media_stream", NULL, tracks, 2, NULL, 0) == VDON_OK, "publish");
-    rc = vdon_view(b, "media_stream", NULL, 10000);
+    vdon_view_options view_opts;
+    vdon_view_options_init(&view_opts);
+    view_opts.audio = view_opts.video = 0;
+    rc = vdon_view(b, "media_stream", &view_opts, 10000);
     CHECK(rc == VDON_OK, "view rc=%d", rc);
+    CHECK(wait_event(&rb, VDON_EVENT_DATA_CHANNEL_OPEN, 15000) >= 0, "B initial control channel");
+    pthread_mutex_lock(&a->lock);
+    conn_t *publisher = a->conns;
+    char first_sdp[16384] = {0};
+    if (publisher) rtcGetLocalDescription(publisher->pc, first_sdp, sizeof(first_sdp));
+    CHECK(strstr(first_sdp, "m=application ") && !strstr(first_sdp, "m=audio ") && !strstr(first_sdp, "m=video "),
+          "initial publisher offer must be data-only");
+    pthread_mutex_unlock(&a->lock);
+    cJSON *preferences = cJSON_Parse("{\"audio\":true,\"video\":true}");
+    pthread_mutex_lock(&b->lock);
+    conn_t *viewer = b->conns;
+    pthread_mutex_unlock(&b->lock);
+    if (viewer) vdon__conn_send_control(b, viewer, preferences);
+    cJSON_Delete(preferences);
     i = wait_event(&rb, VDON_EVENT_TRACK, 10000);
     CHECK(i >= 0, "B got track event");
     CHECK(wait_event_n(&rb, VDON_EVENT_TRACK, NULL, 1, 10000) >= 0, "B got second track");
@@ -498,11 +516,14 @@ int main(int argc, char **argv) {
     }
     snprintf(url, sizeof(url), "ws://127.0.0.1:%d", vdon_signal_server_port(server));
     printf("signaling server at %s\n", url);
-    test_data(url);
+    int media_only = argc > 1 && strcmp(argv[1], "--media-only") == 0;
+    if (!media_only) test_data(url);
     test_media(url);
-    test_no_password(url);
-    test_pending_view(url);
-    test_room_autoconnect(url);
+    if (!media_only) {
+        test_no_password(url);
+        test_pending_view(url);
+        test_room_autoconnect(url);
+    }
     vdon_signal_server_destroy(server);
     if (failures) {
         fprintf(stderr, "%d failure(s)\n", failures);

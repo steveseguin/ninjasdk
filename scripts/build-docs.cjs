@@ -3,7 +3,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const MarkdownIt = require('markdown-it');
 const root = path.resolve(__dirname, '..');
-const guides = ['guides', 'connecting', 'data-messaging', 'file-transfer', 'agent-network', 'remote-control', 'recording', 'streaming', 'native-sdks', 'reliability-and-recovery', 'compatibility', 'api-reference', 'validation'];
+const guides = ['guides', 'connecting', 'data-messaging', 'file-transfer', 'agent-network', 'remote-control', 'recording', 'streaming', 'native-sdks', 'protocol-audit', 'reliability-and-recovery', 'compatibility', 'api-reference', 'validation'];
 const escape = value => String(value).replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
 
 // Collapses the guide's opening paragraph into a single-sentence meta

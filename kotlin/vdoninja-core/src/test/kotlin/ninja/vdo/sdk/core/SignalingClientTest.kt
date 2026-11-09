@@ -8,6 +8,7 @@ import okhttp3.WebSocketListener
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import okhttp3.mockwebserver.SocketPolicy
+import org.json.JSONObject
 import java.io.IOException
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.CopyOnWriteArrayList
@@ -21,6 +22,34 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class SignalingClientTest {
+    @Test
+    fun routedEndpointKeepsDestinationUuidWithoutInventingSender() {
+        MockWebServer().use { server ->
+            val received = AtomicReference<JSONObject>()
+            val done = CountDownLatch(1)
+            server.enqueue(MockResponse().withWebSocketUpgrade(object : WebSocketListener() {
+                override fun onMessage(webSocket: WebSocket, text: String) {
+                    received.set(JSONObject(text))
+                    done.countDown()
+                }
+                override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
+                    webSocket.close(code, reason)
+                }
+            }))
+            val client = SignalingClient(server.url("/custom-endpoint").toString())
+            try {
+                client.connect()
+                assertTrue(client.send(JSONObject().put("UUID", "destination").put("iceRestartRequest", true)))
+                assertTrue(done.await(3, TimeUnit.SECONDS))
+                val message = received.get()
+                assertEquals(setOf("UUID", "iceRestartRequest"), message.keySet())
+                assertEquals("destination", message.getString("UUID"))
+            } finally {
+                client.shutdown()
+            }
+        }
+    }
+
     @Test
     fun overlappingConnectPreservesPendingHandshake() {
         MockWebServer().use { server ->

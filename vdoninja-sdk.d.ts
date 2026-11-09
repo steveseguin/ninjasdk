@@ -112,8 +112,6 @@ export type DataTarget =
           streamID?: string;
           /** Data-channel routing. Default 'any': publisher first, then viewer. */
           preference?: 'any' | 'viewer' | 'publisher' | 'all';
-          /** Use WebSocket signaling when no matching data channel is available. Default false. */
-          allowFallback?: boolean;
       };
 
 // ---------------------------------------------------------------------------
@@ -268,9 +266,9 @@ export interface VDONinjaEventMap {
     /** Sparse OBS update plus the SDK's merged state for this peer. */
     obsState: { uuid: string; streamID: string | null; state: OBSState; update: OBSState };
 
-    dataReceived: { data: unknown; uuid: string; streamID?: string | null; fallback?: boolean };
+    dataReceived: { data: unknown; uuid: string; streamID?: string | null };
     /** Long-standing misspelling, still emitted alongside dataReceived. */
-    dataRecieved: { data: unknown; uuid: string; streamID?: string | null; fallback?: boolean };
+    dataRecieved: { data: unknown; uuid: string; streamID?: string | null };
 
     track: { track: MediaStreamTrack; streams?: MediaStream[]; uuid: string; streamID: string | null };
 

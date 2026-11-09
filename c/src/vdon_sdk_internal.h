@@ -66,6 +66,7 @@ typedef struct chan {
 
 typedef struct ptrack {
     int tr;
+    int template_index; /* local template index + 1; zero for incoming tracks */
     vdon_media_kind kind;
     int packetize;
     uint32_t ts;
@@ -85,6 +86,7 @@ struct conn {
     int connected_once;
     int disc_emitted;
     int remote_set;
+    int media_needs_offer, media_offer_outstanding;
     int recovering;
     int grace_pending;
     chan_t *chans;
@@ -255,6 +257,7 @@ struct vdon_sdk {
     char **ice_servers;
     int ice_count;
     int turn_fetched;
+    int64_t turn_expires_at;
 };
 
 /* core (vdon_sdk.c) */

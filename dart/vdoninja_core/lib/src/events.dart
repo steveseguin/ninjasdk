@@ -53,7 +53,6 @@ class VdoEvent {
     this.attempt,
     this.muted,
     this.intentional = false,
-    this.fallback = false,
     this.track,
     this.stream,
     this.raw,
@@ -76,7 +75,6 @@ class VdoEvent {
   final int? attempt;
   final bool? muted;
   final bool intentional;
-  final bool fallback;
 
   /// Engine-specific track object (`MediaStreamTrack` in Flutter).
   final Object? track;

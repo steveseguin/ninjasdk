@@ -1,0 +1,78 @@
+{
+  "source": {
+    "repository": "https://github.com/steveseguin/vdo.ninja",
+    "commit": "3ea79516ff9f96108bff10cffd33fa5fe95a00de",
+    "mode": "server-routed (default and wss2); not customWSS/fan-out",
+    "evidence": {
+      "requests": "webrtc.js: session.watch (play), session.sendMsg; main.js room/seed setup",
+      "routing": "webrtc.js: session.sendMsg; customWSS receive block",
+      "applicationData": "webrtc.js: session.sendGenericData, session.sendRequest, session.sendMessage; pipe is WebRTC-only"
+    }
+  },
+  "requests": {
+    "joinroom": [
+      "request",
+      "roomid",
+      "claim",
+      "streamID"
+    ],
+    "seed": [
+      "request",
+      "streamID"
+    ],
+    "play": [
+      "request",
+      "streamID"
+    ]
+  },
+  "leave": [
+    "leave"
+  ],
+  "peer": [
+    "UUID",
+    "session",
+    "streamID",
+    "description",
+    "candidate",
+    "candidates",
+    "type",
+    "vector",
+    "bye",
+    "iceRestartRequest"
+  ],
+  "peerPayloads": [
+    "description",
+    "candidate",
+    "candidates",
+    "bye",
+    "iceRestartRequest"
+  ],
+  "candidateTypes": [
+    "local",
+    "remote"
+  ],
+  "control": [
+    "audio",
+    "video",
+    "downloads",
+    "allowresources",
+    "info",
+    "ping",
+    "pong",
+    "pipe",
+    "bye",
+    "videoMuted",
+    "iceRestartRequest",
+    "description",
+    "candidate",
+    "candidates",
+    "vector",
+    "UUID",
+    "session",
+    "streamID",
+    "type",
+    "fileList",
+    "requestFile",
+    "obsState"
+  ]
+}

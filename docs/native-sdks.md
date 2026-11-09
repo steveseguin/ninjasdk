@@ -72,8 +72,8 @@ links contain the password. The shared default is not a private secret.
 
 ## Code and tests
 
-The implementation is authoritative. Check the JS SDK together with the relevant
-VDO.Ninja handler and `hss/gemini.js`; server acceptance alone does not establish
+The VDO.Ninja application is authoritative. Check its relevant handler and
+`hss/gemini.js`; SDK behavior and server acceptance alone do not establish
 correct usage. Do not copy behavior that violates the handshake checklist.
 
 | Check | Starting point |
@@ -92,3 +92,9 @@ See [test commands](../tests/interop/README.md) and each port's README.
 
 SDK core code is MPL-2.0; see [LICENSING.md](../LICENSING.md). Hosted services have
 separate usage rules and limits. Use the SDK's supported signaling paths.
+
+## Protocol audit and migration
+
+The VDO.Ninja application is the source of truth. See the [validated audit and migration notes](protocol-audit.md) for the reviewed source revision and browser interoperability checks. Removed unsupported identity options (`client_id`, `ClientID`, `clientId`) and WebSocket application-data fallback options must be removed from callers. Rebuild C applications after the struct changes. Custom signaling URLs use routed `UUID`, not fan-out `from`. Application data requires an open data channel.
+
+Relay lists follow the browser fallback data. Automatic credentials expire and refresh. Custom discovery URLs preserve their query parameters. The C backend does not implement TURN TCP/TLS; `force_tcp` fails with `EINVAL`. Python's aiortc backend cannot enforce relay-only candidate policy through the current API.

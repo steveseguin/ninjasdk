@@ -107,7 +107,6 @@ class Event:
     intentional: Optional[bool] = None
     will_reconnect: Optional[bool] = None
     reason: Optional[str] = None
-    fallback: bool = False
 
 
 @dataclass
@@ -163,9 +162,10 @@ class Connection:
         self.info: Dict[str, Any] = {}
         self.obs_state: Dict[str, Any] = {}
         self.info_sent = False
-        self.media_lock = asyncio.Lock()
         self.allow_audio = False
         self.allow_video = False
+        self.media_lock = asyncio.Lock()
+        self.media_negotiation_needed = False
         self.allow_downloads = False
         self.allow_resources = False
         self.view_options = _ViewOptions()
@@ -475,6 +475,8 @@ class VDONinja:
     async def _read_loop(self, ws, generation: int) -> None:
         try:
             async for raw in ws:
+                if self._ws is not ws or generation != self._generation:
+                    break
                 if isinstance(raw, bytes):
                     raw = raw.decode("utf-8", "replace")
                 try:
@@ -1023,7 +1025,11 @@ class VDONinja:
         return servers + list(self._turn_list)
 
     async def _create_connection(self, uuid: str, kind: str) -> Connection:
-        pc = RTCPeerConnection(RTCConfiguration(iceServers=await self._ice_servers()))
+        generation = self._generation
+        servers = await self._ice_servers()
+        if generation != self._generation or self._intentional:
+            raise VDONinjaError("peer creation cancelled by disconnect")
+        pc = RTCPeerConnection(RTCConfiguration(iceServers=servers))
         conn = Connection(self, uuid, kind, pc)
 
         @pc.on("connectionstatechange")
@@ -1055,6 +1061,9 @@ class VDONinja:
         if old:
             log.debug("replacing existing %s connection to %s", kind, uuid)
             await old.close()
+        if generation != self._generation or self._intentional or not self._is_current(conn):
+            await conn.close()
+            raise VDONinjaError("peer creation cancelled by disconnect or replacement")
 
         async def connect_timeout() -> None:
             await asyncio.sleep(self.connection_timeout)
@@ -1066,15 +1075,18 @@ class VDONinja:
 
     def _is_current(self, conn: Connection) -> bool:
         pair = self.connections.get(conn.uuid)
-        return bool(pair) and (pair.publisher is conn or pair.viewer is conn)
+        return not conn.finalized and bool(pair) and (pair.publisher is conn or pair.viewer is conn)
 
     async def _create_offer(self, conn: Connection) -> RTCSessionDescription:
-        # Initial negotiation establishes the control channel only.
+        # The initial publisher offer contains sendChannel only. Media is added
+        # by _update_tracks after the viewer sends data-channel preferences.
         offer = await conn.pc.createOffer()
         await conn.pc.setLocalDescription(offer)
         return conn.pc.localDescription
 
     def _send_description(self, conn: Connection, desc: RTCSessionDescription, include_stream_id: bool, via_signaling: bool = False) -> None:
+        if not self._is_current(conn):
+            return
         payload = {"type": desc.type, "sdp": desc.sdp}
         msg: Dict[str, Any] = {"UUID": conn.uuid, "session": conn.session}
         if include_stream_id and conn.stream_id:
@@ -1156,6 +1168,8 @@ class VDONinja:
             log.debug("handling offer failed: %s", exc)
             self._emit(Event("error", error=exc, uuid=uuid, message="failed to handle offer"))
             return
+        if not self._is_current(conn):
+            return
         local = conn.pc.localDescription
         payload = {"type": local.type, "sdp": local.sdp}
         out: Dict[str, Any] = {"UUID": uuid, "session": session}
@@ -1189,6 +1203,8 @@ class VDONinja:
         try:
             await conn.pc.setRemoteDescription(desc)
             await self._drain_pending_ice(conn, "remote")
+            if conn.media_negotiation_needed:
+                await self._update_tracks(conn)
         except Exception as exc:  # noqa: BLE001
             self._emit(Event("error", error=exc, uuid=uuid, message="failed to handle answer"))
 
@@ -1521,18 +1537,20 @@ class VDONinja:
         if conn.type != "publisher" or not conn.control_open or not conn.info_sent:
             return
         async with conn.media_lock:
-            changed = False
-            for track in self._local_tracks:
-                allowed = conn.allow_audio if track.kind == "audio" else conn.allow_video
-                sender = next((s for s in conn.senders if s.kind == track.kind), None)
-                if sender is None:
-                    if allowed:
+            if not self._is_current(conn):
+                return
+            for kind, allow in (("audio", conn.allow_audio), ("video", conn.allow_video)):
+                tracks = [track for track in self._local_tracks if track.kind == kind][:1]
+                senders = [sender for sender in conn.senders if sender.kind == kind]
+                for index, sender in enumerate(senders):
+                    # aiortc replaceTrack is synchronous, including the None case.
+                    sender.replaceTrack(tracks[index] if allow and index < len(tracks) else None)
+                if allow:
+                    for track in tracks[len(senders):]:
                         conn.senders.append(conn.pc.addTrack(track))
-                        changed = True
-                else:
-                    # aiortc replaceTrack is synchronous.
-                    sender.replaceTrack(track if allowed else None)
-            if changed:
+                        conn.media_negotiation_needed = True
+            if conn.media_negotiation_needed and conn.pc.signalingState == "stable":
+                conn.media_negotiation_needed = False
                 await self._renegotiate(conn)
 
     def _start_ping_monitor(self, conn: Connection) -> None:
@@ -1588,6 +1606,10 @@ class VDONinja:
         if isinstance(target, str):
             return self._send_data_internal(msg, target, None, "any")
         t = dict(target)
+        allowed = {"uuid", "UUID", "type", "streamID", "stream_id", "preference", "channel", "prefer"}
+        unknown = set(t) - allowed
+        if unknown:
+            raise TypeError(f"Unsupported send_data target options: {sorted(unknown)}")
         uuid = t.get("uuid") or t.get("UUID")
         pref = t.get("preference") or t.get("channel") or t.get("prefer") or "any"
         pref = {"pcs": "publisher", "rpcs": "viewer"}.get(pref, pref)

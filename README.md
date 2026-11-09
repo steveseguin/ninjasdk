@@ -325,7 +325,6 @@ vdo.sendData(data, {                 // Advanced targeting
     uuid: "targetUUID",
     type: "viewer",                  // Target viewers only
     streamID: "streamID",            // Target stream connections
-    allowFallback: true              // Allow WebSocket fallback
 });
 
 // Raw bytes and additional channels never use the JSON control channel
@@ -418,7 +417,6 @@ peer.sendData(data, { uuid: "...", preference: 'viewer' }); // Force viewer chan
 
 **Note:** The default `'any'` preference tries one available data channel per peer while preventing duplicates. It tries the publisher channel first (as that's typically the announcing peer's primary channel), then uses the viewer channel if the publisher channel isn't available.
 
-These preferences select between WebRTC data channels. WebSocket signaling fallback is separate and disabled by default; opt in with `{ allowFallback: true }`.
 
 ## Salt Configuration (Important!)
 

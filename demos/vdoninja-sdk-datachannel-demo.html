@@ -726,29 +726,28 @@ sdk.sendPing();                                  // answered with a 'peerLatency
 
         function handleDataReceived(nodeId, detail) {
             const node = nodes[nodeId];
-            const { data, uuid, fallback } = detail;
+            const { data, uuid } = detail;
             node.stats.received++;
-            const via = fallback ? ' [via WebSocket fallback]' : '';
             const from = peerName(nodeId, uuid);
 
             if (data && typeof data === 'object') {
                 if (data.type === 'chat') {
                     displayChatMessage(nodeId, { from: data.from || from, text: data.text, timestamp: data.timestamp }, 'received');
-                    logMessage(nodeId, `Chat from ${data.from || from}: ${data.text}${via}`, 'received');
+                    logMessage(nodeId, `Chat from ${data.from || from}: ${data.text}`, 'received');
                 } else if (data.type === 'publish') {
                     // Only show topics this node subscribed to
                     if (node.topics.has(data.topic)) {
-                        logMessage(nodeId, `[${data.topic}] ${data.data} (from ${data.publisher || from})${via}`, 'received');
+                        logMessage(nodeId, `[${data.topic}] ${data.data} (from ${data.publisher || from})`, 'received');
                     }
                 } else if (data.type === 'topicSubscribe') {
-                    logMessage(nodeId, `${data.subscriber || from} subscribed to ${data.topic}${via}`, 'system');
+                    logMessage(nodeId, `${data.subscriber || from} subscribed to ${data.topic}`, 'system');
                 } else if (data.type === 'topicUnsubscribe') {
-                    logMessage(nodeId, `${data.subscriber || from} unsubscribed from ${data.topic}${via}`, 'system');
+                    logMessage(nodeId, `${data.subscriber || from} unsubscribed from ${data.topic}`, 'system');
                 } else {
-                    logMessage(nodeId, `Received ${data.type || 'object'} from ${from}: ${JSON.stringify(data)}${via}`, 'received');
+                    logMessage(nodeId, `Received ${data.type || 'object'} from ${from}: ${JSON.stringify(data)}`, 'received');
                 }
             } else {
-                logMessage(nodeId, `Received data from ${from}: ${String(data)}${via}`, 'received');
+                logMessage(nodeId, `Received data from ${from}: ${String(data)}`, 'received');
             }
             updateStats(nodeId);
         }

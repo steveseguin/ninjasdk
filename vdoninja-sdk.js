@@ -89,7 +89,7 @@ const VDON_RESOURCE_CHUNK_SIZE = 16384;
  *
  * UUIDs are used for direct client-to-client messaging within the signaling server.
  * When a client sends a message that is routed to another client, the 'UUID' field
- * in the outgoing message indicates the original sender's UUID.
+ * identifies the destination on send; the server rewrites it to the sender on delivery.
  */
 
 // Global state tracking (server-side context for understanding message logic):
@@ -604,6 +604,11 @@ const VDON_RESOURCE_CHUNK_SIZE = 16384;
          */
         constructor(options = {}) {
             super();
+            for (const key of ['client_id', 'clientId', 'ClientID', 'from']) {
+                if (Object.prototype.hasOwnProperty.call(options, key)) {
+                    throw new TypeError(`Unsupported signaling identity option: ${key}. The server supplies UUID routing.`);
+                }
+            }
             
             // SDK Version
             this.version = VDONinjaSDK.VERSION;
@@ -717,6 +722,7 @@ const VDON_RESOURCE_CHUNK_SIZE = 16384;
             
             this._turnPromise = null; // For caching TURN server fetch
             this._turnList = null; // Cached TURN servers
+            this._turnExpiresAt = 0;
             
             // Reconnection settings
             this._reconnectAttempts = 0;
@@ -2210,8 +2216,8 @@ const VDON_RESOURCE_CHUNK_SIZE = 16384;
                 info: {}, // Remote metadata, populated by incoming info messages
                 localInfo: options?.label ? { label: options.label } : {},
                 obsState: {},
-                allowAudio: true,
-                allowVideo: true,
+                allowAudio: false,
+                allowVideo: false,
                 viewOptions: {},
                 stats: {
                     packetsReceived: 0,
@@ -4475,8 +4481,8 @@ const VDON_RESOURCE_CHUNK_SIZE = 16384;
                         await this._handleRemoteICECandidates(msg);
                     } else if (typeof msg.audio === 'boolean' || typeof msg.video === 'boolean') {
                         this._log('Received track preferences:', msg);
-                        connection.allowAudio = msg.audio !== false;
-                        connection.allowVideo = msg.video !== false;
+                        if (typeof msg.audio === 'boolean') connection.allowAudio = msg.audio;
+                        if (typeof msg.video === 'boolean') connection.allowVideo = msg.video;
 
                         if (this.localStream && this._updateTracksForConnection) {
                             await this._updateTracksForConnection(connection);
@@ -4596,33 +4602,43 @@ const VDON_RESOURCE_CHUNK_SIZE = 16384;
          * @param {Object} connection - Connection object
          */
         async _updateTracksForConnection(connection) {
-            if (!this.localStream || !connection.pc) return;
-
-            const senders = connection.pc.getSenders();
-            
-            // Update audio tracks
-            const audioTracks = this.localStream.getAudioTracks();
-            const audioSender = senders.find(s => s.track && s.track.kind === 'audio');
-            
-            if (audioSender) {
-                if (!connection.allowAudio) {
-                    await audioSender.replaceTrack(null);
-                } else if (audioTracks.length > 0) {
-                    await audioSender.replaceTrack(audioTracks[0]);
+            // Serialize updates; multiple preference messages may arrive while
+            // replaceTrack/setLocalDescription are awaiting the engine.
+            const previous = connection._mediaUpdatePromise || Promise.resolve();
+            const update = previous.catch(() => {}).then(async () => {
+                if (connection.type !== 'publisher' || !this.localStream || !connection.pc ||
+                    !this._isCurrentConnection(connection) || connection._finalized) return;
+                const kinds = connection._publisherSenderKinds || (connection._publisherSenderKinds = new Map());
+                for (const kind of ['audio', 'video']) {
+                    const tracks = this.localStream.getTracks().filter(track => track.kind === kind);
+                    const allowed = kind === 'audio' ? connection.allowAudio : connection.allowVideo;
+                    const senders = connection.pc.getSenders().filter(sender => {
+                        if (sender.track) kinds.set(sender, sender.track.kind);
+                        return kinds.get(sender) === kind;
+                    });
+                    for (let i = 0; i < senders.length; i++) {
+                        const track = allowed ? tracks[i] || null : null;
+                        if (senders[i].track !== track) await senders[i].replaceTrack(track);
+                    }
+                    if (allowed) for (const track of tracks.slice(senders.length)) {
+                        kinds.set(connection.pc.addTrack(track, this.localStream), kind);
+                        connection._mediaNegotiationNeeded = true;
+                    }
                 }
-            }
-
-            // Update video tracks
-            const videoTracks = this.localStream.getVideoTracks();
-            const videoSender = senders.find(s => s.track && s.track.kind === 'video');
-            
-            if (videoSender) {
-                if (!connection.allowVideo) {
-                    await videoSender.replaceTrack(null);
-                } else if (videoTracks.length > 0) {
-                    await videoSender.replaceTrack(videoTracks[0]);
+                if (!connection._mediaNegotiationNeeded || connection.pc.signalingState !== 'stable') return;
+                connection._mediaNegotiationNeeded = false;
+                const offer = await this._createOffer(connection);
+                if (!this._isCurrentConnection(connection) || connection._finalized) return;
+                const msg = { session: connection.session, description: { type: offer.type, sdp: offer.sdp } };
+                if (this._getEffectivePassword() !== null) {
+                    [msg.description, msg.vector] = await this._encryptMessage(JSON.stringify(msg.description));
                 }
-            }
+                if (!this._isCurrentConnection(connection) || connection._finalized) return;
+                if (connection.dataChannel?.readyState === 'open') connection.dataChannel.send(JSON.stringify(msg));
+                else this._sendMessageWS({ ...msg, UUID: connection.uuid });
+            });
+            connection._mediaUpdatePromise = update;
+            return update;
         }
 
         /**
@@ -4642,25 +4658,7 @@ const VDON_RESOURCE_CHUNK_SIZE = 16384;
             }
 
             try {
-                // Add tracks if we're publishing
-                if (this.localStream && connection.type === 'publisher') {
-                    const audioTracks = this.localStream.getAudioTracks();
-                    const videoTracks = this.localStream.getVideoTracks();
-
-                    // Add tracks based on viewer preferences
-                    if (connection.allowAudio && audioTracks.length > 0) {
-                        audioTracks.forEach(track => {
-                            connection.pc.addTrack(track, this.localStream);
-                        });
-                    }
-
-                    if (connection.allowVideo && videoTracks.length > 0) {
-                        videoTracks.forEach(track => {
-                            connection.pc.addTrack(track, this.localStream);
-                        });
-                    }
-                }
-                
+                // Track insertion happens only after data-channel preferences.
                 // Apply encoding preferences (bitrate/codec) if requested
                 await this._applyEncodingPreferencesToConnection(connection);
 
@@ -5820,9 +5818,6 @@ const VDON_RESOURCE_CHUNK_SIZE = 16384;
                 this._handleBye(msg);
             } else if (msg.hangup) {
                 this._handleHangup(msg);
-            } else if (msg.pipe !== undefined && msg.__fallback) {
-                // Handle fallback data message from WebSocket
-                this._handleFallbackData(msg);
             }
         }
 
@@ -6004,6 +5999,7 @@ const VDON_RESOURCE_CHUNK_SIZE = 16384;
                 await connection.pc.setRemoteDescription(new RTCSessionDescription(msg.description));
                 await this._drainPendingICE(msg.UUID, 'remote', connection);
                 this._log('Remote description set successfully');
+                if (connection._mediaNegotiationNeeded) await this._updateTracksForConnection(connection);
             } catch (error) {
                 this._log('Error handling answer:', error);
                 this._emit('error', { 
@@ -6281,11 +6277,7 @@ const VDON_RESOURCE_CHUNK_SIZE = 16384;
             }
             connection.streamID = this.state.streamID;
 
-            // Store track preferences from viewer
-            if (msg.audio !== undefined || msg.video !== undefined) {
-                connection.allowAudio = msg.audio !== false;
-                connection.allowVideo = msg.video !== false;
-            }
+            // Media preferences arrive over sendChannel after the initial offer.
 
             // Create offer and send it
             try {
@@ -6371,11 +6363,7 @@ const VDON_RESOURCE_CHUNK_SIZE = 16384;
             // Generate a new session for this connection (publisher creates session)
             connection.session = this._generateSession();
 
-            // Store track preferences
-            if (msg.audio !== undefined || msg.video !== undefined) {
-                connection.allowAudio = msg.audio !== false;
-                connection.allowVideo = msg.video !== false;
-            }
+            // Media preferences arrive over sendChannel after the initial offer.
 
             // Create offer
             try {
@@ -6975,49 +6963,6 @@ const VDON_RESOURCE_CHUNK_SIZE = 16384;
             } catch (e) {}
         }
 
-        /**
-         * Handle fallback data message received via WebSocket
-         * @private
-         * @param {Object} msg - Fallback data message
-         */
-        _handleFallbackData(msg) {
-            this._log('Received fallback data via WebSocket from:', msg.UUID);
-            
-            // Remove the fallback marker before emitting
-            const cleanMsg = { ...msg };
-            delete cleanMsg.__fallback;
-            
-            // If this is a pub/sub subscription update, mirror DC handling to emit peer events
-            try {
-                if (cleanMsg && cleanMsg.pipe && typeof cleanMsg.pipe === 'object') {
-                    const t = cleanMsg.pipe.type;
-                    if (t === 'subscribe' || t === 'unsubscribe') {
-                        this._handleDataChannelMessage(cleanMsg.pipe, msg.UUID);
-                    }
-                }
-            } catch (e) {}
-            
-            // Emit the same events as regular data channel messages
-            this._emit('dataReceived', {
-                data: cleanMsg.pipe,
-                uuid: msg.UUID,
-                fallback: true
-            });
-            // Typo compatibility
-            this._emit('dataRecieved', {
-                data: cleanMsg.pipe,
-                uuid: msg.UUID,
-                fallback: true
-            });
-            
-            // Also emit the original format for compatibility
-            this._emit('data', {
-                UUID: msg.UUID,
-                data: cleanMsg
-            });
-        }
-
-
         // ============================================================================
         // UTILITIES
         // ============================================================================
@@ -7264,7 +7209,8 @@ const VDON_RESOURCE_CHUNK_SIZE = 16384;
          * @returns {Uint8Array} Array buffer
          */
         _convertStringToArrayBufferView(str) {
-            return this._encoder.encode(str);
+            // lib.js:convertStringToArrayBufferView (AES only, not ID hashing).
+            return Uint8Array.from({ length: str.length }, (_, i) => str.charCodeAt(i) & 255);
         }
 
         /**
@@ -7382,7 +7328,7 @@ const VDON_RESOURCE_CHUNK_SIZE = 16384;
                     encryptedBytes
                 );
                 
-                return this._decoder.decode(new Uint8Array(decrypted));
+                return Array.from(new Uint8Array(decrypted), byte => String.fromCharCode(byte)).join('');
                 
             } catch (error) {
                 this._log('Decryption error:', error);
@@ -7467,7 +7413,10 @@ const VDON_RESOURCE_CHUNK_SIZE = 16384;
          */
         _getTimezone() {
             try {
-                return new Date().getTimezoneOffset() * -1;
+                // Match lib.js getTimezone(), including its historical baseline dates.
+                const standard = Math.max(new Date(0, 1).getTimezoneOffset(), new Date(6, 1).getTimezoneOffset());
+                const current = new Date().getTimezoneOffset();
+                return current < standard ? current + 60 : current;
             } catch (e) {
                 return 0;
             }
@@ -7602,16 +7551,13 @@ const VDON_RESOURCE_CHUNK_SIZE = 16384;
                 }
             }
 
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 2000);
             try {
-                // Fetch with timeout
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 2000);
                 
                 const response = await fetch(`${getTurnURL}?ts=${timestamp}`, {
                     signal: controller.signal
                 });
-                
-                clearTimeout(timeoutId);
                 
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
@@ -7630,66 +7576,40 @@ const VDON_RESOURCE_CHUNK_SIZE = 16384;
                 
             } catch (error) {
                 this._log('Failed to fetch TURN servers, using fallback:', error.message);
+                this._turnFetchFailed = true;
                 
                 // Fallback TURN servers
                 return [
-                    {
-                        username: "steve",
-                        credential: "setupYourOwnPlease",
-                        urls: ["turns:www.turn.obs.ninja:443"],
-                        tz: 300,
-                        udp: false,
-                        locale: "cae1"
-                    },
-                    {
-                        username: "steve",
-                        credential: "setupYourOwnPlease",
-                        urls: ["turn:turn-cae1.vdo.ninja:3478"],
-                        tz: 300,
-                        udp: true,
-                        locale: "cae1"
-                    },
-                    {
-                        username: "vdoninja",
-                        credential: "theyBeSharksHere",
-                        urls: ["turn:turn-usw2.vdo.ninja:3478"],
-                        tz: 480,
-                        udp: true,
-                        locale: "usw2"
-                    },
-                    {
-                        username: "vdoninja",
-                        credential: "PolandPirat",
-                        urls: ["turn:turn-eu4.vdo.ninja:3478"],
-                        tz: -70,
-                        udp: true,
-                        locale: "pol1"
-                    },
-                    {
-                        username: "steve",
-                        credential: "setupYourOwnPlease",
-                        urls: ["turns:turn.obs.ninja:443"],
-                        tz: -60,
-                        udp: false,
-                        locale: "de1"
-                    },
-                    {
-                        username: "steve",
-                        credential: "setupYourOwnPlease",
-                        urls: ["turn:turn-eu1.vdo.ninja:3478"],
-                        tz: -60,
-                        udp: true,
-                        locale: "de1"
-                    },
-                    {
-                        username: "vdoninja",
-                        credential: "EastSideRepresentZ",
-                        urls: ["turn:turn-use1.vdo.ninja:3478"],
-                        tz: 300,
-                        udp: true,
-                        locale: "use1"
-                    }
+                    {"username":"use5","credential":"c-5eSrFCaAaMFG11-Ax1r1k61y3RDpFhi3jP5oDXsdc","urls":["turn:turn-use5.vdo.ninja:3478"],"tz":300,"udp":true,"locale":"use5"},
+                    {"username":"use5","credential":"c-5eSrFCaAaMFG11-Ax1r1k61y3RDpFhi3jP5oDXsdc","urls":["turns:turn-use5.vdo.ninja:443"],"tz":300,"udp":false,"locale":"use5"},
+                    {"username":"de3","credential":"NR5d6huNQQsVyLx5sYE4V_uxW9xjL9qO-mI0tU5lkXc","urls":["turn:turn-de3.vdo.ninja:3478"],"tz":-60,"udp":true,"locale":"de3"},
+                    {"username":"de3","credential":"NR5d6huNQQsVyLx5sYE4V_uxW9xjL9qO-mI0tU5lkXc","urls":["turns:turn-de3.vdo.ninja:443"],"tz":-60,"udp":false,"locale":"de3"},
+                    {"username":"pl2","credential":"vmYXvwN9C+FeHV7raGixEUctlSRrYAXxjDunAxd8PJg=","urls":["turn:turn-pl2.vdo.ninja:3478"],"tz":-60,"udp":true,"locale":"pl2"},
+                    {"username":"pl2","credential":"vmYXvwN9C+FeHV7raGixEUctlSRrYAXxjDunAxd8PJg=","urls":["turns:turn-pl2.vdo.ninja:443"],"tz":-60,"udp":false,"locale":"pl2"},
+                    {"username":"vdoninja","credential":"EastSideRepresentZ","urls":["turn:turn-use3.vdo.ninja:3478"],"tz":300,"udp":true,"locale":"use3"},
+                    {"username":"vdoninja","credential":"EastSideRepresentZ","urls":["turns:turn-use3.vdo.ninja:443"],"tz":300,"udp":false,"locale":"use3"},
+                    {"username":"vdoninja","credential":"ViennaSchnitzel","urls":["turn:turn-eu5.vdo.ninja:3478"],"tz":-60,"udp":true,"locale":"eu5"},
+                    {"username":"vdoninja","credential":"ViennaSchnitzel","urls":["turns:turn-eu5.vdo.ninja:443"],"tz":-60,"udp":false,"locale":"eu5"},
+                    {"username":"vdoninja","credential":"donotuseplease","urls":["turn:turn-usw3.vdo.ninja:3478"],"tz":480,"udp":true,"locale":"usw3"},
+                    {"username":"vdoninja","credential":"donotuseplease","urls":["turns:turn-usw3.vdo.ninja:443"],"tz":480,"udp":false,"locale":"usw3"},
+                    {"username":"vdoninja","credential":"donotuseplease","urls":["turn:turn-usw4.vdo.ninja:3478"],"tz":480,"udp":true,"locale":"usw4"},
+                    {"username":"vdoninja","credential":"donotuseplease","urls":["turns:turn-usw4.vdo.ninja:443"],"tz":480,"udp":false,"locale":"usw4"},
+                    {"username":"vdoninja","credential":"donotuseplease","urls":["turn:turn-usw5.vdo.ninja:3478"],"tz":480,"udp":true,"locale":"usw5"},
+                    {"username":"vdoninja","credential":"donotuseplease","urls":["turns:turn-usw5.vdo.ninja:443"],"tz":480,"udp":false,"locale":"usw5"},
+                    {"username":"vdoninja","credential":"donotuseplease","urls":["turn:turn-fr1.vdo.ninja:3478"],"tz":-60,"udp":true,"locale":"fr1"},
+                    {"username":"vdoninja","credential":"donotuseplease","urls":["turns:turn-fr1.vdo.ninja:443"],"tz":-60,"udp":false,"locale":"fr1"},
+                    {"username":"vdoninja","credential":"donotuseplease","urls":["turn:turn-fr2.vdo.ninja:3478"],"tz":-60,"udp":true,"locale":"fr2"},
+                    {"username":"vdoninja","credential":"donotuseplease","urls":["turns:turn-fr2.vdo.ninja:443"],"tz":-60,"udp":false,"locale":"fr2"},
+                    {"username":"vdoninja","credential":"IchBinSteveDerNinja","urls":["turn:www.turn.vdo.ninja:3478"],"tz":-60,"udp":true,"locale":"de2"},
+                    {"username":"vdoninja","credential":"IchBinSteveDerNinja","urls":["turns:www.turn.vdo.ninja:443"],"tz":-60,"udp":false,"locale":"de2"},
+                    {"username":"vdoninja","credential":"EastSideRepresentZ","urls":["turn:turn-use1.vdo.ninja:3478"],"tz":300,"udp":true,"locale":"use1"},
+                    {"username":"vdoninja","credential":"EastSideRepresentZ","urls":["turns:turn-use1.vdo.ninja:443"],"tz":300,"udp":false,"locale":"use1"},
+                    {"username":"vdoninja","credential":"pleaseUseYourOwn","urls":["turn:turn-use2.vdo.ninja:3478"],"tz":300,"udp":true,"locale":"use2"},
+                    {"username":"vdoninja","credential":"pleaseUseYourOwn","urls":["turns:turn-use2.vdo.ninja:443"],"tz":300,"udp":false,"locale":"use2"}
                 ];
+            } finally {
+                // Headers alone are not a completed lookup; bound body reads too.
+                clearTimeout(timeoutId);
             }
         }
 
@@ -7713,15 +7633,16 @@ const VDON_RESOURCE_CHUNK_SIZE = 16384;
                 return;
             }
 
-            // Otherwise, fetch from API
+            if (this._turnList !== null && Date.now() < this._turnExpiresAt) return;
             if (!this._turnPromise) {
+                this._turnFetchFailed = false;
                 this._turnPromise = this._fetchTURNServers().then(servers => {
                     this._turnList = this._processTURNs(servers);
+                    this._turnExpiresAt = Date.now() + (this._turnFetchFailed ? 30000 : this.turnCacheTTL * 60000);
                     this._log('TURN servers loaded:', this._turnList.length);
                     return this._turnList;
-                });
+                }).finally(() => { this._turnPromise = null; });
             }
-
             await this._turnPromise;
         }
 
@@ -7731,10 +7652,7 @@ const VDON_RESOURCE_CHUNK_SIZE = 16384;
          * @returns {Promise<Object>} RTCConfiguration object
          */
         async _getICEConfiguration() {
-            // Setup TURN servers if not already done
-            if (this._turnList === null) {
-                await this._setupTURNServers();
-            }
+            await this._setupTURNServers();
 
             const iceServers = [...this.stunServers];
             
@@ -8168,14 +8086,13 @@ const VDON_RESOURCE_CHUNK_SIZE = 16384;
         }
 
         /**
-         * Internal method to send raw data via data channel with WebSocket fallback
+         * Internal method to send data over an open WebRTC data channel
          * @private
          * @param {*} data - Data to send
          * @param {string} uuid - Target UUID (optional)
          * @param {string} type - Connection type (optional)
-         * @param {boolean} allowFallback - Whether to use WebSocket fallback (default: false)
          */
-        _sendDataInternal(data, uuid = null, type = null, preference = 'any', allowFallback = false) {
+        _sendDataInternal(data, uuid = null, type = null, preference = 'any') {
             let sent = false;
             const message = typeof data === 'string' ? data : JSON.stringify(data);
 
@@ -8287,32 +8204,10 @@ const VDON_RESOURCE_CHUNK_SIZE = 16384;
                 }
             }
 
-            // Fallback to WebSocket if data channel is not available
-            if (!sent && allowFallback && this.state.connected && this.signaling && this.signaling.readyState === WebSocket.OPEN) {
-                try {
-                    // Prepare WebSocket fallback message
-                    const fallbackMsg = {
-                        ...data,
-                        __fallback: true  // Mark as fallback message
-                    };
-                    
-                    if (uuid) {
-                        // Send to specific peer via WebSocket
-                        fallbackMsg.UUID = uuid;
-                    }
-                    
-                    this._sendMessageWS(fallbackMsg);
-                    sent = true;
-                    this._log(`Sent via WebSocket fallback${uuid ? ` to ${uuid}` : ' (broadcast)'}`);
-                } catch (error) {
-                    this._log('Error sending via WebSocket fallback:', error);
-                }
-            }
-
             if (!sent && uuid) {
-                this._log(`Failed to send data to UUID: ${uuid}, type: ${type || 'any'} - no data channel or WebSocket available`);
+                this._log(`Failed to send data to UUID: ${uuid}, type: ${type || 'any'} - no data channel available`);
             } else if (!sent) {
-                this._log('Failed to send data - no data channels or WebSocket available');
+                this._log('Failed to send data - no data channels available');
             }
 
             return sent;
@@ -8329,15 +8224,12 @@ const VDON_RESOURCE_CHUNK_SIZE = 16384;
          * - type: Connection type ('viewer' or 'publisher')
          * - streamID: Target specific stream ID
          * - preference: Data-channel routing ('any', 'viewer', 'publisher', or 'all'; default: 'any')
-         * - allowFallback: Whether to use WebSocket fallback if data channel unavailable (default: false)
          * 
          * Behavior:
          * - The default 'any' preference tries the publisher data channel first, then the viewer data channel
          * - An explicit 'viewer' or 'publisher' preference only tries that connection type
          * - The 'all' preference sends on both connection types when available and may duplicate messages
          * - When type is specified, only tries that specific connection type
-         * - If data channel is not available and allowFallback is true, uses WebSocket signaling
-         * - Data-channel preference is separate from WebSocket fallback, which is opt-in
          * 
          * Examples:
          * - sendData(data) // Send once to every reachable peer (publisher channel preferred)
@@ -8345,11 +8237,15 @@ const VDON_RESOURCE_CHUNK_SIZE = 16384;
          * - sendData(data, { preference: 'all' }) // Send via ALL connections (may duplicate)
          * - sendData(data, { uuid: "uuid123", preference: 'viewer' }) // Use viewer channel
          * - sendData(data, { type: 'publisher' }) // Send to all publisher connections
-         * - sendData(data, { uuid: "uuid123", allowFallback: true }) // Opt into WebSocket fallback
          */
         sendData(data, target = null) {
+            if (target && typeof target === 'object') {
+                const allowed = new Set(['uuid', 'UUID', 'type', 'streamID', 'preference', 'channel', 'prefer']);
+                for (const key of Object.keys(target)) {
+                    if (!allowed.has(key)) throw new TypeError(`Unsupported sendData target option: ${key}`);
+                }
+            }
             const msg = { pipe: data };
-            let allowFallback = false;  // Default to false for true P2P
             // Default to any-channel; SDK will try publisher first, then viewer.
             let preference = 'any';
 
@@ -8365,15 +8261,15 @@ const VDON_RESOURCE_CHUNK_SIZE = 16384;
             if (!this.state || !this.state.connected) {
                 console.warn('[VDONinja SDK] sendData() called while not connected. Call connect() first.');
                 this._emit('error', { error: 'sendData() called while not connected. Call connect() before sending data.' });
-            } else if (!anyOpenDC && !(target && target.allowFallback)) {
-                console.warn('[VDONinja SDK] No open data channels yet. Wait for "dataChannelOpen" before sendData(), or pass { allowFallback: true } to use WebSocket fallback.');
-                this._emit('alert', { message: 'No open data channels yet. Wait for dataChannelOpen or set allowFallback: true.' });
+            } else if (!anyOpenDC) {
+                console.warn('[VDONinja SDK] No open data channels yet. Wait for "dataChannelOpen" before sendData().');
+                this._emit('alert', { message: 'No open data channels yet. Wait for dataChannelOpen.' });
             }
 
             // Handle different parameter formats
             if (typeof target === 'string') {
                 // Simple UUID string - use default preference
-                return this._sendDataInternal(msg, target, null, preference, allowFallback);
+                return this._sendDataInternal(msg, target, null, preference);
             } else if (typeof target === 'object' && target !== null) {
                 const t = { ...target };
 
@@ -8391,9 +8287,6 @@ const VDON_RESOURCE_CHUNK_SIZE = 16384;
                 if (t.preference === 'pcs') t.preference = 'publisher';
                 if (t.preference === 'rpcs') t.preference = 'viewer';
 
-                if (Object.prototype.hasOwnProperty.call(t, 'allowFallback')) {
-                    allowFallback = t.allowFallback;
-                }
                 if (Object.prototype.hasOwnProperty.call(t, 'preference')) {
                     preference = t.preference;
                 }
@@ -8401,7 +8294,7 @@ const VDON_RESOURCE_CHUNK_SIZE = 16384;
                 // Options object
                 if (t.uuid && !t.type && !t.streamID) {
                     // Simple UUID case
-                    return this._sendDataInternal(msg, t.uuid, null, preference, allowFallback);
+                    return this._sendDataInternal(msg, t.uuid, null, preference);
                 } else if (t.uuid || t.type || t.streamID) {
                     // Complex filtering - need to handle streamID case
                     if (t.streamID && !t.uuid) {
@@ -8420,7 +8313,7 @@ const VDON_RESOURCE_CHUNK_SIZE = 16384;
                         let sent = false;
                         for (const [uuid] of connectionsByUuid) {
                             // For each UUID, send according to preference
-                            if (this._sendDataInternal(msg, uuid, null, preference, allowFallback)) {
+                            if (this._sendDataInternal(msg, uuid, null, preference)) {
                                 sent = true;
                             }
                         }
@@ -8429,13 +8322,13 @@ const VDON_RESOURCE_CHUNK_SIZE = 16384;
                     } else {
                         // UUID with optional type (type must be 'viewer' or 'publisher')
                         const normalizedType = (t.type === 'viewer' || t.type === 'publisher') ? t.type : null;
-                        return this._sendDataInternal(msg, t.uuid, normalizedType, preference, allowFallback);
+                        return this._sendDataInternal(msg, t.uuid, normalizedType, preference);
                     }
                 }
             }
 
             // Default: send to all with preference
-            return this._sendDataInternal(msg, null, null, preference, allowFallback);
+            return this._sendDataInternal(msg, null, null, preference);
         }
         
         /**
@@ -8494,7 +8387,7 @@ const VDON_RESOURCE_CHUNK_SIZE = 16384;
                 this.sendData({
                     type: 'subscribe',
                     channels: channelList
-                }, { allowFallback: true });
+                }, {});
             }
 
             this._emit('subscribed', { channels: channelList });
@@ -8522,7 +8415,7 @@ const VDON_RESOURCE_CHUNK_SIZE = 16384;
                 this.sendData({
                     type: 'unsubscribe',
                     channels: channelList
-                }, { allowFallback: true });
+                }, {});
             }
 
             this._emit('unsubscribed', { channels: channelList });

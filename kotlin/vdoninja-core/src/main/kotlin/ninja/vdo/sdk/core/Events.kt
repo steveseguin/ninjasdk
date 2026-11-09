@@ -57,7 +57,6 @@ class VdoEvent(
     val attempt: Int? = null,
     val muted: Boolean? = null,
     val intentional: Boolean = false,
-    val fallback: Boolean = false,
     /** Engine-specific track (`org.webrtc.MediaStreamTrack` on Android). */
     val track: Any? = null,
     /** Engine-specific stream, when the engine groups tracks. */

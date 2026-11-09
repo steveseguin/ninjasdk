@@ -212,7 +212,7 @@ The same server is used by the test suite (`vdoninja::signalserver::SignalServer
 cargo test            # vdoninja-core vectors + vdoninja end-to-end tests over the local server
 ```
 
-The protocol vectors in [`../spec/vectors.json`](../spec/vectors.json) are generated from the JavaScript SDK, so hashing, encryption and sanitization cannot drift from the reference implementation.
+The protocol vectors in [`../spec/vectors.json`](../spec/vectors.json) are generated from the JavaScript SDK, so hashing, encryption and sanitization can be compared across SDKs; compatibility is defined by the VDO.Ninja application, not these vectors.
 
 ## Hosted service notice
 

@@ -147,7 +147,7 @@ go test ./...          # protocol vectors + end-to-end tests over the local serv
 go test -race ./...
 ```
 
-The protocol vectors in [`../spec/vectors.json`](../spec/vectors.json) are generated from the JavaScript SDK, so hashing, encryption and sanitization cannot drift from the reference implementation.
+The protocol vectors in [`../spec/vectors.json`](../spec/vectors.json) are generated from the JavaScript SDK, so hashing, encryption and sanitization can be compared across SDKs; compatibility is defined by the VDO.Ninja application, not these vectors.
 
 ## Hosted service notice
 

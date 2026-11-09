@@ -74,7 +74,7 @@ class VectorsTest {
     fun encryption() {
         for (c in cases("encryption")) {
             val phrase = c.getString("phrase")
-            assertEquals(c.getString("keyHex"), Crypto.toHex(Crypto.sha256(phrase.toByteArray())))
+            assertEquals(c.getString("keyHex"), Crypto.toHex(Crypto.sha256(Crypto.browserAesBytes(phrase))))
             val enc = Crypto.encryptMessage(c.getString("plaintext"), phrase, Crypto.fromHex(c.getString("ivHex")))
             assertEquals(c.getString("ciphertextHex"), enc.ciphertext)
             assertEquals(c.getString("plaintext"), Crypto.decryptMessage(c.getString("ciphertextHex"), c.getString("ivHex"), phrase))
@@ -140,7 +140,7 @@ class VectorsTest {
         val servers = Turn.select(Turn.FALLBACK, tzOffsetMinutes = -60)
         assertEquals(3, servers.size)
         assertEquals(1, servers.count { it.urls.first().startsWith("turns:") })
-        assertTrue(servers.any { it.urls == listOf("turn:turn-eu1.vdo.ninja:3478") })
+        assertTrue(servers.any { it.urls == listOf("turn:turn-de3.vdo.ninja:3478") })
         assertEquals(1, Turn.select(Turn.FALLBACK, tzOffsetMinutes = -60, forceTcp = true).size)
     }
 

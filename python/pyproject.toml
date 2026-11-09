@@ -24,7 +24,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-test = ["pytest>=7", "pytest-asyncio>=0.23"]
+test = ["pytest>=7", "pytest-asyncio>=0.23", "tzdata; sys_platform == 'win32'"]
 
 [project.urls]
 Homepage = "https://github.com/steveseguin/ninjasdk"

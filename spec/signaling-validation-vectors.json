@@ -1,0 +1,22 @@
+{
+  "valid": [
+    {"channel":"signaling","message":{"request":"play","streamID":"camera"}},
+    {"channel":"signaling","message":{"UUID":"peer","description":{"type":"offer","sdp":"v=0\r\n"}}},
+    {"channel":"control","message":{"description":{"type":"answer","sdp":"v=0\r\n"},"session":"generation"}},
+    {"channel":"signaling","message":{"UUID":"peer","type":"local","candidates":[{"candidate":"candidate:1 1 udp 1 127.0.0.1 9 typ host","sdpMid":"0","sdpMLineIndex":0,"usernameFragment":null}]}},
+    {"channel":"control","message":{"description":"00000000000000000000000000000000","vector":"11111111111111111111111111111111"}},
+    {"channel":"control","message":{"pipe":{"client_id":"application data"},"info":{"arbitrary":true}}}
+  ],
+  "invalid": [
+    {"channel":"signaling","message":{"UUID":"peer","description":{"type":"offer","sdp":"v=0\r\n","client_id":"invented"}}},
+    {"channel":"control","message":{"description":{"type":"invented","sdp":42}}},
+    {"channel":"signaling","message":{"UUID":"peer","type":"local","candidates":42}},
+    {"channel":"control","message":{"candidate":{"candidate":"candidate:1","client_id":"invented"}}},
+    {"channel":"control","message":{"candidates":[{"candidate":true}]}},
+    {"channel":"control","message":{"candidate":{"candidate":"candidate:1","sdpMLineIndex":-1}}},
+    {"channel":"control","message":{"description":"unencrypted invalid description"}},
+    {"channel":"signaling","message":{"UUID":"peer","description":"00","vector":"not-an-IV"}},
+    {"channel":"control","message":{"vector":"11111111111111111111111111111111","description":{"type":"offer","sdp":"v=0"}}},
+    {"channel":"control","message":{"iceRestartRequest":"invented"}}
+  ]
+}

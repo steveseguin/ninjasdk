@@ -101,7 +101,6 @@ pub enum Event {
         uuid: String,
         stream_id: Option<String>,
         data: Value,
-        fallback: bool,
     },
     PeerInfo {
         uuid: String,

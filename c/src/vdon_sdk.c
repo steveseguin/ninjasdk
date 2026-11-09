@@ -514,17 +514,35 @@ typedef struct turn_entry {
 } turn_entry;
 
 static const turn_entry FALLBACK_TURNS[] = {
-    {"steve", "setupYourOwnPlease", "turns:www.turn.obs.ninja:443", 300, 0},
-    {"steve", "setupYourOwnPlease", "turn:turn-cae1.vdo.ninja:3478", 300, 1},
-    {"vdoninja", "theyBeSharksHere", "turn:turn-usw2.vdo.ninja:3478", 480, 1},
-    {"vdoninja", "PolandPirat", "turn:turn-eu4.vdo.ninja:3478", -70, 1},
-    {"steve", "setupYourOwnPlease", "turns:turn.obs.ninja:443", -60, 0},
-    {"steve", "setupYourOwnPlease", "turn:turn-eu1.vdo.ninja:3478", -60, 1},
+    {"use5", "c-5eSrFCaAaMFG11-Ax1r1k61y3RDpFhi3jP5oDXsdc", "turn:turn-use5.vdo.ninja:3478", 300, 1},
+    {"use5", "c-5eSrFCaAaMFG11-Ax1r1k61y3RDpFhi3jP5oDXsdc", "turns:turn-use5.vdo.ninja:443", 300, 0},
+    {"de3", "NR5d6huNQQsVyLx5sYE4V_uxW9xjL9qO-mI0tU5lkXc", "turn:turn-de3.vdo.ninja:3478", -60, 1},
+    {"de3", "NR5d6huNQQsVyLx5sYE4V_uxW9xjL9qO-mI0tU5lkXc", "turns:turn-de3.vdo.ninja:443", -60, 0},
+    {"pl2", "vmYXvwN9C+FeHV7raGixEUctlSRrYAXxjDunAxd8PJg=", "turn:turn-pl2.vdo.ninja:3478", -60, 1},
+    {"pl2", "vmYXvwN9C+FeHV7raGixEUctlSRrYAXxjDunAxd8PJg=", "turns:turn-pl2.vdo.ninja:443", -60, 0},
+    {"vdoninja", "EastSideRepresentZ", "turn:turn-use3.vdo.ninja:3478", 300, 1},
+    {"vdoninja", "EastSideRepresentZ", "turns:turn-use3.vdo.ninja:443", 300, 0},
+    {"vdoninja", "ViennaSchnitzel", "turn:turn-eu5.vdo.ninja:3478", -60, 1},
+    {"vdoninja", "ViennaSchnitzel", "turns:turn-eu5.vdo.ninja:443", -60, 0},
+    {"vdoninja", "donotuseplease", "turn:turn-usw3.vdo.ninja:3478", 480, 1},
+    {"vdoninja", "donotuseplease", "turns:turn-usw3.vdo.ninja:443", 480, 0},
+    {"vdoninja", "donotuseplease", "turn:turn-usw4.vdo.ninja:3478", 480, 1},
+    {"vdoninja", "donotuseplease", "turns:turn-usw4.vdo.ninja:443", 480, 0},
+    {"vdoninja", "donotuseplease", "turn:turn-usw5.vdo.ninja:3478", 480, 1},
+    {"vdoninja", "donotuseplease", "turns:turn-usw5.vdo.ninja:443", 480, 0},
+    {"vdoninja", "donotuseplease", "turn:turn-fr1.vdo.ninja:3478", -60, 1},
+    {"vdoninja", "donotuseplease", "turns:turn-fr1.vdo.ninja:443", -60, 0},
+    {"vdoninja", "donotuseplease", "turn:turn-fr2.vdo.ninja:3478", -60, 1},
+    {"vdoninja", "donotuseplease", "turns:turn-fr2.vdo.ninja:443", -60, 0},
+    {"vdoninja", "IchBinSteveDerNinja", "turn:www.turn.vdo.ninja:3478", -60, 1},
+    {"vdoninja", "IchBinSteveDerNinja", "turns:www.turn.vdo.ninja:443", -60, 0},
     {"vdoninja", "EastSideRepresentZ", "turn:turn-use1.vdo.ninja:3478", 300, 1},
+    {"vdoninja", "EastSideRepresentZ", "turns:turn-use1.vdo.ninja:443", 300, 0},
+    {"vdoninja", "pleaseUseYourOwn", "turn:turn-use2.vdo.ninja:3478", 300, 1},
+    {"vdoninja", "pleaseUseYourOwn", "turns:turn-use2.vdo.ninja:443", 300, 0},
 };
 
-static int local_tz_offset_minutes(void) {
-    time_t t = time(NULL);
+static int west_offset_minutes(time_t t, int *daylight) {
     struct tm lt, gt;
 #ifdef _WIN32
     localtime_s(&lt, &t);
@@ -533,15 +551,35 @@ static int local_tz_offset_minutes(void) {
     localtime_r(&t, &lt);
     gmtime_r(&t, &gt);
 #endif
-    {
-        int diff = (lt.tm_hour - gt.tm_hour) * 60 + (lt.tm_min - gt.tm_min);
-        int dd = lt.tm_yday - gt.tm_yday;
-        if (dd == 1 || dd < -1)
-            diff += 24 * 60;
-        else if (dd == -1 || dd > 1)
-            diff -= 24 * 60;
-        return diff;
+    if (daylight) *daylight = lt.tm_isdst > 0;
+    int diff = (lt.tm_hour - gt.tm_hour) * 60 + lt.tm_min - gt.tm_min;
+    int dd = lt.tm_yday - gt.tm_yday;
+    if (dd == 1 || dd < -1) diff += 24 * 60;
+    else if (dd == -1 || dd > 1) diff -= 24 * 60;
+    return -diff;
+}
+
+static int local_tz_offset_minutes(void) {
+    int daylight = 0;
+    int current = west_offset_minutes(time(NULL), &daylight);
+    // lib.js getTimezone() uses February 1900 and 1906 as its baseline.
+    // Windows CRT cannot convert pre-1970 dates; use the OS standard offset there.
+    int standard = current + (daylight ? 60 : 0);
+    int valid = 0;
+    for (int year = 1900; year <= 1906; year += 6) {
+        struct tm date = {0};
+        date.tm_year = year - 1900;
+        date.tm_mon = 1;
+        date.tm_mday = 1;
+        date.tm_isdst = -1;
+        time_t t = mktime(&date);
+        if (t != (time_t)-1) {
+            int offset = west_offset_minutes(t, NULL);
+            if (!valid || offset > standard) standard = offset;
+            valid = 1;
+        }
     }
+    return current < standard ? current + 60 : current;
 }
 
 /* Builds "turn:user:pass@host:port" from a VDO.Ninja URL. */
@@ -570,7 +608,7 @@ typedef struct cand_turn {
 } cand_turn;
 
 static void select_turns(vdon_sdk *s, cand_turn *list, int n) {
-    int tz = local_tz_offset_minutes(), i, j, udp = 0, tcp = 0;
+    int tz = local_tz_offset_minutes(), i, j, udp = 0;
     for (i = 0; i < n; i++) {
         int d = list[i].tz - tz, w;
         if (d < 0)
@@ -587,14 +625,9 @@ static void select_turns(vdon_sdk *s, cand_turn *list, int n) {
         list[j + 1] = t;
     }
     for (i = 0; i < n; i++) {
-        if (s->o.force_tcp && list[i].udp)
-            continue;
-        if (list[i].udp && udp < 2)
-            udp++;
-        else if (!list[i].udp && tcp < 1)
-            tcp++;
-        else
-            continue;
+        // Supported libjuice builds provide TURN/UDP only.
+        if (!list[i].udp || udp >= 2) continue;
+        udp++;
         add_ice_server(s, turn_url(list[i].user, list[i].cred, list[i].url));
     }
 }
@@ -663,12 +696,13 @@ static int fetch_hosted_turns(vdon_sdk *s, cand_turn *list, int max) {
 }
 #endif
 
-/* Builds the ICE server list once. lock NOT held. */
+/* Refresh hosted credentials after one hour; retry discovery failures after 30s.
+ * Custom/disabled TURN configurations are immutable. lock NOT held. */
 static void ensure_ice_servers(vdon_sdk *s) {
     cand_turn list[64];
     int n = 0, i, fetched = 0;
     pthread_mutex_lock(&s->lock);
-    if (s->turn_fetched) {
+    if (s->turn_fetched && (s->o.turn_mode != VDON_TURN_AUTO || vdon_now_ms() < s->turn_expires_at)) {
         pthread_mutex_unlock(&s->lock);
         return;
     }
@@ -691,7 +725,11 @@ static void ensure_ice_servers(vdon_sdk *s) {
         }
     }
     pthread_mutex_lock(&s->lock);
-    if (!s->turn_fetched) {
+    if (!s->turn_fetched || (s->o.turn_mode == VDON_TURN_AUTO && vdon_now_ms() >= s->turn_expires_at)) {
+        for (i = 0; i < s->ice_count; i++) free(s->ice_servers[i]);
+        free(s->ice_servers);
+        s->ice_servers = NULL;
+        s->ice_count = 0;
         if (s->stun_copy) {
             for (i = 0; i < s->o.stun_server_count; i++)
                 add_ice_server(s, vdon_strdup(s->stun_copy[i]));
@@ -706,6 +744,7 @@ static void ensure_ice_servers(vdon_sdk *s) {
             select_turns(s, list, n);
         }
         s->turn_fetched = 1;
+        s->turn_expires_at = vdon_now_ms() + (fetched ? 3600000 : 30000);
         vdon__logf(s, "ICE servers: %d (%s TURN list)", s->ice_count, fetched ? "hosted" : "built-in");
     }
     pthread_mutex_unlock(&s->lock);
@@ -1434,14 +1473,17 @@ static int add_publisher_tracks(vdon_sdk *s, conn_t *c) {
     int i;
     for (i = 0; i < s->track_count; i++) {
         track_tmpl *tp = &s->tracks[i];
+        if ((tp->init.kind == VDON_MEDIA_AUDIO && !c->allow_audio) ||
+            (tp->init.kind == VDON_MEDIA_VIDEO && !c->allow_video)) continue;
+        ptrack_t *existing;
+        for (existing = c->tracks; existing && existing->template_index != i + 1; existing = existing->next) {}
+        if (existing) continue;
+        for (existing = c->tracks; existing && existing->kind != tp->init.kind; existing = existing->next) {}
+        if (existing) continue;
         rtcTrackInit init;
         ptrack_t *t;
         int tr;
         uint32_t ssrc = tp->init.ssrc;
-        if ((tp->init.kind == VDON_MEDIA_AUDIO && !c->allow_audio) ||
-            (tp->init.kind == VDON_MEDIA_VIDEO && !c->allow_video)) continue;
-        for (t = c->tracks; t; t = t->next) if (t->kind == tp->init.kind) break;
-        if (t) continue;
         if (!ssrc)
             vdon_random_bytes((uint8_t *)&ssrc, sizeof(ssrc));
         memset(&init, 0, sizeof(init));
@@ -1458,6 +1500,8 @@ static int add_publisher_tracks(vdon_sdk *s, conn_t *c) {
             return VDON_ERR_FAILURE;
         t = (ptrack_t *)calloc(1, sizeof(*t));
         t->tr = tr;
+        t->template_index = i + 1;
+        c->media_needs_offer = 1;
         t->kind = tp->init.kind;
         t->packetize = tp->init.packetize;
         t->clock_rate = (uint32_t)(tp->init.clock_rate > 0 ? tp->init.clock_rate : codec_clock_rate(tp->init.codec));
@@ -1498,27 +1542,39 @@ static int add_publisher_tracks(vdon_sdk *s, conn_t *c) {
     return VDON_OK;
 }
 
+/* Called without the SDK lock; RTC's SDP callback also acquires it. */
+static void negotiate_publisher_media(vdon_sdk *s, conn_t *c) {
+    int offer = 0, pc = -1;
+    pthread_mutex_lock(&s->lock);
+    if (!c->closed && c->type == TYPE_PUBLISHER && c->media_needs_offer && !c->media_offer_outstanding) {
+        c->media_needs_offer = 0;
+        c->media_offer_outstanding = 1;
+        offer = 1;
+        pc = c->pc;
+    }
+    pthread_mutex_unlock(&s->lock);
+    if (offer && rtcSetLocalDescription(pc, "offer") < 0) {
+        pthread_mutex_lock(&s->lock);
+        c->media_offer_outstanding = 0;
+        pthread_mutex_unlock(&s->lock);
+        vdon__logf(s, "Failed to offer media after viewer preferences");
+    }
+}
+
+/* Creates a peer connection record. lock NOT held. Returns NULL on failure. */
 static void update_publisher_tracks(vdon_sdk *s, conn_t *c) {
-    ptrack_t *before;
-    int changed, rc;
+    int rc;
     pthread_mutex_lock(&s->lock);
     if (c->closed || c->type != TYPE_PUBLISHER || !c->info_sent || !c->control || !c->control->open) {
         pthread_mutex_unlock(&s->lock);
         return;
     }
-    before = c->tracks;
     rc = add_publisher_tracks(s, c);
-    changed = before != c->tracks;
     pthread_mutex_unlock(&s->lock);
-    if (rc != VDON_OK || (changed && rtcSetLocalDescription(c->pc, "offer") < 0)) {
-        EV(ev, VDON_EVENT_ERROR);
-        ev.uuid = c->uuid;
-        ev.message = "failed to negotiate requested media";
-        vdon__emit(s, &ev);
-    }
+    if (rc == VDON_OK) negotiate_publisher_media(s, c);
+    else vdon__logf(s, "Failed to attach requested media");
 }
 
-/* Creates a peer connection record. lock NOT held. Returns NULL on failure. */
 static conn_t *conn_create(vdon_sdk *s, const char *uuid, const char *type) {
     rtcConfiguration cfg;
     conn_t *c;
@@ -1526,14 +1582,32 @@ static conn_t *conn_create(vdon_sdk *s, const char *uuid, const char *type) {
     ensure_ice_servers(s);
     memset(&cfg, 0, sizeof(cfg));
     pthread_mutex_lock(&s->lock);
-    cfg.iceServers = (const char **)s->ice_servers;
     cfg.iceServersCount = s->ice_count;
+    // Snapshot credentials: another thread may refresh/free the cached list
+    // while rtcCreatePeerConnection generates its certificate without our lock.
+    char **ice_copy = (char **)calloc((size_t)s->ice_count, sizeof(char *));
+    if (s->ice_count && !ice_copy) {
+        pthread_mutex_unlock(&s->lock);
+        return NULL;
+    }
+    for (int i = 0; i < s->ice_count; i++) {
+        ice_copy[i] = vdon_strdup(s->ice_servers[i]);
+        if (!ice_copy[i]) {
+            for (int j = 0; j < i; j++) free(ice_copy[j]);
+            free(ice_copy);
+            pthread_mutex_unlock(&s->lock);
+            return NULL;
+        }
+    }
+    cfg.iceServers = (const char **)ice_copy;
     cfg.bindAddress = s->o.bind_address;
     cfg.iceTransportPolicy = s->o.force_turn ? RTC_TRANSPORT_POLICY_RELAY : RTC_TRANSPORT_POLICY_ALL;
     cfg.disableAutoNegotiation = true;
     cfg.forceMediaTransport = true; /* Media is added after the data-channel handshake. */
     pthread_mutex_unlock(&s->lock);
     pc = rtcCreatePeerConnection(&cfg);
+    for (int i = 0; i < cfg.iceServersCount; i++) free(ice_copy[i]);
+    free(ice_copy);
     if (pc < 0) {
         vdon__logf(s, "rtcCreatePeerConnection failed: %d", pc);
         return NULL;
@@ -1768,8 +1842,10 @@ static void handle_answer(vdon_sdk *s, const char *uuid, const char *session, cJ
     }
     pthread_mutex_lock(&s->lock);
     c->remote_set = 1;
+    c->media_offer_outstanding = 0;
     pthread_mutex_unlock(&s->lock);
     drain_pending_ice(s, c, "remote");
+    negotiate_publisher_media(s, c);
 }
 
 static void handle_sdp(vdon_sdk *s, cJSON *msg, conn_t *via) {
@@ -1872,6 +1948,7 @@ static void handle_offer_request(vdon_sdk *s, const char *uuid, const char *sess
         ch = vdon__chan_new(c, dc, CH_CONTROL, VDON_CONTROL_CHANNEL);
         vdon__chan_install_callbacks(ch);
     }
+    c->media_offer_outstanding = 1;
     pthread_mutex_unlock(&s->lock);
     if (rtcSetLocalDescription(c->pc, "offer") < 0) {
         EV(ev, VDON_EVENT_ERROR);
@@ -2994,6 +3071,12 @@ vdon_sdk *vdon_create(const vdon_options *opts, vdon_event_callback cb, void *us
     if (!opts) {
         vdon_options_init(&d);
         opts = &d;
+    }
+    if (opts->force_tcp) {
+        // Do not accept a policy that leaves this SDK with unusable relays.
+        free(s);
+        errno = EINVAL;
+        return NULL;
     }
     s->o = *opts;
     s->o.host = vdon_strdup(opts->host ? opts->host : VDON_DEFAULT_HOST);

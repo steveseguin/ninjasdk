@@ -11,6 +11,7 @@ jobs:
   test-sdk:
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         node-version: [18, 20]
         webrtc-lib: ['@roamhq/wrtc', 'node-datachannel']
@@ -29,6 +30,18 @@ jobs:
       run: |
         npm install
         npm install ${{ matrix.webrtc-lib }}
+
+    - name: Checkout authoritative VDO.Ninja source for protocol checks
+      uses: actions/checkout@v7
+      with:
+        repository: steveseguin/vdo.ninja
+        ref: 3ea79516ff9f96108bff10cffd33fa5fe95a00de
+        path: reference-vdo
+
+    - name: Verify protocol against the browser source
+      run: npm run test:protocol:source
+      env:
+        VDON_REFERENCE_SOURCE: ${{ github.workspace }}/reference-vdo
 
     - name: Run deterministic reliability tests
       run: npm run test:reliability

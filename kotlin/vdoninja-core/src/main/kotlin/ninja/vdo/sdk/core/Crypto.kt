@@ -60,8 +60,11 @@ object Crypto {
     /** Result of [encryptMessage]: hex ciphertext and hex IV ("vector"). */
     data class Encrypted(val ciphertext: String, val vector: String)
 
+    /** lib.js AES bytes; stream/room hashing remains UTF-8. */
+    fun browserAesBytes(value: String): ByteArray = ByteArray(value.length) { value[it].code.toByte() }
+
     private fun cipher(mode: Int, phrase: String, iv: ByteArray): Cipher {
-        val key = SecretKeySpec(sha256(phrase.toByteArray(Charsets.UTF_8)), "AES")
+        val key = SecretKeySpec(sha256(browserAesBytes(phrase)), "AES")
         return Cipher.getInstance("AES/CBC/PKCS5Padding").apply { init(mode, key, IvParameterSpec(iv)) }
     }
 
@@ -70,7 +73,7 @@ object Crypto {
     @JvmOverloads
     fun encryptMessage(plaintext: String, phrase: String, iv: ByteArray = randomBytes(16)): Encrypted {
         require(iv.size == 16) { "iv must be 16 bytes" }
-        val out = cipher(Cipher.ENCRYPT_MODE, phrase, iv).doFinal(plaintext.toByteArray(Charsets.UTF_8))
+        val out = cipher(Cipher.ENCRYPT_MODE, phrase, iv).doFinal(browserAesBytes(plaintext))
         return Encrypted(toHex(out), toHex(iv))
     }
 
@@ -79,7 +82,7 @@ object Crypto {
     fun decryptMessage(ciphertextHex: String, vectorHex: String, phrase: String): String {
         val iv = fromHex(vectorHex)
         require(iv.size == 16) { "vector must be 16 bytes" }
-        return String(cipher(Cipher.DECRYPT_MODE, phrase, iv).doFinal(fromHex(ciphertextHex)), Charsets.UTF_8)
+        return String(cipher(Cipher.DECRYPT_MODE, phrase, iv).doFinal(fromHex(ciphertextHex)), Charsets.ISO_8859_1)
     }
 
     /** Random alphanumeric string; 12 characters for stream IDs. */

@@ -102,7 +102,7 @@ UDP socket (see `examples/view_rtp.c`). `vdon_request_keyframe()` sends a PLI.
 | Rooms | `vdon_join_room`, `vdon_leave_room`, `vdon_room` |
 | Publishing | `vdon_announce` (data only), `vdon_publish`, `vdon_send_rtp`, `vdon_send_sample`, `vdon_stop_publishing` |
 | Viewing | `vdon_view`, `vdon_stop_viewing`, `vdon_request_keyframe`, `vdon_auto_connect` |
-| Data | `vdon_send_data`, `vdon_send_data_ex` (target by UUID/type/preference, optional signaling fallback), `vdon_send_ping` |
+| Data | `vdon_send_data`, `vdon_send_data_ex` (target by UUID/type/preference), `vdon_send_ping` |
 | Pub/sub | `vdon_subscribe`, `vdon_unsubscribe`, `vdon_publish_to_channel` |
 | RPC | `vdon_on_request`, `vdon_request` (blocking, with timeout), `vdon_respond` |
 | Binary | `vdon_send_binary` (reserved `x-bin` lane), `vdon_open_channel` (any `x-` channel, returns a libdatachannel id) |
@@ -121,7 +121,7 @@ attempts with doubling delay, 20 s connection timeout). Notable fields:
 
 * `password` / `no_password`: the password hashes stream and room IDs and encrypts SDP and ICE, exactly like the
   JavaScript SDK. `no_password = 1` mirrors `password: false`.
-* `turn_mode`: `VDON_TURN_AUTO` (hosted list, closest two UDP and one TCP relay; built-in list when offline or when
+* `turn_mode`: `VDON_TURN_AUTO` (hosted list, closest two UDP relays; browser backup list when offline or when
   libcurl is absent), `VDON_TURN_DISABLED`, or `VDON_TURN_CUSTOM` with `turn_servers` in libdatachannel form
   `turn:user:pass@host:3478`. `force_turn` makes ICE relay-only.
 * `stun_servers`: NULL for Google and Cloudflare STUN; a non-NULL pointer with `stun_server_count = 0` disables STUN
@@ -140,7 +140,9 @@ TLS, see the Go server's `-cert`/`-key` options). The same server is embedded in
 
 * libdatachannel does not implement ICE restart; a failed connection is torn down and, for viewers, re-requested
   from the publisher (`VDON_EVENT_CONNECTION_FAILED` is emitted).
-* libjuice (the ICE agent) supports TURN over UDP only; `turns:` and TCP relays in the hosted list are ignored.
+* libjuice (the ICE agent) supports TURN over UDP only; `turns:` and TCP relays in the hosted list are excluded.
+  `force_tcp` is unsupported: `vdon_create()` returns `NULL` with `errno=EINVAL` when it is set.
+  Custom TURN servers must provide UDP. Networks that block all UDP require a different supported WebRTC engine.
 * Incoming messages larger than the SCTP receive limit (default 256 KiB) are dropped by libdatachannel; the file
   transfer protocol uses 16 KiB chunks and is unaffected.
 * Data channels opened by peers with labels other than `sendChannel`, `x-*`, `resources` or `chunked` are treated as

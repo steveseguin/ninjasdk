@@ -33,6 +33,7 @@ public final class VDOConnection {
     var viewOptions = ViewOptions()
     var infoSent = false
     var allowAudio = false, allowVideo = false
+    var mediaNeedsOffer = false, mediaOfferPending = false
     var iceBundle: [IceCandidate] = []
     var iceWork: DispatchWorkItem?
     var iceDelay: TimeInterval = 0.07
@@ -173,6 +174,8 @@ public final class VDONinja {
     private var pendingRequests: [String: (target: String?, done: (Result<Any?, Error>) -> Void)] = [:]
     private var autoConnectOn = false, autoFull = false
     private var iceServers: [RTCIceServer]?
+    private var iceServersExpiresAt = Date.distantPast
+    private var iceServerWaiters: [([RTCIceServer]) -> Void] = [] // queue only
     private var intentional = false
 
     public enum SDKError: Error, LocalizedError {
@@ -689,14 +692,19 @@ public final class VDONinja {
     }
 
     private func iceServerList(_ completion: @escaping ([RTCIceServer]) -> Void) {
-        if let s = iceServers { return completion(s) }
+        if let s = iceServers, options.turnMode != .auto || Date() < iceServersExpiresAt { return completion(s) }
+        iceServerWaiters.append(completion)
+        if iceServerWaiters.count > 1 { return }
         var out: [IceServer] = (options.stunServers ?? Turn.defaultStun).map { IceServer(urls: [$0]) }
         let finish: ([IceServer]) -> Void = { servers in
             let list = servers.map { s in
                 s.username != nil ? RTCIceServer(urlStrings: s.urls, username: s.username, credential: s.credential) : RTCIceServer(urlStrings: s.urls)
             }
             self.iceServers = list
-            completion(list)
+            self.iceServersExpiresAt = Date().addingTimeInterval(3600)
+            let waiters = self.iceServerWaiters
+            self.iceServerWaiters.removeAll()
+            waiters.forEach { $0(list) }
         }
         switch options.turnMode {
         case .disabled: finish(out)
@@ -757,11 +765,22 @@ public final class VDONinja {
         if iceRestart { c.pc.restartIce() }
         let constraints = RTCMediaConstraints(mandatoryConstraints: iceRestart ? [kRTCMediaConstraintsIceRestart: kRTCMediaConstraintsValueTrue] : nil, optionalConstraints: nil)
         c.pc.offer(for: constraints) { [weak self] offer, err in
-            guard let self, let offer else { self?.log("createOffer failed: \(err?.localizedDescription ?? "?")"); return }
-            c.pc.setLocalDescription(offer) { err in
-                self.queue.async {
-                    if let err { self.log("setLocalDescription failed: \(err)"); return }
-                    self.sendDescription(c, offer)
+            guard let self else { return }
+            self.queue.async {
+                guard !c.closed, self.connectionLocked(c.uuid, c.type) === c else { return }
+                guard let offer else {
+                    c.mediaOfferPending = false; c.mediaNeedsOffer = true
+                    self.log("createOffer failed: \(err?.localizedDescription ?? "?")"); return
+                }
+                c.pc.setLocalDescription(offer) { err in
+                    self.queue.async {
+                        guard !c.closed, self.connectionLocked(c.uuid, c.type) === c else { return }
+                        if let err {
+                            c.mediaOfferPending = false; c.mediaNeedsOffer = true
+                            self.log("setLocalDescription failed: \(err)"); return
+                        }
+                        self.sendDescription(c, offer)
+                    }
                 }
             }
         }
@@ -1029,18 +1048,28 @@ public final class VDONinja {
     }
 
     private func updateTracks(_ c: VDOConnection) {
-        guard c.type == "publisher", !c.closed, c.controlOpen, c.infoSent else { return }
-        var changed = false
-        for track in localTracks {
-            let allowed = track.kind == "video" ? c.allowVideo : c.allowAudio
-            if let (sender, _) = c.senders.first(where: { $0.1 == track.kind }) {
-                sender.track = allowed ? track : nil
-            } else if allowed, let sender = c.pc.add(track, streamIds: ["vdoninja"]) {
-                c.senders.append((sender, track.kind))
-                changed = true
+        guard c.type == "publisher", !c.closed, c.controlOpen, c.infoSent, connectionLocked(c.uuid, c.type) === c else { return }
+        for kind in ["audio", "video"] {
+            let tracks = Array(localTracks.filter { $0.kind == kind }.prefix(1))
+            let senders = c.senders.filter { $0.1 == kind }.map { $0.0 }
+            let allowed = kind == "audio" ? c.allowAudio : c.allowVideo
+            for (index, sender) in senders.enumerated() {
+                sender.track = allowed && index < tracks.count ? tracks[index] : nil
+            }
+            if allowed {
+                for track in tracks.dropFirst(senders.count) {
+                    if let sender = c.pc.add(track, streamIds: ["vdoninja"]) {
+                        c.senders.append((sender, kind))
+                        c.mediaNeedsOffer = true
+                    }
+                }
             }
         }
-        if changed { renegotiate(c, iceRestart: false) }
+        if c.mediaNeedsOffer && !c.mediaOfferPending && c.pc.signalingState == .stable {
+            c.mediaNeedsOffer = false
+            c.mediaOfferPending = true
+            renegotiate(c, iceRestart: false)
+        }
     }
 
     // MARK: Signaling
@@ -1213,6 +1242,8 @@ public final class VDONinja {
                 if let err { return self.emit(VDOEvent(.error, uuid: uuid, message: "failed to handle answer: \(err)")) }
                 c.remoteSet = true
                 self.drainPendingIce(c, "remote")
+                c.mediaOfferPending = false
+                self.updateTracks(c)
             }
         }
     }

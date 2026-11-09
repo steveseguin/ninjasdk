@@ -32,7 +32,7 @@ def test_encryption_vectors():
     for case in load()["encryption"]:
         phrase = sanitize.sanitize_password(case["rawPassword"]) + case["salt"]
         assert phrase == case["phrase"]
-        assert hashlib.sha256(phrase.encode()).hexdigest() == case["keyHex"]
+        assert hashlib.sha256(crypto.browser_aes_bytes(phrase)).hexdigest() == case["keyHex"]
         ct = crypto.encrypt_with_iv(case["plaintext"], phrase, bytes.fromhex(case["ivHex"]))
         assert ct.hex() == case["ciphertextHex"]
         assert crypto.decrypt_message(case["ciphertextHex"], case["ivHex"], phrase) == case["plaintext"]
@@ -84,7 +84,10 @@ def test_sdk_password_modes_match_javascript():
         assert room == case["hashedRoom"]
         sent = []
         sdk._send_ws = lambda message: sent.append(message) or True
-        conn = SimpleNamespace(uuid="peer", session="session", stream_id="camera", control_open=False)
+        from vdoninja.sdk import _PeerPair
+        conn = SimpleNamespace(uuid="peer", session="session", stream_id="camera", control_open=False, finalized=False)
+        sdk.connections["peer"] = _PeerPair()
+        sdk.connections["peer"].publisher = conn
         desc = RTCSessionDescription(sdp="v=0\r\n", type="offer")
         sdk._send_description(conn, desc, True)
         message = sent[0]

@@ -11,7 +11,7 @@
 <link rel="stylesheet" href="../site.css"><link rel="stylesheet" href="guide.css"></head>
 <body><a class="skip-link" href="#content">Skip to content</a>
 <header class="site-header"><div class="site-header-inner"><a class="brand" href="../index.html"><img src="../favicon.svg" alt="" width="26" height="26"><span>VDO.Ninja SDK</span></a><nav class="site-nav" aria-label="Main"><a href="../index.html#try-live">Live demo</a><a href="../index.html#quickstart">Quick start</a><a href="../index.html#sdks">SDKs</a><a href="../demos/">Demos</a><a href="guides.html">Guides</a><a href="api-reference.html">API</a><a href="../index.html#faq">FAQ</a></nav><div class="site-header-actions"><a class="btn btn-secondary btn-sm" href="https://github.com/steveseguin/ninjasdk">GitHub</a></div></div></header>
-<div class="layout"><aside><nav aria-label="On this page"><strong>On this page</strong><a href="#basic-audiovideo-demo">Basic audio/video demo</a><a href="#sdk-integration-checklist">SDK integration checklist</a><a href="#password-inputs">Password inputs</a><a href="#code-and-tests">Code and tests</a><a href="#license-and-hosted-services">License and hosted services</a></nav></aside>
+<div class="layout"><aside><nav aria-label="On this page"><strong>On this page</strong><a href="#basic-audiovideo-demo">Basic audio/video demo</a><a href="#sdk-integration-checklist">SDK integration checklist</a><a href="#password-inputs">Password inputs</a><a href="#code-and-tests">Code and tests</a><a href="#license-and-hosted-services">License and hosted services</a><a href="#protocol-audit-and-migration">Protocol audit and migration</a></nav></aside>
 <main id="content"><h1 id="native-sdks">Native SDKs</h1>
 <p>Basic connectors for publishing/receiving audio/video and sending peer data.
 Use one audio track and one primary video track as the interoperability baseline.
@@ -103,8 +103,8 @@ consistent on both peers. Do not encode passwords again during join/reconnect.</
 disables password protection, and <code>--salt</code> selects the salt. Printed private-password
 links contain the password. The shared default is not a private secret.</p>
 <h2 id="code-and-tests">Code and tests</h2>
-<p>The implementation is authoritative. Check the JS SDK together with the relevant
-VDO.Ninja handler and <code>hss/gemini.js</code>; server acceptance alone does not establish
+<p>The VDO.Ninja application is authoritative. Check its relevant handler and
+<code>hss/gemini.js</code>; SDK behavior and server acceptance alone do not establish
 correct usage. Do not copy behavior that violates the handshake checklist.</p>
 <div class="table-scroll" tabindex="0" role="region" aria-label="Code and tests table"><table>
 <thead>
@@ -142,5 +142,8 @@ See <a href="../tests/interop/README.md">test commands</a> and each port's READM
 <h2 id="license-and-hosted-services">License and hosted services</h2>
 <p>SDK core code is MPL-2.0; see <a href="../LICENSING.md">LICENSING.md</a>. Hosted services have
 separate usage rules and limits. Use the SDK's supported signaling paths.</p>
+<h2 id="protocol-audit-and-migration">Protocol audit and migration</h2>
+<p>The VDO.Ninja application is the source of truth. See the <a href="protocol-audit.html">validated audit and migration notes</a> for the reviewed source revision and browser interoperability checks. Removed unsupported identity options (<code>client_id</code>, <code>ClientID</code>, <code>clientId</code>) and WebSocket application-data fallback options must be removed from callers. Rebuild C applications after the struct changes. Custom signaling URLs use routed <code>UUID</code>, not fan-out <code>from</code>. Application data requires an open data channel.</p>
+<p>Relay lists follow the browser fallback data. Automatic credentials expire and refresh. Custom discovery URLs preserve their query parameters. The C backend does not implement TURN TCP/TLS; <code>force_tcp</code> fails with <code>EINVAL</code>. Python's aiortc backend cannot enforce relay-only candidate policy through the current API.</p>
 </main></div>
 <footer class="site-footer"><div class="container"><span>VDO.Ninja SDK guides</span><nav aria-label="Footer"><a href="guides.html">All guides</a><a href="validation.html">Validation and limits</a><a href="native-sdks.md">Markdown source</a><a href="https://github.com/steveseguin/ninjasdk">Repository</a></nav></div></footer></body></html>

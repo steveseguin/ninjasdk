@@ -30,15 +30,34 @@ public struct IceServer: Equatable {
 public enum Turn {
     public static let defaultStun = ["stun:stun.l.google.com:19302", "stun:stun.cloudflare.com:3478"]
 
-    /// Built-in list used when the hosted endpoint is unreachable (same as the JavaScript SDK).
+    /// Built-in list used when the hosted endpoint is unreachable (from vdo.ninja/webrtc.js).
     public static let fallback: [TurnServer] = [
-        TurnServer(username: "steve", credential: "setupYourOwnPlease", urls: ["turns:www.turn.obs.ninja:443"], tz: 300, udp: false, locale: "cae1"),
-        TurnServer(username: "steve", credential: "setupYourOwnPlease", urls: ["turn:turn-cae1.vdo.ninja:3478"], tz: 300, udp: true, locale: "cae1"),
-        TurnServer(username: "vdoninja", credential: "theyBeSharksHere", urls: ["turn:turn-usw2.vdo.ninja:3478"], tz: 480, udp: true, locale: "usw2"),
-        TurnServer(username: "vdoninja", credential: "PolandPirat", urls: ["turn:turn-eu4.vdo.ninja:3478"], tz: -70, udp: true, locale: "pol1"),
-        TurnServer(username: "steve", credential: "setupYourOwnPlease", urls: ["turns:turn.obs.ninja:443"], tz: -60, udp: false, locale: "de1"),
-        TurnServer(username: "steve", credential: "setupYourOwnPlease", urls: ["turn:turn-eu1.vdo.ninja:3478"], tz: -60, udp: true, locale: "de1"),
+        TurnServer(username: "use5", credential: "c-5eSrFCaAaMFG11-Ax1r1k61y3RDpFhi3jP5oDXsdc", urls: ["turn:turn-use5.vdo.ninja:3478"], tz: 300, udp: true, locale: "use5"),
+        TurnServer(username: "use5", credential: "c-5eSrFCaAaMFG11-Ax1r1k61y3RDpFhi3jP5oDXsdc", urls: ["turns:turn-use5.vdo.ninja:443"], tz: 300, udp: false, locale: "use5"),
+        TurnServer(username: "de3", credential: "NR5d6huNQQsVyLx5sYE4V_uxW9xjL9qO-mI0tU5lkXc", urls: ["turn:turn-de3.vdo.ninja:3478"], tz: -60, udp: true, locale: "de3"),
+        TurnServer(username: "de3", credential: "NR5d6huNQQsVyLx5sYE4V_uxW9xjL9qO-mI0tU5lkXc", urls: ["turns:turn-de3.vdo.ninja:443"], tz: -60, udp: false, locale: "de3"),
+        TurnServer(username: "pl2", credential: "vmYXvwN9C+FeHV7raGixEUctlSRrYAXxjDunAxd8PJg=", urls: ["turn:turn-pl2.vdo.ninja:3478"], tz: -60, udp: true, locale: "pl2"),
+        TurnServer(username: "pl2", credential: "vmYXvwN9C+FeHV7raGixEUctlSRrYAXxjDunAxd8PJg=", urls: ["turns:turn-pl2.vdo.ninja:443"], tz: -60, udp: false, locale: "pl2"),
+        TurnServer(username: "vdoninja", credential: "EastSideRepresentZ", urls: ["turn:turn-use3.vdo.ninja:3478"], tz: 300, udp: true, locale: "use3"),
+        TurnServer(username: "vdoninja", credential: "EastSideRepresentZ", urls: ["turns:turn-use3.vdo.ninja:443"], tz: 300, udp: false, locale: "use3"),
+        TurnServer(username: "vdoninja", credential: "ViennaSchnitzel", urls: ["turn:turn-eu5.vdo.ninja:3478"], tz: -60, udp: true, locale: "eu5"),
+        TurnServer(username: "vdoninja", credential: "ViennaSchnitzel", urls: ["turns:turn-eu5.vdo.ninja:443"], tz: -60, udp: false, locale: "eu5"),
+        TurnServer(username: "vdoninja", credential: "donotuseplease", urls: ["turn:turn-usw3.vdo.ninja:3478"], tz: 480, udp: true, locale: "usw3"),
+        TurnServer(username: "vdoninja", credential: "donotuseplease", urls: ["turns:turn-usw3.vdo.ninja:443"], tz: 480, udp: false, locale: "usw3"),
+        TurnServer(username: "vdoninja", credential: "donotuseplease", urls: ["turn:turn-usw4.vdo.ninja:3478"], tz: 480, udp: true, locale: "usw4"),
+        TurnServer(username: "vdoninja", credential: "donotuseplease", urls: ["turns:turn-usw4.vdo.ninja:443"], tz: 480, udp: false, locale: "usw4"),
+        TurnServer(username: "vdoninja", credential: "donotuseplease", urls: ["turn:turn-usw5.vdo.ninja:3478"], tz: 480, udp: true, locale: "usw5"),
+        TurnServer(username: "vdoninja", credential: "donotuseplease", urls: ["turns:turn-usw5.vdo.ninja:443"], tz: 480, udp: false, locale: "usw5"),
+        TurnServer(username: "vdoninja", credential: "donotuseplease", urls: ["turn:turn-fr1.vdo.ninja:3478"], tz: -60, udp: true, locale: "fr1"),
+        TurnServer(username: "vdoninja", credential: "donotuseplease", urls: ["turns:turn-fr1.vdo.ninja:443"], tz: -60, udp: false, locale: "fr1"),
+        TurnServer(username: "vdoninja", credential: "donotuseplease", urls: ["turn:turn-fr2.vdo.ninja:3478"], tz: -60, udp: true, locale: "fr2"),
+        TurnServer(username: "vdoninja", credential: "donotuseplease", urls: ["turns:turn-fr2.vdo.ninja:443"], tz: -60, udp: false, locale: "fr2"),
+        TurnServer(username: "vdoninja", credential: "IchBinSteveDerNinja", urls: ["turn:www.turn.vdo.ninja:3478"], tz: -60, udp: true, locale: "de2"),
+        TurnServer(username: "vdoninja", credential: "IchBinSteveDerNinja", urls: ["turns:www.turn.vdo.ninja:443"], tz: -60, udp: false, locale: "de2"),
         TurnServer(username: "vdoninja", credential: "EastSideRepresentZ", urls: ["turn:turn-use1.vdo.ninja:3478"], tz: 300, udp: true, locale: "use1"),
+        TurnServer(username: "vdoninja", credential: "EastSideRepresentZ", urls: ["turns:turn-use1.vdo.ninja:443"], tz: 300, udp: false, locale: "use1"),
+        TurnServer(username: "vdoninja", credential: "pleaseUseYourOwn", urls: ["turn:turn-use2.vdo.ninja:3478"], tz: 300, udp: true, locale: "use2"),
+        TurnServer(username: "vdoninja", credential: "pleaseUseYourOwn", urls: ["turns:turn-use2.vdo.ninja:443"], tz: 300, udp: false, locale: "use2"),
     ]
 
     /// Parses the hosted list body; nil when it is not a usable list.
@@ -56,9 +75,21 @@ public enum Turn {
         return out.isEmpty ? nil : out
     }
 
+    static func discoveryURL(_ url: String, timestamp: Int) -> URL? {
+        guard var parts = URLComponents(string: url) else { return nil }
+        // Preserve encoded '+' and duplicate/empty values exactly. Rebuilding
+        // queryItems can turn %2B into '+', which form-style servers read as space.
+        var query = (parts.percentEncodedQuery ?? "").components(separatedBy: "&").filter {
+            !$0.isEmpty && $0.components(separatedBy: "=").first?.removingPercentEncoding != "ts"
+        }
+        query.append("ts=\(timestamp)")
+        parts.percentEncodedQuery = query.joined(separator: "&")
+        return parts.url
+    }
+
     /// Downloads the hosted TURN list; falls back to `fallback`.
     public static func fetch(url: String = Defaults.turnUrl, timeout: TimeInterval = 5, completion: @escaping ([TurnServer]) -> Void) {
-        guard let u = URL(string: "\(url)?ts=\(Int(Date().timeIntervalSince1970 * 1000))") else { return completion(fallback) }
+        guard let u = discoveryURL(url, timestamp: Int(Date().timeIntervalSince1970 * 1000)) else { return completion(fallback) }
         var req = URLRequest(url: u)
         req.timeoutInterval = timeout
         URLSession.shared.dataTask(with: req) { data, response, _ in
@@ -67,8 +98,18 @@ public enum Turn {
         }.resume()
     }
 
-    /// Local UTC offset in minutes, like JavaScript's `-getTimezoneOffset()`.
-    public static func localTzOffsetMinutes() -> Int { TimeZone.current.secondsFromGMT() / 60 }
+    /// lib.js getTimezone(), in minutes west of UTC (including its historical baseline).
+    public static func localTzOffsetMinutes() -> Int {
+        let zone = TimeZone.current
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = zone
+        let current = -zone.secondsFromGMT() / 60
+        let offsets = [1900, 1906].compactMap { year -> Int? in
+            guard let date = calendar.date(from: DateComponents(year: year, month: 2, day: 1)) else { return nil }
+            return -zone.secondsFromGMT(for: date) / 60
+        }
+        return current < (offsets.max() ?? current) ? current + 60 : current
+    }
 
     /// Picks the closest servers by time zone: two UDP and one TCP/TLS, like the JavaScript SDK.
     public static func select(_ list: [TurnServer], tzOffsetMinutes: Int = localTzOffsetMinutes(), forceTcp: Bool = false) -> [IceServer] {

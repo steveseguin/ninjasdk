@@ -29,22 +29,23 @@ type Connection struct {
 	// local one is being set races inside pion and corrupts the negotiation
 	// state, and answers arrive on the data channel reader goroutine while the
 	// caller's thread may be renegotiating. Lock order is mediaMu -> negMu -> mu.
-	negMu         sync.Mutex
-	infoSent      bool
-	mu            sync.Mutex
-	control       *webrtc.DataChannel
-	channels      map[string]*webrtc.DataChannel
-	streamID      string
-	session       string
-	info          map[string]any
-	obsState      map[string]any
-	allowAudio    bool
-	allowVideo    bool
-	allowDownload bool
-	allowResource bool
-	viewOptions   ViewOptions
-	senders       []*webrtc.RTPSender
-	senderKinds   map[*webrtc.RTPSender]webrtc.RTPCodecType // survives ReplaceTrack(nil)
+	negMu                  sync.Mutex
+	infoSent               bool
+	mu                     sync.Mutex
+	control                *webrtc.DataChannel
+	channels               map[string]*webrtc.DataChannel
+	streamID               string
+	session                string
+	info                   map[string]any
+	obsState               map[string]any
+	allowAudio             bool
+	allowVideo             bool
+	allowDownload          bool
+	allowResource          bool
+	viewOptions            ViewOptions
+	senders                []*webrtc.RTPSender
+	senderKinds            map[*webrtc.RTPSender]webrtc.RTPCodecType // survives ReplaceTrack(nil)
+	mediaNegotiationNeeded bool
 
 	iceBundle      []webrtc.ICECandidateInit
 	iceTimer       *time.Timer
@@ -548,6 +549,9 @@ func (s *SDK) handleAnswer(uuid, session string, desc webrtc.SessionDescription)
 	if err != nil {
 		s.logf("SetRemoteDescription(answer) failed: %v", err)
 		s.emit(Event{Type: EventError, Err: err, UUID: uuid, Message: "failed to handle answer"})
+	}
+	if err == nil {
+		s.updateTracksForConnection(c)
 	}
 }
 
@@ -1166,82 +1170,67 @@ func (s *SDK) updateTracksForConnection(c *Connection) {
 	s.mu.Lock()
 	tracks := append([]webrtc.TrackLocal(nil), s.localTracks...)
 	s.mu.Unlock()
-	if len(tracks) == 0 {
+	c.mu.Lock()
+	if c.finalized {
+		c.mu.Unlock()
 		return
 	}
-	c.mu.Lock()
 	senders := append([]*webrtc.RTPSender(nil), c.senders...)
 	allowAudio, allowVideo := c.allowAudio, c.allowVideo
+	kinds := make(map[*webrtc.RTPSender]webrtc.RTPCodecType, len(c.senderKinds))
+	for sender, kind := range c.senderKinds {
+		kinds[sender] = kind
+	}
 	c.mu.Unlock()
-	for _, sender := range senders {
-		c.mu.Lock()
-		k, known := c.senderKinds[sender]
-		c.mu.Unlock()
-		if !known {
-			// A muted sender has no track; the recorded kind is what lets it resume.
-			if t := sender.Track(); t != nil {
-				k = t.Kind()
-			} else {
+	for _, kind := range []webrtc.RTPCodecType{webrtc.RTPCodecTypeAudio, webrtc.RTPCodecTypeVideo} {
+		allowed := (kind == webrtc.RTPCodecTypeAudio && allowAudio) || (kind == webrtc.RTPCodecTypeVideo && allowVideo)
+		var local []webrtc.TrackLocal
+		for _, track := range tracks {
+			if track.Kind() == kind {
+				local = append(local, track)
+				break // One primary track per kind, matching the native browser path.
+			}
+		}
+		count := 0
+		for _, sender := range senders {
+			k, known := kinds[sender]
+			if !known && sender.Track() != nil {
+				k = sender.Track().Kind()
+			}
+			if k != kind {
 				continue
 			}
-		}
-		allow := (k == webrtc.RTPCodecTypeAudio && allowAudio) || (k == webrtc.RTPCodecTypeVideo && allowVideo)
-		if !allow {
-			if sender.Track() != nil {
-				if err := sender.ReplaceTrack(nil); err != nil {
-					s.logf("ReplaceTrack(nil) failed: %v", err)
-				}
+			var track webrtc.TrackLocal
+			if allowed && count < len(local) {
+				track = local[count]
 			}
-			continue
+			if err := sender.ReplaceTrack(track); err != nil {
+				s.logf("ReplaceTrack failed: %v", err)
+			}
+			count++
 		}
-		if sender.Track() != nil {
-			continue // already sending this kind
-		}
-		for _, t := range tracks {
-			if t.Kind() == k {
-				if err := sender.ReplaceTrack(t); err != nil {
-					s.logf("ReplaceTrack failed: %v", err)
+		if allowed {
+			for _, track := range local[min(count, len(local)):] {
+				sender, err := c.pc.AddTrack(track)
+				if err != nil {
+					s.logf("AddTrack after viewer preferences failed: %v", err)
+					continue
 				}
-				break
+				c.mu.Lock()
+				c.senders = append(c.senders, sender)
+				c.senderKinds[sender] = kind
+				c.mu.Unlock()
+				go s.drainRTCP(sender)
+				c.mediaNegotiationNeeded = true
 			}
 		}
 	}
-	changed := false
-	for _, track := range tracks {
-		kind := track.Kind()
-		if (kind == webrtc.RTPCodecTypeAudio && !allowAudio) || (kind == webrtc.RTPCodecTypeVideo && !allowVideo) {
-			continue
-		}
-		found := false
-		c.mu.Lock()
-		for _, k := range c.senderKinds {
-			if k == kind {
-				found = true
-				break
-			}
-		}
-		c.mu.Unlock()
-		if found {
-			continue
-		}
-		sender, err := c.pc.AddTrack(track)
-		if err != nil {
-			s.logf("AddTrack failed: %v", err)
-			continue
-		}
-		c.mu.Lock()
-		c.senders = append(c.senders, sender)
-		c.senderKinds[sender] = kind
-		c.mu.Unlock()
-		go s.drainRTCP(sender)
-		changed = true
-	}
-	if changed {
+	if c.mediaNegotiationNeeded && c.pc.SignalingState() == webrtc.SignalingStateStable {
+		c.mediaNegotiationNeeded = false
 		if err := s.renegotiate(c, false, false); err != nil {
-			s.logf("media offer failed: %v", err)
+			s.logf("Media renegotiation failed: %v", err)
 		}
 	}
-
 }
 
 // ---------------------------------------------------------------------------

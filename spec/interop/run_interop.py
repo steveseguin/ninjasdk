@@ -31,6 +31,7 @@ import socket
 import subprocess
 import sys
 import time
+from wire_audit import WireAudit
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 C_BUILD = os.environ.get("VDON_C_BUILD_DIR", os.path.join(ROOT, "c", "build"))
@@ -135,7 +136,9 @@ def main() -> int:
         server.kill()
         print("signaling server did not start")
         return 2
-    host = f"ws://127.0.0.1:{port}"
+    audit = WireAudit(f"ws://127.0.0.1:{port}")
+    audit.__enter__()
+    host = audit.host
     results = {}
     try:
         for pub in langs:
@@ -176,7 +179,10 @@ def main() -> int:
                     except subprocess.TimeoutExpired:
                         pass
     finally:
-        server.kill()
+        try:
+            audit.__exit__()
+        finally:
+            server.kill()
     print("\nInteroperability matrix (rows publish, columns view):")
     width = max(len(l) for l in langs) + 2
     print(" " * width + "".join(l.ljust(width) for l in langs))

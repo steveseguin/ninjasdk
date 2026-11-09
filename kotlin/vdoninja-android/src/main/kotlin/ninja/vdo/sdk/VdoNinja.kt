@@ -83,6 +83,9 @@ class VdoConnection internal constructor(
     @Volatile internal var infoSent = false
     internal var allowAudio = false
     internal var allowVideo = false
+    internal val mediaLock = Any()
+    internal var mediaNeedsOffer = false
+    internal var mediaOfferPending = false
     internal val iceBundle = ArrayList<IceCandidate>()
     internal var iceTask: ScheduledFuture<*>? = null
     internal var iceDelayMs = 70L
@@ -195,6 +198,7 @@ class VdoNinja @JvmOverloads constructor(
     @Volatile private var autoConnect = false
     private var autoFull = false
     private var iceServers: CompletableFuture<List<PeerConnection.IceServer>>? = null
+    private var iceServersExpiresAt = 0L // guarded by lock; monotonic clock
     @Volatile private var intentional = false
 
     /** Blocking work (TURN fetch, native dispose, request handlers) stays off the timer and signaling threads. */
@@ -667,9 +671,15 @@ class VdoNinja @JvmOverloads constructor(
         }
     }
 
-    /** Starts (once) the ICE server resolution on a worker thread; `Turn.fetch` blocks for up to 10 s. */
+    /** Refresh hosted credentials hourly; coalesce lookups on the worker. */
     private fun iceServerFuture(): CompletableFuture<List<PeerConnection.IceServer>> = synchronized(lock) {
-        iceServers ?: CompletableFuture.supplyAsync({ buildIceServers() }, worker).also { iceServers = it }
+        val cached = iceServers
+        if (cached != null && (!cached.isDone || options.turnMode != TurnMode.AUTO || System.nanoTime() < iceServersExpiresAt)) {
+            cached
+        } else {
+            iceServersExpiresAt = System.nanoTime() + TimeUnit.HOURS.toNanos(1)
+            CompletableFuture.supplyAsync({ buildIceServers() }, worker).also { iceServers = it }
+        }
     }
 
     /** Cached ICE servers; waits for the prefetch only when it has not finished yet. */
@@ -760,14 +770,22 @@ class VdoNinja @JvmOverloads constructor(
     }
 
     private fun renegotiate(c: VdoConnection, iceRestart: Boolean) {
+        fun failed(reason: String) {
+            synchronized(c.mediaLock) {
+                c.mediaOfferPending = false
+                c.mediaNeedsOffer = true
+            }
+            log(reason)
+        }
         if (iceRestart) c.pc.restartIce()
         val constraints = MediaConstraints().apply {
             if (iceRestart) mandatory.add(MediaConstraints.KeyValuePair("IceRestart", "true"))
         }
         c.pc.createOffer(sdpObserver({ offer ->
-            if (offer == null) return@sdpObserver
-            c.pc.setLocalDescription(sdpObserver({ sendDescription(c, offer) }, { log("setLocalDescription failed: $it") }), offer)
-        }, { log("createOffer failed: $it") }), constraints)
+            if (c.closed) return@sdpObserver
+            if (offer == null) { failed("createOffer returned no offer"); return@sdpObserver }
+            c.pc.setLocalDescription(sdpObserver({ if (!c.closed) sendDescription(c, offer) }, { failed("setLocalDescription failed: $it") }), offer)
+        }, { failed("createOffer failed: $it") }), constraints)
     }
 
     private fun handleLocalCandidate(c: VdoConnection, cand: org.webrtc.IceCandidate) {
@@ -1047,25 +1065,27 @@ class VdoNinja @JvmOverloads constructor(
         return false
     }
 
-    private fun updateTracks(c: VdoConnection) {
-        if (c.type != "publisher" || c.closed || !c.controlOpen || !c.infoSent) return
+    private fun updateTracks(c: VdoConnection): Unit = synchronized(c.mediaLock) {
+        if (c.type != "publisher" || c.closed || !c.controlOpen || !c.infoSent || connection(c.uuid, c.type) !== c) return@synchronized
         val local = synchronized(lock) { localTracks.toList() }
-        synchronized(c) {
-            var changed = false
-            for (track in local) {
-                val kind = track.kind()
-                val allowed = if (kind == "video") c.allowVideo else c.allowAudio
-                val sender = c.senders.firstOrNull { it.second == kind }?.first
-                if (sender == null) {
-                    if (allowed) {
-                        c.senders.add(c.pc.addTrack(track, listOf("vdoninja")) to kind)
-                        changed = true
-                    }
-                } else {
-                    sender.setTrack(if (allowed) track else null, false)
-                }
+        for (kind in listOf("audio", "video")) {
+            val tracks = local.filter { it.kind() == kind }.take(1)
+            val senders = synchronized(lock) { c.senders.filter { it.second == kind }.map { it.first } }
+            val allowed = if (kind == "audio") c.allowAudio else c.allowVideo
+            for ((index, sender) in senders.withIndex()) {
+                val track = if (allowed) tracks.getOrNull(index) else null
+                if (sender.track() !== track) sender.setTrack(track, false)
             }
-            if (changed) renegotiate(c, false)
+            if (allowed) for (track in tracks.drop(senders.size)) {
+                val sender = c.pc.addTrack(track, listOf("vdoninja"))
+                synchronized(lock) { c.senders.add(sender to kind) }
+                c.mediaNeedsOffer = true
+            }
+        }
+        if (c.mediaNeedsOffer && !c.mediaOfferPending && c.pc.signalingState() == PeerConnection.SignalingState.STABLE) {
+            c.mediaNeedsOffer = false
+            c.mediaOfferPending = true
+            renegotiate(c, false)
         }
     }
 
@@ -1234,6 +1254,8 @@ class VdoNinja @JvmOverloads constructor(
         }
         c.pc.setRemoteDescription(sdpObserver({
             drainPendingIce(c, "remote")
+            synchronized(c.mediaLock) { c.mediaOfferPending = false }
+            updateTracks(c)
         }, { emit(VdoEvent(VdoEvents.ERROR, uuid = uuid, message = "failed to handle answer: $it")) }), RtcSessionDescription(RtcSessionDescription.Type.ANSWER, desc.sdp))
     }
 

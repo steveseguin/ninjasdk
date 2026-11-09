@@ -37,12 +37,14 @@
     "watch": "chokidar \"vdoninja-sdk.js\" -c \"npm run build\"",
     "test": "node run-all-tests.js",
     "test:types": "tsc --noEmit --strict --lib es2020 --module node16 --moduleResolution node16 tests/types/consumer.ts tests/types/node-consumer.ts",
-    "test:reliability": "node --test tests/sdk-reliability.test.js tests/sdk-review.test.js tests/sdk-reconnect-cancellation.test.js",
+    "test:reliability": "node --test tests/sdk-reliability.test.js tests/sdk-review.test.js tests/sdk-reconnect-cancellation.test.js tests/signaling-contract.test.cjs tests/sdk-turn-discovery.test.cjs",
     "test:node": "node demos/node-example.js",
     "test:all": "node run-all-tests.js",
     "check:webrtc": "node -e \"console.log(require('./vdoninja-sdk-node.js').checkWebRTCSupport())\"",
     "ssn:listen": "node demos/socialstreamninja-listener.js",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run build",
+    "test:protocol": "node --test tests/signaling-contract.test.cjs",
+    "test:protocol:source": "node --test tests/browser-protocol-source.test.cjs"
   },
   "repository": {
     "type": "git",

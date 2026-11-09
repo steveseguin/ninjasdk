@@ -3264,7 +3264,6 @@ impl Inner {
                 uuid: conn.uuid.clone(),
                 stream_id: conn.stream_id(),
                 data: msg.clone(),
-                fallback: false,
             });
         } else if let Some(pipe) = msg.get("pipe") {
             if let Some(t) = pipe.get("type").and_then(|t| t.as_str()) {
@@ -3280,7 +3279,6 @@ impl Inner {
                 uuid: conn.uuid.clone(),
                 stream_id: conn.stream_id(),
                 data: pipe.clone(),
-                fallback: false,
             });
         } else if msg.get("iceRestartRequest").is_some() && conn.kind == "publisher" {
             self.restart_ice(conn, "remote_request", true).await;
@@ -3606,7 +3604,6 @@ impl Inner {
                 uuid,
                 stream_id: None,
                 data: data.clone(),
-                fallback: false,
             }),
         }
     }
@@ -4285,7 +4282,7 @@ async fn fetch_turn_list(url: &str) -> Vec<vdoninja_core::turn::TurnServer> {
         .timeout(Duration::from_secs(2))
         .build()
     {
-        if let Ok(resp) = client.get(format!("{url}?ts={}", now_ms())).send().await {
+        if let Ok(resp) = client.get(url).query(&[("ts", now_ms())]).send().await {
             if let Ok(list) = resp.json::<TurnList>().await {
                 if !list.servers.is_empty() {
                     return list.servers;
@@ -4297,40 +4294,26 @@ async fn fetch_turn_list(url: &str) -> Vec<vdoninja_core::turn::TurnServer> {
     fallback_turn_servers()
 }
 
-/// Local UTC offset in minutes (JavaScript's `-getTimezoneOffset()`), used to
-/// pick nearby TURN servers. Falls back to 0 (UTC) when unavailable.
+/// lib.js getTimezone(): minutes west of UTC, with its historical baseline dates.
 fn local_tz_offset_minutes() -> i64 {
-    #[cfg(unix)]
-    {
-        #[repr(C)]
-        struct Tm {
-            tm_sec: i32,
-            tm_min: i32,
-            tm_hour: i32,
-            tm_mday: i32,
-            tm_mon: i32,
-            tm_year: i32,
-            tm_wday: i32,
-            tm_yday: i32,
-            tm_isdst: i32,
-            tm_gmtoff: i64,
-            tm_zone: *const std::os::raw::c_char,
-        }
-        extern "C" {
-            fn time(t: *mut i64) -> i64;
-            fn localtime_r(t: *const i64, tm: *mut Tm) -> *mut Tm;
-        }
-        // SAFETY: libc time()/localtime_r() with valid, properly sized out-pointers.
-        unsafe {
-            let mut t: i64 = 0;
-            time(&mut t);
-            let mut tm = std::mem::zeroed::<Tm>();
-            if !localtime_r(&t, &mut tm).is_null() {
-                return tm.tm_gmtoff / 60;
-            }
-        }
+    use chrono::{Local, TimeZone};
+    let now = Local::now();
+    let current = -(now.offset().local_minus_utc() as i64) / 60;
+    let standard = [1900, 1906]
+        .into_iter()
+        .filter_map(|year| {
+            Local
+                .with_ymd_and_hms(year, 2, 1, 0, 0, 0)
+                .single()
+                .map(|date| -(date.offset().local_minus_utc() as i64) / 60)
+        })
+        .max()
+        .unwrap_or(current);
+    if current < standard {
+        current + 60
+    } else {
+        current
     }
-    0
 }
 
 #[allow(dead_code)]
@@ -4602,6 +4585,43 @@ mod protocol_tests {
         assert!(
             wire.try_recv().is_err(),
             "bye sent on signaling without a control channel"
+        );
+    }
+}
+
+#[cfg(test)]
+mod turn_discovery_tests {
+    use super::*;
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+    #[tokio::test]
+    async fn existing_query_survives_discovery() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let server = tokio::spawn(async move {
+            let (mut socket, _) = listener.accept().await.unwrap();
+            let mut request = Vec::new();
+            let mut chunk = [0; 1024];
+            while !request.windows(4).any(|part| part == b"\r\n\r\n") {
+                let n = socket.read(&mut chunk).await.unwrap();
+                assert!(n > 0 && request.len() < 8192);
+                request.extend_from_slice(&chunk[..n]);
+            }
+            let body = r#"{"servers":[{"urls":["turn:fixture.invalid:3478"],"username":"fixture","credential":"fixture","udp":true,"tz":0,"locale":"test"}]}"#;
+            let response = format!(
+                "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+                body.len(),
+                body
+            );
+            socket.write_all(response.as_bytes()).await.unwrap();
+            String::from_utf8(request).unwrap()
+        });
+        let list = fetch_turn_list(&format!("http://{addr}/list?region=ca&key=a%2Bb&empty=")).await;
+        assert_eq!(list.len(), 1);
+        let request = server.await.unwrap();
+        assert!(
+            request.starts_with("GET /list?region=ca&key=a%2Bb&empty=&ts="),
+            "{request}"
         );
     }
 }

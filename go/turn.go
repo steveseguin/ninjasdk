@@ -47,16 +47,35 @@ func (s *TURNServer) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// fallbackTURNServers mirrors the JavaScript SDK's built-in list, used only when
+// fallbackTURNServers mirrors the official browser's built-in list, used only when
 // the hosted TURN endpoint cannot be reached.
 var fallbackTURNServers = []TURNServer{
-	{Username: "steve", Credential: "setupYourOwnPlease", URLs: []string{"turns:www.turn.obs.ninja:443"}, TZ: 300, UDP: false, Locale: "cae1"},
-	{Username: "steve", Credential: "setupYourOwnPlease", URLs: []string{"turn:turn-cae1.vdo.ninja:3478"}, TZ: 300, UDP: true, Locale: "cae1"},
-	{Username: "vdoninja", Credential: "theyBeSharksHere", URLs: []string{"turn:turn-usw2.vdo.ninja:3478"}, TZ: 480, UDP: true, Locale: "usw2"},
-	{Username: "vdoninja", Credential: "PolandPirat", URLs: []string{"turn:turn-eu4.vdo.ninja:3478"}, TZ: -70, UDP: true, Locale: "pol1"},
-	{Username: "steve", Credential: "setupYourOwnPlease", URLs: []string{"turns:turn.obs.ninja:443"}, TZ: -60, UDP: false, Locale: "de1"},
-	{Username: "steve", Credential: "setupYourOwnPlease", URLs: []string{"turn:turn-eu1.vdo.ninja:3478"}, TZ: -60, UDP: true, Locale: "de1"},
+	{Username: "use5", Credential: "c-5eSrFCaAaMFG11-Ax1r1k61y3RDpFhi3jP5oDXsdc", URLs: []string{"turn:turn-use5.vdo.ninja:3478"}, TZ: 300, UDP: true, Locale: "use5"},
+	{Username: "use5", Credential: "c-5eSrFCaAaMFG11-Ax1r1k61y3RDpFhi3jP5oDXsdc", URLs: []string{"turns:turn-use5.vdo.ninja:443"}, TZ: 300, UDP: false, Locale: "use5"},
+	{Username: "de3", Credential: "NR5d6huNQQsVyLx5sYE4V_uxW9xjL9qO-mI0tU5lkXc", URLs: []string{"turn:turn-de3.vdo.ninja:3478"}, TZ: -60, UDP: true, Locale: "de3"},
+	{Username: "de3", Credential: "NR5d6huNQQsVyLx5sYE4V_uxW9xjL9qO-mI0tU5lkXc", URLs: []string{"turns:turn-de3.vdo.ninja:443"}, TZ: -60, UDP: false, Locale: "de3"},
+	{Username: "pl2", Credential: "vmYXvwN9C+FeHV7raGixEUctlSRrYAXxjDunAxd8PJg=", URLs: []string{"turn:turn-pl2.vdo.ninja:3478"}, TZ: -60, UDP: true, Locale: "pl2"},
+	{Username: "pl2", Credential: "vmYXvwN9C+FeHV7raGixEUctlSRrYAXxjDunAxd8PJg=", URLs: []string{"turns:turn-pl2.vdo.ninja:443"}, TZ: -60, UDP: false, Locale: "pl2"},
+	{Username: "vdoninja", Credential: "EastSideRepresentZ", URLs: []string{"turn:turn-use3.vdo.ninja:3478"}, TZ: 300, UDP: true, Locale: "use3"},
+	{Username: "vdoninja", Credential: "EastSideRepresentZ", URLs: []string{"turns:turn-use3.vdo.ninja:443"}, TZ: 300, UDP: false, Locale: "use3"},
+	{Username: "vdoninja", Credential: "ViennaSchnitzel", URLs: []string{"turn:turn-eu5.vdo.ninja:3478"}, TZ: -60, UDP: true, Locale: "eu5"},
+	{Username: "vdoninja", Credential: "ViennaSchnitzel", URLs: []string{"turns:turn-eu5.vdo.ninja:443"}, TZ: -60, UDP: false, Locale: "eu5"},
+	{Username: "vdoninja", Credential: "donotuseplease", URLs: []string{"turn:turn-usw3.vdo.ninja:3478"}, TZ: 480, UDP: true, Locale: "usw3"},
+	{Username: "vdoninja", Credential: "donotuseplease", URLs: []string{"turns:turn-usw3.vdo.ninja:443"}, TZ: 480, UDP: false, Locale: "usw3"},
+	{Username: "vdoninja", Credential: "donotuseplease", URLs: []string{"turn:turn-usw4.vdo.ninja:3478"}, TZ: 480, UDP: true, Locale: "usw4"},
+	{Username: "vdoninja", Credential: "donotuseplease", URLs: []string{"turns:turn-usw4.vdo.ninja:443"}, TZ: 480, UDP: false, Locale: "usw4"},
+	{Username: "vdoninja", Credential: "donotuseplease", URLs: []string{"turn:turn-usw5.vdo.ninja:3478"}, TZ: 480, UDP: true, Locale: "usw5"},
+	{Username: "vdoninja", Credential: "donotuseplease", URLs: []string{"turns:turn-usw5.vdo.ninja:443"}, TZ: 480, UDP: false, Locale: "usw5"},
+	{Username: "vdoninja", Credential: "donotuseplease", URLs: []string{"turn:turn-fr1.vdo.ninja:3478"}, TZ: -60, UDP: true, Locale: "fr1"},
+	{Username: "vdoninja", Credential: "donotuseplease", URLs: []string{"turns:turn-fr1.vdo.ninja:443"}, TZ: -60, UDP: false, Locale: "fr1"},
+	{Username: "vdoninja", Credential: "donotuseplease", URLs: []string{"turn:turn-fr2.vdo.ninja:3478"}, TZ: -60, UDP: true, Locale: "fr2"},
+	{Username: "vdoninja", Credential: "donotuseplease", URLs: []string{"turns:turn-fr2.vdo.ninja:443"}, TZ: -60, UDP: false, Locale: "fr2"},
+	{Username: "vdoninja", Credential: "IchBinSteveDerNinja", URLs: []string{"turn:www.turn.vdo.ninja:3478"}, TZ: -60, UDP: true, Locale: "de2"},
+	{Username: "vdoninja", Credential: "IchBinSteveDerNinja", URLs: []string{"turns:www.turn.vdo.ninja:443"}, TZ: -60, UDP: false, Locale: "de2"},
 	{Username: "vdoninja", Credential: "EastSideRepresentZ", URLs: []string{"turn:turn-use1.vdo.ninja:3478"}, TZ: 300, UDP: true, Locale: "use1"},
+	{Username: "vdoninja", Credential: "EastSideRepresentZ", URLs: []string{"turns:turn-use1.vdo.ninja:443"}, TZ: 300, UDP: false, Locale: "use1"},
+	{Username: "vdoninja", Credential: "pleaseUseYourOwn", URLs: []string{"turn:turn-use2.vdo.ninja:3478"}, TZ: 300, UDP: true, Locale: "use2"},
+	{Username: "vdoninja", Credential: "pleaseUseYourOwn", URLs: []string{"turns:turn-use2.vdo.ninja:443"}, TZ: 300, UDP: false, Locale: "use2"},
 }
 
 // FetchTURNServers downloads the hosted TURN list. It falls back to a built-in
@@ -68,10 +87,13 @@ func FetchTURNServers(ctx context.Context, client *http.Client, url string) ([]T
 	if url == "" {
 		url = DefaultTURNURL
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s?ts=%d", url, time.Now().UnixMilli()), nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return fallbackTURNServers, err
 	}
+	query := req.URL.Query()
+	query.Set("ts", fmt.Sprintf("%d", time.Now().UnixMilli()))
+	req.URL.RawQuery = query.Encode()
 	resp, err := client.Do(req)
 	if err != nil {
 		return fallbackTURNServers, err
@@ -89,11 +111,20 @@ func FetchTURNServers(ctx context.Context, client *http.Client, url string) ([]T
 	return body.Servers, nil
 }
 
-// localTimezoneOffsetMinutes returns the local UTC offset in minutes, matching
-// JavaScript's -getTimezoneOffset().
+// localTimezoneOffsetMinutes follows lib.js getTimezone (minutes west of UTC).
 func localTimezoneOffsetMinutes() int {
-	_, off := time.Now().Zone()
-	return off / 60
+	return browserTimezoneOffset(time.Now())
+}
+
+func browserTimezoneOffset(now time.Time) int {
+	_, off := now.Zone()
+	_, first := time.Date(1900, 2, 1, 0, 0, 0, 0, now.Location()).Zone()
+	_, second := time.Date(1906, 2, 1, 0, 0, 0, 0, now.Location()).Zone()
+	current, standard := -off/60, max(-first/60, -second/60)
+	if current < standard {
+		return current + 60
+	}
+	return current
 }
 
 // SelectTURNServers picks the closest servers by timezone: up to two UDP and one

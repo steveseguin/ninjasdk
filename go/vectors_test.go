@@ -153,12 +153,12 @@ func TestVectorsEncryption(t *testing.T) {
 		if phrase != c.Phrase {
 			t.Errorf("phrase=%q want %q", phrase, c.Phrase)
 		}
-		key := sha256.Sum256([]byte(phrase))
+		key := sha256.Sum256(browserAESBytes(phrase))
 		if hex.EncodeToString(key[:]) != c.KeyHex {
 			t.Errorf("key mismatch for %q", c.RawPassword)
 		}
 		iv, _ := hex.DecodeString(c.IVHex)
-		ct, err := encryptWithIV([]byte(c.Plaintext), phrase, iv)
+		ct, err := encryptWithIV(browserAESBytes(c.Plaintext), phrase, iv)
 		if err != nil {
 			t.Fatal(err)
 		}

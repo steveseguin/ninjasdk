@@ -93,6 +93,75 @@ func waitFor(t *testing.T, ch <-chan Event, timeout time.Duration, what string) 
 	}
 }
 
+func TestDataFirstPublisherPreferences(t *testing.T) {
+	host := startSignal(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	pub, view := newTestSDK(t, host, nil), newTestSDK(t, host, nil)
+	audio, _ := webrtc.NewTrackLocalStaticSample(webrtc.RTPCodecCapability{MimeType: webrtc.MimeTypeOpus}, "audio", "data-first")
+	video, _ := webrtc.NewTrackLocalStaticSample(webrtc.RTPCodecCapability{MimeType: webrtc.MimeTypeVP8}, "video", "data-first")
+	if err := pub.Connect(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pub.Publish(ctx, []webrtc.TrackLocal{audio, video}, PublishOptions{StreamID: "data-first"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := view.Connect(ctx); err != nil {
+		t.Fatal(err)
+	}
+	opened := make(chan Event, 4)
+	pub.On(EventDataChannelOpen, func(ev Event) { opened <- ev })
+	no := false
+	viewer, err := view.View(ctx, "data-first", ViewOptions{Audio: &no, Video: &no})
+	if err != nil {
+		t.Fatal(err)
+	}
+	event := waitFor(t, opened, 10*time.Second, "control channel")
+	publisher := pub.findConnection(event.UUID, "publisher")
+	sdp := publisher.pc.LocalDescription().SDP
+	if !strings.Contains(sdp, "m=application ") || strings.Contains(sdp, "m=audio ") || strings.Contains(sdp, "m=video ") {
+		t.Fatal("Initial offer must contain only the data channel")
+	}
+	until := func(check func() bool) {
+		t.Helper()
+		for end := time.Now().Add(5 * time.Second); time.Now().Before(end); {
+			if check() {
+				return
+			}
+			time.Sleep(10 * time.Millisecond)
+		}
+		t.Fatal("Preference update did not complete")
+	}
+	until(viewer.controlOpen)
+	viewer.sendControl(map[string]any{"audio": true, "video": false})
+	until(func() bool {
+		publisher.mu.Lock()
+		defer publisher.mu.Unlock()
+		return len(publisher.senders) == 1 && publisher.pc.SignalingState() == webrtc.SignalingStateStable
+	})
+	if strings.Contains(publisher.pc.LocalDescription().SDP, "m=video ") {
+		t.Fatal("Disabled video added")
+	}
+	viewer.sendControl(map[string]any{"audio": false})
+	until(func() bool {
+		publisher.mu.Lock()
+		defer publisher.mu.Unlock()
+		return publisher.senders[0].Track() == nil
+	})
+	viewer.sendControl(map[string]any{"audio": true})
+	until(func() bool {
+		publisher.mu.Lock()
+		defer publisher.mu.Unlock()
+		return publisher.senders[0].Track() != nil
+	})
+	viewer.sendControl(map[string]any{"video": true})
+	until(func() bool {
+		publisher.mu.Lock()
+		defer publisher.mu.Unlock()
+		return len(publisher.senders) == 2 && publisher.pc.SignalingState() == webrtc.SignalingStateStable
+	})
+}
+
 func TestPublishingSurvivesSignalingReconnect(t *testing.T) {
 	for _, mediaPublish := range []bool{false, true} {
 		name := "announce"

@@ -33,8 +33,9 @@ class VdoConnection {
   final Map<String, dynamic> obsState = {};
   ViewOptions viewOptions = const ViewOptions();
   bool _infoSent = false;
-  Future<void> _mediaUpdate = Future.value();
   bool allowAudio = false, allowVideo = false;
+  Future<void> _mediaUpdate = Future.value();
+  bool _mediaNeedsOffer = false, _mediaOfferPending = false;
   final List<IceCandidate> _iceBundle = [];
   Timer? _iceTimer;
   Duration _iceDelay = const Duration(milliseconds: 70);
@@ -154,6 +155,8 @@ class VdoNinja {
   bool _autoConnect = false;
   bool _autoFull = false;
   List<IceServer>? _iceServers;
+  DateTime? _iceServersExpires;
+  Future<List<IceServer>>? _iceServersPending;
   bool _intentional = false;
 
   // ------------------------------------------------------------- events
@@ -627,7 +630,14 @@ class VdoNinja {
   }
 
   Future<List<IceServer>> _iceServerList() async {
-    if (_iceServers != null) return _iceServers!;
+    if (_iceServers != null && (options.turnMode != TurnMode.auto ||
+        DateTime.now().isBefore(_iceServersExpires!))) {
+      return _iceServers!;
+    }
+    return _iceServersPending ??= _fetchIceServers().whenComplete(() { _iceServersPending = null; });
+  }
+
+  Future<List<IceServer>> _fetchIceServers() async {
     final out = <IceServer>[];
     for (final s in options.stunServers ?? defaultStunServers) {
       out.add({'urls': s});
@@ -642,6 +652,7 @@ class VdoNinja {
         out.addAll(selectTurnServers(list, forceTcp: options.forceTcp));
     }
     _iceServers = out;
+    _iceServersExpires = DateTime.now().add(const Duration(hours: 1));
     return out;
   }
 
@@ -982,29 +993,37 @@ class VdoNinja {
   }
 
   Future<void> _updateTracks(VdoConnection c) {
-    c._mediaUpdate = c._mediaUpdate.then((_) => _applyTracks(c)).catchError((Object e) {
-      _log('media update failed: $e');
-    });
-    return c._mediaUpdate;
-  }
-
-  Future<void> _applyTracks(VdoConnection c) async {
-    if (c.type != 'publisher' || c._closed || !c.controlOpen || !c._infoSent) return;
-    var changed = false;
-    for (final track in _localTracks.toList()) {
-      final kind = track.kind;
-      final allowed = kind == 'video' ? c.allowVideo : c.allowAudio;
-      final sender = c._senders.where((s) => _senderKinds[s] == kind).firstOrNull;
-      if (sender != null) {
-        await sender.replaceTrack(allowed ? track : null);
-      } else if (allowed) {
-        final added = await c.pc.addTrack(track, _localStream ?? await createLocalMediaStream('vdoninja'));
-        c._senders.add(added);
-        _senderKinds[added] = kind ?? 'video';
-        changed = true;
+    c._mediaUpdate = c._mediaUpdate.then((_) async {
+      if (c.type != 'publisher' || c._closed || !c.controlOpen || !c._infoSent || connection(c.uuid, c.type) != c) return;
+      for (final kind in ['audio', 'video']) {
+        final tracks = _localTracks.where((t) => t.kind == kind).take(1).toList();
+        final senders = c._senders.where((s) => (_senderKinds[s] ?? s.track?.kind) == kind).toList();
+        final allowed = kind == 'audio' ? c.allowAudio : c.allowVideo;
+        for (var i = 0; i < senders.length; i++) {
+          final track = allowed && i < tracks.length ? tracks[i] : null;
+          if (senders[i].track != track) await senders[i].replaceTrack(track);
+        }
+        if (allowed) {
+          for (final track in tracks.skip(senders.length)) {
+            final sender = await c.pc.addTrack(track, _localStream ?? await createLocalMediaStream('vdoninja'));
+            c._senders.add(sender);
+            _senderKinds[sender] = kind;
+            c._mediaNeedsOffer = true;
+          }
+        }
       }
-    }
-    if (changed) await _renegotiate(c);
+      if (c._mediaNeedsOffer && !c._mediaOfferPending &&
+          await c.pc.getSignalingState() == RTCSignalingState.RTCSignalingStateStable) {
+        c._mediaNeedsOffer = false;
+        c._mediaOfferPending = true;
+        try { await _renegotiate(c); } catch (_) {
+          c._mediaOfferPending = false;
+          c._mediaNeedsOffer = true;
+          rethrow;
+        }
+      }
+    }).catchError((Object error) { _log('media preference update failed: $error'); });
+    return c._mediaUpdate;
   }
 
   // ---------------------------------------------------------- signaling
@@ -1182,6 +1201,8 @@ class VdoNinja {
       await c.pc.setRemoteDescription(RTCSessionDescription(desc.sdp, desc.type));
       c._remoteSet = true;
       await _drainPendingIce(c, 'remote');
+      c._mediaOfferPending = false;
+      if (c._mediaNeedsOffer) await _updateTracks(c);
     } catch (e) {
       _emit(VdoEvent(VdoEvents.error, uuid: uuid, message: 'failed to handle answer: $e'));
     }
