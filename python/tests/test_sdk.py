@@ -14,6 +14,46 @@ def make(host, **kwargs):
     return VDONinja(host, **kwargs)
 
 
+async def test_data_first_publisher_preferences(signal_host):
+    pub, view = make(signal_host), make(signal_host)
+
+    async def until(check):
+        for _ in range(250):
+            if check():
+                return
+            await asyncio.sleep(0.02)
+        assert check(), "publisher preference change did not finish"
+
+    try:
+        await pub.connect()
+        await pub.publish([AudioStreamTrack(), VideoStreamTrack()], "data-first")
+        await view.connect()
+        opened = asyncio.create_task(view.wait_for("dataChannelOpen", timeout=10))
+        viewer = await view.view("data-first", audio=False, video=False)
+        await opened
+        publisher = next(pair.publisher for pair in pub.connections.values() if pair.publisher)
+        assert "m=application " in publisher.pc.localDescription.sdp
+        assert "m=audio " not in publisher.pc.localDescription.sdp
+        assert "m=video " not in publisher.pc.localDescription.sdp
+        assert not publisher.senders
+        viewer.send_control({"audio": True, "video": False})
+        await until(lambda: len(publisher.senders) == 1 and publisher.pc.signalingState == "stable")
+        assert publisher.senders[0].kind == "audio"
+        assert "m=video " not in publisher.pc.localDescription.sdp
+        viewer.send_control({"audio": False})
+        await until(lambda: publisher.senders[0].track is None)
+        viewer.send_control({"audio": True})
+        await until(lambda: publisher.senders[0].track is not None)
+        assert len(publisher.senders) == 1
+        viewer.send_control({"video": True})
+        await until(lambda: len(publisher.senders) == 2 and publisher.pc.signalingState == "stable")
+        assert {sender.kind for sender in publisher.senders} == {"audio", "video"}
+        assert publisher.senders[0].track is not None, "video-only update must preserve audio preference"
+    finally:
+        await view.disconnect()
+        await pub.disconnect()
+
+
 @pytest.mark.parametrize("media", [False, True])
 async def test_publishing_survives_signaling_reconnect(signal_host, media):
     pub = make(signal_host, reconnect_delay=0.05)

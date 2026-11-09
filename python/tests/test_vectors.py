@@ -32,7 +32,7 @@ def test_encryption_vectors():
     for case in load()["encryption"]:
         phrase = sanitize.sanitize_password(case["rawPassword"]) + case["salt"]
         assert phrase == case["phrase"]
-        assert hashlib.sha256(phrase.encode()).hexdigest() == case["keyHex"]
+        assert hashlib.sha256(crypto.browser_aes_bytes(phrase)).hexdigest() == case["keyHex"]
         ct = crypto.encrypt_with_iv(case["plaintext"], phrase, bytes.fromhex(case["ivHex"]))
         assert ct.hex() == case["ciphertextHex"]
         assert crypto.decrypt_message(case["ciphertextHex"], case["ivHex"], phrase) == case["plaintext"]

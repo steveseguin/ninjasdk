@@ -1,7 +1,7 @@
 # Native SDKs: Go, Rust, C, Python, Flutter, Android and Swift
 
-The JavaScript SDK (`vdoninja-sdk.js`) is the reference implementation of the VDO.Ninja client protocol. This
-repository also ships native SDKs that implement the same protocol on top of established WebRTC engines, so
+The [VDO.Ninja application](https://github.com/steveseguin/vdo.ninja) is the protocol source of truth.
+The JavaScript SDK (`vdoninja-sdk.js`) and native SDKs in this repository implement its protocol on top of established WebRTC engines, so
 applications written in Go, Rust, C or Python, and mobile apps in Flutter, Kotlin/Java or Swift, can publish to and
 view from browsers running VDO.Ninja, talk to each other, and use the hosted signaling and TURN infrastructure the
 same way the JavaScript SDK does.
@@ -22,8 +22,9 @@ platform's own capture APIs. They deliberately leave out file transfer, resource
 and screen capture. Each is split into a protocol core that is unit-tested against the shared vectors without WebRTC
 (`vdoninja_core`, `vdoninja-core`, `VDONinjaCore`) and a thin engine layer.
 
-All of them share one conformance suite: [`spec/vectors.json`](https://github.com/steveseguin/ninjasdk/blob/main/spec/vectors.json) is generated from the JavaScript
+All of them share SDK consistency tests: [`spec/vectors.json`](https://github.com/steveseguin/ninjasdk/blob/main/spec/vectors.json) is generated from the JavaScript
 SDK (`spec/generate-vectors.cjs`) and every native SDK tests its hashing, encryption and sanitization against it.
+Agreement between SDKs alone does not prove compatibility with VDO.Ninja. See [protocol audit and contract tests](protocol-audit.md).
 [`spec/interop/run_interop.py`](https://github.com/steveseguin/ninjasdk/blob/main/spec/interop/run_interop.py) runs every publisher/viewer language pair, including
 the Node build of the JavaScript SDK, against a local signaling server.
 
@@ -35,7 +36,7 @@ the Node build of the JavaScript SDK, against a local signaling server.
 | Stream and room hashing, SDP/ICE encryption, `password: false` | yes | yes | yes | yes | yes | yes | yes | yes |
 | Data-only publishing (`announce`) and viewing | yes | yes | yes | yes | yes | yes | yes | yes |
 | Control channel protocol (prefs, info, ping/pong, bye, videoMuted, obsState) | yes | yes | yes | yes | yes | yes | yes | yes |
-| `sendData` targeting (uuid, type, preference, signaling fallback) | yes | yes | yes | yes | yes | yes | yes | yes |
+| `sendData` targeting (uuid, type, preference, data-channel routing) | yes | yes | yes | yes | yes | yes | yes | yes |
 | Pub/sub channels and request/response | yes | yes | yes | yes | yes | yes | yes | yes |
 | Native file transfer (host, list, request, cancel) | yes | yes | yes | yes | yes | no | no | no |
 | Reserved `x-` channels and the `x-bin` binary lane | yes | yes | yes | yes | yes | receive | receive | receive |
@@ -46,7 +47,8 @@ the Node build of the JavaScript SDK, against a local signaling server.
 | Keyframe requests (PLI) | n/a | yes | yes | yes (event) | via aiortc | engine | engine | engine |
 | Trickle ICE, ICE candidate bundling | yes | yes | yes | yes | no (aiortc gathers first) | yes | yes | yes |
 | ICE restart | yes | yes | reconnects | reconnects | no | yes | yes | yes |
-| TURN: hosted list by proximity, custom, forced relay | yes | yes | yes | yes (UDP relays) | yes | yes | yes | yes |
+| TURN: hosted discovery and custom servers | yes | yes | yes | yes (UDP relays) | yes | yes | yes | yes |
+| Forced relay ICE policy | yes | yes | yes | yes (backend policy) | no (aiortc limitation) | yes | yes | yes |
 | WHIP / WHEP clients | yes | yes | yes | no | yes | no | no | no |
 | Local signaling server for LAN, offline and tests | — | `vdoninja-signal` | `vdoninja-signal` | `vdoninja-signal` | `python -m vdoninja.signalserver` | use another SDK's | use another SDK's | use another SDK's |
 | autoConnect (half/full mesh) | yes | yes | yes | yes | yes | yes | yes | yes |
@@ -54,6 +56,13 @@ the Node build of the JavaScript SDK, against a local signaling server.
 
 "reconnects" means the engine lacks ICE restart, so a failed connection is torn down and re-requested from the
 publisher instead; the application sees `peerDisconnected` and `connectionFailed` followed by a fresh `peerConnected`.
+
+Hosted TURN credentials expire from each instance's cache and are refreshed for new connections.
+Backup lists are imported from `vdo.ninja/webrtc.js`; run `node scripts/sync-turn-fallback.cjs --check`
+with the reference checkout to detect drift. Timezone selection uses minutes west of UTC. The browser's
+historical baseline cannot be resolved by the Windows CRT in C/Python, which use the OS standard offset instead.
+The C SDK's supported libjuice backend handles TURN/UDP only; setting `force_tcp` makes `vdon_create()`
+fail with `NULL` and `errno=EINVAL`, rather than silently accepting an unsupported transport policy.
 
 ### Connection lifecycle (all SDKs, as in the JavaScript SDK)
 
@@ -84,17 +93,22 @@ DTLS certificates that aiortc rejects).
 ## Protocol summary
 
 The native SDKs implement the routed VDO.Ninja signaling protocol used by `wss.vdo.ninja` (the "wss2" format).
-Everything below is what the JavaScript SDK does; the native SDKs mirror it so they are indistinguishable to the
-server and to browser peers.
+The following describes the supported subset and local SDK policies. SDK defaults and convenience APIs are not
+new VDO.Ninja signaling options. Custom host URLs still use routed signaling; these SDKs do not implement the
+web application's `&wss` fan-out mode. Outgoing `UUID` is the destination; incoming `UUID` is the sender supplied by the server.
 
-* **Sanitization.** Stream IDs: `[^A-Za-z0-9_]+` runs become `_`, at most 64 characters, generated (12 random
+* **SDK sanitization policy.** Stream IDs: `[^A-Za-z0-9_]+` runs become `_`, at most 64 characters, generated (12 random
   alphanumerics) when empty. Rooms: same rule, at most 30 characters. Passwords: trimmed and
   `encodeURIComponent`-encoded. Labels: line breaks removed, at most 100 characters.
 * **Hashing.** With a password `P` and salt `S` (default `vdo.ninja`), published stream IDs on the wire are
   `streamID + sha256(P+S)[:6]` and room IDs are `sha256(room+P+S)[:16]`. The default password is
   `someEncryptionKey123`; `password: false` disables hashing and encryption entirely.
 * **Encryption.** SDP and ICE candidates are JSON-serialized and encrypted with AES-256-CBC (PKCS#7), key
-  `sha256(P+S)`, random 16-byte IV, both sent as hex (`description`/`candidates` plus `vector`).
+  `sha256(browserBytes(P+S))`, random 16-byte IV, both sent as hex (`description`/`candidates` plus `vector`).
+  `browserBytes` takes the low byte of each UTF-16 code unit, matching `lib.js` for both the key phrase
+  and plaintext. Decryption maps each byte to its character value. This legacy format is lossy for
+  characters above U+00FF; JSON Unicode escapes preserve those characters when needed. Stream and
+  room hashes still use UTF-8. AES fixtures are checked against the actual browser converter.
 * **Requests.** `joinroom {roomid, claim?, streamID?}` → `listing {list, director?, claim?}`; `{leave: true}` leaves
   the room; `seed {streamID}` registers a publisher (one publish per signaling connection; reconnect to change it); `play {streamID}` asks the server to find the publisher, which receives
   `offerSDP {UUID}`; room members receive `videoaddedtoroom` and `someonejoined`; `alert`/`error` carry text.
@@ -106,11 +120,12 @@ server and to browser peers.
 * **Control channel.** The publisher creates `sendChannel`. The viewer sends `{audio, video, downloads,
   info:{label}, allowresources}`; the publisher sends `{info:{label, meta, ...}}`. `ping`/`pong`, `pipe`
   (application data), `bye`, `videoMuted`, `iceRestartRequest`, `fileList`/`requestFile` and `obsState` share the
-  channel. `pipe` payloads with `type` `subscribe`, `unsubscribe`, `channelMessage`, `request` or `response`
-  implement pub/sub and RPC; everything else is delivered as `dataReceived`.
+  channel. The following are **SDK application conventions**, not VDO.Ninja commands: `pipe` payloads with `type` `subscribe`, `unsubscribe`, `channelMessage`, `request` or `response`
+  implement pub/sub and RPC between cooperating SDK applications; a VDO.Ninja browser receives ordinary application data.
+  Generic `pipe` data uses WebRTC only; it is not relayed through signaling.
 * **Other channels.** File transfers use a channel labeled with the file ID: a text header
   `{type:"filetransfer", size, filename, id}`, 16 KiB binary chunks, then `EOF1` (complete) or `EOF2` (cancelled).
-  `x-` labels are reserved for applications (`x-bin` is the binary lane); `resources` carries VDO.Ninja overlay
+  `x-` labels are explicitly reserved for third-party applications and ignored by VDO.Ninja (`x-bin` is an SDK convention); `resources` carries VDO.Ninja overlay
   resources; `chunked` is VDO.Ninja's own chunked transfer and is reported as unsupported.
 * **TURN.** `GET https://turnservers.vdo.ninja/?ts=…` returns `{servers:[{username, credential, urls, tz, udp}]}`.
   Clients pick the two closest UDP relays and one TCP relay by time-zone distance; a built-in list is the fallback.

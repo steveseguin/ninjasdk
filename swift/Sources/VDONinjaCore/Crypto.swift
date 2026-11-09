@@ -208,12 +208,17 @@ public enum Crypto {
 
     public enum CryptoError: Error { case badInput, badPadding }
 
+    /// lib.js AES bytes; stream/room hashing remains UTF-8.
+    public static func browserAesBytes(_ value: String) -> [UInt8] {
+        value.utf16.map { UInt8(truncatingIfNeeded: $0) }
+    }
+
     /// AES-256-CBC (PKCS#7) with key SHA-256(phrase); `phrase` is `sanitizedPassword + salt`.
     public static func encryptMessage(_ plaintext: String, phrase: String, iv: [UInt8]? = nil) -> Encrypted {
         let ivBytes = iv ?? randomBytes(16)
         precondition(ivBytes.count == 16, "iv must be 16 bytes")
-        let w = expandKey(sha256(Array(phrase.utf8)))
-        var data = Array(plaintext.utf8)
+        let w = expandKey(sha256(browserAesBytes(phrase)))
+        var data = browserAesBytes(plaintext)
         let pad = 16 - data.count % 16
         data.append(contentsOf: [UInt8](repeating: UInt8(pad), count: pad))
         var out = [UInt8](); out.reserveCapacity(data.count)
@@ -232,7 +237,7 @@ public enum Crypto {
         guard let iv = fromHex(vector), iv.count == 16, let ct = fromHex(ciphertextHex), ct.count % 16 == 0, !ct.isEmpty else {
             throw CryptoError.badInput
         }
-        let w = expandKey(sha256(Array(phrase.utf8)))
+        let w = expandKey(sha256(browserAesBytes(phrase)))
         var out = [UInt8](); out.reserveCapacity(ct.count)
         var prev = iv
         for off in stride(from: 0, to: ct.count, by: 16) {
@@ -246,8 +251,7 @@ public enum Crypto {
             throw CryptoError.badPadding
         }
         out.removeLast(Int(pad))
-        guard let s = String(bytes: out, encoding: .utf8) else { throw CryptoError.badInput }
-        return s
+        return String(decoding: out.map(UInt16.init), as: UTF16.self)
     }
 
     // MARK: Identifiers

@@ -88,7 +88,7 @@ await recorder.start()
 | Rooms | `join_room(room, password=None, claim=False)`, `leave_room()` |
 | Publishing | `announce(stream_id=None, room=...)` (data only), `publish(tracks, stream_id=None, ...)`, `add_track(track)`, `stop_publishing()` |
 | Viewing | `view(stream_id, audio=True, video=True, label="", downloads=True, allowresources=False, timeout=15)`, `stop_viewing(stream_id)`, `auto_connect(room, mode="half"|"full", ...)` |
-| Data | `send_data(data, target=None)` (target: UUID or `{"uuid","type","streamID","preference","allowFallback"}`), `send_ping(uuid=None)` |
+| Data | `send_data(data, target=None)` (target: UUID or `{"uuid","type","streamID","preference"}`), `send_ping(uuid=None)` |
 | Pub/sub | `subscribe(*channels)`, `unsubscribe(*channels)`, `publish_to_channel(channel, data, target="all")` |
 | RPC | `on_request(type, handler)` (sync or async `(data, from_uuid) -> result`), `await request(type, data, uuid, timeout=5)`, `respond(request_id, data, uuid)` |
 | Binary | `await send_binary(uuid, bytes)` (reserved `x-bin` lane), `await open_channel(uuid, "x-label", ...)` returns an `RTCDataChannel` |
@@ -101,7 +101,7 @@ await recorder.start()
 
 `VDONinja(host="wss://wss.vdo.ninja", *, room=None, password=None, salt="vdo.ninja", label="", meta=None,
 turn="auto"|False|[RTCIceServer], force_tcp=False, stun_servers=None, max_reconnect_attempts=5,
-reconnect_delay=1.0, connection_timeout=20.0, view_retry_interval=900.0, auto_ping_viewer=False, client_id=None)`
+reconnect_delay=1.0, connection_timeout=20.0, view_retry_interval=900.0, auto_ping_viewer=False)`
 
 `password=None` uses the shared default password, `password=False` disables hashing and encryption (JavaScript
 `password: false`).

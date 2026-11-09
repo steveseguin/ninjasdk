@@ -53,8 +53,13 @@ pub fn hash_room(room: &str, sanitized_password: &str, salt: &str) -> String {
     generate_hash(&format!("{room}{sanitized_password}{salt}"), 16)
 }
 
+/// lib.js AES bytes: low byte of each UTF-16 unit. ID hashes stay UTF-8.
+pub fn browser_aes_bytes(value: &str) -> Vec<u8> {
+    value.encode_utf16().map(|unit| unit as u8).collect()
+}
+
 fn key_for(phrase: &str) -> [u8; 32] {
-    Sha256::digest(phrase.as_bytes()).into()
+    Sha256::digest(browser_aes_bytes(phrase)).into()
 }
 
 /// AES-256-CBC with PKCS#7 padding and a caller-supplied IV (tests / vectors).
@@ -69,7 +74,7 @@ pub fn encrypt_with_iv(plaintext: &[u8], phrase: &str, iv: &[u8; 16]) -> Vec<u8>
 pub fn encrypt_message(plaintext: &str, phrase: &str) -> (String, String) {
     let mut iv = [0u8; 16];
     rand::thread_rng().fill_bytes(&mut iv);
-    let ct = encrypt_with_iv(plaintext.as_bytes(), phrase, &iv);
+    let ct = encrypt_with_iv(&browser_aes_bytes(plaintext), phrase, &iv);
     (hex::encode(ct), hex::encode(iv))
 }
 
@@ -89,7 +94,7 @@ pub fn decrypt_message(
     let plain = Aes256CbcDec::new(&key.into(), &iv.into())
         .decrypt_padded_vec_mut::<Pkcs7>(&ct)
         .map_err(|_| CryptoError::Padding)?;
-    String::from_utf8(plain).map_err(|_| CryptoError::Utf8)
+    Ok(plain.into_iter().map(char::from).collect())
 }
 
 const ALNUM: &[u8] = b"0123456789abcdefghijklmnopqrstuvwxyz";

@@ -29,7 +29,6 @@ public struct VDOEvent {
     public var attempt: Int?
     public var muted: Bool?
     public var intentional = false
-    public var fallback = false
     /// Engine-specific track (`RTCMediaStreamTrack` on Apple platforms).
     public var track: AnyObject?
     public var bytes: Data?
@@ -38,11 +37,11 @@ public struct VDOEvent {
 
     public init(_ type: VDOEventType, uuid: String? = nil, streamId: String? = nil, connectionType: String? = nil,
                 data: Any? = nil, message: String? = nil, channel: String? = nil, latencyMs: Int? = nil,
-                attempt: Int? = nil, muted: Bool? = nil, intentional: Bool = false, fallback: Bool = false,
+                attempt: Int? = nil, muted: Bool? = nil, intentional: Bool = false,
                 track: AnyObject? = nil, bytes: Data? = nil, raw: JSON? = nil) {
         self.type = type; self.uuid = uuid; self.streamId = streamId; self.connectionType = connectionType
         self.data = data; self.message = message; self.channel = channel; self.latencyMs = latencyMs
-        self.attempt = attempt; self.muted = muted; self.intentional = intentional; self.fallback = fallback
+        self.attempt = attempt; self.muted = muted; self.intentional = intentional
         self.track = track; self.bytes = bytes; self.raw = raw
     }
 }

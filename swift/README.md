@@ -75,7 +75,7 @@ would otherwise retain the SDK, so call it once you are done with the instance.
 | Rooms | `joinRoom(room, claim:)` → listing, `leaveRoom()`, `currentRoom` |
 | Publishing | `announce()`, `publish(tracks:streamId:room:)`, `addTrack()`, `replaceTrack()` (camera switch), `stopPublishing()` |
 | Viewing | `view(streamId, options: ViewOptions(audio:video:label:))`, `stopViewing()`, `autoConnect(room:streamId:fullMode:)`; media arrives as `.track` events with an `RTCMediaStreamTrack` |
-| Data | `sendData(data, uuid:type:preference:allowFallback:)`, `sendPing()` → `.peerLatency` |
+| Data | `sendData(data, uuid:type:preference:)`, `sendPing()` → `.peerLatency` |
 | Pub/sub | `subscribe()`, `unsubscribe()`, `publishToChannel()` → `.channelMessage` |
 | RPC | `onRequest(type) { data, from in }`, `request(type, data, to:)`, `respond()` |
 | Introspection | `peers()`, `connection(uuid, type:)` (exposes the `RTCPeerConnection`), `streams()` |

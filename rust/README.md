@@ -118,7 +118,6 @@ Events are an enum received from a `tokio::sync::broadcast` channel; variant nam
 | `stun_servers` | Google + Cloudflare | Empty disables STUN. |
 | `bind_addrs` | `["0.0.0.0:0"]` | Local UDP bind addresses; the wildcard expands to all interfaces. `include_loopback` adds `127.0.0.1` candidates (tests). |
 | `auto_ping_viewer` | off | Viewer pings every `auto_ping_interval`; two misses trigger an ICE restart request. |
-| `client_id` | unset | Adds a `from` field for the legacy fan-out signaling servers. |
 
 Reconnection: after an unexpected socket loss the SDK reconnects with exponential backoff and replays the room join, publish/announce and pending views.
 
@@ -163,7 +162,7 @@ The same server is used by the test suite (`vdoninja::signalserver::SignalServer
 cargo test            # vdoninja-core vectors + vdoninja end-to-end tests over the local server
 ```
 
-The protocol vectors in [`../spec/vectors.json`](../spec/vectors.json) are generated from the JavaScript SDK, so hashing, encryption and sanitization cannot drift from the reference implementation.
+The protocol vectors in [`../spec/vectors.json`](../spec/vectors.json) are generated from the JavaScript SDK, so hashing, encryption and sanitization can be compared across SDKs; compatibility is defined by the VDO.Ninja application, not these vectors.
 
 ## Hosted service notice
 

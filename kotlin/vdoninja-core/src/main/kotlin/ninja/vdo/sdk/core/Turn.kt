@@ -3,6 +3,7 @@ package ninja.vdo.sdk.core
 
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.HttpUrl.Companion.toHttpUrl
 import org.json.JSONObject
 import java.util.TimeZone
 import java.util.concurrent.TimeUnit
@@ -25,16 +26,35 @@ object Turn {
     @JvmField
     val DEFAULT_STUN = listOf("stun:stun.l.google.com:19302", "stun:stun.cloudflare.com:3478")
 
-    /** Built-in list used when the hosted endpoint is unreachable (same as the JavaScript SDK). */
+    /** Built-in list used when the hosted endpoint is unreachable (from vdo.ninja/webrtc.js). */
     @JvmField
     val FALLBACK = listOf(
-        TurnServer("steve", "setupYourOwnPlease", listOf("turns:www.turn.obs.ninja:443"), 300, false, "cae1"),
-        TurnServer("steve", "setupYourOwnPlease", listOf("turn:turn-cae1.vdo.ninja:3478"), 300, true, "cae1"),
-        TurnServer("vdoninja", "theyBeSharksHere", listOf("turn:turn-usw2.vdo.ninja:3478"), 480, true, "usw2"),
-        TurnServer("vdoninja", "PolandPirat", listOf("turn:turn-eu4.vdo.ninja:3478"), -70, true, "pol1"),
-        TurnServer("steve", "setupYourOwnPlease", listOf("turns:turn.obs.ninja:443"), -60, false, "de1"),
-        TurnServer("steve", "setupYourOwnPlease", listOf("turn:turn-eu1.vdo.ninja:3478"), -60, true, "de1"),
+        TurnServer("use5", "c-5eSrFCaAaMFG11-Ax1r1k61y3RDpFhi3jP5oDXsdc", listOf("turn:turn-use5.vdo.ninja:3478"), 300, true, "use5"),
+        TurnServer("use5", "c-5eSrFCaAaMFG11-Ax1r1k61y3RDpFhi3jP5oDXsdc", listOf("turns:turn-use5.vdo.ninja:443"), 300, false, "use5"),
+        TurnServer("de3", "NR5d6huNQQsVyLx5sYE4V_uxW9xjL9qO-mI0tU5lkXc", listOf("turn:turn-de3.vdo.ninja:3478"), -60, true, "de3"),
+        TurnServer("de3", "NR5d6huNQQsVyLx5sYE4V_uxW9xjL9qO-mI0tU5lkXc", listOf("turns:turn-de3.vdo.ninja:443"), -60, false, "de3"),
+        TurnServer("pl2", "vmYXvwN9C+FeHV7raGixEUctlSRrYAXxjDunAxd8PJg=", listOf("turn:turn-pl2.vdo.ninja:3478"), -60, true, "pl2"),
+        TurnServer("pl2", "vmYXvwN9C+FeHV7raGixEUctlSRrYAXxjDunAxd8PJg=", listOf("turns:turn-pl2.vdo.ninja:443"), -60, false, "pl2"),
+        TurnServer("vdoninja", "EastSideRepresentZ", listOf("turn:turn-use3.vdo.ninja:3478"), 300, true, "use3"),
+        TurnServer("vdoninja", "EastSideRepresentZ", listOf("turns:turn-use3.vdo.ninja:443"), 300, false, "use3"),
+        TurnServer("vdoninja", "ViennaSchnitzel", listOf("turn:turn-eu5.vdo.ninja:3478"), -60, true, "eu5"),
+        TurnServer("vdoninja", "ViennaSchnitzel", listOf("turns:turn-eu5.vdo.ninja:443"), -60, false, "eu5"),
+        TurnServer("vdoninja", "donotuseplease", listOf("turn:turn-usw3.vdo.ninja:3478"), 480, true, "usw3"),
+        TurnServer("vdoninja", "donotuseplease", listOf("turns:turn-usw3.vdo.ninja:443"), 480, false, "usw3"),
+        TurnServer("vdoninja", "donotuseplease", listOf("turn:turn-usw4.vdo.ninja:3478"), 480, true, "usw4"),
+        TurnServer("vdoninja", "donotuseplease", listOf("turns:turn-usw4.vdo.ninja:443"), 480, false, "usw4"),
+        TurnServer("vdoninja", "donotuseplease", listOf("turn:turn-usw5.vdo.ninja:3478"), 480, true, "usw5"),
+        TurnServer("vdoninja", "donotuseplease", listOf("turns:turn-usw5.vdo.ninja:443"), 480, false, "usw5"),
+        TurnServer("vdoninja", "donotuseplease", listOf("turn:turn-fr1.vdo.ninja:3478"), -60, true, "fr1"),
+        TurnServer("vdoninja", "donotuseplease", listOf("turns:turn-fr1.vdo.ninja:443"), -60, false, "fr1"),
+        TurnServer("vdoninja", "donotuseplease", listOf("turn:turn-fr2.vdo.ninja:3478"), -60, true, "fr2"),
+        TurnServer("vdoninja", "donotuseplease", listOf("turns:turn-fr2.vdo.ninja:443"), -60, false, "fr2"),
+        TurnServer("vdoninja", "IchBinSteveDerNinja", listOf("turn:www.turn.vdo.ninja:3478"), -60, true, "de2"),
+        TurnServer("vdoninja", "IchBinSteveDerNinja", listOf("turns:www.turn.vdo.ninja:443"), -60, false, "de2"),
         TurnServer("vdoninja", "EastSideRepresentZ", listOf("turn:turn-use1.vdo.ninja:3478"), 300, true, "use1"),
+        TurnServer("vdoninja", "EastSideRepresentZ", listOf("turns:turn-use1.vdo.ninja:443"), 300, false, "use1"),
+        TurnServer("vdoninja", "pleaseUseYourOwn", listOf("turn:turn-use2.vdo.ninja:3478"), 300, true, "use2"),
+        TurnServer("vdoninja", "pleaseUseYourOwn", listOf("turns:turn-use2.vdo.ninja:443"), 300, false, "use2"),
     )
 
     /** Downloads the hosted TURN list (blocking); falls back to [FALLBACK]. */
@@ -46,7 +66,8 @@ object Turn {
             .readTimeout(timeoutMs, TimeUnit.MILLISECONDS)
             .build()
         return try {
-            http.newCall(Request.Builder().url("$url?ts=${System.currentTimeMillis()}").build()).execute().use { res ->
+            val endpoint = url.toHttpUrl().newBuilder().setQueryParameter("ts", System.currentTimeMillis().toString()).build()
+            http.newCall(Request.Builder().url(endpoint).build()).execute().use { res ->
                 if (!res.isSuccessful) return FALLBACK
                 val servers = JSONObject(res.body?.string() ?: return FALLBACK).optJSONArray("servers") ?: return FALLBACK
                 val out = ArrayList<TurnServer>()
@@ -67,9 +88,19 @@ object Turn {
         }
     }
 
-    /** Local UTC offset in minutes, like JavaScript's `-getTimezoneOffset()`. */
+    /** lib.js getTimezone(), in minutes west of UTC (including its historical baseline). */
     @JvmStatic
-    fun localTzOffsetMinutes(): Int = TimeZone.getDefault().getOffset(System.currentTimeMillis()) / 60000
+    fun localTzOffsetMinutes(): Int {
+        val zone = TimeZone.getDefault()
+        fun baseline(year: Int): Int {
+            val date = java.util.GregorianCalendar(zone)
+            date.clear()
+            date.set(year, java.util.Calendar.FEBRUARY, 1)
+            return -zone.getOffset(date.timeInMillis) / 60000
+        }
+        val current = -zone.getOffset(System.currentTimeMillis()) / 60000
+        return if (current < maxOf(baseline(1900), baseline(1906))) current + 60 else current
+    }
 
     /** Picks the closest servers by time zone: two UDP and one TCP/TLS, like the JavaScript SDK. */
     @JvmStatic

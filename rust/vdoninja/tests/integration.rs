@@ -277,8 +277,31 @@ async fn media_publish_view() {
         .unwrap();
     view_sdk.connect().await.unwrap();
     view_sdk.join_room("rs-media").await.unwrap();
-    view_sdk
-        .view("rscam", ViewOptions::default())
+    let viewer = view_sdk
+        .view(
+            "rscam",
+            ViewOptions {
+                audio: false,
+                video: false,
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+    wait_for(&mut view_ev, Duration::from_secs(10), |e| {
+        matches!(e, Event::DataChannelOpen { .. })
+    })
+    .await;
+    let initial = viewer.peer_connection().remote_description().await.unwrap();
+    assert!(initial.sdp.contains("m=application "));
+    assert!(
+        !initial.sdp.contains("m=audio ") && !initial.sdp.contains("m=video "),
+        "Initial publisher offer must be data-only"
+    );
+    viewer
+        .control_channel()
+        .unwrap()
+        .send_text(r#"{"audio":true,"video":true}"#)
         .await
         .unwrap();
 

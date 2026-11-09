@@ -29,7 +29,6 @@ class VdoNinjaOptions {
     this.viewRetryInterval = const Duration(minutes: 15),
     this.autoPingViewer = false,
     this.autoPingInterval = const Duration(seconds: 10),
-    this.clientId,
     this.debug = false,
   });
 
@@ -75,8 +74,6 @@ class VdoNinjaOptions {
   final bool autoPingViewer;
   final Duration autoPingInterval;
 
-  /// Adds a `from` field (legacy fan-out servers only).
-  final String? clientId;
   final bool debug;
 
   /// The effective password context.

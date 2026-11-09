@@ -92,15 +92,20 @@ int main(int argc, char **argv) {
 
     cJSON_ArrayForEach(it, cJSON_GetObjectItemCaseSensitive(root, "encryption")) {
         uint8_t key[32], *iv = NULL, *ct = NULL;
-        size_t ivlen, ctlen;
+        size_t ivlen, ctlen, encoded_len;
+        uint8_t *encoded = NULL;
         char keyhex[65];
         int n;
         const char *phrase = S(it, "phrase");
-        vdon_sha256((const uint8_t *)phrase, strlen(phrase), key);
+        CHECK(vdon_browser_aes_bytes(phrase, &encoded, &encoded_len) == VDON_OK, "AES key bytes");
+        vdon_sha256(encoded, encoded_len, key);
+        free(encoded);
         vdon_hex_encode(key, 32, keyhex);
         CHECK(strcmp(keyhex, S(it, "keyHex")) == 0, "key %s want %s", keyhex, S(it, "keyHex"));
         CHECK(vdon_hex_decode(S(it, "ivHex"), &iv, &ivlen) == 0 && ivlen == 16, "iv decode");
-        n = vdon_aes256_cbc_encrypt(key, iv, (const uint8_t *)S(it, "plaintext"), strlen(S(it, "plaintext")), &ct);
+        CHECK(vdon_browser_aes_bytes(S(it, "plaintext"), &encoded, &encoded_len) == VDON_OK, "AES payload bytes");
+        n = vdon_aes256_cbc_encrypt(key, iv, encoded, encoded_len, &ct);
+        free(encoded);
         if (n > 0) {
             char *cthex = (char *)malloc((size_t)n * 2 + 1);
             vdon_hex_encode(ct, (size_t)n, cthex);

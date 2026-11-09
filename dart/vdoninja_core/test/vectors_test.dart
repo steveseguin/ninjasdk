@@ -103,7 +103,7 @@ void main() {
     final servers = selectTurnServers(fallbackTurnServers, tzOffsetMinutes: -60);
     expect(servers.length, 3);
     expect(servers.where((s) => (s['urls'] as List).first.toString().startsWith('turns:')).length, 1);
-    expect(servers.map((s) => (s['urls'] as List).first), containsAll(['turn:turn-eu1.vdo.ninja:3478', 'turns:turn.obs.ninja:443']));
+    expect(servers.map((s) => (s['urls'] as List).first), containsAll(['turn:turn-de3.vdo.ninja:3478', 'turns:turn-de3.vdo.ninja:443']));
     final tcpOnly = selectTurnServers(fallbackTurnServers, tzOffsetMinutes: -60, forceTcp: true);
     expect(tcpOnly.length, 1);
   });

@@ -616,11 +616,8 @@ func (s *SDK) writeWS(b []byte) bool {
 	return true
 }
 
-// sendWS marshals and sends a signaling message, adding ClientID as "from" when configured.
+// sendWS sends routed signaling; the server supplies the sender UUID on delivery.
 func (s *SDK) sendWS(msg map[string]any) bool {
-	if s.opts.ClientID != "" {
-		msg["from"] = s.opts.ClientID
-	}
 	b, err := json.Marshal(msg)
 	if err != nil {
 		return false
@@ -1125,8 +1122,6 @@ func (s *SDK) handleSignalingMessage(msg map[string]any) {
 		s.handleBye(getString(msg, "UUID"), EventBye, msg)
 	case msg["hangup"] != nil:
 		s.handleBye(getString(msg, "UUID"), EventHangup, msg)
-	case msg["pipe"] != nil && msg["__fallback"] != nil:
-		s.handleFallbackData(msg)
 	}
 }
 
@@ -1340,15 +1335,4 @@ func (s *SDK) handleBye(uuid string, typ EventType, msg map[string]any) {
 	}
 	s.emit(Event{Type: typ, UUID: uuid, Raw: msg})
 	s.emit(Event{Type: EventPeerDisconnected, UUID: uuid})
-}
-
-func (s *SDK) handleFallbackData(msg map[string]any) {
-	uuid := getString(msg, "UUID")
-	pipe := msg["pipe"]
-	if m, ok := pipe.(map[string]any); ok {
-		if t, _ := m["type"].(string); t == "subscribe" || t == "unsubscribe" {
-			s.handleDataChannelMessage(m, uuid)
-		}
-	}
-	s.emit(Event{Type: EventDataReceived, UUID: uuid, Data: pipe, Fallback: true, Raw: msg})
 }

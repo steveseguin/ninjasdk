@@ -444,14 +444,64 @@ void vdon_generate_hash(const char *input, int length, char *out) {
     out[n] = 0;
 }
 
+int vdon_browser_aes_bytes(const char *text, uint8_t **out, size_t *length) {
+    size_t size = strlen(text), i = 0, count = 0;
+    uint8_t *bytes = (uint8_t *)malloc(size + 1);
+    if (!bytes) return VDON_ERR_FAILURE;
+    while (i < size) {
+        uint32_t first = (uint8_t)text[i++], point = first, minimum = 0;
+        unsigned remaining = 0, j;
+        if (first >= 0xc2 && first <= 0xdf) { point &= 31; remaining = 1; minimum = 0x80; }
+        else if (first >= 0xe0 && first <= 0xef) { point &= 15; remaining = 2; minimum = 0x800; }
+        else if (first >= 0xf0 && first <= 0xf4) { point &= 7; remaining = 3; minimum = 0x10000; }
+        else if (first >= 0x80) goto invalid;
+        for (j = 0; j < remaining; ++j) {
+            uint8_t next;
+            if (i >= size) goto invalid;
+            next = (uint8_t)text[i++];
+            if ((next & 0xc0) != 0x80) goto invalid;
+            point = (point << 6) | (next & 63);
+        }
+        if (point < minimum || point > 0x10ffff || (point >= 0xd800 && point <= 0xdfff)) goto invalid;
+        if (point >= 0x10000) {
+            point -= 0x10000;
+            bytes[count++] = (uint8_t)(0xd800 + (point >> 10));
+            bytes[count++] = (uint8_t)(0xdc00 + (point & 1023));
+        } else bytes[count++] = (uint8_t)point;
+    }
+    bytes[count] = 0;
+    *out = bytes;
+    *length = count;
+    return VDON_OK;
+invalid:
+    free(bytes);
+    return VDON_ERR_INVALID;
+}
+
+static int browser_aes_key(const char *phrase, uint8_t key[32]) {
+    uint8_t *bytes;
+    size_t length;
+    int result = vdon_browser_aes_bytes(phrase, &bytes, &length);
+    if (result != VDON_OK) return result;
+    vdon_sha256(bytes, length, key);
+    free(bytes);
+    return VDON_OK;
+}
+
 int vdon_encrypt_message(const char *plaintext, const char *phrase, char **out_hex, char **out_iv_hex) {
     uint8_t key[32], iv[16], *ct;
+    uint8_t *bytes;
+    size_t length;
     int n;
     if (!plaintext || !phrase || !out_hex || !out_iv_hex)
         return VDON_ERR_INVALID;
-    vdon_sha256((const uint8_t *)phrase, strlen(phrase), key);
+    n = browser_aes_key(phrase, key);
+    if (n != VDON_OK) return n;
+    n = vdon_browser_aes_bytes(plaintext, &bytes, &length);
+    if (n != VDON_OK) return n;
     vdon_random_bytes(iv, 16);
-    n = vdon_aes256_cbc_encrypt(key, iv, (const uint8_t *)plaintext, strlen(plaintext), &ct);
+    n = vdon_aes256_cbc_encrypt(key, iv, bytes, length, &ct);
+    free(bytes);
     if (n < 0)
         return VDON_ERR_FAILURE;
     *out_hex = (char *)malloc((size_t)n * 2 + 1);
@@ -479,13 +529,28 @@ int vdon_decrypt_message(const char *cipher_hex, const char *iv_hex, const char 
         free(iv);
         return VDON_ERR_INVALID;
     }
-    vdon_sha256((const uint8_t *)phrase, strlen(phrase), key);
+    n = browser_aes_key(phrase, key);
+    if (n != VDON_OK) { free(ct); free(iv); return n; }
     n = vdon_aes256_cbc_decrypt(key, iv, ct, ct_len, &plain);
     free(ct);
     free(iv);
     if (n < 0)
         return VDON_ERR_FAILURE;
-    *out_plaintext = (char *)plain;
+    {
+        size_t i, length = 0;
+        char *utf8 = (char *)malloc((size_t)n * 2 + 1);
+        if (!utf8) { free(plain); return VDON_ERR_FAILURE; }
+        for (i = 0; i < (size_t)n; ++i) {
+            if (plain[i] < 128) utf8[length++] = (char)plain[i];
+            else {
+                utf8[length++] = (char)(0xc0 | (plain[i] >> 6));
+                utf8[length++] = (char)(0x80 | (plain[i] & 63));
+            }
+        }
+        utf8[length] = 0;
+        free(plain);
+        *out_plaintext = utf8;
+    }
     return VDON_OK;
 }
 

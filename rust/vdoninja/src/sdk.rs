@@ -664,10 +664,7 @@ impl VdoNinja {
             self.inner
                 .send_data_with(
                     json!({"type": "subscribe", "channels": list}),
-                    DataTarget {
-                        allow_fallback: true,
-                        ..Default::default()
-                    },
+                    DataTarget::default(),
                 )
                 .await;
         }
@@ -687,10 +684,7 @@ impl VdoNinja {
             self.inner
                 .send_data_with(
                     json!({"type": "unsubscribe", "channels": list}),
-                    DataTarget {
-                        allow_fallback: true,
-                        ..Default::default()
-                    },
+                    DataTarget::default(),
                 )
                 .await;
         }
@@ -1478,10 +1472,7 @@ impl Inner {
         });
     }
 
-    fn send_ws(&self, mut msg: Value) -> bool {
-        if let Some(id) = &self.opts.client_id {
-            msg["from"] = json!(id);
-        }
+    fn send_ws(&self, msg: Value) -> bool {
         let text = msg.to_string();
         log::debug!("-> WS {}", truncate(&text, 300));
         let tx = self.ws_tx.lock().unwrap().clone();
@@ -1960,20 +1951,6 @@ impl Inner {
             if let Some(u) = uuid {
                 self.handle_bye(&u, "hangup", msg.clone()).await;
             }
-        } else if msg.get("pipe").is_some() && msg.get("__fallback").is_some() {
-            let pipe = msg["pipe"].clone();
-            if let Some(t) = pipe.get("type").and_then(|t| t.as_str()) {
-                if t == "subscribe" || t == "unsubscribe" {
-                    self.handle_data_message(&pipe, uuid.clone().unwrap_or_default())
-                        .await;
-                }
-            }
-            self.emit(Event::DataReceived {
-                uuid: uuid.unwrap_or_default(),
-                stream_id: None,
-                data: pipe,
-                fallback: true,
-            });
         }
     }
 
@@ -2239,8 +2216,8 @@ impl Inner {
                 session: None,
                 info: Map::new(),
                 obs_state: Map::new(),
-                allow_audio: true,
-                allow_video: true,
+                allow_audio: false,
+                allow_video: false,
                 allow_downloads: false,
                 allow_resources: false,
                 view_options: ViewOptions::default(),
@@ -2316,23 +2293,7 @@ impl Inner {
         conn: &Arc<Connection>,
         ice_restart: bool,
     ) -> Result<RTCSessionDescription> {
-        if conn.kind == "publisher" && conn.cs.lock().unwrap().senders.is_empty() {
-            let tracks = self.st.lock().unwrap().local_tracks.clone();
-            for t in tracks {
-                let kind = t.kind().await;
-                let (allow_audio, allow_video) = {
-                    let cs = conn.cs.lock().unwrap();
-                    (cs.allow_audio, cs.allow_video)
-                };
-                if (kind == RtpCodecKind::Audio && !allow_audio)
-                    || (kind == RtpCodecKind::Video && !allow_video)
-                {
-                    continue;
-                }
-                let sender = conn.pc.add_track(t).await?;
-                conn.cs.lock().unwrap().senders.push((sender, kind));
-            }
-        }
+        // sendChannel is offered first; update_tracks adds media after preferences.
         let options = if ice_restart {
             Some(RTCOfferOptions { ice_restart: true })
         } else {
@@ -3290,7 +3251,6 @@ impl Inner {
                 uuid: conn.uuid.clone(),
                 stream_id: conn.stream_id(),
                 data: msg.clone(),
-                fallback: false,
             });
         } else if let Some(pipe) = msg.get("pipe") {
             if let Some(t) = pipe.get("type").and_then(|t| t.as_str()) {
@@ -3306,7 +3266,6 @@ impl Inner {
                 uuid: conn.uuid.clone(),
                 stream_id: conn.stream_id(),
                 data: pipe.clone(),
-                fallback: false,
             });
         } else if msg.get("iceRestartRequest").is_some() && conn.kind == "publisher" {
             self.restart_ice(conn, "remote_request", true).await;
@@ -3419,7 +3378,6 @@ impl Inner {
             if uuid.is_empty() { None } else { Some(uuid) },
             None,
             "any",
-            false,
         )
         .await
     }
@@ -3459,7 +3417,7 @@ impl Inner {
             let mut sent = false;
             for u in uuids {
                 if self
-                    .send_data_internal(msg.clone(), Some(&u), kind, &pref, t.allow_fallback)
+                    .send_data_internal(msg.clone(), Some(&u), kind, &pref)
                     .await
                 {
                     sent = true;
@@ -3467,7 +3425,7 @@ impl Inner {
             }
             return sent;
         }
-        self.send_data_internal(msg, t.uuid.as_deref(), kind, &pref, t.allow_fallback)
+        self.send_data_internal(msg, t.uuid.as_deref(), kind, &pref)
             .await
     }
 
@@ -3477,7 +3435,6 @@ impl Inner {
         uuid: Option<&str>,
         kind: Option<&str>,
         preference: &str,
-        allow_fallback: bool,
     ) -> bool {
         type PeerPair = (String, Option<Arc<Connection>>, Option<Arc<Connection>>);
         let text = msg.to_string();
@@ -3506,22 +3463,6 @@ impl Inner {
                     }
                 }
             }
-        }
-        if sent || !allow_fallback || !self.st.lock().unwrap().connected {
-            return sent;
-        }
-        let Value::Object(map) = msg else {
-            return false;
-        };
-        let targets: Vec<String> = match uuid {
-            Some(u) => vec![u.to_string()],
-            None => pairs.iter().map(|(k, _, _)| k.clone()).collect(),
-        };
-        for target in targets {
-            let mut fallback = map.clone();
-            fallback.insert("__fallback".into(), json!(true));
-            fallback.insert("UUID".into(), json!(target));
-            sent |= self.send_ws(Value::Object(fallback));
         }
         sent
     }
@@ -3616,7 +3557,6 @@ impl Inner {
                         Some(&uuid),
                         None,
                         "any",
-                        false,
                     )
                     .await;
                 });
@@ -3650,7 +3590,6 @@ impl Inner {
                 uuid,
                 stream_id: None,
                 data: data.clone(),
-                fallback: false,
             }),
         }
     }
@@ -4329,7 +4268,7 @@ async fn fetch_turn_list(url: &str) -> Vec<vdoninja_core::turn::TurnServer> {
         .timeout(Duration::from_secs(2))
         .build()
     {
-        if let Ok(resp) = client.get(format!("{url}?ts={}", now_ms())).send().await {
+        if let Ok(resp) = client.get(url).query(&[("ts", now_ms())]).send().await {
             if let Ok(list) = resp.json::<TurnList>().await {
                 if !list.servers.is_empty() {
                     return list.servers;
@@ -4341,40 +4280,26 @@ async fn fetch_turn_list(url: &str) -> Vec<vdoninja_core::turn::TurnServer> {
     fallback_turn_servers()
 }
 
-/// Local UTC offset in minutes (JavaScript's `-getTimezoneOffset()`), used to
-/// pick nearby TURN servers. Falls back to 0 (UTC) when unavailable.
+/// lib.js getTimezone(): minutes west of UTC, with its historical baseline dates.
 fn local_tz_offset_minutes() -> i64 {
-    #[cfg(unix)]
-    {
-        #[repr(C)]
-        struct Tm {
-            tm_sec: i32,
-            tm_min: i32,
-            tm_hour: i32,
-            tm_mday: i32,
-            tm_mon: i32,
-            tm_year: i32,
-            tm_wday: i32,
-            tm_yday: i32,
-            tm_isdst: i32,
-            tm_gmtoff: i64,
-            tm_zone: *const std::os::raw::c_char,
-        }
-        extern "C" {
-            fn time(t: *mut i64) -> i64;
-            fn localtime_r(t: *const i64, tm: *mut Tm) -> *mut Tm;
-        }
-        // SAFETY: libc time()/localtime_r() with valid, properly sized out-pointers.
-        unsafe {
-            let mut t: i64 = 0;
-            time(&mut t);
-            let mut tm = std::mem::zeroed::<Tm>();
-            if !localtime_r(&t, &mut tm).is_null() {
-                return tm.tm_gmtoff / 60;
-            }
-        }
+    use chrono::{Local, TimeZone};
+    let now = Local::now();
+    let current = -(now.offset().local_minus_utc() as i64) / 60;
+    let standard = [1900, 1906]
+        .into_iter()
+        .filter_map(|year| {
+            Local
+                .with_ymd_and_hms(year, 2, 1, 0, 0, 0)
+                .single()
+                .map(|date| -(date.offset().local_minus_utc() as i64) / 60)
+        })
+        .max()
+        .unwrap_or(current);
+    if current < standard {
+        current + 60
+    } else {
+        current
     }
-    0
 }
 
 #[allow(dead_code)]
@@ -4382,4 +4307,41 @@ fn _assert_send_sync() {
     fn check<T: Send + Sync>() {}
     check::<VdoNinja>();
     check::<Event>();
+}
+
+#[cfg(test)]
+mod turn_discovery_tests {
+    use super::*;
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+    #[tokio::test]
+    async fn existing_query_survives_discovery() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let server = tokio::spawn(async move {
+            let (mut socket, _) = listener.accept().await.unwrap();
+            let mut request = Vec::new();
+            let mut chunk = [0; 1024];
+            while !request.windows(4).any(|part| part == b"\r\n\r\n") {
+                let n = socket.read(&mut chunk).await.unwrap();
+                assert!(n > 0 && request.len() < 8192);
+                request.extend_from_slice(&chunk[..n]);
+            }
+            let body = r#"{"servers":[{"urls":["turn:fixture.invalid:3478"],"username":"fixture","credential":"fixture","udp":true,"tz":0,"locale":"test"}]}"#;
+            let response = format!(
+                "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+                body.len(),
+                body
+            );
+            socket.write_all(response.as_bytes()).await.unwrap();
+            String::from_utf8(request).unwrap()
+        });
+        let list = fetch_turn_list(&format!("http://{addr}/list?region=ca&key=a%2Bb&empty=")).await;
+        assert_eq!(list.len(), 1);
+        let request = server.await.unwrap();
+        assert!(
+            request.starts_with("GET /list?region=ca&key=a%2Bb&empty=&ts="),
+            "{request}"
+        );
+    }
 }

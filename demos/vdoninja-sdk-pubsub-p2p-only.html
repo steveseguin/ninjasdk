@@ -85,7 +85,7 @@
     </div>
 
     <div class="callout callout-info" style="margin-bottom:24px">
-      <p><strong>Why wait for the data channel?</strong> <code>subscribe()</code> and <code>unsubscribe()</code> send with WebSocket fallback enabled, so if no data channel is open they go through the signaling server. <code>publishToChannel()</code> and <code>sendData()</code> never fall back unless you pass <code>allowFallback: true</code>. This page waits for <code>dataChannelOpen</code> before subscribing, so nothing is relayed. As in the channels demo, channels are filtered by each subscriber, not by the publisher.</p>
+      <p><strong>Why wait for the data channel?</strong> Application data, including SDK pub/sub messages, travels over WebRTC. This page waits for <code>dataChannelOpen</code> before subscribing or publishing. No open channel means a send cannot reach a peer. Channels are filtered by each subscriber, not by the publisher.</p>
     </div>
 
     <div class="grid grid-2">

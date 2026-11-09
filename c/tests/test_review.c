@@ -153,7 +153,41 @@ static void test_sender_lifetime(void) {
     CHECK(sender_finished);
 }
 
+static void test_turn_cache_refresh(void) {
+    // This source-inclusion target has no CURL feature macro, so it exercises
+    // discovery failure deterministically without reaching a public service.
+    vdon_sdk s = {0};
+    pthread_mutex_init(&s.lock, NULL);
+    s.o.turn_mode = VDON_TURN_AUTO;
+    ensure_ice_servers(&s);
+    CHECK(s.turn_fetched && s.ice_count > 2);
+    CHECK(s.turn_expires_at > vdon_now_ms() && s.turn_expires_at <= vdon_now_ms() + 30000);
+    char **cached = s.ice_servers;
+    int64_t expiry = s.turn_expires_at;
+    ensure_ice_servers(&s);
+    CHECK(cached == s.ice_servers && expiry == s.turn_expires_at);
+    s.turn_expires_at = 1;
+    ensure_ice_servers(&s);
+    CHECK(s.turn_expires_at > vdon_now_ms() && s.ice_count == 4);
+    s.o.turn_mode = VDON_TURN_CUSTOM;
+    s.turn_expires_at = 1;
+    ensure_ice_servers(&s);
+    CHECK(s.turn_expires_at == 1); // Explicit custom settings never replaced by hosted discovery.
+    for (int i = 0; i < s.ice_count; i++) free(s.ice_servers[i]);
+    free(s.ice_servers);
+    pthread_mutex_destroy(&s.lock);
+}
+
 int main(void) {
+    {
+        vdon_options opts;
+        vdon_options_init(&opts);
+        opts.force_tcp = 1;
+        vdon_sdk *unsupported = vdon_create(&opts, NULL, NULL);
+        CHECK(unsupported == NULL); // Default libjuice cannot relay over TCP/TLS.
+        CHECK(errno == EINVAL);
+    }
+    test_turn_cache_refresh();
     test_ice_sessions();
     test_join_collision();
     test_retired_transfer();

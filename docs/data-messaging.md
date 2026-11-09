@@ -51,6 +51,6 @@ The default route uses an open publisher data channel, falling back to the viewe
 
 `sendData` returns immediately. Success reports local sending, not remote processing or persistence. Use application acknowledgements or RPC for a confirmed result, and give retried actions stable IDs if running them twice would matter. Keep update payloads small and bounded; coalesce frequent changes into the newest state instead of accumulating an unbounded queue. For bulk bytes, use the file/binary facilities and their backpressure controls.
 
-`allowFallback: true` explicitly permits generic signaling relay when a data route is unavailable. That changes the transport and its privacy assumptions; leave it off for data-channel-only applications. It is not durable offline delivery. Custom messages should use your own application namespace and avoid the SDK's reserved request/response types.
+Application data uses WebRTC only. Wait for `dataChannelOpen`; no open channel means sending fails. SDK pub/sub and RPC are application conventions inside `pipe`, not browser signaling commands.
 
 See [connection options](connecting.md), [agent messaging](agent-network.md), and [validation notes](validation.md). The executable [workflow sample](../demos/sdk-workflows.cjs) checks real peer RPC and file delivery; the SDK live suite also checks generic data-channel messages.

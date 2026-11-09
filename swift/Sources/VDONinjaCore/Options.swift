@@ -35,8 +35,6 @@ public struct VDONinjaOptions {
     public var viewRetryInterval: TimeInterval = 900
     public var autoPingViewer = false
     public var autoPingInterval: TimeInterval = 10
-    /// Adds a `from` field (legacy fan-out servers only).
-    public var clientId: String?
     public var debug = false
 
     public init() {}

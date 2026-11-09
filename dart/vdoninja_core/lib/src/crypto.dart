@@ -53,7 +53,10 @@ class EncryptedMessage {
   final String vector;
 }
 
-Uint8List _keyFor(String phrase) => Uint8List.fromList(sha256.convert(utf8.encode(phrase)).bytes);
+/// VDO.Ninja AES bytes; stream/room hashing still uses UTF-8.
+Uint8List browserAesBytes(String value) => Uint8List.fromList(value.codeUnits.map((unit) => unit & 255).toList());
+
+Uint8List _keyFor(String phrase) => Uint8List.fromList(sha256.convert(browserAesBytes(phrase)).bytes);
 
 Uint8List _cbc(bool forEncryption, Uint8List key, Uint8List iv, Uint8List input) {
   final cipher = CBCBlockCipher(AESEngine())..init(forEncryption, ParametersWithIV(KeyParameter(key), iv));
@@ -84,7 +87,7 @@ Uint8List _unpad(Uint8List data) {
 EncryptedMessage encryptMessage(String plaintext, String phrase, {Uint8List? iv}) {
   final ivBytes = iv ?? randomBytes(16);
   if (ivBytes.length != 16) throw ArgumentError('iv must be 16 bytes');
-  final out = _cbc(true, _keyFor(phrase), ivBytes, _pad(utf8.encode(plaintext)));
+  final out = _cbc(true, _keyFor(phrase), ivBytes, _pad(browserAesBytes(plaintext)));
   return EncryptedMessage(bytesToHex(out), bytesToHex(ivBytes));
 }
 
@@ -93,7 +96,7 @@ String decryptMessage(String ciphertextHex, String vectorHex, String phrase) {
   final iv = hexToBytes(vectorHex);
   if (iv.length != 16) throw const FormatException('vector must be 16 bytes');
   final out = _unpad(_cbc(false, _keyFor(phrase), iv, hexToBytes(ciphertextHex)));
-  return utf8.decode(out);
+  return String.fromCharCodes(out);
 }
 
 const String _alnum = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';

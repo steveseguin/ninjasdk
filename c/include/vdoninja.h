@@ -83,7 +83,7 @@ typedef struct vdon_options {
     const char **turn_servers; /* libdatachannel URLs: "turn:user:pass@host:3478" */
     int turn_server_count;
     int force_turn;            /* relay-only ICE */
-    int force_tcp;             /* skip UDP TURN servers from the hosted list */
+    int force_tcp;             /* unsupported: vdon_create returns NULL/EINVAL if set */
     const char **stun_servers; /* NULL = defaults (Google + Cloudflare); count 0 with non-NULL = none */
     int stun_server_count;
     const char *bind_address;  /* local bind address for ICE, NULL = any */
@@ -93,7 +93,6 @@ typedef struct vdon_options {
     int view_retry_interval_ms;/* default 900000 */
     int auto_ping_viewer;      /* viewer-side keepalive pings */
     int auto_ping_interval_ms; /* default 10000 */
-    const char *client_id;     /* adds a "from" field (legacy fan-out servers only) */
     int debug;                 /* log to stderr */
 } vdon_options;
 
@@ -118,7 +117,7 @@ typedef enum vdon_event_type {
     VDON_EVENT_CONNECTION_FAILED,
     VDON_EVENT_DATA_CHANNEL_OPEN,  /* uuid, connection_type */
     VDON_EVENT_DATA_CHANNEL_CLOSE,
-    VDON_EVENT_DATA_RECEIVED,      /* uuid, json = application payload; flag = via fallback */
+    VDON_EVENT_DATA_RECEIVED,      /* uuid, json = application payload */
     VDON_EVENT_PEER_INFO,          /* uuid, json = merged remote info */
     VDON_EVENT_PEER_LATENCY,       /* uuid, number = latency ms */
     VDON_EVENT_REMOTE_VIDEO_MUTE,  /* uuid, flag = muted */
@@ -161,7 +160,7 @@ typedef struct vdon_event {
     const uint8_t *bytes;
     size_t size;
     int64_t number;              /* latency ms, reconnect attempt, ... */
-    int flag;                    /* muted / intentional / data_only / fallback / requested */
+    int flag;                    /* muted / intentional / data_only / requested */
     int track;                   /* libdatachannel track id */
     int channel;                 /* libdatachannel data channel id */
     const char *file_id;
@@ -183,6 +182,8 @@ VDON_API const char *vdon_strerror(int code);
 
 /* ------------------------------------------------------------------ lifecycle */
 
+/* Returns NULL on allocation failure or unsupported force_tcp (errno=EINVAL).
+ * The supported libjuice backend provides TURN/UDP, not TURN/TCP or TLS. */
 VDON_API vdon_sdk *vdon_create(const vdon_options *opts, vdon_event_callback cb, void *user);
 VDON_API void vdon_destroy(vdon_sdk *sdk);
 VDON_API const char *vdon_version(void);
@@ -289,7 +290,6 @@ typedef struct vdon_data_target {
     const char *connection_type; /* "publisher" | "viewer" | NULL */
     const char *stream_id;
     const char *preference;      /* "any" (default) | "publisher" | "viewer" | "all" */
-    int allow_fallback;          /* relay through signaling when no channel is open (off) */
 } vdon_data_target;
 
 VDON_API int vdon_send_data_ex(vdon_sdk *sdk, const char *json, const vdon_data_target *target);

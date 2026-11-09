@@ -62,17 +62,17 @@ func (s *SDK) SendDataWith(data any, t DataTarget) bool {
 		s.mu.Unlock()
 		sent := false
 		for _, uuid := range uuids {
-			if s.sendDataInternal(msg, uuid, typ, pref, t.AllowFallback) {
+			if s.sendDataInternal(msg, uuid, typ, pref) {
 				sent = true
 			}
 		}
 		return sent
 	}
-	return s.sendDataInternal(msg, t.UUID, typ, pref, t.AllowFallback)
+	return s.sendDataInternal(msg, t.UUID, typ, pref)
 }
 
 // sendDataInternal mirrors the JavaScript SDK's _sendDataInternal routing.
-func (s *SDK) sendDataInternal(msg any, uuid, typ, preference string, allowFallback bool) bool {
+func (s *SDK) sendDataInternal(msg any, uuid, typ, preference string) bool {
 	raw, err := json.Marshal(msg)
 	if err != nil {
 		return false
@@ -129,39 +129,6 @@ func (s *SDK) sendDataInternal(msg any, uuid, typ, preference string, allowFallb
 			}
 		}
 	}
-	if sent || !allowFallback {
-		return sent
-	}
-	// WebSocket relay fallback: only ever for explicit opt-in.
-	s.mu.Lock()
-	connected := s.connected
-	s.mu.Unlock()
-	if !connected {
-		return false
-	}
-	m, ok := msg.(map[string]any)
-	if !ok {
-		return false
-	}
-	targets := []string{uuid}
-	if uuid == "" {
-		targets = targets[:0]
-		for id := range byUUID {
-			targets = append(targets, id)
-		}
-	}
-	for _, target := range targets {
-		if target == "" {
-			continue
-		}
-		fallback := map[string]any{"__fallback": true, "UUID": target}
-		for k, v := range m {
-			fallback[k] = v
-		}
-		if s.sendWS(fallback) {
-			sent = true
-		}
-	}
 	return sent
 }
 
@@ -178,7 +145,7 @@ func (s *SDK) Subscribe(channels ...string) {
 	connected := s.connected
 	s.mu.Unlock()
 	if connected {
-		s.SendDataWith(map[string]any{"type": "subscribe", "channels": channels}, DataTarget{AllowFallback: true})
+		s.SendDataWith(map[string]any{"type": "subscribe", "channels": channels}, DataTarget{})
 	}
 }
 
@@ -191,7 +158,7 @@ func (s *SDK) Unsubscribe(channels ...string) {
 	connected := s.connected
 	s.mu.Unlock()
 	if connected {
-		s.SendDataWith(map[string]any{"type": "unsubscribe", "channels": channels}, DataTarget{AllowFallback: true})
+		s.SendDataWith(map[string]any{"type": "unsubscribe", "channels": channels}, DataTarget{})
 	}
 }
 

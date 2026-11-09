@@ -274,7 +274,6 @@ vdo.sendPing(uuid);                      // Send ping (either role; DC-only)
 // - { type: "viewer" }: Send to all viewers
 // - { type: "publisher" }: Send to all publishers
 // - { streamID: "stream1" }: Send to connections for stream
-// - { uuid: "uuid123", allowFallback: true }: Use WebSocket if no P2P
 ```
 
 ### Track Management

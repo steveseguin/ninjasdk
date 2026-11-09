@@ -1,7 +1,7 @@
 use serde_json::Value;
 use vdoninja_core::crypto::{
-    decrypt_message, encrypt_message, encrypt_with_iv, generate_hash, hash_room, hash_stream_id,
-    stream_hash_suffix,
+    browser_aes_bytes, decrypt_message, encrypt_message, encrypt_with_iv, generate_hash, hash_room,
+    hash_stream_id, stream_hash_suffix,
 };
 use vdoninja_core::sanitize::{
     sanitize_label, sanitize_password, sanitize_room, sanitize_stream_id,
@@ -61,7 +61,7 @@ fn encryption_vectors() {
         );
         assert_eq!(phrase, s(c, "phrase"));
         let iv: [u8; 16] = hex::decode(s(c, "ivHex")).unwrap().try_into().unwrap();
-        let ct = encrypt_with_iv(s(c, "plaintext").as_bytes(), &phrase, &iv);
+        let ct = encrypt_with_iv(&browser_aes_bytes(&s(c, "plaintext")), &phrase, &iv);
         assert_eq!(hex::encode(ct), s(c, "ciphertextHex"));
         assert_eq!(
             decrypt_message(&s(c, "ciphertextHex"), &s(c, "ivHex"), &phrase).unwrap(),

@@ -34,13 +34,18 @@ def hash_room(room: str, sanitized_password: str, salt: str) -> str:
     return generate_hash(room + sanitized_password + salt, 16)
 
 
+def browser_aes_bytes(value: str) -> bytes:
+    """lib.js AES encoding: low byte of each UTF-16 code unit; hashes use UTF-8."""
+    return value.encode("utf-16-le", "surrogatepass")[::2]
+
+
 def _key(phrase: str) -> bytes:
-    return hashlib.sha256(phrase.encode("utf-8")).digest()
+    return hashlib.sha256(browser_aes_bytes(phrase)).digest()
 
 
 def encrypt_with_iv(plaintext: str, phrase: str, iv: bytes) -> bytes:
     padder = padding.PKCS7(128).padder()
-    padded = padder.update(plaintext.encode("utf-8")) + padder.finalize()
+    padded = padder.update(browser_aes_bytes(plaintext)) + padder.finalize()
     encryptor = Cipher(algorithms.AES(_key(phrase)), modes.CBC(iv)).encryptor()
     return encryptor.update(padded) + encryptor.finalize()
 
@@ -63,7 +68,7 @@ def decrypt_message(ciphertext_hex: str, iv_hex: str, phrase: str) -> str:
         plain = unpadder.update(padded) + unpadder.finalize()
     except ValueError as exc:  # wrong password or salt
         raise ValueError("bad padding (wrong password or salt?)") from exc
-    return plain.decode("utf-8")
+    return plain.decode("latin-1")
 
 
 _ALNUM = "0123456789abcdefghijklmnopqrstuvwxyz"

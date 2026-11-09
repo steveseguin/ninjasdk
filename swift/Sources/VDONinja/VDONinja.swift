@@ -31,7 +31,8 @@ public final class VDOConnection {
     var remoteSet = false
     var recovering = false
     var viewOptions = ViewOptions()
-    var allowAudio = true, allowVideo = true
+    var allowAudio = false, allowVideo = false
+    var mediaNeedsOffer = false, mediaOfferPending = false
     var iceBundle: [IceCandidate] = []
     var iceWork: DispatchWorkItem?
     var iceDelay: TimeInterval = 0.07
@@ -172,6 +173,8 @@ public final class VDONinja {
     private var pendingRequests: [String: (target: String?, done: (Result<Any?, Error>) -> Void)] = [:]
     private var autoConnectOn = false, autoFull = false
     private var iceServers: [RTCIceServer]?
+    private var iceServersExpiresAt = Date.distantPast
+    private var iceServerWaiters: [([RTCIceServer]) -> Void] = [] // queue only
     private var intentional = false
 
     public enum SDKError: Error, LocalizedError {
@@ -203,7 +206,7 @@ public final class VDONinja {
         publisherInfo = info
         let log: ((String) -> Void)? = options.debug ? { print("[vdoninja] \($0)") } : nil
         signal = SignalingClient(url: options.host, maxReconnectAttempts: options.maxReconnectAttempts, reconnectDelay: options.reconnectDelay,
-                                 clientId: options.clientId, queue: queue, log: log)
+                                 queue: queue, log: log)
         signal.onOpen = { [weak self] reconnect in
             guard let self else { return }
             self.emit(VDOEvent(reconnect ? .reconnected : .connected))
@@ -558,11 +561,11 @@ public final class VDONinja {
     /// Sends application data (any JSON-encodable value) as `{"pipe": data}`.
     /// `uuid` nil = every peer; `preference` any|publisher|viewer|all.
     @discardableResult
-    public func sendData(_ data: Any, uuid: String? = nil, type: String? = nil, preference: String = "any", allowFallback: Bool = false) -> Bool {
-        onQueue { sendDataLocked(data, uuid: uuid, type: type, preference: preference, allowFallback: allowFallback) }
+    public func sendData(_ data: Any, uuid: String? = nil, type: String? = nil, preference: String = "any") -> Bool {
+        onQueue { sendDataLocked(data, uuid: uuid, type: type, preference: preference) }
     }
 
-    private func sendDataLocked(_ data: Any, uuid: String?, type: String?, preference: String, allowFallback: Bool) -> Bool {
+    private func sendDataLocked(_ data: Any, uuid: String?, type: String?, preference: String) -> Bool {
         guard let text = JSONCodec.encode(["pipe": data]) else { return false }
         let buf = RTCDataBuffer(data: Data(text.utf8), isBinary: false)
         var sent = false
@@ -582,10 +585,6 @@ public final class VDONinja {
             default: r = trySend(pair.publisher) || trySend(pair.viewer)
             }
             sent = r || sent
-        }
-        if sent || !allowFallback || !connected { return sent }
-        for t in (uuid.map { [$0] } ?? order) {
-            if signal.send(["__fallback": true, "UUID": t, "pipe": data]) { sent = true }
         }
         return sent
     }
@@ -607,14 +606,14 @@ public final class VDONinja {
     public func subscribe(_ channels: [String]) {
         queue.async {
             self.subscriptions.formUnion(channels)
-            _ = self.sendDataLocked(["type": "subscribe", "channels": channels], uuid: nil, type: nil, preference: "all", allowFallback: false)
+            _ = self.sendDataLocked(["type": "subscribe", "channels": channels], uuid: nil, type: nil, preference: "all")
         }
     }
 
     public func unsubscribe(_ channels: [String]) {
         queue.async {
             self.subscriptions.subtract(channels)
-            _ = self.sendDataLocked(["type": "unsubscribe", "channels": channels], uuid: nil, type: nil, preference: "all", allowFallback: false)
+            _ = self.sendDataLocked(["type": "unsubscribe", "channels": channels], uuid: nil, type: nil, preference: "all")
         }
     }
 
@@ -640,7 +639,7 @@ public final class VDONinja {
                     cont.resume(with: r)
                 })
                 let payload: JSON = ["type": "request", "requestType": requestType, "requestId": id, "data": data]
-                if !self.sendDataLocked(payload, uuid: targetUuid, type: nil, preference: "any", allowFallback: false) {
+                if !self.sendDataLocked(payload, uuid: targetUuid, type: nil, preference: "any") {
                     self.pendingRequests[id] = nil
                     finished = true
                     return cont.resume(throwing: SDKError.noChannel(targetUuid))
@@ -685,14 +684,19 @@ public final class VDONinja {
     }
 
     private func iceServerList(_ completion: @escaping ([RTCIceServer]) -> Void) {
-        if let s = iceServers { return completion(s) }
+        if let s = iceServers, options.turnMode != .auto || Date() < iceServersExpiresAt { return completion(s) }
+        iceServerWaiters.append(completion)
+        if iceServerWaiters.count > 1 { return }
         var out: [IceServer] = (options.stunServers ?? Turn.defaultStun).map { IceServer(urls: [$0]) }
         let finish: ([IceServer]) -> Void = { servers in
             let list = servers.map { s in
                 s.username != nil ? RTCIceServer(urlStrings: s.urls, username: s.username, credential: s.credential) : RTCIceServer(urlStrings: s.urls)
             }
             self.iceServers = list
-            completion(list)
+            self.iceServersExpiresAt = Date().addingTimeInterval(3600)
+            let waiters = self.iceServerWaiters
+            self.iceServerWaiters.removeAll()
+            waiters.forEach { $0(list) }
         }
         switch options.turnMode {
         case .disabled: finish(out)
@@ -736,12 +740,6 @@ public final class VDONinja {
         }
     }
 
-    private func addLocalTracks(_ c: VDOConnection) {
-        for t in localTracks {
-            if let sender = c.pc.add(t, streamIds: ["vdoninja"]) { c.senders.append((sender, t.kind)) }
-        }
-    }
-
     private func sendDescription(_ c: VDOConnection, _ desc: RTCSessionDescription, includeStreamId: Bool = true) {
         var msg: JSON = ["UUID": c.uuid, "session": c.session]
         if includeStreamId, let sid = c.streamId { msg["streamID"] = pw.hashStreamId(sid) }
@@ -758,11 +756,22 @@ public final class VDONinja {
         if iceRestart { c.pc.restartIce() }
         let constraints = RTCMediaConstraints(mandatoryConstraints: iceRestart ? [kRTCMediaConstraintsIceRestart: kRTCMediaConstraintsValueTrue] : nil, optionalConstraints: nil)
         c.pc.offer(for: constraints) { [weak self] offer, err in
-            guard let self, let offer else { self?.log("createOffer failed: \(err?.localizedDescription ?? "?")"); return }
-            c.pc.setLocalDescription(offer) { err in
-                self.queue.async {
-                    if let err { self.log("setLocalDescription failed: \(err)"); return }
-                    self.sendDescription(c, offer)
+            guard let self else { return }
+            self.queue.async {
+                guard !c.closed, self.connectionLocked(c.uuid, c.type) === c else { return }
+                guard let offer else {
+                    c.mediaOfferPending = false; c.mediaNeedsOffer = true
+                    self.log("createOffer failed: \(err?.localizedDescription ?? "?")"); return
+                }
+                c.pc.setLocalDescription(offer) { err in
+                    self.queue.async {
+                        guard !c.closed, self.connectionLocked(c.uuid, c.type) === c else { return }
+                        if let err {
+                            c.mediaOfferPending = false; c.mediaNeedsOffer = true
+                            self.log("setLocalDescription failed: \(err)"); return
+                        }
+                        self.sendDescription(c, offer)
+                    }
                 }
             }
         }
@@ -1012,7 +1021,7 @@ public final class VDONinja {
         case "request":
             guard let rt = pipe["requestType"] as? String, let rid = pipe["requestId"] as? String, let h = requestHandlers[rt] else { return true }
             let result = h(pipe["data"], c.uuid)
-            _ = sendDataLocked(["type": "response", "requestId": rid, "data": result ?? NSNull()], uuid: c.uuid, type: nil, preference: "any", allowFallback: false)
+            _ = sendDataLocked(["type": "response", "requestId": rid, "data": result ?? NSNull()], uuid: c.uuid, type: nil, preference: "any")
             return true
         case "response":
             guard let rid = pipe["requestId"] as? String, let p = pendingRequests[rid], p.target == nil || p.target == c.uuid else { return true }
@@ -1029,10 +1038,27 @@ public final class VDONinja {
     }
 
     private func updateTracks(_ c: VDOConnection) {
-        for (sender, kind) in c.senders {
-            let allowed = kind == "video" ? c.allowVideo : c.allowAudio
-            let local = localTracks.first { $0.kind == kind }
-            if !allowed && sender.track != nil { sender.track = nil } else if allowed && sender.track == nil, let local { sender.track = local }
+        guard c.type == "publisher", !c.closed, connectionLocked(c.uuid, c.type) === c else { return }
+        for kind in ["audio", "video"] {
+            let tracks = localTracks.filter { $0.kind == kind }
+            let senders = c.senders.filter { $0.1 == kind }.map { $0.0 }
+            let allowed = kind == "audio" ? c.allowAudio : c.allowVideo
+            for (index, sender) in senders.enumerated() {
+                sender.track = allowed && index < tracks.count ? tracks[index] : nil
+            }
+            if allowed {
+                for track in tracks.dropFirst(senders.count) {
+                    if let sender = c.pc.add(track, streamIds: ["vdoninja"]) {
+                        c.senders.append((sender, kind))
+                        c.mediaNeedsOffer = true
+                    }
+                }
+            }
+        }
+        if c.mediaNeedsOffer && !c.mediaOfferPending && c.pc.signalingState == .stable {
+            c.mediaNeedsOffer = false
+            c.mediaOfferPending = true
+            renegotiate(c, iceRestart: false)
         }
     }
 
@@ -1062,9 +1088,6 @@ public final class VDONinja {
         }
         if msg["bye"] != nil { return handleBye(msg["UUID"] as? String, .bye, msg) }
         if msg["hangup"] != nil { return handleBye(msg["UUID"] as? String, .hangup, msg) }
-        if msg["pipe"] != nil && msg["__fallback"] != nil {
-            return emit(VDOEvent(.dataReceived, uuid: msg["UUID"] as? String, data: msg["pipe"], fallback: true, raw: msg))
-        }
         if msg["rejected"] != nil || msg["approved"] != nil {
             return emit(VDOEvent(.alert, message: msg["rejected"] != nil ? "connection rejected" : "connection approved", raw: msg))
         }
@@ -1114,7 +1137,6 @@ public final class VDONinja {
                 return
             }
             self.setupControlChannel(c, dc)
-            self.addLocalTracks(c)
             c.pc.offer(for: RTCMediaConstraints(mandatoryConstraints: nil, optionalConstraints: nil)) { offer, err in
                 self.queue.async {
                     guard let offer else { return self.emit(VDOEvent(.error, uuid: uuid, message: "failed to create offer: \(err?.localizedDescription ?? "?")")) }
@@ -1210,6 +1232,8 @@ public final class VDONinja {
                 if let err { return self.emit(VDOEvent(.error, uuid: uuid, message: "failed to handle answer: \(err)")) }
                 c.remoteSet = true
                 self.drainPendingIce(c, "remote")
+                c.mediaOfferPending = false
+                self.updateTracks(c)
             }
         }
     }

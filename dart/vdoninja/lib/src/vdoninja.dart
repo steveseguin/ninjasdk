@@ -32,7 +32,9 @@ class VdoConnection {
   final Map<String, dynamic> info = {};
   final Map<String, dynamic> obsState = {};
   ViewOptions viewOptions = const ViewOptions();
-  bool allowAudio = true, allowVideo = true;
+  bool allowAudio = false, allowVideo = false;
+  Future<void> _mediaUpdate = Future.value();
+  bool _mediaNeedsOffer = false, _mediaOfferPending = false;
   final List<IceCandidate> _iceBundle = [];
   Timer? _iceTimer;
   Duration _iceDelay = const Duration(milliseconds: 70);
@@ -104,7 +106,6 @@ class VdoNinja {
       options.host,
       maxReconnectAttempts: options.maxReconnectAttempts,
       reconnectDelay: options.reconnectDelay,
-      clientId: options.clientId,
       log: _log,
     )
       ..onOpen = _onSocketOpen
@@ -153,6 +154,8 @@ class VdoNinja {
   bool _autoConnect = false;
   bool _autoFull = false;
   List<IceServer>? _iceServers;
+  DateTime? _iceServersExpires;
+  Future<List<IceServer>>? _iceServersPending;
   bool _intentional = false;
 
   // ------------------------------------------------------------- events
@@ -515,7 +518,7 @@ class VdoNinja {
 
   /// Sends application data (any JSON-encodable value) as `{"pipe": data}`.
   /// [uuid] null = every peer; [preference] any|publisher|viewer|all.
-  bool sendData(Object? data, {String? uuid, String? type, String preference = 'any', bool allowFallback = false}) {
+  bool sendData(Object? data, {String? uuid, String? type, String preference = 'any'}) {
     final text = jsonEncode({'pipe': data});
     var sent = false;
     for (final entry in _connections.entries) {
@@ -543,11 +546,6 @@ class VdoNinja {
         default:
           sent = (trySend(pair.publisher) || trySend(pair.viewer)) || sent;
       }
-    }
-    if (sent || !allowFallback || !connected) return sent;
-    final targets = uuid != null ? [uuid] : _connections.keys.toList();
-    for (final t in targets) {
-      if (_signal.send({'__fallback': true, 'UUID': t, 'pipe': data})) sent = true;
     }
     return sent;
   }
@@ -628,7 +626,12 @@ class VdoNinja {
   }
 
   Future<List<IceServer>> _iceServerList() async {
-    if (_iceServers != null) return _iceServers!;
+    if (_iceServers != null && (options.turnMode != TurnMode.auto ||
+        DateTime.now().isBefore(_iceServersExpires!))) return _iceServers!;
+    return _iceServersPending ??= _fetchIceServers().whenComplete(() { _iceServersPending = null; });
+  }
+
+  Future<List<IceServer>> _fetchIceServers() async {
     final out = <IceServer>[];
     for (final s in options.stunServers ?? defaultStunServers) {
       out.add({'urls': s});
@@ -643,6 +646,7 @@ class VdoNinja {
         out.addAll(selectTurnServers(list, forceTcp: options.forceTcp));
     }
     _iceServers = out;
+    _iceServersExpires = DateTime.now().add(const Duration(hours: 1));
     return out;
   }
 
@@ -678,15 +682,6 @@ class VdoNinja {
       if (!c._closed && !c._connectedOnce) _recoverConnection(c, 'timeout');
     });
     return c;
-  }
-
-  Future<void> _addLocalTracks(VdoConnection c) async {
-    final stream = _localStream;
-    for (final t in _localTracks) {
-      final sender = await c.pc.addTrack(t, stream ?? await createLocalMediaStream('vdoninja'));
-      c._senders.add(sender);
-      _senderKinds[sender] = t.kind ?? 'video';
-    }
   }
 
   Future<void> _sendDescription(VdoConnection c, RTCSessionDescription desc, {bool includeStreamId = true}) async {
@@ -984,21 +979,36 @@ class VdoNinja {
     return false;
   }
 
-  Future<void> _updateTracks(VdoConnection c) async {
-    for (final s in c._senders) {
-      final kind = _senderKinds[s] ?? s.track?.kind;
-      final allowed = kind == 'video' ? c.allowVideo : c.allowAudio;
-      final local = _localTracks.where((t) => t.kind == kind).firstOrNull;
-      try {
-        if (!allowed && s.track != null) {
-          await s.replaceTrack(null);
-        } else if (allowed && s.track == null && local != null) {
-          await s.replaceTrack(local);
+  Future<void> _updateTracks(VdoConnection c) {
+    c._mediaUpdate = c._mediaUpdate.then((_) async {
+      if (c.type != 'publisher' || c._closed || connection(c.uuid, c.type) != c) return;
+      for (final kind in ['audio', 'video']) {
+        final tracks = _localTracks.where((t) => t.kind == kind).toList();
+        final senders = c._senders.where((s) => (_senderKinds[s] ?? s.track?.kind) == kind).toList();
+        final allowed = kind == 'audio' ? c.allowAudio : c.allowVideo;
+        for (var i = 0; i < senders.length; i++) {
+          final track = allowed && i < tracks.length ? tracks[i] : null;
+          if (senders[i].track != track) await senders[i].replaceTrack(track);
         }
-      } catch (e) {
-        _log('replaceTrack failed: $e');
+        if (allowed) for (final track in tracks.skip(senders.length)) {
+          final sender = await c.pc.addTrack(track, _localStream ?? await createLocalMediaStream('vdoninja'));
+          c._senders.add(sender);
+          _senderKinds[sender] = kind;
+          c._mediaNeedsOffer = true;
+        }
       }
-    }
+      if (c._mediaNeedsOffer && !c._mediaOfferPending &&
+          await c.pc.getSignalingState() == RTCSignalingState.RTCSignalingStateStable) {
+        c._mediaNeedsOffer = false;
+        c._mediaOfferPending = true;
+        try { await _renegotiate(c); } catch (_) {
+          c._mediaOfferPending = false;
+          c._mediaNeedsOffer = true;
+          rethrow;
+        }
+      }
+    }).catchError((Object error) { _log('media preference update failed: $error'); });
+    return c._mediaUpdate;
   }
 
   // ---------------------------------------------------------- signaling
@@ -1041,8 +1051,6 @@ class VdoNinja {
       _handleBye(msg['UUID'] as String?, VdoEvents.bye, msg);
     } else if (msg.containsKey('hangup')) {
       _handleBye(msg['UUID'] as String?, VdoEvents.hangup, msg);
-    } else if (msg.containsKey('pipe') && msg.containsKey('__fallback')) {
-      _emit(VdoEvent(VdoEvents.dataReceived, uuid: msg['UUID'] as String?, data: msg['pipe'], fallback: true, raw: msg));
     } else if (msg.containsKey('rejected') || msg.containsKey('approved')) {
       _emit(VdoEvent(VdoEvents.alert, message: msg.containsKey('rejected') ? 'connection rejected' : 'connection approved', raw: msg));
     } else if (msg.containsKey('iceRestartRequest')) {
@@ -1097,7 +1105,6 @@ class VdoNinja {
       c.streamId = _streamId;
       final dc = await c.pc.createDataChannel(controlChannelLabel, RTCDataChannelInit());
       _setupControlChannel(c, dc);
-      await _addLocalTracks(c);
       final offer = await c.pc.createOffer({});
       await c.pc.setLocalDescription(offer);
       await _sendDescription(c, offer);
@@ -1179,6 +1186,8 @@ class VdoNinja {
       await c.pc.setRemoteDescription(RTCSessionDescription(desc.sdp, desc.type));
       c._remoteSet = true;
       await _drainPendingIce(c, 'remote');
+      c._mediaOfferPending = false;
+      if (c._mediaNeedsOffer) await _updateTracks(c);
     } catch (e) {
       _emit(VdoEvent(VdoEvents.error, uuid: uuid, message: 'failed to handle answer: $e'));
     }

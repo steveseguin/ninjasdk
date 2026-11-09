@@ -26,7 +26,6 @@ class SignalingClient(
     val url: String,
     private val maxReconnectAttempts: Int = 5,
     private val reconnectDelayMs: Long = 1000,
-    private val clientId: String? = null,
     private val log: ((String) -> Unit)? = null,
     private val http: OkHttpClient = OkHttpClient.Builder().pingInterval(25, TimeUnit.SECONDS).build(),
     val scheduler: ScheduledExecutorService = Executors.newSingleThreadScheduledExecutor { r ->
@@ -189,7 +188,6 @@ class SignalingClient(
     fun send(message: JSONObject): Boolean {
         val ws = socket ?: return false
         if (!connected) return false
-        if (clientId != null && !message.has("from")) message.put("from", clientId)
         val text = message.toString()
         log?.invoke("-> WS ${text.take(300)}")
         return ws.send(text)

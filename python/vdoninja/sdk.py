@@ -107,7 +107,6 @@ class Event:
     intentional: Optional[bool] = None
     will_reconnect: Optional[bool] = None
     reason: Optional[str] = None
-    fallback: bool = False
 
 
 @dataclass
@@ -162,8 +161,10 @@ class Connection:
         self.session: Optional[str] = None
         self.info: Dict[str, Any] = {}
         self.obs_state: Dict[str, Any] = {}
-        self.allow_audio = True
-        self.allow_video = True
+        self.allow_audio = False
+        self.allow_video = False
+        self.media_lock = asyncio.Lock()
+        self.media_negotiation_needed = False
         self.allow_downloads = False
         self.allow_resources = False
         self.view_options = _ViewOptions()
@@ -258,7 +259,6 @@ class VDONinja:
         view_retry_interval: float = 900.0,
         auto_ping_viewer: bool = False,
         auto_ping_interval: float = 10.0,
-        client_id: Optional[str] = None,
     ) -> None:
         """
         :param host: signaling WebSocket URL.
@@ -268,7 +268,6 @@ class VDONinja:
         :param turn: ``"auto"`` fetches the hosted TURN list, ``False`` disables TURN,
             or pass a list of :class:`aiortc.RTCIceServer`.
         :param stun_servers: STUN URLs; ``[]`` disables STUN.
-        :param client_id: adds a ``from`` field for the legacy fan-out signaling servers.
         """
         self.host = host
         self.salt = salt
@@ -290,7 +289,6 @@ class VDONinja:
         self.view_retry_interval = view_retry_interval
         self.auto_ping_viewer = auto_ping_viewer
         self.auto_ping_interval = max(1.0, auto_ping_interval)
-        self.client_id = client_id
 
         self.publisher_info: Dict[str, Any] = {}
         self._set_publisher_info(label, meta, order, info)
@@ -476,6 +474,8 @@ class VDONinja:
     async def _read_loop(self, ws, generation: int) -> None:
         try:
             async for raw in ws:
+                if self._ws is not ws or generation != self._generation:
+                    break
                 if isinstance(raw, bytes):
                     raw = raw.decode("utf-8", "replace")
                 try:
@@ -627,8 +627,6 @@ class VDONinja:
             await conn.close()
 
     def _send_ws(self, msg: Dict[str, Any]) -> bool:
-        if self.client_id:
-            msg["from"] = self.client_id
         text = json.dumps(msg, separators=(",", ":"))
         log.debug("-> WS %s", text[:300])
         ws = self._ws
@@ -909,11 +907,6 @@ class VDONinja:
             await self._handle_bye(msg.get("UUID"), "bye", msg)
         elif msg.get("hangup"):
             await self._handle_bye(msg.get("UUID"), "hangup", msg)
-        elif "pipe" in msg and msg.get("__fallback"):
-            pipe = msg["pipe"]
-            if isinstance(pipe, dict) and pipe.get("type") in ("subscribe", "unsubscribe"):
-                self._handle_data_message(pipe, msg.get("UUID"))
-            self._emit(Event("dataReceived", uuid=msg.get("UUID"), data=pipe, fallback=True, raw=msg))
 
     def _handle_listing(self, msg: Dict[str, Any]) -> None:
         waiters, self._room_waiters = self._room_waiters, []
@@ -1033,7 +1026,11 @@ class VDONinja:
         return servers + list(self._turn_list)
 
     async def _create_connection(self, uuid: str, kind: str) -> Connection:
-        pc = RTCPeerConnection(RTCConfiguration(iceServers=await self._ice_servers()))
+        generation = self._generation
+        servers = await self._ice_servers()
+        if generation != self._generation or self._intentional:
+            raise VDONinjaError("peer creation cancelled by disconnect")
+        pc = RTCPeerConnection(RTCConfiguration(iceServers=servers))
         conn = Connection(self, uuid, kind, pc)
 
         @pc.on("connectionstatechange")
@@ -1065,6 +1062,9 @@ class VDONinja:
         if old:
             log.debug("replacing existing %s connection to %s", kind, uuid)
             await old.close()
+        if generation != self._generation or self._intentional or not self._is_current(conn):
+            await conn.close()
+            raise VDONinjaError("peer creation cancelled by disconnect or replacement")
 
         async def connect_timeout() -> None:
             await asyncio.sleep(self.connection_timeout)
@@ -1076,19 +1076,18 @@ class VDONinja:
 
     def _is_current(self, conn: Connection) -> bool:
         pair = self.connections.get(conn.uuid)
-        return bool(pair) and (pair.publisher is conn or pair.viewer is conn)
+        return not conn.finalized and bool(pair) and (pair.publisher is conn or pair.viewer is conn)
 
     async def _create_offer(self, conn: Connection) -> RTCSessionDescription:
-        if conn.type == "publisher" and not conn.senders:
-            for track in self._local_tracks:
-                if (track.kind == "audio" and not conn.allow_audio) or (track.kind == "video" and not conn.allow_video):
-                    continue
-                conn.senders.append(conn.pc.addTrack(track))
+        # The initial publisher offer contains sendChannel only. Media is added
+        # by _update_tracks after the viewer sends data-channel preferences.
         offer = await conn.pc.createOffer()
         await conn.pc.setLocalDescription(offer)
         return conn.pc.localDescription
 
     def _send_description(self, conn: Connection, desc: RTCSessionDescription, include_stream_id: bool, via_signaling: bool = False) -> None:
+        if not self._is_current(conn):
+            return
         payload = {"type": desc.type, "sdp": desc.sdp}
         msg: Dict[str, Any] = {"UUID": conn.uuid, "session": conn.session}
         if include_stream_id and conn.stream_id:
@@ -1168,6 +1167,8 @@ class VDONinja:
             log.debug("handling offer failed: %s", exc)
             self._emit(Event("error", error=exc, uuid=uuid, message="failed to handle offer"))
             return
+        if not self._is_current(conn):
+            return
         local = conn.pc.localDescription
         payload = {"type": local.type, "sdp": local.sdp}
         out: Dict[str, Any] = {"UUID": uuid, "session": session}
@@ -1201,6 +1202,8 @@ class VDONinja:
         try:
             await conn.pc.setRemoteDescription(desc)
             await self._drain_pending_ice(conn, "remote")
+            if conn.media_negotiation_needed:
+                await self._update_tracks(conn)
         except Exception as exc:  # noqa: BLE001
             self._emit(Event("error", error=exc, uuid=uuid, message="failed to handle answer"))
 
@@ -1531,19 +1534,22 @@ class VDONinja:
     async def _update_tracks(self, conn: Connection) -> None:
         if conn.type != "publisher" or not self._local_tracks:
             return
-        for sender in conn.senders:
-            kind = sender.kind
-            allow = (kind == "audio" and conn.allow_audio) or (kind == "video" and conn.allow_video)
-            try:
-                if not allow:
-                    await sender.replaceTrack(None)
-                else:
-                    for track in self._local_tracks:
-                        if track.kind == kind:
-                            await sender.replaceTrack(track)
-                            break
-            except Exception as exc:  # noqa: BLE001
-                log.debug("replaceTrack failed: %s", exc)
+        async with conn.media_lock:
+            if not self._is_current(conn):
+                return
+            for kind, allow in (("audio", conn.allow_audio), ("video", conn.allow_video)):
+                tracks = [track for track in self._local_tracks if track.kind == kind]
+                senders = [sender for sender in conn.senders if sender.kind == kind]
+                for index, sender in enumerate(senders):
+                    # aiortc replaceTrack is synchronous, including the None case.
+                    sender.replaceTrack(tracks[index] if allow and index < len(tracks) else None)
+                if allow:
+                    for track in tracks[len(senders):]:
+                        conn.senders.append(conn.pc.addTrack(track))
+                        conn.media_negotiation_needed = True
+            if conn.media_negotiation_needed and conn.pc.signalingState == "stable":
+                conn.media_negotiation_needed = False
+                await self._renegotiate(conn)
 
     def _start_ping_monitor(self, conn: Connection) -> None:
         if not self.auto_ping_viewer or conn.type != "viewer":
@@ -1581,7 +1587,7 @@ class VDONinja:
             for conn in (pair.publisher, pair.viewer):
                 if conn:
                     conn.pending_ping = ts
-        return self._send_data_internal({"ping": ts}, uuid, None, "any", False)
+        return self._send_data_internal({"ping": ts}, uuid, None, "any")
 
     # ------------------------------------------------------------------ data
 
@@ -1590,34 +1596,37 @@ class VDONinja:
 
         ``target`` may be a peer UUID or a dict with ``uuid``, ``type``
         (``publisher``/``viewer``), ``streamID``, ``preference``
-        (``any``/``publisher``/``viewer``/``all``) and ``allowFallback``.
+        (``any``/``publisher``/``viewer``/``all``).
         """
         msg = {"pipe": data}
         if target is None:
-            return self._send_data_internal(msg, None, None, "any", False)
+            return self._send_data_internal(msg, None, None, "any")
         if isinstance(target, str):
-            return self._send_data_internal(msg, target, None, "any", False)
+            return self._send_data_internal(msg, target, None, "any")
         t = dict(target)
+        allowed = {"uuid", "UUID", "type", "streamID", "stream_id", "preference", "channel", "prefer"}
+        unknown = set(t) - allowed
+        if unknown:
+            raise TypeError(f"Unsupported send_data target options: {sorted(unknown)}")
         uuid = t.get("uuid") or t.get("UUID")
         pref = t.get("preference") or t.get("channel") or t.get("prefer") or "any"
         pref = {"pcs": "publisher", "rpcs": "viewer"}.get(pref, pref)
         kind = {"pcs": "publisher", "rpcs": "viewer"}.get(t.get("type"), t.get("type"))
         if kind not in ("publisher", "viewer"):
             kind = None
-        fallback = bool(t.get("allowFallback", False))
         stream_id = t.get("streamID") or t.get("stream_id")
         if stream_id and not uuid:
             sent = False
             for pid, pair in list(self.connections.items()):
                 for conn in (pair.publisher, pair.viewer):
                     if conn and (kind is None or conn.type == kind) and conn.stream_id == stream_id:
-                        if self._send_data_internal(msg, pid, kind, pref, fallback):
+                        if self._send_data_internal(msg, pid, kind, pref):
                             sent = True
                         break
             return sent
-        return self._send_data_internal(msg, uuid, kind, pref, fallback)
+        return self._send_data_internal(msg, uuid, kind, pref)
 
-    def _send_data_internal(self, msg: Any, uuid: Optional[str], kind: Optional[str], preference: str, allow_fallback: bool) -> bool:
+    def _send_data_internal(self, msg: Any, uuid: Optional[str], kind: Optional[str], preference: str) -> bool:
         text = json.dumps(msg, separators=(",", ":"))
         sent = False
 
@@ -1642,13 +1651,6 @@ class VDONinja:
                 sent |= attempt(pair.viewer)
             else:
                 sent |= attempt(pair.publisher) or attempt(pair.viewer)
-        if sent or not allow_fallback or not self._connected or not isinstance(msg, dict):
-            return sent
-        for target in ([uuid] if uuid else list(self.connections.keys())):
-            if target:
-                fallback = dict(msg)
-                fallback.update({"__fallback": True, "UUID": target})
-                sent |= self._send_ws(fallback)
         return sent
 
     def _send_raw_control(self, uuid: str, msg: Dict[str, Any]) -> bool:
@@ -1665,12 +1667,12 @@ class VDONinja:
     def subscribe(self, *channels: str) -> None:
         self._subscriptions.update(channels)
         if self._connected:
-            self.send_data({"type": "subscribe", "channels": list(channels)}, {"allowFallback": True})
+            self.send_data({"type": "subscribe", "channels": list(channels)})
 
     def unsubscribe(self, *channels: str) -> None:
         self._subscriptions.difference_update(channels)
         if self._connected:
-            self.send_data({"type": "unsubscribe", "channels": list(channels)}, {"allowFallback": True})
+            self.send_data({"type": "unsubscribe", "channels": list(channels)})
 
     def subscriptions(self) -> List[str]:
         return sorted(self._subscriptions)

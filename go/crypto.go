@@ -15,6 +15,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"unicode/utf16"
 )
 
 // GenerateHash returns the hex SHA-256 of str, truncated to length hex
@@ -53,12 +54,21 @@ func HashRoom(room, sanitizedPassword, salt string) string {
 // key = SHA-256(phrase). It returns the ciphertext and the random IV, both as
 // lowercase hex strings, exactly as VDO.Ninja places them in the "description"
 // / "candidates" and "vector" fields.
+func browserAESBytes(value string) []byte {
+	units := utf16.Encode([]rune(value))
+	bytes := make([]byte, len(units))
+	for i, unit := range units {
+		bytes[i] = byte(unit)
+	}
+	return bytes
+}
+
 func EncryptMessage(plaintext, phrase string) (ciphertextHex, ivHex string, err error) {
 	iv := make([]byte, aes.BlockSize)
 	if _, err = rand.Read(iv); err != nil {
 		return "", "", err
 	}
-	ct, err := encryptWithIV([]byte(plaintext), phrase, iv)
+	ct, err := encryptWithIV(browserAESBytes(plaintext), phrase, iv)
 	if err != nil {
 		return "", "", err
 	}
@@ -66,7 +76,7 @@ func EncryptMessage(plaintext, phrase string) (ciphertextHex, ivHex string, err 
 }
 
 func encryptWithIV(plaintext []byte, phrase string, iv []byte) ([]byte, error) {
-	key := sha256.Sum256([]byte(phrase))
+	key := sha256.Sum256(browserAESBytes(phrase))
 	block, err := aes.NewCipher(key[:])
 	if err != nil {
 		return nil, err
@@ -95,7 +105,7 @@ func DecryptMessage(ciphertextHex, ivHex, phrase string) (string, error) {
 	if len(iv) != aes.BlockSize || len(ct) == 0 || len(ct)%aes.BlockSize != 0 {
 		return "", errors.New("vdoninja: ciphertext/iv length invalid")
 	}
-	key := sha256.Sum256([]byte(phrase))
+	key := sha256.Sum256(browserAESBytes(phrase))
 	block, err := aes.NewCipher(key[:])
 	if err != nil {
 		return "", err
@@ -111,7 +121,11 @@ func DecryptMessage(ciphertextHex, ivHex, phrase string) (string, error) {
 			return "", errors.New("vdoninja: bad padding (wrong password or salt?)")
 		}
 	}
-	return string(out[:len(out)-padLen]), nil
+	chars := make([]rune, len(out)-padLen)
+	for i := range chars {
+		chars[i] = rune(out[i])
+	}
+	return string(chars), nil
 }
 
 // generateStreamID returns a random 12-character lowercase alphanumeric ID,

@@ -1,0 +1,166 @@
+<!doctype html>
+<!-- Generated from protocol-audit.md by npm run docs:build. Edit the Markdown source. -->
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Protocol audit: 2026-11-08 | VDO.Ninja SDK</title><meta name="description" content="Protocol audit: 2026-11-08. VDO.Ninja SDK options, practical examples, requirements, and validation limits.">
+<link rel="canonical" href="https://sdk.vdo.ninja/docs/protocol-audit.html">
+<meta property="og:title" content="Protocol audit: 2026-11-08"><meta property="og:description" content="Protocol audit: 2026-11-08. VDO.Ninja SDK options, practical examples, requirements, and validation limits.">
+<meta property="og:type" content="article"><meta property="og:url" content="https://sdk.vdo.ninja/docs/protocol-audit.html">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../site.css"><link rel="stylesheet" href="guide.css"></head>
+<body><a class="skip-link" href="#content">Skip to content</a>
+<header class="site-header"><div class="site-header-inner"><a class="brand" href="../index.html"><img src="../favicon.svg" alt="" width="26" height="26"><span>VDO.Ninja SDK</span></a><nav class="site-nav" aria-label="Main"><a href="../index.html#try-live">Live demo</a><a href="../index.html#quickstart">Quick start</a><a href="../index.html#sdks">SDKs</a><a href="../demos/">Demos</a><a href="guides.html">Guides</a><a href="api-reference.html">API</a><a href="../index.html#faq">FAQ</a></nav><div class="site-header-actions"><a class="btn btn-secondary btn-sm" href="https://github.com/steveseguin/ninjasdk">GitHub</a></div></div></header>
+<div class="layout"><aside><nav aria-label="On this page"><strong>On this page</strong><a href="#validated-issues-and-remedies">Validated issues and remedies</a><a href="#source-evidence">Source evidence</a><a href="#migration">Migration</a><a href="#regression-checks">Regression checks</a><a href="#initial-audit-validation">Initial audit validation</a><a href="#follow-up-correctness-review">Follow-up correctness review</a></nav></aside>
+<main id="content"><h1 id="protocol-audit-2026-11-08">Protocol audit: 2026-11-08</h1>
+<p>The source of truth is the <a href="https://github.com/steveseguin/vdo.ninja/tree/3ea79516ff9f96108bff10cffd33fa5fe95a00de">VDO.Ninja application at <code>3ea79516</code></a>.
+The JavaScript SDK, native SDKs, their local signaling servers and their generated vectors are implementations and test aids, not specifications.</p>
+<h2 id="validated-issues-and-remedies">Validated issues and remedies</h2>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Comparison table"><table>
+<thead>
+<tr>
+<th>Finding</th>
+<th>Change</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>C, Go, Python, Rust, Dart, Kotlin and Swift exposed a local identity option and added <code>from</code> without implementing fan-out mode.</td>
+<td>Removed <code>client_id</code>, <code>ClientID</code> and <code>clientId</code>, including their allocations and send-path injection. JavaScript rejects those unsupported constructor options.</td>
+</tr>
+<tr>
+<td>All eight SDKs implemented <code>__fallback</code> signaling messages for application data, although the browser's signaling receiver has no matching handler.</td>
+<td>Removed the send/receive extension, <code>allowFallback</code> / <code>AllowFallback</code> / <code>allow_fallback</code> and obsolete event flags. Generic application data waits for WebRTC.</td>
+</tr>
+<tr>
+<td>JavaScript comments reversed the meaning of outgoing <code>UUID</code>.</td>
+<td>Documented destination on send and server-supplied sender on delivery.</td>
+</tr>
+<tr>
+<td>SDK-generated vectors and SDK-to-SDK interoperability were described as protocol authority.</td>
+<td>Relabeled them as consistency tests and added independent browser-source checks and wire auditing.</td>
+</tr>
+<tr>
+<td>Pub/sub, RPC and <code>x-bin</code> were mixed into the description of native browser functionality.</td>
+<td>Identified them as SDK application conventions using the browser's supported extension mechanisms.</td>
+</tr>
+<tr>
+<td>Local signaling fixtures could hide incorrect client fields by stripping them.</td>
+<td>Audit outbound frames before fixture processing, and deliberately add a conflicting <code>from</code> to server replies.</td>
+</tr>
+</tbody>
+</table></div>
+<p>The VST plugin's vendored JavaScript SDK receives the same corrections. Its native <code>play</code> requests also drop <code>audio</code>/<code>video</code>: those preferences belong on <code>sendChannel</code> after connection, not in discovery signaling.</p>
+<h2 id="source-evidence">Source evidence</h2>
+<ul>
+<li><a href="https://github.com/steveseguin/vdo.ninja/blob/3ea79516ff9f96108bff10cffd33fa5fe95a00de/main.js#L7621"><code>main.js</code> URL setup</a>: <code>wss</code> enables <code>customWSS</code>; <code>wss2</code> changes the endpoint without enabling it.</li>
+<li><a href="https://github.com/steveseguin/vdo.ninja/blob/3ea79516ff9f96108bff10cffd33fa5fe95a00de/webrtc.js#L6798"><code>webrtc.js</code> <code>sendMsg</code></a> and <a href="https://github.com/steveseguin/vdo.ninja/blob/3ea79516ff9f96108bff10cffd33fa5fe95a00de/webrtc.js#L7728">receive normalization</a>: <code>from</code> is added/interpreted in <code>customWSS</code> mode only.</li>
+<li><a href="https://github.com/steveseguin/vdo.ninja/blob/3ea79516ff9f96108bff10cffd33fa5fe95a00de/webrtc.js#L3451"><code>sendGenericData</code></a>: wraps application data in <code>pipe</code> and uses WebRTC send helpers.</li>
+<li><a href="https://github.com/steveseguin/vdo.ninja/blob/3ea79516ff9f96108bff10cffd33fa5fe95a00de/webrtc.js#L6661"><code>watch</code> discovery</a>: <code>play</code> carries <code>streamID</code>; audio/video preferences follow on the data channel.</li>
+<li><a href="https://github.com/steveseguin/vdo.ninja/blob/3ea79516ff9f96108bff10cffd33fa5fe95a00de/webrtc.js#L877"><code>isReservedChannelLabel</code></a>: <code>x-</code> is explicitly reserved for third-party channels, which the browser ignores. <code>x-bin</code> is an SDK convention within that reservation.</li>
+</ul>
+<p>Custom SDK <code>host</code> URLs still use server-routed signaling. These SDKs do not implement the browser's <code>&amp;wss</code> fan-out mode. Local logging, timeouts, buffering, WebRTC engine selection and connection routing preferences are SDK controls; they are not transmitted as extra VDO.Ninja protocol fields.</p>
+<h2 id="migration">Migration</h2>
+<p>Remove the deleted identity and signaling-fallback options from application configuration. Rebuild native applications: removing C struct members changes its ABI. Wait for <code>dataChannelOpen</code> before sending application data; a send without an available data channel reports failure. JavaScript and Python reject unknown data-target options rather than silently accepting obsolete ones.</p>
+<p>SDK pub/sub and RPC remain application payloads inside <code>pipe</code>. A plain VDO.Ninja browser does not execute those SDK conventions. Ordinary application payloads may contain arbitrary field names; the protocol allowlist applies to the outer envelope, not user data.</p>
+<p>The <code>social_ninja</code> Android app was not modified. Its preference for <code>from</code> over server-routed <code>UUID</code> remains a separate follow-up for the app maintainer; behavior should be conditional on an explicitly implemented fan-out mode.</p>
+<h2 id="regression-checks">Regression checks</h2>
+<ul>
+<li><code>npm run test:protocol</code> checks emitted SDK messages, removed APIs and unknown outer fields, while preserving arbitrary <code>pipe</code> payloads.</li>
+<li><code>npm run test:protocol:source</code> executes <code>sendMsg</code> and <code>sendGenericData</code> from a separate VDO.Ninja checkout. Set <code>VDON_REFERENCE_SOURCE</code> if it is not <code>../vdo.ninja</code>. CI pins the reviewed source revision.</li>
+<li><code>spec/signaling-contract.json</code> records the reviewed signaling subset. It is a test allowlist, not a replacement specification. New supported messages require browser-source evidence and corresponding tests.</li>
+<li>Python integration tests inspect client messages before local-server processing and deliver a conflicting <code>from</code> beside the authoritative <code>UUID</code>.</li>
+<li>The cross-language interop runner uses the same audit via a transparent proxy. Unknown fields fail the run, even for an otherwise known failing engine pair.</li>
+<li>Existing C, Go, Rust and mobile core tests still verify their own lifecycle and shared-vector behavior. Passing these alone does not prove compatibility with every browser feature.</li>
+</ul>
+<p>This audit covers signaling identities, request/control envelopes, application-data transport and their documentation. It does not claim every SDK implements every feature in the VDO.Ninja application.</p>
+<h2 id="initial-audit-validation">Initial audit validation</h2>
+<ul>
+<li>C: build and all 3 native suites passed.</li>
+<li>Go: all package tests passed.</li>
+<li>Rust: workspace unit, integration, vector and documentation tests passed.</li>
+<li>Python: all 19 tests passed, including audited signaling with conflicting incoming <code>from</code> fields.</li>
+<li>JavaScript: 80 reliability/contract tests passed; one optional external-server-source test skipped. TypeScript and all 14 generated-guide checks passed.</li>
+<li>Browser source: both independent function checks passed against the pinned VDO.Ninja checkout.</li>
+<li>Cross-language signaling audit: all 13 tested pairings passed (the 4 JavaScript/Python pairs and the 9 Go/C/Rust pairs). This was not the complete five-language matrix.</li>
+<li>Dart core: analyzer and all 10 tests passed. Kotlin core: all 14 tests passed.</li>
+<li>VST: Windows build, vendored-SDK tests, 9 receive scenarios and the 6-case native receive matrix passed. These include data-before-media, conflicting incoming <code>from</code>, native mic-only, video-bearing offers, forced TURN and a TURN-discovery outage.</li>
+</ul>
+<p>Swift and the Flutter/Android/Apple WebRTC wrapper builds were not run locally. Their existing CI jobs remain required before publishing SDK packages. These changes have not been released.</p>
+<h2 id="follow-up-correctness-review">Follow-up correctness review</h2>
+<p>Each correction below was checked against the browser implementation or the actual transport library. SDK configuration and local retry scheduling are not additional wire protocol fields.</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Comparison table"><table>
+<thead>
+<tr>
+<th>Finding</th>
+<th>Correction and focused validation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1. Publishers attached audio/video before control preferences.</td>
+<td>All SDKs and the VST now offer <code>sendChannel</code> first. Boolean audio/video preferences enable tracks and a later media offer; an omitted preference preserves the previous choice. Real transport tests cover JS, C, Go, Python, Rust and the plugin. Mobile wrapper builds remain a separate gate.</td>
+</tr>
+<tr>
+<td>2. VST data-channel ICE could use a payload UUID to create or target another peer.</td>
+<td>Bind ICE to its source channel and current session. A conflicting UUID test receives audio without creating the fake peer.</td>
+</tr>
+<tr>
+<td>3. Non-ASCII AES bytes differed from the browser.</td>
+<td>Use each UTF-16 code unit's low byte for AES keys and plaintext, and Latin-1 decoding. Hashes remain UTF-8. Execute the real browser conversion in vector tests, including an emoji salt and Latin-1 plaintext.</td>
+</tr>
+<tr>
+<td>4. VST encryption failure could send plaintext.</td>
+<td>Fail closed. A separate native test process forces OpenSSL RNG failure and observes no plaintext SDP/ICE.</td>
+</tr>
+<tr>
+<td>5. Relay timezone selection used inconsistent signs or DST rules.</td>
+<td>Match <code>lib.js:getTimezone</code>, including its historical 1900/1906 baseline. Winter/summer tests execute browser code. Windows C runtimes without pre-1970 dates use the OS standard offset; rare historical timezone differences remain a limitation there.</td>
+</tr>
+<tr>
+<td>6. Backup relay lists drifted.</td>
+<td>Generate all eight SDK lists and the plugin's list from the reviewed <code>webrtc.js</code> source; CI detects drift. Test discovery failure and selected relay URLs independently of the SDK.</td>
+</tr>
+<tr>
+<td>7. Long-lived clients retained expired relay credentials.</td>
+<td>Refresh automatic discovery caches and coalesce concurrent lookups. The plugin refreshes its instance even while signaling stays connected. Deterministic expiry/outage tests verify credential rotation.</td>
+</tr>
+<tr>
+<td>8. C advertised unsupported forced TCP relay.</td>
+<td>Reject <code>force_tcp</code> with <code>EINVAL</code> and select supported UDP relays. The current C/plugin libjuice backend does not provide TURN TCP/TLS.</td>
+</tr>
+<tr>
+<td>9. Documentation overstated Python forced-relay support.</td>
+<td>Separate TURN discovery from an enforced relay-only policy; aiortc does not expose that policy here.</td>
+</tr>
+<tr>
+<td>10. VST recovery dropped throttled requests and could stall after disconnect.</td>
+<td>Retain retry intent through outages; expire stalled initial/disconnected peers; use existing <code>play</code>, offers, <code>ping</code>/<code>pong</code> and <code>iceRestartRequest</code>. Ignore retired-session messages. UDP proxy tests cover repeated IP/port changes, complete packet blackouts, encrypted room reconnects, delayed offers, source outages and cancellation.</td>
+</tr>
+<tr>
+<td>11. Python asynchronous work could outlive disconnect.</td>
+<td>Check connection generation after awaits and before sending; cancellation regression tests cover late work.</td>
+</tr>
+<tr>
+<td>12. VST ignored WHEP restart markers at the same URL.</td>
+<td>Match the browser's <code>started</code> marker identity and replace the WHEP resource when it changes. Test both control-channel and encrypted signaling delivery.</td>
+</tr>
+<tr>
+<td>13. Custom TURN discovery URLs lost existing queries.</td>
+<td>Preserve encoded, repeated and empty query values in Python, Go, Rust, Dart, Kotlin and Swift URL construction. Test owned HTTP endpoints or captured requests.</td>
+</tr>
+<tr>
+<td>14. JS TURN timeout ended after headers.</td>
+<td>Keep the timeout active through body parsing. An owned server stalls its body and the request times out.</td>
+</tr>
+<tr>
+<td>15. Envelope guards accepted invalid nested values.</td>
+<td>Validate SDP, ICE, session and encrypted-field shapes; keep opaque application payloads unrestricted. Shared invalid vectors exercise the plugin and SDK test guards.</td>
+</tr>
+</tbody>
+</table></div>
+<p>The browser recovery reference is <a href="https://github.com/steveseguin/vdo.ninja/blob/3ea79516ff9f96108bff10cffd33fa5fe95a00de/webrtc.js#L23518"><code>webrtc.js</code> connection-state handling</a>. The plugin's libjuice backend explicitly rejects ICE restart, so it recovers with a fresh publisher session through the existing negotiation flow. Healthy media survives signaling reconnects. A peer that has never answered a control ping is not disconnected for ignoring pings; it uses ICE state and connection deadlines instead.</p>
+<p>Follow-up local results include C's three suites, Go's race-enabled package tests, 29 Python tests, Dart core analysis and 11 tests, the six browser-source checks, and BrowserStack Samsung Galaxy S23 / Android 13 Chrome publishing through the unmodified browser checkout into the plugin (received RMS 0.166392). Repeated VST IP changes recovered measured audio in about nine seconds; an older-app fixture without pong support took about 30 seconds. These are controlled test results, not a guarantee for every mobile network.</p>
+<p>Android remains unchanged. In the reviewed <code>social_ninja</code> source, incoming default signaling prefers <code>from</code> at <code>signaling.dart:5402</code>, and <code>_handleDataChannelMessage</code> at <code>signaling.dart:12683</code> lacks the browser's ping/pong handling. Use routed <code>UUID</code> outside explicit fan-out mode and echo a control ping's token on that same channel. Review its existing ICE-restart/session guards when applying those app fixes; no new wire identity is needed.</p>
+</main></div>
+<footer class="site-footer"><div class="container"><span>VDO.Ninja SDK guides</span><nav aria-label="Footer"><a href="guides.html">All guides</a><a href="validation.html">Validation and limits</a><a href="protocol-audit.md">Markdown source</a><a href="https://github.com/steveseguin/ninjasdk">Repository</a></nav></div></footer></body></html>

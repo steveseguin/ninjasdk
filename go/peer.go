@@ -24,20 +24,22 @@ type Connection struct {
 	typ  string // "publisher" | "viewer"
 	pc   *webrtc.PeerConnection
 
-	mu            sync.Mutex
-	control       *webrtc.DataChannel
-	channels      map[string]*webrtc.DataChannel
-	streamID      string
-	session       string
-	info          map[string]any
-	obsState      map[string]any
-	allowAudio    bool
-	allowVideo    bool
-	allowDownload bool
-	allowResource bool
-	viewOptions   ViewOptions
-	senders       []*webrtc.RTPSender
-	senderKinds   map[*webrtc.RTPSender]webrtc.RTPCodecType // survives ReplaceTrack(nil)
+	mu                     sync.Mutex
+	mediaMu                sync.Mutex
+	mediaNegotiationNeeded bool
+	control                *webrtc.DataChannel
+	channels               map[string]*webrtc.DataChannel
+	streamID               string
+	session                string
+	info                   map[string]any
+	obsState               map[string]any
+	allowAudio             bool
+	allowVideo             bool
+	allowDownload          bool
+	allowResource          bool
+	viewOptions            ViewOptions
+	senders                []*webrtc.RTPSender
+	senderKinds            map[*webrtc.RTPSender]webrtc.RTPCodecType // survives ReplaceTrack(nil)
 
 	iceBundle      []webrtc.ICECandidateInit
 	iceTimer       *time.Timer
@@ -206,8 +208,8 @@ func (s *SDK) createConnection(uuid, typ string) (*Connection, error) {
 		channels:       map[string]*webrtc.DataChannel{},
 		info:           map[string]any{},
 		obsState:       map[string]any{},
-		allowAudio:     true,
-		allowVideo:     true,
+		allowAudio:     false,
+		allowVideo:     false,
 		iceBundleDelay: 70 * time.Millisecond,
 		advertised:     map[string]bool{},
 		senderKinds:    map[*webrtc.RTPSender]webrtc.RTPCodecType{},
@@ -275,27 +277,8 @@ func (s *SDK) createConnection(uuid, typ string) (*Connection, error) {
 	return c, nil
 }
 
-// createOffer adds local tracks for publisher connections and creates an offer.
+// createOffer initially offers only sendChannel; preferences add media later.
 func (s *SDK) createOffer(c *Connection, iceRestart bool) (webrtc.SessionDescription, error) {
-	if c.typ == "publisher" && len(c.senders) == 0 {
-		s.mu.Lock()
-		tracks := append([]webrtc.TrackLocal(nil), s.localTracks...)
-		s.mu.Unlock()
-		for _, t := range tracks {
-			if (t.Kind() == webrtc.RTPCodecTypeAudio && !c.allowAudio) || (t.Kind() == webrtc.RTPCodecTypeVideo && !c.allowVideo) {
-				continue
-			}
-			sender, err := c.pc.AddTrack(t)
-			if err != nil {
-				return webrtc.SessionDescription{}, err
-			}
-			c.mu.Lock()
-			c.senders = append(c.senders, sender)
-			c.senderKinds[sender] = t.Kind()
-			c.mu.Unlock()
-			go s.drainRTCP(sender)
-		}
-	}
 	var opts *webrtc.OfferOptions
 	if iceRestart {
 		opts = &webrtc.OfferOptions{ICERestart: true}
@@ -540,6 +523,7 @@ func (s *SDK) handleAnswer(uuid, session string, desc webrtc.SessionDescription)
 		return
 	}
 	s.drainPendingICE(c, "remote")
+	s.updateTracksForConnection(c)
 }
 
 // renegotiate creates a new offer on a publisher connection (track changes or
@@ -1138,47 +1122,69 @@ func (s *SDK) updateTracksForConnection(c *Connection) {
 	if c.typ != "publisher" {
 		return
 	}
+	c.mediaMu.Lock()
+	defer c.mediaMu.Unlock()
 	s.mu.Lock()
 	tracks := append([]webrtc.TrackLocal(nil), s.localTracks...)
 	s.mu.Unlock()
-	if len(tracks) == 0 {
+	c.mu.Lock()
+	if c.finalized {
+		c.mu.Unlock()
 		return
 	}
-	c.mu.Lock()
 	senders := append([]*webrtc.RTPSender(nil), c.senders...)
 	allowAudio, allowVideo := c.allowAudio, c.allowVideo
+	kinds := make(map[*webrtc.RTPSender]webrtc.RTPCodecType, len(c.senderKinds))
+	for sender, kind := range c.senderKinds {
+		kinds[sender] = kind
+	}
 	c.mu.Unlock()
-	for _, sender := range senders {
-		c.mu.Lock()
-		k, known := c.senderKinds[sender]
-		c.mu.Unlock()
-		if !known {
-			// A muted sender has no track; the recorded kind is what lets it resume.
-			if t := sender.Track(); t != nil {
-				k = t.Kind()
-			} else {
+	for _, kind := range []webrtc.RTPCodecType{webrtc.RTPCodecTypeAudio, webrtc.RTPCodecTypeVideo} {
+		allowed := (kind == webrtc.RTPCodecTypeAudio && allowAudio) || (kind == webrtc.RTPCodecTypeVideo && allowVideo)
+		var local []webrtc.TrackLocal
+		for _, track := range tracks {
+			if track.Kind() == kind {
+				local = append(local, track)
+			}
+		}
+		count := 0
+		for _, sender := range senders {
+			k, known := kinds[sender]
+			if !known && sender.Track() != nil {
+				k = sender.Track().Kind()
+			}
+			if k != kind {
 				continue
 			}
-		}
-		allow := (k == webrtc.RTPCodecTypeAudio && allowAudio) || (k == webrtc.RTPCodecTypeVideo && allowVideo)
-		if !allow {
-			if sender.Track() != nil {
-				if err := sender.ReplaceTrack(nil); err != nil {
-					s.logf("ReplaceTrack(nil) failed: %v", err)
-				}
+			var track webrtc.TrackLocal
+			if allowed && count < len(local) {
+				track = local[count]
 			}
-			continue
-		}
-		if sender.Track() != nil {
-			continue // already sending this kind
-		}
-		for _, t := range tracks {
-			if t.Kind() == k {
-				if err := sender.ReplaceTrack(t); err != nil {
-					s.logf("ReplaceTrack failed: %v", err)
-				}
-				break
+			if err := sender.ReplaceTrack(track); err != nil {
+				s.logf("ReplaceTrack failed: %v", err)
 			}
+			count++
+		}
+		if allowed {
+			for _, track := range local[min(count, len(local)):] {
+				sender, err := c.pc.AddTrack(track)
+				if err != nil {
+					s.logf("AddTrack after viewer preferences failed: %v", err)
+					continue
+				}
+				c.mu.Lock()
+				c.senders = append(c.senders, sender)
+				c.senderKinds[sender] = kind
+				c.mu.Unlock()
+				go s.drainRTCP(sender)
+				c.mediaNegotiationNeeded = true
+			}
+		}
+	}
+	if c.mediaNegotiationNeeded && c.pc.SignalingState() == webrtc.SignalingStateStable {
+		c.mediaNegotiationNeeded = false
+		if err := s.renegotiate(c, false, false); err != nil {
+			s.logf("Media renegotiation failed: %v", err)
 		}
 	}
 }
@@ -1266,5 +1272,5 @@ func (s *SDK) SendPing(uuid string) bool {
 		c.pendingPing = ts
 		c.mu.Unlock()
 	}
-	return s.sendDataInternal(map[string]any{"ping": ts}, uuid, "", "any", false)
+	return s.sendDataInternal(map[string]any{"ping": ts}, uuid, "", "any")
 }

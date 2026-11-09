@@ -7,6 +7,8 @@
 
 /* crypto */
 void vdon_sha256(const uint8_t *data, size_t len, uint8_t out[32]);
+/* Browser AES encoding only; ordinary hashes continue to use UTF-8. */
+int vdon_browser_aes_bytes(const char *text, uint8_t **out, size_t *length);
 /* AES-256-CBC with PKCS#7; *out is malloc'd. Returns length or -1. */
 int vdon_aes256_cbc_encrypt(const uint8_t key[32], const uint8_t iv[16], const uint8_t *in, size_t len, uint8_t **out);
 int vdon_aes256_cbc_decrypt(const uint8_t key[32], const uint8_t iv[16], const uint8_t *in, size_t len, uint8_t **out);

@@ -108,9 +108,9 @@ default, matching VDO.Ninja, where it requires the <code>&amp;resources</code> U
 <ul>
 <li>sendData(data, target?): boolean
 <ul>
-<li>target: undefined → all connected peers; 'uuid' → a specific peer; { uuid?, type?: 'viewer'|'publisher', streamID?, preference?: 'any'|'viewer'|'publisher'|'all', allowFallback? }</li>
+<li>Uses WebRTC data channels only; returns false when no matching channel is open.</li>
+<li>target: undefined → all connected peers; 'uuid' → a specific peer; { uuid?, type?: 'viewer'|'publisher', streamID?, preference?: 'any'|'viewer'|'publisher'|'all' }</li>
 <li>preference controls data-channel routing. 'any' (default) tries publisher first, then viewer; an explicit role uses only that role; 'all' may duplicate messages.</li>
-<li>allowFallback controls the separate WebSocket signaling fallback. It defaults to false; set it to true to opt in.</li>
 </ul>
 </li>
 <li>sendPing(uuid?): boolean</li>
@@ -395,7 +395,6 @@ mis-routed</li>
 <li>Reserved pipe types: 'subscribe' | 'unsubscribe' | 'channelMessage' are used by the SDK pub/sub system and do not emit dataReceived; use the pub/sub helpers and events.</li>
 <li>Viewer preferences (audio/video) are sent viewer → publisher via the viewer data channel, not the reverse.</li>
 <li>Legacy support: quickView and autoConnect can infer data-only; you can also pass { dataOnly:true }.</li>
-<li>WebSocket fallback: sendData can deliver via signaling when allowFallback is true (default false); dataReceived includes { fallback:true }.</li>
 <li>OBS state is reported per connected OBS viewer. Applications combining multiple OBS browser sources should aggregate by <code>uuid</code>; common fields are <code>visibility</code>, <code>sourceActive</code>, <code>recording</code>, and <code>streaming</code>.</li>
 </ul>
 <hr>

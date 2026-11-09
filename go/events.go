@@ -109,8 +109,6 @@ type Event struct {
 	Intentional   bool
 	WillReconnect bool
 	Reason        string
-	// Fallback marks data that arrived through the signaling relay.
-	Fallback bool
 	// BufferedAmount is set for bufferedAmountLow.
 	BufferedAmount uint64
 }

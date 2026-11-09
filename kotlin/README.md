@@ -72,7 +72,7 @@ and connects when the stream appears (`timeoutMs = 0` returns immediately).
 | Rooms | `joinRoom(room, claim, timeoutMs)` → listing, `leaveRoom()`, `currentRoom` |
 | Publishing | `announce()`, `publish(tracks, streamId, room)`, `addTrack()`, `replaceTrack()` (camera switch), `stopPublishing()` |
 | Viewing | `view(streamId, ViewOptions(audio, video, label), timeoutMs)`, `stopViewing()`, `autoConnect(room, streamId, fullMode)`; media arrives as `TRACK` events with an `org.webrtc.MediaStreamTrack` |
-| Data | `sendData(data, uuid, type, preference, allowFallback)`, `sendPing()` → `PEER_LATENCY` |
+| Data | `sendData(data, uuid, type, preference)`, `sendPing()` → `PEER_LATENCY` |
 | Pub/sub | `subscribe()`, `unsubscribe()`, `publishToChannel()` → `CHANNEL_MESSAGE` |
 | RPC | `onRequest(type) { data, from -> }`, `request(type, data, uuid)` (blocking), `respond()` |
 | Introspection | `peers()`, `connection(uuid, type)` (exposes the `PeerConnection`), `streams()` |

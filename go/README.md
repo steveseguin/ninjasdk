@@ -119,7 +119,6 @@ Events carry the same names as the JavaScript SDK (`dataReceived`, `peerInfo`, `
 | `STUNServers` | Google + Cloudflare | Empty slice disables STUN. |
 | `API` | default pion API | Supply a `webrtc.API` with your own `MediaEngine`/`SettingEngine` (codec selection, port ranges, loopback candidates). |
 | `AutoPingViewer` | off | Viewer pings every `AutoPingInterval`; two misses trigger an ICE restart request. |
-| `ClientID` | unset | Adds a `from` field for the legacy fan-out signaling servers. |
 
 Reconnection: after an unexpected socket loss the SDK reconnects with exponential backoff (`MaxReconnectAttempts`, `ReconnectDelay`) and replays the room join, publish/announce and pending views.
 
@@ -142,7 +141,7 @@ go test ./...          # protocol vectors + end-to-end tests over the local serv
 go test -race ./...
 ```
 
-The protocol vectors in [`../spec/vectors.json`](../spec/vectors.json) are generated from the JavaScript SDK, so hashing, encryption and sanitization cannot drift from the reference implementation.
+The protocol vectors in [`../spec/vectors.json`](../spec/vectors.json) are generated from the JavaScript SDK, so hashing, encryption and sanitization can be compared across SDKs; compatibility is defined by the VDO.Ninja application, not these vectors.
 
 ## Hosted service notice
 

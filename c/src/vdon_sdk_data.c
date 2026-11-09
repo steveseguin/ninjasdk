@@ -28,7 +28,7 @@ static char *conn_sid(vdon_sdk *s, conn_t *c) {
 /* ------------------------------------------------------------ send data */
 
 /* Sends {"pipe": payload} (payload consumed) to matching peers. Returns number of peers reached. */
-static int send_pipe(vdon_sdk *s, cJSON *payload, const char *uuid, const char *type, const char *pref, int fallback) {
+static int send_pipe(vdon_sdk *s, cJSON *payload, const char *uuid, const char *type, const char *pref) {
     cJSON *msg = cJSON_CreateObject();
     conn_t *c, *list[256];
     char *text;
@@ -78,41 +78,6 @@ static int send_pipe(vdon_sdk *s, cJSON *payload, const char *uuid, const char *
             sent++;
         }
     }
-    if (!sent && fallback) {
-        /* WebSocket relay, explicit opt-in only */
-        char **targets = NULL;
-        int tn = 0;
-        if (uuid) {
-            targets = (char **)calloc(1, sizeof(char *));
-            targets[tn++] = vdon_strdup(uuid);
-        } else {
-            pthread_mutex_lock(&s->lock);
-            for (c = s->conns; c; c = c->next) {
-                int dup = 0;
-                if (c->closed)
-                    continue;
-                for (i = 0; i < tn; i++)
-                    if (strcmp(targets[i], c->uuid) == 0)
-                        dup = 1;
-                if (dup)
-                    continue;
-                targets = (char **)realloc(targets, sizeof(char *) * (size_t)(tn + 1));
-                targets[tn++] = vdon_strdup(c->uuid);
-            }
-            pthread_mutex_unlock(&s->lock);
-        }
-        for (i = 0; i < tn; i++) {
-            cJSON *fb = cJSON_CreateObject();
-            cJSON_AddBoolToObject(fb, "__fallback", 1);
-            cJSON_AddStringToObject(fb, "UUID", targets[i]);
-            cJSON_AddItemToObject(fb, "pipe", cJSON_Duplicate(jget(msg, "pipe"), 1));
-            if (vdon__ws_send(s, fb))
-                sent++;
-            cJSON_Delete(fb);
-            free(targets[i]);
-        }
-        free(targets);
-    }
     free(text);
     cJSON_Delete(msg);
     return sent;
@@ -124,8 +89,7 @@ int vdon_send_data_ex(vdon_sdk *s, const char *json, const vdon_data_target *t) 
     if (!s || !json)
         return VDON_ERR_INVALID;
     payload = vdon__parse_or_string(json);
-    n = send_pipe(s, payload, t ? t->uuid : NULL, t ? t->connection_type : NULL, t ? t->preference : NULL,
-                  t ? t->allow_fallback : 0);
+    n = send_pipe(s, payload, t ? t->uuid : NULL, t ? t->connection_type : NULL, t ? t->preference : NULL);
     return n > 0 ? VDON_OK : VDON_ERR_NO_CHANNEL;
 }
 
@@ -178,7 +142,7 @@ static void broadcast_sub(vdon_sdk *s, const char *type, const char *channel, co
         vdon__conn_send_control(s, only, m);
         cJSON_Delete(m);
     } else
-        send_pipe(s, p, NULL, NULL, "all", 0);
+        send_pipe(s, p, NULL, NULL, "all");
 }
 
 void vdon__send_subscriptions(vdon_sdk *s, conn_t *c) {
@@ -236,7 +200,7 @@ int vdon_publish_to_channel(vdon_sdk *s, const char *channel, const char *json, 
     cJSON_AddStringToObject(p, "channel", channel);
     cJSON_AddItemToObject(p, "data", vdon__parse_or_string(json));
     cJSON_AddNumberToObject(p, "timestamp", (double)vdon_now_ms());
-    return send_pipe(s, p, uuid, NULL, "any", 0) > 0 ? VDON_OK : VDON_ERR_NO_CHANNEL;
+    return send_pipe(s, p, uuid, NULL, "any") > 0 ? VDON_OK : VDON_ERR_NO_CHANNEL;
 }
 
 void vdon__drop_peer_subs(vdon_sdk *s, const char *uuid) {
@@ -304,7 +268,7 @@ int vdon_respond(vdon_sdk *s, const char *request_id, const char *json, const ch
     cJSON_AddStringToObject(p, "type", "response");
     cJSON_AddStringToObject(p, "requestId", request_id);
     cJSON_AddItemToObject(p, "data", vdon__parse_or_string(json));
-    return send_pipe(s, p, uuid, NULL, "any", 0) > 0 ? VDON_OK : VDON_ERR_NO_CHANNEL;
+    return send_pipe(s, p, uuid, NULL, "any") > 0 ? VDON_OK : VDON_ERR_NO_CHANNEL;
 }
 
 int vdon_request(vdon_sdk *s, const char *request_type, const char *json, const char *uuid, int timeout_ms,
@@ -333,7 +297,7 @@ int vdon_request(vdon_sdk *s, const char *request_type, const char *json, const 
     cJSON_AddStringToObject(p, "requestType", request_type);
     cJSON_AddStringToObject(p, "requestId", id);
     cJSON_AddItemToObject(p, "data", vdon__parse_or_string(json));
-    if (send_pipe(s, p, uuid, NULL, "any", 0) == 0)
+    if (send_pipe(s, p, uuid, NULL, "any") == 0)
         rc = VDON_ERR_NO_CHANNEL;
     deadline = vdon_now_ms() + timeout_ms;
     pthread_mutex_lock(&s->lock);

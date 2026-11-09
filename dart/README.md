@@ -70,7 +70,7 @@ returns `null` right away and leaves the request pending.
 | Rooms | `joinRoom(room:, claim:)` → listing, `leaveRoom()`, `room` |
 | Publishing | `announce(streamId:, room:)`, `publish(MediaStream, streamId:, room:)`, `addTrack()`, `replaceTrack()` (camera switch), `stopPublishing()` |
 | Viewing | `view(streamId, options: ViewOptions(audio:, video:, label:))`, `stopViewing()`, `autoConnect(room, fullMode:)` ; media arrives as `track` events with `track` and `stream` |
-| Data | `sendData(data, uuid:, type:, preference:, allowFallback:)`, `sendPing()` → `peerLatency` |
+| Data | `sendData(data, uuid:, type:, preference:)`, `sendPing()` → `peerLatency` |
 | Pub/sub | `subscribe(channels)`, `unsubscribe()`, `publishToChannel(channel, data)` → `channelMessage` |
 | RPC | `onRequest(type, handler)`, `request(type, data, uuid)`, `respond()` |
 | Introspection | `peers`, `connection(uuid, type)` (exposes the `RTCPeerConnection`), `streams` |
