@@ -92,3 +92,7 @@ Android remains unchanged. In the reviewed `social_ninja` source, incoming defau
 [Native SDK CI](https://github.com/steveseguin/ninjasdk/actions/runs/42543274997) passed all twelve jobs: C, Go with the race detector, Rust on Linux/macOS/Windows, Python 3.10/3.12, Dart/Flutter, Kotlin/Android, Swift on macOS and Linux, and cross-language interop. [JavaScript CI](https://github.com/steveseguin/ninjasdk/actions/runs/42543277607) passed both WebRTC engines on Node 18 and 20. These runs validate commit `82bf101`; integrating subsequent upstream changes requires another run.
 
 Real Chrome against the unmodified browser checkout passed encrypted media, special-character password and application-data interoperability. The plugin passed Chrome audio in both directions, owned encrypted live-room audio and destination-UUID media renegotiation.
+
+## Integration with current main
+
+Commit `3b80181` combines the audit with the newer upstream native SDK fixes, preserving the initial `info` exchange, one primary track per media kind, cancellable discovery, password-mode behavior and Go SDP serialization. [Native CI](https://github.com/steveseguin/ninjasdk/actions/runs/42545011410) passed all twelve jobs, including cross-language interop. [JavaScript CI](https://github.com/steveseguin/ninjasdk/actions/runs/42545014134) passed all four Node/engine combinations. Focused merge validation also passed Go race tests, Python tests, all 24 documentation/protocol/source checks and Rust formatting. SDK package publication remains separate from these repository changes.
