@@ -104,8 +104,10 @@ jobs:
   swift:
     name: Swift SDK
     strategy:
+      fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        # setup-swift v2 does not support Ubuntu 26.04 yet.
+        os: [ubuntu-24.04, macos-latest]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7

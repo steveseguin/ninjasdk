@@ -13,6 +13,8 @@ const main = fs.readFileSync(path.join(source, 'main.js'), 'utf8');
 const lib = fs.readFileSync(path.join(source, 'lib.js'), 'utf8');
 const SDK = require(process.env.VDON_TEST_SDK || '../vdoninja-sdk.js');
 const crypto = require('node:crypto');
+// Node 18 does not expose browser WebCrypto globally by default.
+global.crypto ||= crypto.webcrypto;
 
 test('all bundled TURN backup lists match the official browser source', () => {
     const { execFileSync } = require('node:child_process');

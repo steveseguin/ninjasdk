@@ -11,6 +11,7 @@ jobs:
   test-sdk:
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         node-version: [18, 20]
         webrtc-lib: ['@roamhq/wrtc', 'node-datachannel']

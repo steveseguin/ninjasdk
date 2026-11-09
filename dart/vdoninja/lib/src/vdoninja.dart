@@ -627,7 +627,9 @@ class VdoNinja {
 
   Future<List<IceServer>> _iceServerList() async {
     if (_iceServers != null && (options.turnMode != TurnMode.auto ||
-        DateTime.now().isBefore(_iceServersExpires!))) return _iceServers!;
+        DateTime.now().isBefore(_iceServersExpires!))) {
+      return _iceServers!;
+    }
     return _iceServersPending ??= _fetchIceServers().whenComplete(() { _iceServersPending = null; });
   }
 
@@ -990,11 +992,13 @@ class VdoNinja {
           final track = allowed && i < tracks.length ? tracks[i] : null;
           if (senders[i].track != track) await senders[i].replaceTrack(track);
         }
-        if (allowed) for (final track in tracks.skip(senders.length)) {
-          final sender = await c.pc.addTrack(track, _localStream ?? await createLocalMediaStream('vdoninja'));
-          c._senders.add(sender);
-          _senderKinds[sender] = kind;
-          c._mediaNeedsOffer = true;
+        if (allowed) {
+          for (final track in tracks.skip(senders.length)) {
+            final sender = await c.pc.addTrack(track, _localStream ?? await createLocalMediaStream('vdoninja'));
+            c._senders.add(sender);
+            _senderKinds[sender] = kind;
+            c._mediaNeedsOffer = true;
+          }
         }
       }
       if (c._mediaNeedsOffer && !c._mediaOfferPending &&
